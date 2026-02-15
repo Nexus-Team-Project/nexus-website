@@ -1,0 +1,889 @@
+/* Wallet Editor Styles */
+
+/* Main wrapper with panels */
+.wed-wrap {
+  max-width: 100%;
+  margin: 0 auto;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* Panels */
+.wed-panel {
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.wed-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.wed-card__head {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  font-weight: 800;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wed-mini {
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b7280;
+}
+
+.wed-list {
+  padding: 8px;
+}
+
+.wed-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 6px;
+  font-size: 11px;
+  font-weight: 650;
+  color: #111;
+  user-select: none;
+  cursor: pointer;
+}
+
+.wed-row + .wed-row {
+  border-top: 1px solid #f0f1f4;
+}
+
+/* Switch */
+.wed-switch {
+  position: relative;
+  width: 34px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.wed-switch input {
+  opacity: 0;
+  position: absolute;
+  inset: 0;
+}
+
+.wed-switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #d1d5db;
+  transition: background 0.2s ease;
+}
+
+.wed-switch span::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(-50%);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  transition: right 0.2s ease;
+}
+
+.wed-switch input:checked + span {
+  background: #6366f1;
+}
+
+.wed-switch input:checked + span::after {
+  right: 18px;
+}
+
+/* Color Model */
+.wed-colorModal {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.wed-colorModal__head {
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 12px;
+  font-weight: 900;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wed-colorModal__head .pill {
+  font-size: 10px;
+  font-weight: 800;
+  color: #111;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.20);
+}
+
+.wed-colorModal__body {
+  padding: 10px 12px;
+}
+
+.wed-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wed-swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--c);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.10);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.wed-swatch:hover {
+  transform: scale(1.1);
+}
+
+/* Currency row */
+.wed-currencyRow {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px;
+}
+
+.wed-currencyRow::-webkit-scrollbar {
+  height: 4px;
+}
+
+.wed-currencyRow::-webkit-scrollbar-thumb {
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.wed-phoneWrap {
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+}
+
+.wed-phone {
+  width: 260px;
+  height: 560px;
+  border-radius: 36px;
+  background: #ffffff;
+  padding: 12px;
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.28);
+  border: 2px solid #ffffff;
+  position: relative;
+}
+
+/* Side buttons */
+.wed-phone::before,
+.wed-phone::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 52px;
+  background: #e5e7eb;
+  border-radius: 999px;
+}
+
+.wed-phone::before {
+  left: -6px;
+  top: 120px;
+}
+
+.wed-phone::after {
+  right: -6px;
+  top: 180px;
+}
+
+.wed-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 30px;
+  overflow: hidden;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.wed-topbar {
+  height: 48px;
+  background: #f8fafc;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wed-hero {
+  padding: 10px 12px;
+  background: #f8fafc;
+  color: #111;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wed-hero .wed-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #111;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.wed-cardCarousel {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+/* Payment card */
+.wed-paycard {
+  width: 240px;
+  height: 150px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #06b6d4, #6366f1);
+  color: #fff;
+  padding: 16px;
+  font-size: 13px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.28);
+  position: relative;
+  overflow: hidden;
+}
+
+.wed-paycard b {
+  font-size: 20px;
+  letter-spacing: 0.02em;
+}
+
+.wed-paycard::after {
+  content: "";
+  position: absolute;
+  inset: -40px -80px auto auto;
+  width: 200px;
+  height: 200px;
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.14);
+  transform: rotate(18deg);
+}
+
+.wed-paycard.side {
+  position: absolute;
+  transform: scale(0.9);
+  opacity: 0.5;
+  filter: blur(0.3px);
+}
+
+.wed-paycard.side.left {
+  left: -60px;
+}
+
+.wed-paycard.side.right {
+  right: -60px;
+}
+
+.wed-paycard.main {
+  z-index: 2;
+}
+
+.wed-visa {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  font-weight: 900;
+  padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+}
+
+/* NFC icon */
+.wed-nfc {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+}
+
+.wed-nfc::before,
+.wed-nfc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  border-left-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  transform: rotate(45deg);
+}
+
+.wed-nfc::after {
+  inset: 4px;
+  opacity: 0.8;
+}
+
+.wed-paid {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  font-weight: 900;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.wed-paycard.main.is-pay {
+  animation: wedPay 0.9s ease both;
+}
+
+.wed-paycard.main.is-pay .wed-paid {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.wed-paycard.main.is-pay::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  transform: translate(-50%, -50%) scale(0.4);
+  animation: wedRipple 0.9s ease-out both;
+}
+
+@keyframes wedPay {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  20% {
+    transform: translateY(-6px) scale(1.02);
+  }
+  55% {
+    transform: translateY(-2px) scale(1.01);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes wedRipple {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4);
+  }
+  15% {
+    opacity: 0.55;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(9);
+  }
+}
+
+.wed-actionsRow {
+  display: flex;
+  justify-content: space-around;
+  padding: 6px 10px;
+  gap: 10px;
+}
+
+.wed-action {
+  width: 70px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 9px 8px;
+  text-align: center;
+  font-size: 10px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.wed-action:active {
+  transform: scale(0.95);
+}
+
+.wed-action .ico {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+/* Card activity */
+.wed-activity {
+  margin: 10px 10px 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.wed-activity__head {
+  padding: 10px 10px;
+  border-bottom: 1px solid #f0f1f4;
+  font-size: 11px;
+  font-weight: 900;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wed-activity__head span {
+  color: #6b7280;
+  font-weight: 750;
+}
+
+.wed-tx {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+}
+
+.wed-tx + .wed-tx {
+  border-top: 1px solid #f0f1f4;
+}
+
+.wed-tx .dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.wed-tx .dot::after {
+  content: "";
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.wed-tx .dot.payout::after {
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #22c55e, #16a34a);
+}
+
+.wed-tx .dot.exchange::after {
+  width: 16px;
+  height: 10px;
+  border: 2px solid #0ea5e9;
+  border-left: 0;
+  border-right: 0;
+  transform: skewX(-15deg);
+}
+
+.wed-tx .dot.roundup::after {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 2px solid #f59e0b;
+}
+
+.wed-tx .mid {
+  flex: 1;
+  min-width: 0;
+}
+
+.wed-tx .t {
+  font-size: 12px;
+  font-weight: 900;
+  color: #111;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wed-tx .s {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.wed-tx .amt {
+  font-size: 12px;
+  font-weight: 900;
+  color: #111;
+}
+
+.wed-tx .amt.neg {
+  color: #ef4444;
+}
+
+.wed-tx .amt.pos {
+  color: #16a34a;
+}
+
+.wed-nav {
+  margin-top: auto;
+  height: 58px;
+  border-top: 1px solid #e5e7eb;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  font-size: 10px;
+  font-weight: 800;
+  color: #6b7280;
+}
+
+.wed-nav b {
+  color: #6366f1;
+}
+
+/* Currency row at bottom */
+.wed-currencyRow-bottom {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+}
+
+.wed-currency {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+}
+
+.wed-currency img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wed-currency.pulse {
+  animation: wedPulse 0.6s ease both;
+}
+
+@keyframes wedPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Wallet Editor Card Styles */
+.wallet-editor-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.wallet-editor-card:not(.expanded):hover {
+  transform: translateY(-2px);
+}
+
+/* Collapsed Preview */
+.wallet-preview {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  height: 100%;
+}
+
+.preview-content {
+  flex: 1;
+}
+
+.phone-preview {
+  flex-shrink: 0;
+  width: 140px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mini-phone {
+  width: 120px;
+  height: 240px;
+  border-radius: 20px;
+  background: #ffffff;
+  padding: 6px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  border: 2px solid #ffffff;
+}
+
+.phone-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #06b6d4, #6366f1);
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.phone-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 8px;
+  color: white;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.phone-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: white;
+}
+
+.card-balance {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.card-name {
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Expanded Editor */
+.wallet-editor-full {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90vw;
+  max-width: 800px;
+  height: 90vh;
+  max-height: 700px;
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  overflow: hidden;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: white;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: #f3f4f6;
+}
+
+.wed-wrap-embedded {
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: calc(100% - 80px);
+  overflow: auto;
+}
+
+/* Backdrop */
+.wallet-editor-card.expanded::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Wallet Editor Interactive Animations */
+.wallet-editor-interactive {
+  position: relative;
+}
+
+/* Hide panels initially */
+.wallet-panel-left {
+  opacity: 0;
+  transform: translateX(-100%);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wallet-panel-right {
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Phone starts on the left */
+.wallet-phone-center {
+  transform: translateX(-180px);
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* On hover: show panels and center phone */
+.wallet-editor-interactive:hover .wallet-panel-left {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.wallet-editor-interactive:hover .wallet-panel-right {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.wallet-editor-interactive:hover .wallet-phone-center {
+  transform: translateX(0);
+}
+
+/* Wallet Title Animation */
+.wallet-title-animated {
+  right: 120px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 240px;
+  z-index: 10;
+}
+
+.wallet-card-hover:hover .wallet-title-animated {
+  right: auto;
+  left: 32px;
+  top: 32px;
+  transform: translateY(0);
+  width: auto;
+}
+
+.wallet-title-3lines {
+  display: inline;
+}
+
+.wallet-title-2lines {
+  display: none;
+}
+
+.wallet-card-hover:hover .wallet-title-3lines {
+  display: none;
+}
+
+.wallet-card-hover:hover .wallet-title-2lines {
+  display: inline;
+}
+
+.wallet-editor-container {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 240px;
+  transition: padding-top 0.6s ease-out;
+}
+
+.wallet-card-hover:hover .wallet-editor-container {
+  padding-top: 151px;
+}
