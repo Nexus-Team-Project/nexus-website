@@ -2,7 +2,10 @@
 // Access token is stored in memory (never localStorage) for XSS protection.
 // The httpOnly refresh token cookie is sent automatically via `credentials: 'include'`.
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+// Use the explicit VITE_API_URL when set (local dev: http://localhost:3001).
+// In production the SPA is served by the same Express server, so relative paths work —
+// .env.production sets VITE_API_URL='' which collapses to empty string via ??.
+const API_URL = import.meta.env.VITE_API_URL ?? '';
 
 let _accessToken: string | null = null;
 

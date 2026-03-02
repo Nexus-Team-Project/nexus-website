@@ -201,8 +201,8 @@ export const translations = {
       communityForum: 'Community Forum',
     },
     hero: {
-      title: 'Financial infrastructure for the internet',
-      subtitle: 'Millions of companies of all sizes—from startups to Fortune 500s—use Nexus software and APIs to accept payments, send payouts, and manage their businesses online.',
+      title: 'Loyalty & Payment Solutions',
+      subtitle: 'Companies of all sizes—from startups to enterprises—use Nexus technologies to build winning relationships with their users and move money.',
       startNow: 'Start now',
       contactSales: 'Contact sales',
     },
@@ -635,8 +635,8 @@ export const translations = {
       communityForum: 'פורום קהילה',
     },
     hero: {
-      title: 'תשתית פיננסית לאינטרנט',
-      subtitle: 'מיליוני חברות בכל הגדלים - מסטארט-אפים ועד חברות Fortune 500 - משתמשות בתוכנה ובממשקי ה-API של Nexus כדי לקבל תשלומים, לשלוח כספים ולנהל את העסק שלהן באינטרנט.',
+      title: 'פתרונות נאמנות ותשלומים',
+      subtitle: 'חברות בכל הגדלים - מסטרטאפים ועד תאגידים - משתמשות בטכנולגיות של נקסוס כדי לבנות מערכת יחסים מנצחת עם המשתמשים שלהם, ולהניע כסף.',
       startNow: 'התחל עכשיו',
       contactSales: 'צור קשר עם המכירות',
     },

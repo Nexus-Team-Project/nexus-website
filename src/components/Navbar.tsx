@@ -353,7 +353,7 @@ export default function Navbar() {
     {mobileOpen && (
       <div className="lg:hidden fixed inset-0 z-[200] bg-white overflow-y-auto">
         {/* Mobile header */}
-        <div className="px-6 h-16 flex items-center justify-between" style={{ direction: 'ltr' }}>
+        <div className="px-6 h-16 flex items-center justify-between" style={{ direction }}>
           <Link to={language === 'he' ? '/he' : '/'} className="flex items-center translate-y-1" onClick={() => setMobileOpen(false)}>
             <NexusLogo height={55} page="auth" variant="black" />
           </Link>
@@ -404,7 +404,7 @@ export default function Navbar() {
     )}
 
     <nav className="absolute top-0 left-0 right-0 z-[100]">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between" style={{ direction: 'ltr' }}>
+      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between" style={{ direction }}>
         {/* Logo and Nav */}
         <div className="flex items-center gap-4">
           <Link to={language === 'he' ? '/he' : '/'} className="flex items-center translate-y-1">
@@ -457,6 +457,7 @@ export default function Navbar() {
                   }}
                   onMouseLeave={handleMouseLeave}
                   style={{
+                    direction,
                     animation: slideDirection
                       ? `slideIn${slideDirection === 'right' ? 'Right' : 'Left'} 0.35s cubic-bezier(0.4, 0, 0.2, 1)`
                       : 'fadeIn 0.25s ease-out'
@@ -508,7 +509,7 @@ export default function Navbar() {
 
                       {/* Sidebar */}
                       <div
-                        className="w-[320px] bg-slate-50 border-l border-slate-100 p-8"
+                        className={`w-[320px] bg-slate-50 ${direction === 'rtl' ? 'border-r' : 'border-l'} border-slate-100 p-8`}
                         onMouseEnter={() => setHoveredColumn(4)}
                         onMouseLeave={() => setHoveredColumn(null)}
                       >
@@ -551,7 +552,7 @@ export default function Navbar() {
                             rel={item.megaMenu.sidebar.link ? 'noopener noreferrer' : undefined}
                             className="text-xs font-bold text-stripe-purple flex items-center gap-1 hover:gap-2 transition-all"
                           >
-                            {item.megaMenu.sidebar.cta} <ArrowRight size={12} />
+                            {item.megaMenu.sidebar.cta} <ArrowRight size={12} className={direction === 'rtl' ? 'scale-x-[-1]' : ''} />
                           </a>
                         </div>
                       </div>
@@ -571,7 +572,7 @@ export default function Navbar() {
                             {link.label}
                             <ArrowRight
                               size={14}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity"
+                              className={`opacity-0 group-hover:opacity-100 transition-opacity ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`}
                             />
                           </a>
                         );
