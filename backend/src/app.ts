@@ -73,10 +73,20 @@ if (existsSync(frontendDist)) {
       immutable: true,
     }),
   );
-  // Other static files (favicons, robots.txt, images without hash) — 1-hour cache.
-  // `index: false` prevents express.static from auto-serving index.html for '/'
-  // so that the SPA fallback below can set no-cache on it properly.
-  app.use(express.static(frontendDist, { redirect: false, maxAge: '1h', index: false }));
+  // Other static files (images, fonts, favicons) — 1-hour cache.
+  // index.html gets special no-cache treatment via setHeaders so the browser
+  // always re-validates it after a deploy (it references new hashed asset filenames).
+  app.use(
+    express.static(frontendDist, {
+      redirect: false,
+      maxAge: '1h',
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        }
+      },
+    }),
+  );
   // SPA fallback — serve index.html for all non-API client-side routes
   // index.html itself must NOT be cached (it references new hashed assets after deploys)
   app.get(/^(?!\/api).*/, (_req, res) => {
