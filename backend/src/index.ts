@@ -1,10 +1,19 @@
 import 'dotenv/config'; // Load .env before anything else
 import http from 'http';
+import path from 'path';
+import { existsSync, readdirSync } from 'fs';
 import app from './app';
 import { initSocket } from './socket';
 import { env } from './config/env';
 import { prisma } from './config/database';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
+
+// ── Debug: report frontend dist location at startup ──────
+const _feDist = path.resolve(__dirname, '../public');
+const _feExists = existsSync(_feDist);
+const _feFiles = _feExists ? readdirSync(_feDist).slice(0, 5) : [];
+console.log(`[startup] __dirname=${__dirname}`);
+console.log(`[startup] frontendDist=${_feDist} | exists=${_feExists} | files=${JSON.stringify(_feFiles)}`);
 
 const PORT = env.PORT;
 
