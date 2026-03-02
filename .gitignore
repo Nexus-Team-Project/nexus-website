@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Frontend build output copied into backend (Railway build artifact)
+backend/public/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

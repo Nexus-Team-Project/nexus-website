@@ -56,8 +56,8 @@ app.use('/api/admin/ai', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 
 // ─── Serve frontend (SPA) ─────────────────────────────────
-// __dirname = backend/dist/ → ../../dist = repo root dist/ (Vite output)
-const frontendDist = path.resolve(__dirname, '../../dist');
+// __dirname = backend/dist/ → ../public = backend/public/ (Vite output copied there at build time)
+const frontendDist = path.resolve(__dirname, '../public');
 if (existsSync(frontendDist)) {
   app.use(express.static(frontendDist));
   // SPA fallback — serve index.html for all non-API client-side routes
