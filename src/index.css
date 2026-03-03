@@ -75,26 +75,22 @@ body {
   animation: partnerSlideReverse 12s linear infinite;
 }
 
-/* Mega Menu Slide Animations — opacity + X only, no Y drift/jump */
+/* Mega Menu Slide Animations — opacity only, no X/Y movement to prevent layout jumps */
 @keyframes slideInLeft {
   from {
     opacity: 0;
-    transform: translateX(-10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
 @keyframes slideInRight {
   from {
     opacity: 0;
-    transform: translateX(10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
   }
 }
 
@@ -133,7 +129,7 @@ body {
    animation-fill-mode:both = "backwards" (opacity:0 applied BEFORE animation starts,
    guaranteeing the element is invisible on its very first painted frame) + "forwards"
    (hold opacity:1 after animation ends). Zero JS timing — no rAF race condition.
-   No translateY so there is no vertical jump. */
+   All three variants are opacity-only — no translate to prevent horizontal/vertical jumps. */
 .mega-menu-enter {
   animation: fadeIn 0.18s ease-out both;
 }
