@@ -228,7 +228,13 @@ function MegaMenuPanel({
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    rafRef.current = requestAnimationFrame(() => setVisible(true));
+    // Double rAF: the first rAF fires before the first paint (browser may not
+    // have actually painted opacity:0 yet). The second rAF fires before the
+    // SECOND paint, guaranteeing the opacity:0 frame was committed to screen
+    // before we flip to opacity:1.
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = requestAnimationFrame(() => setVisible(true));
+    });
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
@@ -243,6 +249,7 @@ function MegaMenuPanel({
         direction,
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.15s ease-out',
+        pointerEvents: visible ? 'auto' : 'none',
       }}
     >
       {children}
