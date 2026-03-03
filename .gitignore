@@ -25,3 +25,10 @@ backend/public/
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code
+.claude/
+
+# Windows artifacts
+nul
+extglob*
