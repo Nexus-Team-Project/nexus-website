@@ -52,10 +52,13 @@ export default function GoogleSignIn({ onSuccess, onError, variant = 'form' }: G
 
   return (
     <button
-      onClick={() => handleGoogleLogin()}
-      disabled={isLoading}
-      className={buttonStyles}
-    >
+  onClick={() => {
+    console.log('Button clicked');
+    handleGoogleLogin();
+  }}
+  disabled={isLoading}
+  className={buttonStyles}
+>
       {isLoading ? (
         <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
       ) : (
