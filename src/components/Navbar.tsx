@@ -285,7 +285,7 @@ export default function Navbar() {
       const timer = setTimeout(() => {
         setIsStabilizing(false);
         setStabilizeTimer(null);
-      }, 150);
+      }, 220); // covers full animation duration (200ms) + small buffer
       setStabilizeTimer(timer);
     }
 
@@ -461,8 +461,8 @@ export default function Navbar() {
                   style={{
                     direction,
                     animation: slideDirection
-                      ? `slideIn${slideDirection === 'right' ? 'Right' : 'Left'} 0.22s ease-out`
-                      : 'fadeIn 0.2s ease-out'
+                      ? `slideIn${slideDirection === 'right' ? 'Right' : 'Left'} 0.2s ease-out both`
+                      : 'fadeIn 0.15s ease-out both'
                   }}
                 >
                   <div className="max-w-7xl mx-auto space-y-4">
