@@ -428,7 +428,7 @@ export default function Navbar() {
       </div>
     )}
 
-    <nav className="absolute top-0 left-0 right-0 z-[100]">
+    <nav className="fixed top-0 left-0 right-0 z-[100]">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between" style={{ direction }}>
         {/* Logo */}
         <Link to={language === 'he' ? '/he' : '/'} className="flex items-center translate-y-1 flex-shrink-0">
