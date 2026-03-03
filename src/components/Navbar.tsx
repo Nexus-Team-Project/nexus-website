@@ -294,8 +294,12 @@ export default function Navbar() {
       shouldCalculateSlide = true; // We're unlocking, so calculate slide
     }
 
-    // Determine slide direction based on menu order (only if not locked)
-    if (shouldCalculateSlide) {
+    // Determine slide direction based on menu order (only when switching to a DIFFERENT menu).
+    // CRITICAL: skip this block when openDropdown === label (re-entering the same item's
+    // hover zone). Without this guard, the else-branch fires setSlideDirection(null) which
+    // resets a non-null slideDirection → key changes → React remounts MegaMenuPanel →
+    // CSS animation replays → visible jump/flash on every mouse micro-movement.
+    if (shouldCalculateSlide && openDropdown !== label) {
       const menuOrder = navItems.map(item => item.label);
       const currentIndex = menuOrder.indexOf(label);
       const previousIndex = openDropdown ? menuOrder.indexOf(openDropdown) : -1;
