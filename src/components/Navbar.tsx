@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, ShoppingCart, Layers, Receipt, BarChart3, Scale, TrendingUp, Building2, Globe, Wallet, Bitcoin, Network, FileText, HelpCircle, AppWindow, Users, Store, Briefcase, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
@@ -209,6 +209,47 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
   { label: t.navbar.pricing, href: '#pricing' },
 ];
 
+// MegaMenuPanel: mounts at opacity:0, rAF flips to opacity:1 via CSS transition.
+// This guarantees the element is NEVER seen at its natural (un-animated) state,
+// eliminating the starting-position jump caused by React applying `animation` via
+// the style prop only AFTER the first paint.
+function MegaMenuPanel({
+  direction,
+  onMouseEnter,
+  onMouseLeave,
+  children,
+}: {
+  direction: string;
+  onMouseEnter: React.MouseEventHandler<HTMLDivElement>;
+  onMouseLeave: React.MouseEventHandler<HTMLDivElement>;
+  children: React.ReactNode;
+}) {
+  const [visible, setVisible] = useState(false);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    rafRef.current = requestAnimationFrame(() => setVisible(true));
+    return () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  return (
+    <div
+      className="fixed left-0 right-0 top-12 px-6 z-50 pt-4"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      style={{
+        direction,
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.15s ease-out',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function Navbar() {
   const { t, direction, language } = useLanguage();
 
@@ -220,7 +261,6 @@ export default function Navbar() {
   const [closeTimer, setCloseTimer] = useState<NodeJS.Timeout | null>(null);
   const [stabilizeTimer, setStabilizeTimer] = useState<NodeJS.Timeout | null>(null);
   const [hoveredColumn, setHoveredColumn] = useState<number | null>(null);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [isLocked, setIsLocked] = useState(false);
   const [isStabilizing, setIsStabilizing] = useState(false);
   const [justUnlocked, setJustUnlocked] = useState(false);
@@ -247,33 +287,9 @@ export default function Navbar() {
       return;
     }
 
-    // Track if we should calculate slide direction
-    let shouldCalculateSlide = !isLocked;
-
     // If locked but hovering a different menu, unlock and switch
     if (isLocked && openDropdown && openDropdown !== label) {
       setIsLocked(false);
-      shouldCalculateSlide = true; // We're unlocking, so calculate slide
-    }
-
-    // Determine slide direction only when switching to a DIFFERENT menu.
-    // Guarding with openDropdown !== label prevents the common case where the
-    // mouse moves from the nav button into the mega menu panel (which fires
-    // onMouseEnter again for the same label). Without this guard,
-    // setSlideDirection(null) would fire, changing the key and causing React to
-    // unmount+remount the mega menu mid-hover — the visible "jump".
-    if (shouldCalculateSlide && openDropdown !== label) {
-      const menuOrder = navItems.map(item => item.label);
-      const currentIndex = menuOrder.indexOf(label);
-      const previousIndex = openDropdown ? menuOrder.indexOf(openDropdown) : -1;
-
-      if (previousIndex !== -1 && currentIndex !== previousIndex) {
-        // Mouse moving right → menu slides in from left, and vice-versa
-        const direction = currentIndex > previousIndex ? 'left' : 'right';
-        setSlideDirection(direction);
-      } else {
-        setSlideDirection(null);
-      }
     }
 
     // If opening a new menu (not switching), add stabilization period
@@ -299,8 +315,7 @@ export default function Navbar() {
     const timer = setTimeout(() => {
       setOpenDropdown(null);
       setHoveredColumn(null);
-      setSlideDirection(null);
-    }, 300); // Increased from 100ms to 300ms
+    }, 300);
     setCloseTimer(timer);
   };
 
@@ -450,20 +465,14 @@ export default function Navbar() {
 
               {/* Mega Menu */}
               {item.megaMenu && openDropdown === item.label && (
-                <div
+                <MegaMenuPanel
                   key={item.label}
-                  className="fixed left-0 right-0 top-12 px-6 z-50 pt-4"
+                  direction={direction}
                   onMouseEnter={(e) => {
                     e.stopPropagation();
                     handleMouseEnter(item.label);
                   }}
                   onMouseLeave={handleMouseLeave}
-                  style={{
-                    direction,
-                    animation: slideDirection
-                      ? `slideIn${slideDirection === 'right' ? 'Right' : 'Left'} 0.2s ease-out both`
-                      : 'fadeIn 0.15s ease-out both'
-                  }}
                 >
                   <div className="max-w-7xl mx-auto space-y-4">
                     <div className="bg-white shadow-2xl rounded-2xl overflow-hidden border border-gray-200 flex">
@@ -583,7 +592,7 @@ export default function Navbar() {
                       })}
                     </div>
                   </div>
-                </div>
+                </MegaMenuPanel>
               )}
             </div>
           ))}
