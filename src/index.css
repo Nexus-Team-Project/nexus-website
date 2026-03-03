@@ -75,37 +75,35 @@ body {
   animation: partnerSlideReverse 12s linear infinite;
 }
 
-/* Mega Menu Slide Animations — subtle drift, no scale/jump */
+/* Mega Menu Slide Animations — opacity + X only, no Y drift/jump */
 @keyframes slideInLeft {
   from {
     opacity: 0;
-    transform: translateX(-18px) translateY(-5px);
+    transform: translateX(-10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0) translateY(0);
+    transform: translateX(0);
   }
 }
 
 @keyframes slideInRight {
   from {
     opacity: 0;
-    transform: translateX(18px) translateY(-5px);
+    transform: translateX(10px);
   }
   to {
     opacity: 1;
-    transform: translateX(0) translateY(0);
+    transform: translateX(0);
   }
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(-8px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
