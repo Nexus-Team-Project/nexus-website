@@ -89,11 +89,57 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
-  const quickActions = [
-    { id: 'pricing', label: t.liveChat.pricing, icon: '💰' },
-    { id: 'demo', label: t.liveChat.requestDemo, icon: '🎯' },
-    { id: 'integration', label: t.liveChat.technicalIntegration, icon: '⚙️' },
-    { id: 'support', label: t.liveChat.generalSupport, icon: '💬' },
+  // ── Action menu state ──
+  const [actionView, setActionView] = useState<'main' | 'more'>('main');
+
+  // ⚠️ Replace these with real values:
+  const WA_SALES_NUMBER = '972507980002';   // WhatsApp sales number
+  const WA_TECH_NUMBER  = '972544322280';   // WhatsApp tech number
+  const CALENDAR_LINK   = 'https://app.apollo.io/#/meet/nexus_admin_934'; // Calendar booking link
+
+  const primaryActions = [
+    {
+      id: 'whatsapp-sales',
+      label: t.liveChat.whatsappSales,
+      icon: '💬',
+      action: () => {
+        sendMessage(t.liveChat.whatsappSalesResponse);
+        setTimeout(() => window.open(`https://wa.me/${WA_SALES_NUMBER}`, '_blank'), 800);
+      },
+    },
+    {
+      id: 'schedule',
+      label: t.liveChat.schedulemeeting,
+      icon: '📅',
+      action: () => {
+        sendMessage(t.liveChat.scheduleMeetingResponse);
+        setTimeout(() => window.open(CALENDAR_LINK, '_blank'), 800);
+      },
+    },
+    {
+      id: 'more',
+      label: t.liveChat.moreOptions,
+      icon: '⚙️',
+      action: () => setActionView('more'),
+    },
+  ];
+
+  const secondaryActions = [
+    {
+      id: 'whatsapp-tech',
+      label: t.liveChat.whatsappTech,
+      icon: '🔧',
+      action: () => {
+        sendMessage(t.liveChat.whatsappTechResponse);
+        setTimeout(() => window.open(`https://wa.me/${WA_TECH_NUMBER}`, '_blank'), 800);
+      },
+    },
+    {
+      id: 'integration',
+      label: t.liveChat.integration,
+      icon: '⚙️',
+      action: () => sendMessage(t.liveChat.integrationResponse),
+    },
   ];
 
   const scrollToBottom = () => {
@@ -262,11 +308,6 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
     [sessionId, t],
   );
 
-  const handleQuickAction = (actionLabel: string) => {
-    setShowQuickActions(false);
-    sendMessage(actionLabel);
-  };
-
   const handleSend = () => {
     if (!inputValue.trim()) return;
     setShowQuickActions(false);
@@ -427,36 +468,85 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
             </div>
           ))}
 
-          {/* Quick Actions */}
+          {/* Action Menu */}
           {showQuickActions && messages.length > 0 && !isTyping && (
-            <div className="flex flex-col gap-2 px-2">
-              <p className="text-xs text-slate-500 font-medium px-2">{t.liveChat.quickActionsLabel}</p>
-              <div className="flex flex-wrap gap-2">
-                {quickActions.map((action) => (
+            <div className="flex flex-col gap-3 px-2">
+              <p className="text-xs text-slate-500 font-medium px-1">{t.liveChat.quickActionsLabel}</p>
+
+              {/* ── Main view: 3 primary actions ── */}
+              {actionView === 'main' && (
+                <div className="flex flex-col gap-2">
+                  {primaryActions.map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => {
+                        if (action.id !== 'more') setShowQuickActions(false);
+                        action.action();
+                      }}
+                      className="w-full px-4 py-3 rounded-2xl text-sm font-semibold flex items-center gap-3 transition-all hover:-translate-y-0.5 active:scale-95 text-right"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.6)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.7)',
+                        color: '#1e293b',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                      }}
+                    >
+                      <span className="text-lg">{action.icon}</span>
+                      <span className="flex-1">{action.label}</span>
+                      {action.id === 'more' && <span className="text-slate-400 text-xs">›</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* ── More options: 2 secondary actions + back ── */}
+              {actionView === 'more' && (
+                <div className="flex flex-col gap-2">
                   <button
-                    key={action.id}
-                    onClick={() => handleQuickAction(action.label)}
-                    className="px-4 py-2.5 rounded-full text-xs font-semibold flex items-center gap-2 transition-all hover:-translate-y-0.5"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.5)',
-                      backdropFilter: 'blur(8px)',
-                      border: '1px solid rgba(6, 182, 212, 0.4)',
-                      color: '#0891b2',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.8)';
-                      e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.6)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.5)';
-                      e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.4)';
-                    }}
+                    onClick={() => setActionView('main')}
+                    className="text-xs text-slate-500 font-medium px-1 mb-1 text-right hover:text-slate-700 transition-colors"
                   >
-                    <span>{action.icon}</span>
-                    {action.label}
+                    {t.liveChat.back}
                   </button>
-                ))}
-              </div>
+                  {secondaryActions.map((action) => (
+                    <button
+                      key={action.id}
+                      onClick={() => {
+                        setShowQuickActions(false);
+                        action.action();
+                      }}
+                      className="w-full px-4 py-3 rounded-2xl text-sm font-semibold flex items-center gap-3 transition-all hover:-translate-y-0.5 active:scale-95 text-right"
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.6)',
+                        backdropFilter: 'blur(8px)',
+                        border: '1px solid rgba(255, 255, 255, 0.7)',
+                        color: '#1e293b',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
+                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                      }}
+                    >
+                      <span className="text-lg">{action.icon}</span>
+                      <span className="flex-1">{action.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

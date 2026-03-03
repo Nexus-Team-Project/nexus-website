@@ -428,15 +428,24 @@ export const translations = {
     liveChat: {
       salesTeam: 'Sales Team',
       alwaysOnline: 'Always Online',
-      welcomeMessage: 'Welcome! How can we help you with Nexus today?',
-      quickActionsLabel: 'Quick actions:',
-      pricing: 'Pricing & Plans',
-      requestDemo: 'Request Demo',
-      technicalIntegration: 'Technical Integration',
-      generalSupport: 'General Support',
-      quickActionResponse: 'Great! I can help you with that. A sales representative will connect with you shortly to discuss this in detail.',
-      defaultResponse: 'Thanks for your message! A sales representative will be with you shortly to discuss your needs.',
-      inputPlaceholder: 'Type your request here...',
+      welcomeMessage: 'Hi! How can we help you today?',
+      quickActionsLabel: 'How can we help you?',
+      // Primary actions
+      whatsappSales: 'WhatsApp with Sales',
+      schedulemeeting: 'Schedule a Meeting',
+      moreOptions: 'More Options',
+      // Secondary actions (under "More Options")
+      whatsappTech: 'WhatsApp with Technical Support',
+      integration: 'Technical Integration',
+      // Back button
+      back: '← Back',
+      // Responses
+      whatsappSalesResponse: 'Great! Opening WhatsApp with our sales team now...',
+      scheduleMeetingResponse: 'Opening our calendar to schedule a meeting...',
+      whatsappTechResponse: 'Opening WhatsApp with our technical team now...',
+      integrationResponse: 'A technical representative will contact you shortly to discuss the integration.',
+      defaultResponse: 'Thanks for your message! A sales representative will be with you shortly.',
+      inputPlaceholder: 'Type your message here...',
     },
   },
   he: {
@@ -868,15 +877,24 @@ export const translations = {
     liveChat: {
       salesTeam: 'צוות מכירות',
       alwaysOnline: 'תמיד זמינים',
-      welcomeMessage: 'ברוכים הבאים! איך נוכל לעזור לכם עם Nexus היום?',
-      quickActionsLabel: 'פעולות מהירות:',
-      pricing: 'תמחור ותוכניות',
-      requestDemo: 'בקשת הדגמה',
-      technicalIntegration: 'אינטגרציה טכנית',
-      generalSupport: 'תמיכה כללית',
-      quickActionResponse: 'מצוין! אני יכול לעזור לכם בנושא זה. נציג מכירות יתחבר אליכם בקרוב כדי לדון בזה בפירוט.',
-      defaultResponse: 'תודה על ההודעה! נציג מכירות יהיה אתכם בקרוב כדי לדון בצרכים שלכם.',
-      inputPlaceholder: 'כתבו את הבקשה שלכם כאן...',
+      welcomeMessage: 'שלום! איך נוכל לעזור לכם היום?',
+      quickActionsLabel: 'במה נוכל לעזור?',
+      // Primary actions
+      whatsappSales: 'וואטסאפ עם נציג מכירות',
+      schedulemeeting: 'תיאום פגישה',
+      moreOptions: 'פעולות נוספות',
+      // Secondary actions (under "פעולות נוספות")
+      whatsappTech: 'וואטסאפ עם נציג טכני',
+      integration: 'אינטגרציה',
+      // Back button
+      back: '→ חזרה',
+      // Responses
+      whatsappSalesResponse: 'מעולה! פותח וואטסאפ עם צוות המכירות שלנו...',
+      scheduleMeetingResponse: 'פותח את היומן לתיאום פגישה...',
+      whatsappTechResponse: 'פותח וואטסאפ עם הצוות הטכני שלנו...',
+      integrationResponse: 'נציג טכני יצור אתכם קשר בהקדם לדיון על האינטגרציה.',
+      defaultResponse: 'תודה על ההודעה! נציג יחזור אליכם בהקדם.',
+      inputPlaceholder: 'כתבו את ההודעה שלכם כאן...',
     },
   },
 };
