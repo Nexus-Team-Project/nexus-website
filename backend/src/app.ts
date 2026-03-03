@@ -31,6 +31,9 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'img-src': ["'self'", 'data:', 'https://flagcdn.com', 'https://lh3.googleusercontent.com'],
+        'script-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://cdn.jsdelivr.net', 'https://apis.google.com'],
+        'frame-src': ["'self'", 'https://accounts.google.com'],
+        'connect-src': ["'self'", 'https://accounts.google.com', 'https://oauth2.googleapis.com'],
       },
     },
   }),
