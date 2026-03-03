@@ -25,7 +25,16 @@ const app = express();
 app.use(compression());
 
 // ─── Security headers ────────────────────────────────────
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'img-src': ["'self'", 'data:', 'https://flagcdn.com', 'https://lh3.googleusercontent.com'],
+      },
+    },
+  }),
+);
 
 // ─── CORS ────────────────────────────────────────────────
 app.use(
