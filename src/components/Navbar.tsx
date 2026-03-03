@@ -457,8 +457,8 @@ export default function Navbar() {
                   style={{
                     direction,
                     animation: slideDirection
-                      ? `slideIn${slideDirection === 'right' ? 'Right' : 'Left'} 0.35s cubic-bezier(0.4, 0, 0.2, 1)`
-                      : 'fadeIn 0.25s ease-out'
+                      ? `slideIn${slideDirection === 'right' ? 'Right' : 'Left'} 0.22s ease-out`
+                      : 'fadeIn 0.2s ease-out'
                   }}
                 >
                   <div className="max-w-7xl mx-auto space-y-4">

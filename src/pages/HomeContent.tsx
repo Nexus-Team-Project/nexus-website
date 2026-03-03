@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
 import PartnerBubbles from '../components/PartnerBubbles';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { useSectionVisible } from '../hooks/useSectionVisible';
 
 // Lazy load heavy components below the fold
 const Features = lazy(() => import('../components/Features'));
@@ -16,6 +17,8 @@ const CTA = lazy(() => import('../components/CTA'));
 const Footer = lazy(() => import('../components/Footer'));
 const ContactSalesButton = lazy(() => import('../components/ContactSalesButton'));
 const LiveChat = lazy(() => import('../components/LiveChat'));
+
+// ─── Skeleton Components ──────────────────────────────────────────────────────
 
 function FeaturesSkeleton() {
   return (
@@ -55,9 +58,169 @@ function FeaturesSkeleton() {
   );
 }
 
+function StatsSkeleton() {
+  return (
+    <section className="py-24 bg-stripe-light">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex flex-col items-center gap-3 animate-pulse">
+              <div className="h-14 w-36 bg-slate-300 rounded-xl" />
+              <div className="h-4 w-28 bg-slate-200 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function GlobalSectionSkeleton() {
+  return (
+    <section className="relative py-20 md:py-48 overflow-x-hidden">
+      <div className="absolute inset-0 bg-stripe-blue" />
+      <div className="relative max-w-7xl mx-auto px-6 animate-pulse">
+        <div className="grid lg:grid-cols-2 gap-16 items-center min-h-[320px]">
+          <div className="space-y-4">
+            <div className="h-5 w-32 bg-white/20 rounded" />
+            <div className="h-10 w-72 bg-white/25 rounded-lg" />
+            <div className="h-10 w-56 bg-white/20 rounded-lg" />
+            <div className="space-y-2 mt-6">
+              <div className="h-4 w-80 bg-white/15 rounded" />
+              <div className="h-4 w-64 bg-white/10 rounded" />
+              <div className="h-4 w-72 bg-white/10 rounded" />
+            </div>
+            <div className="flex gap-3 mt-6">
+              <div className="h-12 w-36 bg-stripe-purple/40 rounded-lg" />
+              <div className="h-12 w-28 bg-white/10 rounded-lg" />
+            </div>
+          </div>
+          <div className="hidden lg:flex items-center justify-center">
+            <div className="w-80 h-80 bg-white/5 rounded-full border border-white/10" />
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TestimonialsSkeleton() {
+  return (
+    <section className="py-24 bg-white overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6">
+        {/* Header */}
+        <div className="text-center mb-16 animate-pulse">
+          <div className="h-5 w-32 bg-slate-200 rounded mx-auto mb-4" />
+          <div className="h-10 w-64 bg-slate-200 rounded-lg mx-auto mb-3" />
+          <div className="h-4 w-80 bg-slate-100 rounded mx-auto" />
+        </div>
+        {/* Photo columns */}
+        <div className="flex gap-4 justify-center overflow-hidden h-72">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <div
+              key={i}
+              className="flex flex-col gap-4 animate-pulse"
+              style={{ transform: `translateY(${[10, -5, 16, -10, 4][i]}px)` }}
+            >
+              {[0, 1, 2].map((j) => (
+                <div key={j} className="w-20 h-20 bg-slate-200 rounded-full flex-shrink-0" />
+              ))}
+            </div>
+          ))}
+        </div>
+        {/* CTA skeleton */}
+        <div className="mt-12 flex justify-center animate-pulse">
+          <div className="h-12 w-48 bg-slate-200 rounded-lg" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CTASkeleton() {
+  return (
+    <section className="py-24 bg-stripe-blue">
+      <div className="max-w-7xl mx-auto px-6 animate-pulse">
+        <div className="grid lg:grid-cols-2 gap-16 items-center min-h-[340px]">
+          <div className="space-y-4">
+            <div className="h-5 w-24 bg-white/20 rounded" />
+            <div className="h-10 w-72 bg-white/25 rounded-lg" />
+            <div className="h-10 w-56 bg-white/20 rounded-lg" />
+            <div className="space-y-2 mt-4">
+              <div className="h-4 w-80 bg-white/15 rounded" />
+              <div className="h-4 w-64 bg-white/10 rounded" />
+            </div>
+            <div className="mt-6">
+              <div className="h-12 w-40 bg-stripe-purple/50 rounded-lg" />
+            </div>
+          </div>
+          <div className="h-72 bg-white/5 rounded-2xl border border-white/10 p-6">
+            <div className="space-y-3">
+              {[...Array(8)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-3 bg-white/10 rounded"
+                  style={{ width: `${65 + Math.sin(i * 1.3) * 25}%` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FooterSkeleton() {
+  return (
+    <footer className="bg-stripe-blue py-16">
+      <div className="max-w-7xl mx-auto px-6 animate-pulse">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-12">
+          {/* Logo column */}
+          <div className="col-span-2 md:col-span-1">
+            <div className="h-8 w-24 bg-white/20 rounded mb-6" />
+            <div className="space-y-2">
+              <div className="h-3 w-32 bg-white/10 rounded" />
+              <div className="h-3 w-28 bg-white/10 rounded" />
+            </div>
+          </div>
+          {/* Link columns */}
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i}>
+              <div className="h-4 w-20 bg-white/20 rounded mb-4" />
+              {[0, 1, 2, 3, 4].map((j) => (
+                <div key={j} className="h-3 w-16 bg-white/10 rounded mb-3" />
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="border-t border-white/10 pt-8 flex justify-between items-center">
+          <div className="h-3 w-48 bg-white/10 rounded" />
+          <div className="flex gap-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-3 w-16 bg-white/10 rounded" />
+            ))}
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
+
 export default function HomeContent() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const { t, direction, language } = useLanguage();
+
+  // Differential loading: each section's JS chunk only loads when the user
+  // is within rootMargin distance of that section. '400px 0px' means 400px
+  // before the section enters the viewport — enough time to load without flicker.
+  const [statsRef, statsVisible] = useSectionVisible('400px 0px');
+  const [globalRef, globalVisible] = useSectionVisible('400px 0px');
+  const [testimonialsRef, testimonialsVisible] = useSectionVisible('400px 0px');
+  const [ctaRef, ctaVisible] = useSectionVisible('400px 0px');
+  const [footerRef, footerVisible] = useSectionVisible('300px 0px');
 
   // Scroll-reveal: observe all .scroll-reveal elements, including lazily mounted ones
   useEffect(() => {
@@ -154,20 +317,45 @@ export default function HomeContent() {
         </div>
       </section>
 
+      {/* Features — rendered immediately (just below fold), skeleton while loading */}
       <Suspense fallback={<FeaturesSkeleton />}>
         <Features />
       </Suspense>
-      <Suspense fallback={<div className="h-96" />}>
-        <Stats />
-      </Suspense>
-      <Suspense fallback={<div className="h-screen" />}>
-        <GlobalSection />
-      </Suspense>
-      <Suspense fallback={<div className="h-screen" />}>
-        <Testimonials />
-      </Suspense>
 
-      {/* Gray section with partner ecosystem */}
+      {/* Stats — differential loading */}
+      <div ref={statsRef}>
+        {statsVisible ? (
+          <Suspense fallback={<StatsSkeleton />}>
+            <Stats />
+          </Suspense>
+        ) : (
+          <StatsSkeleton />
+        )}
+      </div>
+
+      {/* GlobalSection — differential loading */}
+      <div ref={globalRef}>
+        {globalVisible ? (
+          <Suspense fallback={<GlobalSectionSkeleton />}>
+            <GlobalSection />
+          </Suspense>
+        ) : (
+          <GlobalSectionSkeleton />
+        )}
+      </div>
+
+      {/* Testimonials — differential loading */}
+      <div ref={testimonialsRef}>
+        {testimonialsVisible ? (
+          <Suspense fallback={<TestimonialsSkeleton />}>
+            <Testimonials />
+          </Suspense>
+        ) : (
+          <TestimonialsSkeleton />
+        )}
+      </div>
+
+      {/* Partner ecosystem section — always rendered (lightweight) */}
       <section className="scroll-reveal relative pt-0 pb-8 overflow-hidden">
         {/* Diagonal background */}
         <div
@@ -231,11 +419,18 @@ export default function HomeContent() {
         </div>
       </section>
 
-      <Suspense fallback={<div className="h-screen" />}>
-        <CTA />
-      </Suspense>
+      {/* CTA — differential loading */}
+      <div ref={ctaRef}>
+        {ctaVisible ? (
+          <Suspense fallback={<CTASkeleton />}>
+            <CTA />
+          </Suspense>
+        ) : (
+          <CTASkeleton />
+        )}
+      </div>
 
-      {/* White section before footer */}
+      {/* White section before footer — always rendered (lightweight) */}
       <section className="scroll-reveal py-32 bg-white">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <h2 className="text-4xl lg:text-6xl font-bold text-slate-900 tracking-tight mb-6">
@@ -265,9 +460,16 @@ export default function HomeContent() {
         </div>
       </section>
 
-      <Suspense fallback={<div className="h-96" />}>
-        <Footer />
-      </Suspense>
+      {/* Footer — differential loading */}
+      <div ref={footerRef}>
+        {footerVisible ? (
+          <Suspense fallback={<FooterSkeleton />}>
+            <Footer />
+          </Suspense>
+        ) : (
+          <FooterSkeleton />
+        )}
+      </div>
 
       {/* Contact Sales Button - only show when chat is closed */}
       {!isChatOpen && (
