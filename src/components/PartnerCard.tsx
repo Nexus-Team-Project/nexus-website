@@ -25,11 +25,11 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
   return (
     <div className="group bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 overflow-hidden flex flex-col">
       {/* Logo */}
-      <div className="flex items-center justify-center h-36 bg-white p-4">
+      <div className="flex items-center justify-center h-48 bg-white p-4">
         <img
           src={partner.thumbnailUrl}
           alt={partner.title}
-          className="max-h-28 max-w-[85%] object-contain"
+          className="max-h-40 max-w-[90%] object-contain"
           loading="lazy"
           onError={(e) => {
             (e.target as HTMLImageElement).style.opacity = '0';
