@@ -446,6 +446,7 @@ export const translations = {
       integrationResponse: 'A technical representative will contact you shortly to discuss the integration.',
       defaultResponse: 'Thanks for your message! A sales representative will be with you shortly.',
       inputPlaceholder: 'Type your message here...',
+      selectTopicPrompt: 'Select a topic so we can help you better',
     },
   },
   he: {
@@ -895,6 +896,7 @@ export const translations = {
       integrationResponse: 'נציג טכני יצור אתכם קשר בהקדם לדיון על האינטגרציה.',
       defaultResponse: 'תודה על ההודעה! נציג יחזור אליכם בהקדם.',
       inputPlaceholder: 'כתבו את ההודעה שלכם כאן...',
+      selectTopicPrompt: 'בחר נושא כדי שנוכל לעזור לך טוב יותר',
     },
   },
 };
