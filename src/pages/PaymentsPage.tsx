@@ -130,13 +130,19 @@ export default function PaymentsPage() {
         </div>
       </section>
 
-      {/* ── Animated gradient divider — taller, no overflow clip ── */}
-      <div className="relative h-60 -mt-1">
+      {/* ── Animated gradient divider — diagonal flipped, fades at both edges ── */}
+      <div
+        className="relative h-60 -mt-1"
+        style={{
+          maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 72%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 72%, transparent 100%)',
+        }}
+      >
         <AnimatedGradient
           clipPath={
             isRtl
-              ? 'polygon(0 0, 100% 60%, 100% 100%, 0 100%)'
-              : 'polygon(0 60%, 100% 0, 100% 100%, 0 100%)'
+              ? 'polygon(0 60%, 100% 0, 100% 100%, 0 100%)'
+              : 'polygon(0 0, 100% 60%, 100% 100%, 0 100%)'
           }
         />
       </div>
