@@ -28,7 +28,7 @@ const FlagIcon = ({ code }: { code: string }) => {
   );
 };
 
-export default function Footer() {
+export default function Footer({ light = false }: { light?: boolean }) {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -80,7 +80,7 @@ export default function Footer() {
     <footer className="relative py-24 bg-white">
       {/* Diagonal slanted background */}
       <div
-        className="absolute bg-slate-100"
+        className={`absolute ${light ? 'bg-white' : 'bg-slate-100'}`}
         style={{
           top: '-100px',
           left: 0,

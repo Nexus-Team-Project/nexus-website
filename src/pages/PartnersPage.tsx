@@ -93,7 +93,7 @@ export default function PartnersPage() {
   const signupLink = language === 'he' ? '/he/signup' : '/signup';
 
   return (
-    <div dir={direction} className="min-h-screen bg-slate-50">
+    <div dir={direction} className="min-h-screen bg-slate-100">
       <Navbar />
 
       {/* ── Hero ─────────────────────────────────────────────── */}
@@ -285,7 +285,7 @@ export default function PartnersPage() {
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <Suspense fallback={<div className="h-40 bg-slate-900" />}>
-        <Footer />
+        <Footer light />
       </Suspense>
     </div>
   );
