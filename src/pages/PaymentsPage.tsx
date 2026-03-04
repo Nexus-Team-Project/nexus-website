@@ -63,8 +63,8 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
-      <section className="relative pt-32 pb-20 bg-slate-50 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <section className="relative pt-32 pb-0 bg-slate-50 overflow-x-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-20">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
             {/* ── Text column (DOM first → right in RTL, left in LTR) ── */}
@@ -128,24 +128,24 @@ export default function PaymentsPage() {
 
           </div>
         </div>
-      </section>
 
-      {/* ── Animated gradient divider — diagonal flipped, fades at both edges ── */}
-      <div
-        className="relative h-60 -mt-1"
-        style={{
-          maskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 72%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 18%, black 72%, transparent 100%)',
-        }}
-      >
-        <AnimatedGradient
-          clipPath={
-            isRtl
-              ? 'polygon(0 60%, 100% 0, 100% 100%, 0 100%)'
-              : 'polygon(0 0, 100% 60%, 100% 100%, 0 100%)'
-          }
-        />
-      </div>
+        {/* ── Gradient diagonal — inside hero, fully contained, not clipped by S2 ── */}
+        <div
+          className="relative h-64"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 70%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 70%, transparent 100%)',
+          }}
+        >
+          <AnimatedGradient
+            clipPath={
+              isRtl
+                ? 'polygon(0 60%, 100% 0, 100% 100%, 0 100%)'
+                : 'polygon(0 0, 100% 60%, 100% 100%, 0 100%)'
+            }
+          />
+        </div>
+      </section>
 
       {/* ══════════════════════════════════════════════════════════
           S2 — קבלו תשלומים מכל מקום
