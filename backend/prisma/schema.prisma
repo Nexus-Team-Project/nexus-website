@@ -120,16 +120,19 @@ model PasswordReset {
   @@index([tokenHash])
 }
 
-model EmailVerification {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique
-  userId    String
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+model PendingRegistration {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  country      String   @default("IL")
+  emailUpdates Boolean  @default(true)
+  tokenHash    String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
 
   @@index([tokenHash])
-  @@index([userId])
+  @@index([email])
 }
 
 // ─── CHAT ─────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ export default function Login() {
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
   const [errors, setErrors] = useState({
     email: '',
     password: '',
@@ -61,9 +62,13 @@ export default function Login() {
       navigate(workspacePath);
     } catch (err: any) {
       setIsLoading(false);
+      // 403 = registered but email not verified yet
+      if (err?.status === 403) {
+        setUnverifiedEmail(email.trim().toLowerCase());
+        return;
+      }
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 900);
-      // Surface specific error messages when available
       if (err?.error) {
         setErrors((prev) => ({ ...prev, password: err.error }));
       }
@@ -95,6 +100,18 @@ export default function Login() {
               <h1 className="text-xl font-bold text-stripe-dark mb-5">
                 {t.auth.signInToAccount}
               </h1>
+
+              {unverifiedEmail && (
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                  Please verify your email before logging in.{' '}
+                  <Link
+                    to={`${signupPath}?resend=${encodeURIComponent(unverifiedEmail)}`}
+                    className="font-semibold underline hover:text-amber-900"
+                  >
+                    Resend verification email
+                  </Link>
+                </div>
+              )}
 
               <form className="space-y-3" onSubmit={handleSubmit}>
                 {/* Email Field */}

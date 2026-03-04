@@ -17,32 +17,26 @@ export async function register(
   },
   meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
-  const existing = await prisma.user.findUnique({ where: { email: data.email } });
-  if (existing) throw createError('Email already registered', 409);
+  const email = data.email.toLowerCase().trim();
+  const fullName = data.fullName.trim();
+
+  // Reject if a verified account already exists
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) throw createError('Email already registered', 409);
 
   const passwordHash = await hashPassword(data.password);
-  const user = await prisma.user.create({
-    data: {
-      email: data.email.toLowerCase().trim(),
-      fullName: data.fullName.trim(),
-      passwordHash,
-      country: data.country ?? 'IL',
-      emailUpdates: data.emailUpdates ?? true,
-      provider: 'EMAIL',
-    },
-  });
-
-  // Create email verification token — do NOT issue session tokens until verified
   const rawVerificationToken = generateToken(48);
-  await prisma.emailVerification.create({
-    data: {
-      tokenHash: hashToken(rawVerificationToken),
-      userId: user.id,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-    },
+  const tokenHash = hashToken(rawVerificationToken);
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+  // Store as a pending registration — user row is NOT created until email is confirmed
+  await prisma.pendingRegistration.upsert({
+    where: { email },
+    update: { passwordHash, fullName, country: data.country ?? 'IL', emailUpdates: data.emailUpdates ?? true, tokenHash, expiresAt },
+    create: { email, passwordHash, fullName, country: data.country ?? 'IL', emailUpdates: data.emailUpdates ?? true, tokenHash, expiresAt },
   });
 
-  return { userId: user.id, email: user.email, fullName: user.fullName, rawVerificationToken };
+  return { email, fullName, rawVerificationToken };
 }
 
 export async function verifyEmail(
@@ -50,49 +44,49 @@ export async function verifyEmail(
   meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
   const tokenHash = hashToken(rawToken);
-  const record = await prisma.emailVerification.findUnique({ where: { tokenHash } });
+  const pending = await prisma.pendingRegistration.findUnique({ where: { tokenHash } });
 
-  if (!record || record.used || record.expiresAt < new Date()) {
+  if (!pending || pending.expiresAt < new Date()) {
     throw createError('Invalid or expired verification link', 400);
   }
 
-  const user = await prisma.user.findUnique({ where: { id: record.userId } });
-  if (!user) throw createError('User not found', 404);
-
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: record.userId },
-      data: { emailVerified: true, lastLoginAt: new Date() },
-    }),
-    prisma.emailVerification.update({
-      where: { id: record.id },
-      data: { used: true },
-    }),
-  ]);
+  // Atomically: create the verified user and delete the pending record
+  const user = await prisma.$transaction(async (tx) => {
+    const newUser = await tx.user.create({
+      data: {
+        email: pending.email,
+        fullName: pending.fullName,
+        passwordHash: pending.passwordHash,
+        country: pending.country,
+        emailUpdates: pending.emailUpdates,
+        provider: 'EMAIL',
+        emailVerified: true,
+        lastLoginAt: new Date(),
+      },
+    });
+    await tx.pendingRegistration.delete({ where: { id: pending.id } });
+    return newUser;
+  });
 
   return issueTokens(user.id, user.email, user.role, false, meta);
 }
 
 export async function resendVerification(email: string) {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user || user.emailVerified || user.provider !== 'EMAIL') return null;
-
-  // Invalidate any existing unused tokens
-  await prisma.emailVerification.updateMany({
-    where: { userId: user.id, used: false },
-    data: { used: true },
+  const pending = await prisma.pendingRegistration.findUnique({
+    where: { email: email.toLowerCase().trim() },
   });
+  if (!pending) return null; // either not registered or already verified (User row exists)
 
   const rawToken = generateToken(48);
-  await prisma.emailVerification.create({
+  await prisma.pendingRegistration.update({
+    where: { id: pending.id },
     data: {
       tokenHash: hashToken(rawToken),
-      userId: user.id,
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
     },
   });
 
-  return { rawToken, email: user.email, fullName: user.fullName };
+  return { rawToken, email: pending.email, fullName: pending.fullName };
 }
 
 export async function login(
@@ -101,8 +95,14 @@ export async function login(
   rememberMe = false,
   meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user || !user.passwordHash) throw createError('Invalid email or password', 401);
+  const normalizedEmail = email.toLowerCase().trim();
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+  if (!user || !user.passwordHash) {
+    // Give a specific error if the user registered but hasn't verified yet
+    const pending = await prisma.pendingRegistration.findUnique({ where: { email: normalizedEmail } });
+    if (pending) throw createError('Please verify your email before logging in', 403);
+    throw createError('Invalid email or password', 401);
+  }
 
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) throw createError('Invalid email or password', 401);
