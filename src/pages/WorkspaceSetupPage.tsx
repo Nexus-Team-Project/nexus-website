@@ -14,7 +14,8 @@ export interface OnboardingData {
   website: string;
   business_desc: string;
   primary_use_cases: string[];
-  extra_use_cases: string[];
+  phone: string;
+  role: string;
 }
 
 export default function WorkspaceSetupPage() {
@@ -31,16 +32,16 @@ export default function WorkspaceSetupPage() {
     setPhase('animation');
   };
 
-  // Reduced blur — more visible dashboard in the background
+  // Very little blur — dashboard clearly visible in background
   const dashFilter =
     phase === 'schedule'
-      ? 'blur(1px) brightness(0.58)'
-      : 'blur(1.5px) brightness(0.50)';
+      ? 'blur(0px) brightness(0.72)'
+      : 'blur(0.4px) brightness(0.60)';
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#080C14]">
 
-      {/* ── Blurred dashboard background ──────────────────────── */}
+      {/* ── Dashboard background ─────────────────────────────── */}
       <div
         className="absolute inset-0 transition-all duration-700"
         style={{ filter: dashFilter }}
@@ -48,9 +49,11 @@ export default function WorkspaceSetupPage() {
         <DashboardMock />
       </div>
 
-      {/* ── Modal overlay ─────────────────────────────────────── */}
-      <div className="absolute inset-0 flex items-center justify-center z-50 px-4 py-8 overflow-y-auto">
-
+      {/* ── Modal overlay — 7vh gap top & bottom ─────────────── */}
+      <div
+        className="absolute inset-0 flex items-center justify-center z-50 px-4 overflow-y-auto"
+        style={{ paddingTop: '7vh', paddingBottom: '7vh' }}
+      >
         {phase === 'wizard' && (
           <OnboardingWizard
             onComplete={handleWizardComplete}
@@ -70,18 +73,17 @@ export default function WorkspaceSetupPage() {
             onExplore={() => navigate(homePath)}
           />
         )}
-
       </div>
 
-      {/* ── Shared modal card styles ───────────────────────────── */}
+      {/* ── Shared modal card styles ──────────────────────────── */}
       <style>{`
         .ws-modal {
           background: #ffffff;
           border-radius: 12px;
           width: 100%;
-          max-width: 680px;
-          min-height: 660px;
-          max-height: 92vh;
+          max-width: min(92vw, 1100px);
+          min-height: 600px;
+          max-height: 86vh;
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -101,6 +103,8 @@ export default function WorkspaceSetupPage() {
           justify-content: flex-end;
           gap: 0.75rem;
           flex-shrink: 0;
+          position: relative;
+          z-index: 10;
         }
         .ws-footer-between {
           border-top: 1px solid #f1f5f9;
@@ -109,6 +113,8 @@ export default function WorkspaceSetupPage() {
           align-items: center;
           justify-content: space-between;
           flex-shrink: 0;
+          position: relative;
+          z-index: 10;
         }
         @keyframes wsIn {
           from { opacity: 0; transform: translateY(20px) scale(0.97); }
