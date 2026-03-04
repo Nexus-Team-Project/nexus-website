@@ -18,8 +18,9 @@ export default function GoogleSignIn({ onSuccess, onError, variant = 'form' }: G
   const isHe = language === 'he';
   const [isLoading, setIsLoading] = useState(false);
 
- const handleGoogleLogin = useGoogleLogin({
+  const handleGoogleLogin = useGoogleLogin({
     flow: 'auth-code',
+    redirect_uri: 'postmessage',
     onSuccess: async (codeResponse) => {
       console.log('Google success:', codeResponse);
       try {
@@ -45,6 +46,7 @@ export default function GoogleSignIn({ onSuccess, onError, variant = 'form' }: G
       console.error('Google nonOAuthError:', err);
     },
   });
+
   const buttonStyles =
     variant === 'hero'
       ? 'inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 border border-gray-300 rounded-lg shadow-sm bg-white text-xs sm:text-sm font-bold text-stripe-dark hover:bg-gray-50 hover:border-stripe-purple transition-colors whitespace-nowrap disabled:opacity-60'
@@ -52,13 +54,13 @@ export default function GoogleSignIn({ onSuccess, onError, variant = 'form' }: G
 
   return (
     <button
-  onClick={() => {
-    console.log('Button clicked');
-    handleGoogleLogin();
-  }}
-  disabled={isLoading}
-  className={buttonStyles}
->
+      onClick={() => {
+        console.log('Button clicked');
+        handleGoogleLogin();
+      }}
+      disabled={isLoading}
+      className={buttonStyles}
+    >
       {isLoading ? (
         <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
       ) : (
