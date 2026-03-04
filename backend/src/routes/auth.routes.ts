@@ -83,6 +83,7 @@ const googleSchema = z.object({
       idToken: z.string().min(1).optional(),
       code: z.string().min(1).optional(),
       accessToken: z.string().min(1).optional(),
+      redirectUri: z.string().url().optional(),
     })
     .refine((d) => d.idToken || d.code || d.accessToken, {
       message: 'idToken, code, or accessToken is required',
@@ -98,7 +99,7 @@ router.post(
       const meta = { userAgent: req.headers['user-agent'], ipAddress: req.ip };
       let result;
       if (req.body.code) {
-        result = await AuthService.googleAuthFromCode(req.body.code, meta);
+        result = await AuthService.googleAuthFromCode(req.body.code, meta, req.body.redirectUri);
       } else if (req.body.accessToken) {
         result = await AuthService.googleAuthFromAccessToken(req.body.accessToken, meta);
       } else {

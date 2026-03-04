@@ -47,31 +47,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Check for Google OAuth redirect callback
-    const hash = window.location.hash;
-    if (hash && hash.includes('access_token=')) {
-      const params = new URLSearchParams(hash.substring(1));
-      const accessToken = params.get('access_token');
-      if (accessToken) {
-        // Clean the URL immediately so the token isn't visible in the address bar
-        window.history.replaceState({}, document.title, window.location.pathname);
-        setIsLoading(true);
-        googleLogin(accessToken)
-          .then(() => {
-            setIsLoading(false);
-            // Navigate to the destination that was saved before the Google redirect.
-            // window.location.replace is used because useNavigate isn't available here
-            // (AuthContext lives outside the Router boundary).
-            const redirect = sessionStorage.getItem('google_oauth_redirect');
-            sessionStorage.removeItem('google_oauth_redirect');
-            window.location.replace(redirect ?? '/');
-          })
-          .catch((err) => {
-            console.error(err);
-            setIsLoading(false);
-          });
-        return;
-      }
+    // Check for Google OAuth redirect callback (Authorization Code Flow)
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get('code');
+    if (code) {
+      // Clean the URL immediately so a refresh doesn't re-submit the code
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setIsLoading(true);
+      api.post<{ accessToken: string }>('/api/auth/google', {
+        code,
+        redirectUri: window.location.origin,
+      })
+        .then(async (data) => {
+          setAccessToken(data.accessToken);
+          const profile = await api.get<AuthUser>('/api/auth/me');
+          setUser(profile);
+          // Navigate to the destination that was saved before the Google redirect.
+          // window.location.replace is used because useNavigate isn't available here
+          // (AuthContext lives outside the Router boundary).
+          const redirect = sessionStorage.getItem('google_oauth_redirect');
+          sessionStorage.removeItem('google_oauth_redirect');
+          window.location.replace(redirect ?? '/');
+        })
+        .catch(console.error)
+        .finally(() => setIsLoading(false));
+      return;
     }
 
     // Normal session restore
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (result && result.user) setUser(result.user as AuthUser);
       })
       .finally(() => setIsLoading(false));
-  }, [googleLogin]);
+  }, []);
 
   const login = useCallback(async (email: string, password: string, rememberMe = false) => {
     const data = await api.post<{ accessToken: string }>('/api/auth/login', { email, password, rememberMe });
