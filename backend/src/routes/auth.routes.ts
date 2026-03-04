@@ -39,10 +39,9 @@ router.post(
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
       });
-      EmailService.sendWelcomeEmail(result.email, result.fullName).catch(console.error);
-      const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
-      res.status(201).json({ accessToken: result.accessToken });
+      // Send verification email instead of welcome email — account is not active until verified
+      EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken).catch(console.error);
+      res.status(201).json({ requiresVerification: true, email: result.email });
     } catch (err) {
       next(err);
     }
@@ -107,6 +106,50 @@ router.post(
       }
       res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
       res.json({ accessToken: result.accessToken });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const verifyEmailSchema = z.object({
+  body: z.object({ token: z.string().min(1) }),
+});
+
+router.post(
+  '/verify-email',
+  authLimiter,
+  validate(verifyEmailSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await AuthService.verifyEmail(req.body.token, {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      });
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
+      res.json({ accessToken: result.accessToken });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+const resendVerificationSchema = z.object({
+  body: z.object({ email: z.string().email() }),
+});
+
+router.post(
+  '/resend-verification',
+  resetLimiter,
+  validate(resendVerificationSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await AuthService.resendVerification(req.body.email);
+      if (result) {
+        EmailService.sendVerificationEmail(result.email, result.fullName, result.rawToken).catch(console.error);
+      }
+      // Always return 200 to avoid leaking which emails are registered
+      res.json({ message: 'If your email is registered and unverified, a new link has been sent.' });
     } catch (err) {
       next(err);
     }

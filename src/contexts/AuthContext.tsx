@@ -28,7 +28,7 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
+  register: (data: RegisterData) => Promise<{ requiresVerification: true; email: string } | void>;
   googleLogin: (accessToken: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -95,10 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (registerData: RegisterData) => {
-    const data = await api.post<{ accessToken: string }>('/api/auth/register', registerData);
-    setAccessToken(data.accessToken);
-    const profile = await api.get<AuthUser>('/api/auth/me');
-    setUser(profile);
+    const data = await api.post<{ requiresVerification?: boolean; email?: string; accessToken?: string }>('/api/auth/register', registerData);
+    if (data.requiresVerification) {
+      return { requiresVerification: true as const, email: data.email! };
+    }
   }, []);
 
   const logout = useCallback(async () => {

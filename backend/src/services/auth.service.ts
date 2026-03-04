@@ -32,8 +32,67 @@ export async function register(
     },
   });
 
-  const tokens = await issueTokens(user.id, user.email, user.role, false, meta);
-  return { ...tokens, userId: user.id, email: user.email, fullName: user.fullName };
+  // Create email verification token — do NOT issue session tokens until verified
+  const rawVerificationToken = generateToken(48);
+  await prisma.emailVerification.create({
+    data: {
+      tokenHash: hashToken(rawVerificationToken),
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    },
+  });
+
+  return { userId: user.id, email: user.email, fullName: user.fullName, rawVerificationToken };
+}
+
+export async function verifyEmail(
+  rawToken: string,
+  meta: { userAgent?: string; ipAddress?: string } = {},
+) {
+  const tokenHash = hashToken(rawToken);
+  const record = await prisma.emailVerification.findUnique({ where: { tokenHash } });
+
+  if (!record || record.used || record.expiresAt < new Date()) {
+    throw createError('Invalid or expired verification link', 400);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: record.userId } });
+  if (!user) throw createError('User not found', 404);
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: record.userId },
+      data: { emailVerified: true, lastLoginAt: new Date() },
+    }),
+    prisma.emailVerification.update({
+      where: { id: record.id },
+      data: { used: true },
+    }),
+  ]);
+
+  return issueTokens(user.id, user.email, user.role, false, meta);
+}
+
+export async function resendVerification(email: string) {
+  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+  if (!user || user.emailVerified || user.provider !== 'EMAIL') return null;
+
+  // Invalidate any existing unused tokens
+  await prisma.emailVerification.updateMany({
+    where: { userId: user.id, used: false },
+    data: { used: true },
+  });
+
+  const rawToken = generateToken(48);
+  await prisma.emailVerification.create({
+    data: {
+      tokenHash: hashToken(rawToken),
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+
+  return { rawToken, email: user.email, fullName: user.fullName };
 }
 
 export async function login(
