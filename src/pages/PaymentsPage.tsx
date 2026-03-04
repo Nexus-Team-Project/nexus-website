@@ -8,15 +8,12 @@ import { useLanguage } from '../i18n/LanguageContext';
 
 const Footer = lazy(() => import('../components/Footer'));
 
-// ─── scroll-reveal observer (same pattern as HomeContent.tsx) ──
+// ─── scroll-reveal observer ────────────────────────────────
 function useScrollReveal() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => entries.forEach((e) => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-          observer.unobserve(e.target);
-        }
+        if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
       }),
       { threshold: 0.1 }
     );
@@ -25,10 +22,10 @@ function useScrollReveal() {
   }, []);
 }
 
-// ─── Reusable bullet row ───────────────────────────────────────
+// ─── Reusable bullet (icon always on right, text right-aligned) ───
 function Bullet({ text, icon: Icon = Check }: { text: string; icon?: React.ElementType }) {
   return (
-    <li className="flex items-start gap-3">
+    <li className="flex items-start gap-3 flex-row-reverse">
       <span className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-stripe-purple/10 flex items-center justify-center">
         <Icon size={12} className="text-stripe-purple" />
       </span>
@@ -37,17 +34,17 @@ function Bullet({ text, icon: Icon = Check }: { text: string; icon?: React.Eleme
   );
 }
 
-// ─── Checkmark row (dark-section variant) ─────────────────────
+// ─── Checkmark row (dark-section variant) ─────────────────
 function CheckRow({ text }: { text: string }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 flex-row-reverse">
       <Check size={20} className="text-violet-400 flex-shrink-0" />
       <span className="text-white/90 text-lg">{text}</span>
     </div>
   );
 }
 
-// ─── Component ────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────
 export default function PaymentsPage() {
   const { language, direction } = useLanguage();
   useScrollReveal();
@@ -60,40 +57,35 @@ export default function PaymentsPage() {
     <div dir={direction} className="min-h-screen bg-white">
       <Navbar />
 
-      {/* ══════════════════════════════════════════════════════════
-          HERO
-      ══════════════════════════════════════════════════════════ */}
-      <section
-        className="relative pt-32 pb-20 text-white overflow-hidden"
-        style={{ background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)' }}
-      >
-        {/* Soft glow blob */}
-        <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[500px] rounded-full opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #635BFF 0%, transparent 70%)' }}
-        />
+      {/* Override .payment-stage overflow so animation is fully visible in hero */}
+      <style>{`.payments-hero-anim .payment-stage { overflow: visible !important; }`}</style>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
+      {/* ══════════════════════════════════════════════════════════
+          HERO — light gray background matching home page
+      ══════════════════════════════════════════════════════════ */}
+      <section className="relative pt-32 pb-20 bg-slate-50 overflow-hidden">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
             {/* ── Text column (DOM first → right in RTL, left in LTR) ── */}
-            <div className={isRtl ? 'text-right' : 'text-left'}>
+            <div className="text-right">
+
               {/* Label chip */}
-              <div className={`inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              <div className="inline-flex items-center gap-2 bg-stripe-purple/10 border border-stripe-purple/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 text-stripe-purple flex-row-reverse">
                 <CreditCard size={13} />
                 <span>{he ? 'סליקה' : 'Payments'}</span>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 text-slate-900">
                 {he ? 'סליקה חכמה לעסקים' : 'Smart Payments for Business'}
               </h1>
 
-              <p className="text-lg text-white/80 mb-4 leading-relaxed">
+              <p className="text-lg text-slate-700 mb-4 leading-relaxed">
                 {he
                   ? 'קבלו תשלומים מכל מקום – באתר, בלינקים, במנויים או בתוך קהילות Nexus.'
                   : 'Accept payments from anywhere – on your website, via links, subscriptions, or within Nexus communities.'}
               </p>
-              <p className="text-lg text-white/70 mb-8 leading-relaxed">
+              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
                 {he
                   ? 'מערכת תשלומים אחת שמאפשרת לכם לנהל את כל ההכנסות של העסק במקום אחד.'
                   : 'One payments system that lets you manage all your business revenue in one place.'}
@@ -105,15 +97,15 @@ export default function PaymentsPage() {
                   ? ['סליקת אשראי וארנקים דיגיטליים', 'מנויים ותשלומים חוזרים', 'קישורי תשלום ועמודי Checkout', 'אפשרות למכור גם בתוך קהילות וארגונים']
                   : ['Credit & digital wallet processing', 'Subscriptions & recurring payments', 'Payment links & Checkout pages', 'Sell within communities and organizations']
                 ).map((item) => (
-                  <li key={item} className={`flex items-center gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                    <Check size={16} className="text-violet-400 flex-shrink-0" />
-                    <span className="text-white/85">{item}</span>
+                  <li key={item} className="flex items-center gap-3 flex-row-reverse">
+                    <Check size={16} className="text-stripe-purple flex-shrink-0" />
+                    <span className="text-slate-700">{item}</span>
                   </li>
                 ))}
               </ul>
 
               {/* CTA buttons */}
-              <div className={`flex flex-wrap gap-4 ${isRtl ? 'justify-end' : 'justify-start'}`}>
+              <div className="flex flex-wrap gap-4 justify-end">
                 <Link
                   to={signupLink}
                   className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
@@ -122,15 +114,15 @@ export default function PaymentsPage() {
                 </Link>
                 <Link
                   to={signupLink}
-                  className="inline-block border border-white/30 bg-white/10 text-white font-semibold px-8 py-3 rounded-xl hover:bg-white/20 transition-colors"
+                  className="inline-block border border-slate-300 bg-white text-slate-700 font-semibold px-8 py-3 rounded-xl hover:bg-slate-50 transition-colors"
                 >
                   {he ? 'קבעו שיחת היכרות' : 'Schedule a call'}
                 </Link>
               </div>
             </div>
 
-            {/* ── Animation column (DOM second → left in RTL, right in LTR) ── */}
-            <div className="relative h-[480px] flex items-center justify-center overflow-hidden">
+            {/* ── Animation column — free overflow (no clipping) ── */}
+            <div className="payments-hero-anim relative h-[520px]">
               <PaymentAnimation />
             </div>
 
@@ -138,8 +130,8 @@ export default function PaymentsPage() {
         </div>
       </section>
 
-      {/* ── Animated gradient divider ──────────────────────────── */}
-      <div className="relative h-40 overflow-hidden -mt-1">
+      {/* ── Animated gradient divider — taller, no overflow clip ── */}
+      <div className="relative h-60 -mt-1">
         <AnimatedGradient
           clipPath={
             isRtl
@@ -154,7 +146,7 @@ export default function PaymentsPage() {
       ══════════════════════════════════════════════════════════ */}
       <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl">
+          <div className="max-w-3xl ml-auto text-right">
             <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
               {he ? 'תשלומים' : 'Payments'}
             </p>
@@ -173,14 +165,14 @@ export default function PaymentsPage() {
               ? ['כרטיסי אשראי', 'Apple Pay ו-Google Pay', 'Bit ו-PayPal', 'חיוב חשבון בנק', 'תשלומים בינלאומיים']
               : ['Credit cards', 'Apple Pay & Google Pay', 'Bit & PayPal', 'Bank account debit', 'International payments']
             ).map((item) => (
-              <div key={item} className={`flex items-center gap-3 bg-slate-50 rounded-xl p-4 border border-slate-100 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              <div key={item} className="flex items-center gap-3 bg-slate-50 rounded-xl p-4 border border-slate-100 flex-row-reverse">
                 <Check size={16} className="text-stripe-purple flex-shrink-0" />
                 <span className="text-slate-700 font-medium">{item}</span>
               </div>
             ))}
           </div>
 
-          <p className="text-slate-500">
+          <p className="text-slate-500 text-right ml-auto max-w-3xl">
             {he
               ? 'התחילו לגבות תשלומים באתר שלכם, במובייל או דרך קישורי תשלום.'
               : 'Start accepting payments on your website, mobile, or via payment links.'}
@@ -204,8 +196,8 @@ export default function PaymentsPage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
-            <div>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 flex-row-reverse">
                 <Link2 size={14} />
                 {he ? 'קישורי תשלום' : 'Payment Links'}
               </p>
@@ -225,7 +217,7 @@ export default function PaymentsPage() {
               </ul>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 mt-8 lg:mt-16">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 mt-8 lg:mt-16 text-right">
               <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-5">
                 {he ? 'פתרון מושלם עבור:' : 'Perfect for:'}
               </p>
@@ -234,7 +226,7 @@ export default function PaymentsPage() {
                   ? ['שירותים מקצועיים', 'מכירת מוצרים', 'גבייה מהירה מלקוחות']
                   : ['Professional services', 'Product sales', 'Quick client billing']
                 ).map((item) => (
-                  <li key={item} className={`flex items-center gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                  <li key={item} className="flex items-center gap-3 flex-row-reverse">
                     <div className="w-2 h-2 rounded-full bg-stripe-purple flex-shrink-0" />
                     <span className="text-slate-700 font-medium">{item}</span>
                   </li>
@@ -253,8 +245,8 @@ export default function PaymentsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
-            <div>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 flex-row-reverse">
                 <RefreshCw size={14} />
                 {he ? 'מנויים' : 'Subscriptions'}
               </p>
@@ -274,7 +266,7 @@ export default function PaymentsPage() {
               </ul>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-100 p-8 mt-8 lg:mt-16">
+            <div className="bg-slate-50 rounded-2xl border border-slate-100 p-8 mt-8 lg:mt-16 text-right">
               <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-5">
                 {he ? 'מתאים במיוחד עבור:' : 'Ideal for:'}
               </p>
@@ -283,7 +275,7 @@ export default function PaymentsPage() {
                   ? ['תוכניות שירות', 'קורסים', 'מועדוני לקוחות']
                   : ['Service plans', 'Courses', 'Customer loyalty clubs']
                 ).map((item) => (
-                  <li key={item} className={`flex items-center gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                  <li key={item} className="flex items-center gap-3 flex-row-reverse">
                     <div className="w-2 h-2 rounded-full bg-stripe-purple flex-shrink-0" />
                     <span className="text-slate-700 font-medium">{item}</span>
                   </li>
@@ -307,8 +299,8 @@ export default function PaymentsPage() {
           style={{ background: 'radial-gradient(circle, #635BFF 0%, transparent 70%)' }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl">
-            <p className="text-violet-300 font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+          <div className="max-w-3xl ml-auto text-right">
+            <p className="text-violet-300 font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 flex-row-reverse">
               <Users size={14} />
               {he ? 'הבידול שלנו' : 'Our Difference'}
             </p>
@@ -346,8 +338,8 @@ export default function PaymentsPage() {
           }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl">
-            <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+          <div className="max-w-3xl ml-auto text-right">
+            <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 flex-row-reverse">
               <Landmark size={14} />
               {he ? 'פיננסים' : 'Finance'}
             </p>
@@ -379,8 +371,8 @@ export default function PaymentsPage() {
       ══════════════════════════════════════════════════════════ */}
       <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl">
-            <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2">
+          <div className="max-w-3xl ml-auto text-right">
+            <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 flex-row-reverse">
               <LayoutDashboard size={14} />
               {he ? 'ניהול' : 'Management'}
             </p>
@@ -392,7 +384,7 @@ export default function PaymentsPage() {
                 ? ['ניהול עסקאות במקום אחד', 'ממשק פשוט וברור', 'אבטחת מידע מתקדמת']
                 : ['Manage transactions in one place', 'Simple and clear interface', 'Advanced data security']
               ).map((item) => (
-                <div key={item} className={`flex items-center gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                <div key={item} className="flex items-center gap-4 flex-row-reverse">
                   <span className="w-8 h-8 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0">
                     <Check size={16} className="text-stripe-purple" />
                   </span>
@@ -407,12 +399,12 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           FINAL CTA
       ══════════════════════════════════════════════════════════ */}
-      <section className="scroll-reveal relative py-24 overflow-hidden bg-gradient-to-br from-stripe-blue to-violet-900 text-white text-center">
+      <section className="scroll-reveal relative py-24 overflow-hidden bg-gradient-to-br from-stripe-blue to-violet-900 text-white">
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full opacity-15 pointer-events-none"
           style={{ background: 'radial-gradient(circle, #a78bfa 0%, transparent 70%)' }}
         />
-        <div className="relative max-w-3xl mx-auto px-4 sm:px-6">
+        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-right">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">
             {he ? 'התחילו לסלוק עם Nexus' : 'Start accepting payments with Nexus'}
           </h2>
@@ -421,7 +413,7 @@ export default function PaymentsPage() {
               ? 'הצטרפו לעסקים שכבר משתמשים במערכת התשלומים של Nexus כדי לנהל את התשלומים שלהם ולהגדיל את הפעילות העסקית.'
               : 'Join businesses already using Nexus payments to manage their payments and grow their business.'}
           </p>
-          <div className="flex flex-wrap gap-4 justify-center">
+          <div className="flex flex-wrap gap-4 justify-end">
             <Link
               to={signupLink}
               className="inline-block bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors"
