@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import DashboardMock from '../components/workspace/DashboardMock';
-import WelcomeModal from '../components/workspace/WelcomeModal';
 import OnboardingWizard from '../components/workspace/OnboardingWizard';
 import SetupAnimation from '../components/workspace/SetupAnimation';
 import ScheduleStep from '../components/workspace/ScheduleStep';
 
-type Phase = 'welcome' | 'wizard' | 'animation' | 'schedule';
+type Phase = 'wizard' | 'animation' | 'schedule';
 
 export interface OnboardingData {
   org_name: string;
@@ -19,7 +18,7 @@ export interface OnboardingData {
 }
 
 export default function WorkspaceSetupPage() {
-  const [phase, setPhase] = useState<Phase>('welcome');
+  const [phase, setPhase] = useState<Phase>('wizard');
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
   const { user } = useAuth();
   const { direction } = useLanguage();
@@ -52,17 +51,10 @@ export default function WorkspaceSetupPage() {
       {/* ── Modal overlay ─────────────────────────────────────── */}
       <div className="absolute inset-0 flex items-center justify-center z-50 px-4 py-8 overflow-y-auto">
 
-        {phase === 'welcome' && (
-          <WelcomeModal
-            onStart={() => setPhase('wizard')}
-            onBack={() => navigate(homePath)}
-          />
-        )}
-
         {phase === 'wizard' && (
           <OnboardingWizard
             onComplete={handleWizardComplete}
-            onBack={() => setPhase('welcome')}
+            onBack={() => navigate(homePath)}
           />
         )}
 
@@ -88,8 +80,8 @@ export default function WorkspaceSetupPage() {
           border-radius: 12px;
           width: 100%;
           max-width: 680px;
-          min-height: 520px;
-          max-height: 88vh;
+          min-height: 660px;
+          max-height: 92vh;
           display: flex;
           flex-direction: column;
           overflow: hidden;

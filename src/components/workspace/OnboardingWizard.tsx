@@ -8,46 +8,44 @@ const TOTAL_STEPS = 3;
 // ── Use-case option definitions ────────────────────────────────────────────
 const USE_CASES = {
   he: [
-    { id: 'benefits_club',    label: 'מועדון הטבות',                          keywords: /קהילה|עמותה|ארגון|חברים|מועדון/i },
-    { id: 'digital_wallet',   label: 'ארנק דיגיטלי',                          keywords: /ארנק|תשלום|pay|wallet|דיגיטל/i },
-    { id: 'vouchers',         label: 'תוכנית שוברים',                         keywords: /שובר|קופון|voucher|coupon/i },
-    { id: 'employee_gifts',   label: 'מתנות לעובדים / מתנות לחגים',           keywords: /עובד|employee|חג|gift|מתנה|staff|צוות/i },
-    { id: 'loyalty',          label: 'תוכנית נאמנות',                         keywords: /נאמנות|loyalty|נקודות|חנות|store|retail|מסחר|לקוח/i },
-    { id: 'prepaid_card',     label: 'כרטיס פרי-פייד / ממותג',               keywords: /כרטיס|card|בנק|bank|פרי.פייד|prepaid/i },
-    { id: 'payment',          label: 'עיבוד תשלומים לעסק שלי',               keywords: /תשלום|payment|סליקה|processing/i },
-    { id: 'not_sure',         label: 'עדיין לא בטוח',                         keywords: null },
+    { id: 'benefits_club',  label: 'מועדון הטבות',                        keywords: /קהילה|עמותה|ארגון|חברים|מועדון/i },
+    { id: 'digital_wallet', label: 'ארנק דיגיטלי',                        keywords: /ארנק|תשלום|pay|wallet|דיגיטל/i },
+    { id: 'vouchers',       label: 'תוכנית שוברים',                       keywords: /שובר|קופון|voucher|coupon/i },
+    { id: 'employee_gifts', label: 'מתנות לעובדים / מתנות לחגים',         keywords: /עובד|employee|חג|gift|מתנה|staff|צוות/i },
+    { id: 'loyalty',        label: 'תוכנית נאמנות',                       keywords: /נאמנות|loyalty|נקודות|חנות|store|retail|מסחר|לקוח/i },
+    { id: 'prepaid_card',   label: 'כרטיס פרי-פייד / ממותג',             keywords: /כרטיס|card|בנק|bank|פרי.פייד|prepaid/i },
+    { id: 'payment',        label: 'עיבוד תשלומים לעסק שלי',             keywords: /תשלום|payment|סליקה|processing/i },
+    { id: 'not_sure',       label: 'עדיין לא בטוח',                       keywords: null },
   ],
   en: [
-    { id: 'benefits_club',    label: 'Benefits club',                          keywords: /community|nonprofit|organization|members|club/i },
-    { id: 'digital_wallet',   label: 'Digital wallet',                         keywords: /wallet|digital|pay/i },
-    { id: 'vouchers',         label: 'Voucher program',                        keywords: /voucher|coupon|gift.?card/i },
-    { id: 'employee_gifts',   label: 'Employee gifts / Holiday gifts',         keywords: /employee|staff|team|holiday|gift/i },
-    { id: 'loyalty',          label: 'Loyalty program',                        keywords: /loyalty|points|store|retail|shop|customer/i },
-    { id: 'prepaid_card',     label: 'Prepaid / branded card',                keywords: /card|prepaid|bank|branded/i },
-    { id: 'payment',          label: 'Payment processing for my business',     keywords: /payment|processing|checkout/i },
-    { id: 'not_sure',         label: 'Not sure yet',                           keywords: null },
+    { id: 'benefits_club',  label: 'Benefits club',                        keywords: /community|nonprofit|organization|members|club/i },
+    { id: 'digital_wallet', label: 'Digital wallet',                       keywords: /wallet|digital|pay/i },
+    { id: 'vouchers',       label: 'Voucher program',                      keywords: /voucher|coupon|gift.?card/i },
+    { id: 'employee_gifts', label: 'Employee gifts / Holiday gifts',       keywords: /employee|staff|team|holiday|gift/i },
+    { id: 'loyalty',        label: 'Loyalty program',                      keywords: /loyalty|points|store|retail|shop|customer/i },
+    { id: 'prepaid_card',   label: 'Prepaid / branded card',              keywords: /card|prepaid|bank|branded/i },
+    { id: 'payment',        label: 'Payment processing for my business',   keywords: /payment|processing|checkout/i },
+    { id: 'not_sure',       label: 'Not sure yet',                         keywords: null },
   ],
 };
 
 function getSuggested(desc: string, lang: 'he' | 'en'): string[] {
   const options = USE_CASES[lang];
-  const suggested = options
-    .filter(o => o.keywords && o.keywords.test(desc))
-    .map(o => o.id);
-  // Default when nothing matched
-  return suggested.length > 0 ? suggested : ['benefits_club', 'loyalty'];
+  const matched = options.filter(o => o.keywords && o.keywords.test(desc)).map(o => o.id);
+  return matched.length > 0 ? matched : ['benefits_club', 'loyalty'];
 }
 
 // ── Bilingual UI text ──────────────────────────────────────────────────────
 const CONTENT = {
   he: {
-    step0Title: 'קצת פרטים על הארגון שלכם',
+    welcomeTitle: 'ברוכים הבאים לנקסוס.',
+    welcomeSubtitle: 'ספרו לנו קצת על הארגון שלכם כדי להתאים את הסביבה. תמיד ניתן לשנות זאת מאוחר יותר.',
     orgNameLabel: 'שם הארגון',
     orgNamePlaceholder: 'נקסוס בע"מ',
     websiteLabel: 'אתר',
     websitePlaceholder: 'www.example.com',
-    businessLabel: 'ספרו לנו – איזה סוג עסק אתם ומה אתם מציעים',
-    businessPlaceholder: 'לדוגמה: אנחנו רשת קמעונאית המציעה מוצרי אלקטרוניקה ורוצים לפתח תוכנית נאמנות ללקוחות...',
+    businessLabel: 'איזה סוג עסק אתם ומה אתם מציעים?',
+    businessPlaceholder: 'לדוגמה: רשת קמעונאית המציעה מוצרי אלקטרוניקה ורוצה לפתח תוכנית נאמנות ללקוחות...',
     step1Title: 'אלו הפתרונות שנראים הכי רלוונטיים לכם',
     step1Sub: 'בחרו את כל האפשרויות הרלוונטיות',
     suggested: 'מומלץ',
@@ -57,9 +55,11 @@ const CONTENT = {
     skip: 'דלג לעת עתה',
     continue: 'המשך',
     finish: 'סיים הגדרה',
+    tooltipMsg: 'אנחנו צריכים עוד פרטים כדי להתקדם',
   },
   en: {
-    step0Title: 'A bit about your organization',
+    welcomeTitle: 'Welcome to Nexus.',
+    welcomeSubtitle: 'Answer a few questions about your organization to customize your workspace. You can always change this later.',
     orgNameLabel: 'Organization name',
     orgNamePlaceholder: 'Nexus Ltd.',
     websiteLabel: 'Website',
@@ -75,6 +75,7 @@ const CONTENT = {
     skip: 'Skip for now',
     continue: 'Continue',
     finish: 'Finish setup',
+    tooltipMsg: 'We need more details to continue',
   },
 };
 
@@ -84,7 +85,7 @@ interface OnboardingWizardProps {
   onBack: () => void;
 }
 
-export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizardProps) {
+export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
   const { language, direction } = useLanguage();
   const lang = language === 'he' ? 'he' : 'en';
   const c = CONTENT[lang];
@@ -93,31 +94,28 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
   const [step, setStep] = useState(0);
 
   // Step 0 fields
-  const [orgName, setOrgName] = useState('');
-  const [website, setWebsite] = useState('');
+  const [orgName, setOrgName]         = useState('');
+  const [website, setWebsite]         = useState('');
   const [businessDesc, setBusinessDesc] = useState('');
 
-  // Step 1 state
+  // Step 1: suggested + user selection
   const [primarySelected, setPrimarySelected] = useState<string[]>([]);
   const [primarySuggested, setPrimarySuggested] = useState<string[]>([]);
 
-  // Step 2 state
+  // Step 2: optional extras
   const [extraSelected, setExtraSelected] = useState<string[]>([]);
 
-  const togglePrimary = (id: string) =>
-    setPrimarySelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-
-  const toggleExtra = (id: string) =>
-    setExtraSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  // Tooltip for disabled Continue button
+  const [showTooltip, setShowTooltip] = useState(false);
 
   const canContinue =
     step === 0 ? orgName.trim() !== '' && businessDesc.trim() !== '' :
     step === 1 ? primarySelected.length > 0 :
-    true; // step 2 is optional
+    true; // step 2 is optional — always continuable
 
   const handleNext = () => {
+    if (!canContinue) return;
     if (step === 0) {
-      // Analyse description and pre-select suggestions
       const suggested = getSuggested(businessDesc, lang);
       setPrimarySuggested(suggested);
       setPrimarySelected(suggested);
@@ -125,11 +123,18 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
     } else if (step === 1) {
       setStep(2);
     } else {
-      onComplete({ org_name: orgName, website, business_desc: businessDesc, primary_use_cases: primarySelected, extra_use_cases: extraSelected });
+      onComplete({
+        org_name: orgName,
+        website,
+        business_desc: businessDesc,
+        primary_use_cases: primarySelected,
+        extra_use_cases: extraSelected,
+      });
     }
   };
 
   const handleSkip = () => {
+    // Step 0: skip to step 1 without analysis
     if (step === 0) {
       setPrimarySelected([]);
       setPrimarySuggested([]);
@@ -140,11 +145,10 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
   };
 
   const handleBack = () => {
-    if (step === 0) onBack();
-    else setStep(s => s - 1);
+    if (step > 0) setStep(s => s - 1);
   };
 
-  // Back arrow: points left in LTR, right in RTL
+  // Back arrow direction: RTL → points right (→), LTR → points left (←)
   const BackArrow = () => (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
       {direction === 'rtl'
@@ -154,10 +158,14 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
     </svg>
   );
 
-  // Shared option button renderer
-  const OptionButton = ({ id, label, selected, isSuggested, onToggle }: {
-    id: string; label: string; selected: boolean; isSuggested?: boolean; onToggle: () => void;
-  }) => (
+  // Renders a single selectable option row
+  const renderOption = (
+    id: string,
+    label: string,
+    selected: boolean,
+    onToggle: () => void,
+    isSuggested?: boolean,
+  ) => (
     <button
       key={id}
       onClick={onToggle}
@@ -188,8 +196,11 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
   return (
     <div className="ws-modal" dir={direction}>
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 shrink-0">
+      {/* ── Header — always LTR: logo on LEFT, bars on RIGHT ── */}
+      <div
+        className="flex items-center justify-between px-8 py-5 border-b border-slate-100 shrink-0"
+        dir="ltr"
+      >
         <img src={nexusBlackLogo} alt="Nexus" className="h-8 w-auto object-contain" />
         <div className="flex gap-1.5">
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
@@ -206,12 +217,20 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
       {/* ── Content (scrollable) ── */}
       <div className="ws-content">
 
-        {/* ── Step 0: Organisation form ── */}
+        {/* ── Step 0: Welcome text + Organisation form (merged) ── */}
         {step === 0 && (
           <>
-            <h2 className="text-[21px] font-semibold text-slate-900 leading-snug mb-6">
-              {c.step0Title}
-            </h2>
+            {/* Welcome header */}
+            <div className="mb-7">
+              <h1 className="text-[26px] font-bold text-indigo-600 leading-tight mb-2">
+                {c.welcomeTitle}
+              </h1>
+              <p className="text-[14px] text-slate-500 leading-relaxed">
+                {c.welcomeSubtitle}
+              </p>
+            </div>
+
+            {/* Form fields */}
             <div className="space-y-4">
               <div>
                 <label className="block text-[13px] font-medium text-slate-700 mb-1.5">
@@ -262,20 +281,21 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
             </h2>
             <p className="text-[13px] text-slate-400 mb-5">{c.step1Sub}</p>
             <div className="space-y-2">
-              {/* Show suggested first, then the rest */}
+              {/* Suggested options float to the top */}
               {[
                 ...useCases.filter(o => primarySuggested.includes(o.id)),
                 ...useCases.filter(o => !primarySuggested.includes(o.id)),
-              ].map(option => (
-                <OptionButton
-                  key={option.id}
-                  id={option.id}
-                  label={option.label}
-                  selected={primarySelected.includes(option.id)}
-                  isSuggested={primarySuggested.includes(option.id)}
-                  onToggle={() => togglePrimary(option.id)}
-                />
-              ))}
+              ].map(option =>
+                renderOption(
+                  option.id,
+                  option.label,
+                  primarySelected.includes(option.id),
+                  () => setPrimarySelected(prev =>
+                    prev.includes(option.id) ? prev.filter(x => x !== option.id) : [...prev, option.id]
+                  ),
+                  primarySuggested.includes(option.id),
+                )
+              )}
             </div>
           </>
         )}
@@ -290,15 +310,16 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
             <div className="space-y-2">
               {useCases
                 .filter(o => !primarySelected.includes(o.id))
-                .map(option => (
-                  <OptionButton
-                    key={option.id}
-                    id={option.id}
-                    label={option.label}
-                    selected={extraSelected.includes(option.id)}
-                    onToggle={() => toggleExtra(option.id)}
-                  />
-                ))}
+                .map(option =>
+                  renderOption(
+                    option.id,
+                    option.label,
+                    extraSelected.includes(option.id),
+                    () => setExtraSelected(prev =>
+                      prev.includes(option.id) ? prev.filter(x => x !== option.id) : [...prev, option.id]
+                    ),
+                  )
+                )}
             </div>
           </>
         )}
@@ -307,16 +328,23 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
 
       {/* ── Footer ── */}
       <div className="ws-footer-between">
-        <button
-          onClick={handleBack}
-          className="text-[14px] text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1.5"
-        >
-          <BackArrow />
-          {c.back}
-        </button>
+
+        {/* Back button — hidden on step 0 (no previous step) */}
+        {step > 0 ? (
+          <button
+            onClick={handleBack}
+            className="text-[14px] text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1.5"
+          >
+            <BackArrow />
+            {c.back}
+          </button>
+        ) : (
+          <div /> /* placeholder to keep flex spacing */
+        )}
 
         <div className="flex items-center gap-3">
-          {/* Skip: only on steps 0 and 1 */}
+
+          {/* Skip — only on steps 0 and 1 */}
           {step < 2 && (
             <button
               onClick={handleSkip}
@@ -325,17 +353,38 @@ export default function OnboardingWizard({ onComplete, onBack }: OnboardingWizar
               {c.skip}
             </button>
           )}
-          <button
-            onClick={handleNext}
-            disabled={!canContinue}
-            className={`px-6 py-2.5 text-[14px] font-semibold rounded-lg transition-colors ${
-              canContinue
-                ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-            }`}
+
+          {/* Continue / Finish — with tooltip when disabled */}
+          <div
+            className="relative"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
           >
-            {step < TOTAL_STEPS - 1 ? c.continue : c.finish}
-          </button>
+            {/* Tooltip bubble */}
+            {showTooltip && !canContinue && (
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 bg-slate-800 text-white text-[12px] px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg z-50 pointer-events-none"
+                dir={direction}
+              >
+                {c.tooltipMsg}
+                {/* Arrow pointing down */}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-slate-800" />
+              </div>
+            )}
+
+            <button
+              onClick={handleNext}
+              disabled={!canContinue}
+              className={`px-6 py-2.5 text-[14px] font-semibold rounded-lg transition-colors ${
+                canContinue
+                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+              }`}
+            >
+              {step < TOTAL_STEPS - 1 ? c.continue : c.finish}
+            </button>
+          </div>
+
         </div>
       </div>
 

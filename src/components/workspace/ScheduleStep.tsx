@@ -51,8 +51,8 @@ export default function ScheduleStep({ user, onBackToSite, onExplore }: Schedule
   return (
     <div className="ws-modal" dir={direction}>
 
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 shrink-0">
+      {/* ── Header — always LTR: logo on LEFT, bars on RIGHT ── */}
+      <div className="flex items-center justify-between px-8 py-5 border-b border-slate-100 shrink-0" dir="ltr">
         <img src={nexusBlackLogo} alt="Nexus" className="h-8 w-auto object-contain" />
         {/* All steps filled — setup complete */}
         <div className="flex gap-1.5">
