@@ -102,12 +102,13 @@ export async function googleAuth(
 export async function googleAuthFromCode(
   code: string,
   meta: { userAgent?: string; ipAddress?: string } = {},
+  redirectUri: string = 'postmessage',
 ) {
   if (!env.GOOGLE_CLIENT_SECRET) throw createError('Google OAuth is not configured on this server', 503);
   const codeClient = new OAuth2Client(
     env.GOOGLE_CLIENT_ID,
     env.GOOGLE_CLIENT_SECRET,
-    'postmessage',
+    redirectUri,
   );
   const { tokens } = await codeClient.getToken(code);
   if (!tokens.id_token) throw createError('Google did not return an ID token', 401);
