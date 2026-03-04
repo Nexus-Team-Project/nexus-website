@@ -110,13 +110,15 @@ export default function PartnersPage() {
         {/* Rotating partner logo rings */}
         {partners.length > 0 && <PartnerRingsAnimation partners={partners} language={language} />}
 
-        <div className={`relative z-10 max-w-3xl px-6 ${direction === 'rtl' ? 'ml-auto text-right' : 'mx-auto text-center'}`}>
-          <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
-            {pT?.heroTitle ?? 'Find a Nexus partner'}
-          </h1>
-          <p className={`text-lg text-white/70 max-w-xl mb-8 ${direction === 'rtl' ? '' : 'mx-auto'}`}>
-            {pT?.heroSubtitle ?? 'Leading brands with exclusive discounts for community members'}
-          </p>
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
+          <div className={direction === 'rtl' ? 'max-w-3xl ml-auto text-right' : 'max-w-3xl mx-auto text-center'}>
+            <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
+              {pT?.heroTitle ?? 'Find a Nexus partner'}
+            </h1>
+            <p className={`text-lg text-white/70 max-w-xl mb-8 ${direction === 'rtl' ? '' : 'mx-auto'}`}>
+              {pT?.heroSubtitle ?? 'Leading brands with exclusive discounts for community members'}
+            </p>
+          </div>
         </div>
       </section>
 
