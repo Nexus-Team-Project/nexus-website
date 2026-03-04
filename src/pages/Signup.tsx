@@ -131,6 +131,27 @@ export default function Signup() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // If arriving from Login with ?resend=email, jump straight to verify screen and resend
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const resendEmail = params.get('resend');
+    if (resendEmail) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setVerificationEmail(resendEmail);
+      setStep('verify');
+      // Auto-trigger resend
+      api.post('/api/auth/resend-verification', { email: resendEmail }).catch(() => {});
+      setResendCooldown(60);
+      const interval = setInterval(() => {
+        setResendCooldown((s) => {
+          if (s <= 1) { clearInterval(interval); return 0; }
+          return s - 1;
+        });
+      }, 1000);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const validateForm = () => {
     const newErrors = {
       email: '',
