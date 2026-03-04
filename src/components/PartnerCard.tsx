@@ -23,9 +23,9 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
   const lockLabel = language === 'he' ? 'התחבר לצפייה' : 'Sign in to view';
 
   return (
-    <div className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 overflow-hidden flex flex-col">
+    <div className="group bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 overflow-hidden flex flex-col">
       {/* Logo */}
-      <div className="flex items-center justify-center h-28 bg-slate-50 p-4 border-b border-slate-100">
+      <div className="flex items-center justify-center h-36 bg-white p-4">
         <img
           src={partner.thumbnailUrl}
           alt={partner.title}

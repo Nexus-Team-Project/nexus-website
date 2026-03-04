@@ -450,7 +450,7 @@ export const translations = {
       selectTopicPrompt: 'Select a topic so we can help you better',
     },
     partnersPage: {
-      heroTitle: 'Exclusive Benefits for the Nexus Community',
+      heroTitle: 'Find a Nexus partner with the benefit or solution you need',
       heroSubtitle: 'Hundreds of leading brands with exclusive discounts for community members',
       searchPlaceholder: 'Search brand...',
       allCategories: 'All categories',
@@ -915,7 +915,7 @@ export const translations = {
       selectTopicPrompt: 'בחר נושא כדי שנוכל לעזור לך טוב יותר',
     },
     partnersPage: {
-      heroTitle: 'הטבות בלעדיות לקהילת Nexus',
+      heroTitle: 'מצא שותף של נקסוס עם ההטבה או הפתרון שאתה צריך',
       heroSubtitle: 'מאות מותגים מובילים עם הנחות בלעדיות לחברי הקהילה',
       searchPlaceholder: 'חפש מותג...',
       allCategories: 'כל הקטגוריות',

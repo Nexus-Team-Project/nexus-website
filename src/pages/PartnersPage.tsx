@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, X, Users } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import PartnerCard, { type Partner } from '../components/PartnerCard';
+import PartnerRingsAnimation from '../components/PartnerRingsAnimation';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
@@ -77,7 +78,10 @@ export default function PartnersPage() {
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full opacity-10 pointer-events-none"
           style={{ background: 'radial-gradient(circle, #635BFF 0%, transparent 70%)' }} />
 
-        <div className="relative max-w-3xl mx-auto px-6 text-center">
+        {/* Rotating partner logo rings */}
+        {partners.length > 0 && <PartnerRingsAnimation partners={partners} />}
+
+        <div className="relative z-10 max-w-3xl mx-auto px-6 text-center">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6">
             <Users size={14} />
             <span>{partners.length > 0 ? `${partners.length}+ ` : ''}{pT?.partnersCount ?? 'Partnerships'}</span>
@@ -136,32 +140,20 @@ export default function PartnersPage() {
             )}
           </div>
 
-          {/* Category chips */}
-          <div className="flex flex-wrap gap-1.5 overflow-x-auto pb-0.5">
-            <button
-              onClick={() => setSelectedCategory('')}
-              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-                !selectedCategory
-                  ? 'bg-stripe-purple text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {pT?.allCategories ?? (language === 'he' ? 'הכל' : 'All')}
-            </button>
+          {/* Category dropdown */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
+                       focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple
+                       py-2 px-3 cursor-pointer"
+            dir={direction}
+          >
+            <option value="">{pT?.allCategories ?? (language === 'he' ? 'כל הקטגוריות' : 'All categories')}</option>
             {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat === selectedCategory ? '' : cat)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-                  selectedCategory === cat
-                    ? 'bg-stripe-purple text-white'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {cat}
-              </button>
+              <option key={cat} value={cat}>{cat}</option>
             ))}
-          </div>
+          </select>
         </div>
       </div>
 
@@ -179,10 +171,10 @@ export default function PartnersPage() {
 
         {/* Loading skeleton */}
         {loading && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {Array.from({ length: 20 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-100 overflow-hidden animate-pulse">
-                <div className="h-28 bg-slate-100" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl border border-slate-100 overflow-hidden animate-pulse">
+                <div className="h-36 bg-slate-100" />
                 <div className="p-4 space-y-2">
                   <div className="h-3 bg-slate-100 rounded w-3/4" />
                   <div className="h-3 bg-slate-100 rounded w-1/2" />
@@ -213,7 +205,7 @@ export default function PartnersPage() {
 
         {/* Grid */}
         {!loading && filtered.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((partner) => (
               <PartnerCard key={partner.id} partner={partner} isLoggedIn={isLoggedIn} />
             ))}
