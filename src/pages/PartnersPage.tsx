@@ -98,7 +98,7 @@ export default function PartnersPage() {
 
       {/* ── Hero ─────────────────────────────────────────────── */}
       <section
-        className="relative pt-36 pb-36 text-white overflow-hidden"
+        className="relative pt-36 pb-56 text-white overflow-hidden"
         style={{ background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)' }}
       >
         {/* Decorative blob */}
