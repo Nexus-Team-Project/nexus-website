@@ -247,7 +247,7 @@ function MegaMenuPanel({
   );
 }
 
-export default function Navbar() {
+export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dark' }) {
   const { t, direction, language } = useLanguage();
 
   // Get nav items with current language
@@ -448,7 +448,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between" style={{ direction }}>
         {/* Logo */}
         <Link to={language === 'he' ? '/he' : '/'} className="flex items-center translate-y-1 flex-shrink-0">
-          <NexusLogo height={55} page="navbar" />
+          <NexusLogo height={55} page="navbar" variant={variant === 'dark' ? 'black' : undefined} />
         </Link>
 
         {/* Desktop Nav */}
@@ -464,8 +464,8 @@ export default function Navbar() {
                 href={item.href || '#'}
                 className={`flex items-center gap-1 px-4 py-2 text-sm rounded-lg transition-all ${
                   isLocked && openDropdown === item.label
-                    ? 'bg-white text-slate-900'
-                    : 'text-white/80 hover:text-slate-900 hover:bg-white'
+                    ? variant === 'dark' ? 'bg-slate-100 text-slate-900' : 'bg-white text-slate-900'
+                    : variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'
                 }`}
                 onMouseDown={(e) => {
                   if (item.megaMenu) {
@@ -624,7 +624,7 @@ export default function Navbar() {
 
         {/* Desktop CTA */}
         <div className="hidden lg:flex items-center gap-4">
-          <Link to={language === 'he' ? '/he/login' : '/login'} className="text-sm text-white/80 hover:text-slate-900 hover:bg-white px-4 py-2 rounded-lg transition-all">
+          <Link to={language === 'he' ? '/he/login' : '/login'} className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}>
             {t.navbar.signIn}
           </Link>
           <Link
@@ -641,7 +641,7 @@ export default function Navbar() {
         {/* Mobile toggle */}
         <button
           onClick={() => setMobileOpen(true)}
-          className="lg:hidden p-2 text-white"
+          className={`lg:hidden p-2 ${variant === 'dark' ? 'text-slate-900' : 'text-white'}`}
         >
           <Menu size={24} />
         </button>

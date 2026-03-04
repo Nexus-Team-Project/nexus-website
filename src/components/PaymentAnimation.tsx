@@ -4,14 +4,84 @@ import CheckoutPanel from './CheckoutPanel';
 import { useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 
-export default function PaymentAnimation() {
+// ─── Named export: standalone pricing panel for use in PaymentsPage S2 ──────
+export function PaymentPricingPanel() {
+  const { t } = useLanguage();
+  return (
+    <BrowserMockup url="nexus.com/pricing">
+      <div className="pricing-card">
+        <div className="pricing-bg-blob pricing-bg-blob-1"></div>
+        <div className="pricing-bg-blob pricing-bg-blob-2"></div>
+        <div className="pricing-plans">
+          <div className="pricing-plan plan-1">
+            <div className="plan-content">
+              <div className="plan-header">
+                <h4>Starter</h4>
+                <p className="plan-subtitle">For side projects</p>
+              </div>
+              <div className="plan-price-section">
+                <div className="plan-price">$0</div>
+                <span className="plan-period">/ month</span>
+              </div>
+              <button className="plan-button plan-button-outline">Get started</button>
+              <ul className="plan-features">
+                <li><span className="feature-check">✓</span>Up to 3 projects</li>
+                <li><span className="feature-check">✓</span>Basic analytics</li>
+                <li><span className="feature-check">✓</span>Community support</li>
+              </ul>
+            </div>
+          </div>
+          <div className="pricing-plan plan-2 plan-featured">
+            <div className="popular-badge">Most Popular</div>
+            <div className="plan-content">
+              <div className="plan-header">
+                <h4>Professional</h4>
+                <p className="plan-subtitle">For growing teams</p>
+              </div>
+              <div className="plan-price-section">
+                <div className="plan-price">$29</div>
+                <span className="plan-period">/ month</span>
+              </div>
+              <button className="plan-button plan-button-primary">Try for free</button>
+              <ul className="plan-features">
+                <li><span className="feature-check">✓</span>Unlimited projects</li>
+                <li><span className="feature-check">✓</span>Advanced analytics</li>
+                <li><span className="feature-check">✓</span>Priority support</li>
+                <li><span className="feature-check">✓</span>Team collaboration</li>
+              </ul>
+            </div>
+          </div>
+          <div className="pricing-plan plan-3">
+            <div className="plan-content">
+              <div className="plan-header">
+                <h4>Enterprise</h4>
+                <p className="plan-subtitle">For large organizations</p>
+              </div>
+              <div className="plan-price-section">
+                <div className="plan-price-custom">Custom</div>
+              </div>
+              <button className="plan-button plan-button-outline">{t.buttons.contactSales}</button>
+              <ul className="plan-features">
+                <li><span className="feature-check">✓</span>Dedicated manager</li>
+                <li><span className="feature-check">✓</span>SSO &amp; SAML</li>
+                <li><span className="feature-check">✓</span>99.99% SLA</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </BrowserMockup>
+  );
+}
+
+export default function PaymentAnimation({ show = 'all' }: { show?: 'all' | 'phone' | 'panel' }) {
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
   const { t } = useLanguage();
 
   return (
     <div className="payment-stage">
       {/* Phone Device */}
-      <div className="payment-phone">
+      {(show === 'all' || show === 'phone') && <div className="payment-phone">
         <div className="phone-side l1"></div>
         <div className="phone-side l2"></div>
         <div className="phone-side r1"></div>
@@ -119,10 +189,10 @@ export default function PaymentAnimation() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Web Panel with Flip Animation */}
-      <div className="checkout-panel">
+      {(show === 'all' || show === 'panel') && <div className="checkout-panel">
         <div className="panel-flip-container">
           <div className="panel-flip-inner">
             {/* Front - Pricing Panel */}
@@ -207,7 +277,7 @@ export default function PaymentAnimation() {
             </div>
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

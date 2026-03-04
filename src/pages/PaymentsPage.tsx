@@ -2,7 +2,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, CreditCard, Link2, RefreshCw, Users, Landmark, LayoutDashboard } from 'lucide-react';
 import Navbar from '../components/Navbar';
-import PaymentAnimation from '../components/PaymentAnimation';
+import PaymentAnimation, { PaymentPricingPanel } from '../components/PaymentAnimation';
 import AnimatedGradient from '../components/AnimatedGradient';
 import { useLanguage } from '../i18n/LanguageContext';
 
@@ -55,10 +55,14 @@ export default function PaymentsPage() {
 
   return (
     <div dir={direction} className="min-h-screen bg-white">
-      <Navbar />
+      <Navbar variant="dark" />
 
-      {/* Override .payment-stage overflow so animation is fully visible in hero */}
-      <style>{`.payments-hero-anim .payment-stage { overflow: visible !important; }`}</style>
+      {/* Override payment-stage: overflow visible + phone centered in hero column */}
+      <style>{`
+        .payments-hero-anim .payment-stage { overflow: visible !important; }
+        .payments-hero-anim .payment-phone { left: 80px !important; }
+        [dir="rtl"] .payments-hero-anim .payment-phone { left: auto !important; right: 80px !important; }
+      `}</style>
 
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
@@ -121,9 +125,9 @@ export default function PaymentsPage() {
               </div>
             </div>
 
-            {/* ── Animation column — free overflow (no clipping) ── */}
-            <div className="payments-hero-anim relative h-[520px]">
-              <PaymentAnimation />
+            {/* ── Animation column — phone only, hover activates animations ── */}
+            <div className="payments-hero-anim payment-card-expandable relative h-[520px]">
+              <PaymentAnimation show="phone" />
             </div>
 
           </div>
@@ -148,41 +152,46 @@ export default function PaymentsPage() {
       </div>
 
       {/* ══════════════════════════════════════════════════════════
-          S2 — קבלו תשלומים מכל מקום
+          S2 — קבלו תשלומים מכל מקום  +  דף מסלולי תשלום
       ══════════════════════════════════════════════════════════ */}
       <section className="scroll-reveal relative z-0 -mt-16 py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="max-w-3xl ml-auto text-right">
-            <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
-              {he ? 'תשלומים' : 'Payments'}
-            </p>
-            <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
-              {he ? 'קבלו תשלומים מכל מקום' : 'Accept payments from anywhere'}
-            </h2>
-            <p className="text-lg text-slate-600 leading-relaxed mb-10">
-              {he
-                ? 'עם Nexus אתם יכולים לקבל תשלומים מכל ערוץ שבו העסק שלכם פועל.'
-                : 'With Nexus you can accept payments through every channel your business operates on.'}
-            </p>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-10">
-            {(he
-              ? ['כרטיסי אשראי', 'Apple Pay ו-Google Pay', 'Bit ו-PayPal', 'חיוב חשבון בנק', 'תשלומים בינלאומיים']
-              : ['Credit cards', 'Apple Pay & Google Pay', 'Bit & PayPal', 'Bank account debit', 'International payments']
-            ).map((item) => (
-              <div key={item} className="flex items-center gap-3 bg-slate-50 rounded-xl p-4 border border-slate-100 flex-row-reverse">
-                <Check size={16} className="text-stripe-purple flex-shrink-0" />
-                <span className="text-slate-700 font-medium">{item}</span>
+            {/* ── Text column ── */}
+            <div className="text-right">
+              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+                {he ? 'תשלומים' : 'Payments'}
+              </p>
+              <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
+                {he ? 'קבלו תשלומים מכל מקום' : 'Accept payments from anywhere'}
+              </h2>
+              <p className="text-lg text-slate-600 leading-relaxed mb-10">
+                {he
+                  ? 'עם Nexus אתם יכולים לקבל תשלומים מכל ערוץ שבו העסק שלכם פועל.'
+                  : 'With Nexus you can accept payments through every channel your business operates on.'}
+              </p>
+              <ul className="space-y-4 mb-8">
+                {(he
+                  ? ['כרטיסי אשראי', 'Apple Pay ו-Google Pay', 'Bit ו-PayPal', 'חיוב חשבון בנק', 'תשלומים בינלאומיים']
+                  : ['Credit cards', 'Apple Pay & Google Pay', 'Bit & PayPal', 'Bank account debit', 'International payments']
+                ).map((item) => <Bullet key={item} text={item} />)}
+              </ul>
+              <p className="text-slate-500">
+                {he
+                  ? 'התחילו לגבות תשלומים באתר שלכם, במובייל או דרך קישורי תשלום.'
+                  : 'Start accepting payments on your website, mobile, or via payment links.'}
+              </p>
+            </div>
+
+            {/* ── Pricing panel animation (דף מסלולי תשלום) ── */}
+            <div className="flex justify-center lg:justify-end items-start overflow-hidden">
+              <div style={{ transform: 'scale(0.82)', transformOrigin: 'top center', marginBottom: '-80px' }}>
+                <PaymentPricingPanel />
               </div>
-            ))}
-          </div>
+            </div>
 
-          <p className="text-slate-500 text-right ml-auto max-w-3xl">
-            {he
-              ? 'התחילו לגבות תשלומים באתר שלכם, במובייל או דרך קישורי תשלום.'
-              : 'Start accepting payments on your website, mobile, or via payment links.'}
-          </p>
+          </div>
         </div>
       </section>
 
