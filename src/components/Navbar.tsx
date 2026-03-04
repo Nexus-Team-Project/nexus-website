@@ -208,7 +208,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
     },
   },
   { label: t.navbar.pricing, href: '#pricing' },
-  { label: t.navbar.partnersPageLabel, href: lang === 'he' ? '/he/partners' : '/partners' },
 ];
 
 // MegaMenuPanel: portal into document.body (eliminates nav stacking-context interference).
