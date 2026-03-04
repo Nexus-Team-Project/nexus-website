@@ -62,6 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setAccessToken(data.accessToken);
           const profile = await api.get<AuthUser>('/api/auth/me');
           setUser(profile);
+          // Persist first name so the welcome screen can show it after the full-page redirect
+          // (access token is in memory and won't survive the navigation).
+          if (profile.fullName) {
+            sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
+          }
           // Navigate to the destination that was saved before the Google redirect.
           // window.location.replace is used because useNavigate isn't available here
           // (AuthContext lives outside the Router boundary).

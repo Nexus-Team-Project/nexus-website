@@ -103,7 +103,7 @@ export default function OnboardingWizard({ onComplete, user }: OnboardingWizardP
   const { language, direction } = useLanguage();
   const lang = language === 'he' ? 'he' : 'en';
   const c = CONTENT[lang];
-  const firstName = user?.fullName?.split(' ')[0];
+  const firstName = user?.fullName?.split(' ')[0] ?? sessionStorage.getItem('auth_first_name') ?? undefined;
   const useCases = USE_CASES[lang];
 
   const [step, setStep] = useState(0);
