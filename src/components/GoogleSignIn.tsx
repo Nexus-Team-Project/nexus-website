@@ -3,19 +3,25 @@ import { useState } from 'react';
 
 interface GoogleSignInProps {
   variant?: 'hero' | 'form';
-  onSuccess?: () => void;
+  /** Path to navigate to after successful Google OAuth. Stored in sessionStorage
+   *  because the OAuth flow does a full-page redirect — callbacks can't survive it. */
+  redirectTo?: string;
+  onSuccess?: () => void; // kept for API compat; use redirectTo instead
   onError?: () => void;
 }
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 const REDIRECT_URI = window.location.origin;
 
-export default function GoogleSignIn({ variant = 'form' }: GoogleSignInProps) {
+export default function GoogleSignIn({ variant = 'form', redirectTo = '/workspace' }: GoogleSignInProps) {
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleGoogleLogin = () => {
     setIsLoading(true);
+    // Persist the intended destination across the full-page OAuth redirect.
+    // AuthContext reads this after the token callback and navigates accordingly.
+    sessionStorage.setItem('google_oauth_redirect', redirectTo);
     const scope = encodeURIComponent('email profile');
     const redirectUri = encodeURIComponent(REDIRECT_URI);
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;

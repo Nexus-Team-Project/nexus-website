@@ -25,6 +25,7 @@ export default function Login() {
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
   const signupPath = isHe ? '/he/signup' : '/signup';
+  const workspacePath = isHe ? '/he/workspace' : '/workspace';
 
   const isFormValid = email.trim() !== '' && password.trim() !== '';
 
@@ -57,7 +58,7 @@ export default function Login() {
 
     try {
       await login(email, password, rememberMe);
-      navigate(homePath);
+      navigate(workspacePath);
     } catch (err: any) {
       setIsLoading(false);
       setShouldShake(true);
@@ -218,7 +219,7 @@ export default function Login() {
 
               {/* Social Sign In */}
               <div className="space-y-3">
-                <GoogleSignIn onSuccess={() => navigate(homePath)} />
+                <GoogleSignIn redirectTo={workspacePath} />
 
                 <button
                   type="button"

@@ -57,6 +57,7 @@ export default function Signup() {
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
   const loginPath = isHe ? '/he/login' : '/login';
+  const workspacePath = isHe ? '/he/workspace' : '/workspace';
 
   const features = [
     {
@@ -161,7 +162,7 @@ export default function Signup() {
 
     try {
       await register({ email, fullName, password, country, emailUpdates });
-      navigate(homePath);
+      navigate(workspacePath);
     } catch (err: any) {
       setIsLoading(false);
       setShouldShake(true);
@@ -436,7 +437,7 @@ export default function Signup() {
                   </div>
 
                   {/* Google sign up */}
-                  <GoogleSignIn onSuccess={() => navigate(homePath)} />
+                  <GoogleSignIn redirectTo={workspacePath} />
                 </div>
 
                 {/* Already have account */}

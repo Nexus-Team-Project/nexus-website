@@ -5,12 +5,13 @@ import { LanguageProvider } from './i18n/LanguageContext';
 // ─── Lazy-load every route ────────────────────────────────
 // Each page becomes a separate chunk loaded only when navigated to.
 // Home/HomeHe are most critical — still lazy but browsers prefetch them.
-const Home     = lazy(() => import('./pages/Home'));
-const HomeHe   = lazy(() => import('./pages/HomeHe'));
-const Signup   = lazy(() => import('./pages/Signup'));
-const Login    = lazy(() => import('./pages/Login'));
-const SignupHe = lazy(() => import('./pages/SignupHe'));
-const LoginHe  = lazy(() => import('./pages/LoginHe'));
+const Home               = lazy(() => import('./pages/Home'));
+const HomeHe             = lazy(() => import('./pages/HomeHe'));
+const Signup             = lazy(() => import('./pages/Signup'));
+const Login              = lazy(() => import('./pages/Login'));
+const SignupHe           = lazy(() => import('./pages/SignupHe'));
+const LoginHe            = lazy(() => import('./pages/LoginHe'));
+const WorkspaceSetupPage = lazy(() => import('./pages/WorkspaceSetupPage'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -57,8 +58,10 @@ function App() {
           <Route path="/he"       element={<HomeHe />} />
           <Route path="/signup"   element={<LanguageProvider language="en"><Signup /></LanguageProvider>} />
           <Route path="/login"    element={<LanguageProvider language="en"><Login /></LanguageProvider>} />
-          <Route path="/he/signup" element={<SignupHe />} />
-          <Route path="/he/login"  element={<LoginHe />} />
+          <Route path="/he/signup"   element={<SignupHe />} />
+          <Route path="/he/login"    element={<LoginHe />} />
+          <Route path="/workspace"    element={<LanguageProvider language="en"><WorkspaceSetupPage /></LanguageProvider>} />
+          <Route path="/he/workspace" element={<LanguageProvider language="he"><WorkspaceSetupPage /></LanguageProvider>} />
         </Routes>
       </Suspense>
     </BrowserRouter>
