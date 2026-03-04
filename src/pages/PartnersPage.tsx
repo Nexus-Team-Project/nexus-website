@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Search, X, Users } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import PartnerCard, { type Partner } from '../components/PartnerCard';
 import PartnerRingsAnimation from '../components/PartnerRingsAnimation';
@@ -110,11 +110,7 @@ export default function PartnersPage() {
         {/* Rotating partner logo rings */}
         {partners.length > 0 && <PartnerRingsAnimation partners={partners} language={language} />}
 
-        <div className={`relative z-10 max-w-3xl mx-auto px-6 ${direction === 'rtl' ? 'text-right' : 'text-center'}`}>
-          <div className={`inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>
-            <Users size={14} />
-            <span>{partners.length > 0 ? `${partners.length}+ ` : ''}{pT?.partnersCount ?? 'Partnerships'}</span>
-          </div>
+        <div className={`relative z-10 max-w-3xl px-6 ${direction === 'rtl' ? 'ml-auto text-right' : 'mx-auto text-center'}`}>
           <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
             {pT?.heroTitle ?? 'Find a Nexus partner'}
           </h1>
@@ -170,18 +166,23 @@ export default function PartnersPage() {
           </select>
 
           {/* Sort dropdown */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
-                       focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple
-                       py-2 px-3 cursor-pointer"
-            dir={direction}
-          >
-            <option value="default">{pT?.sortDefault ?? (language === 'he' ? 'המלצה' : 'Recommended')}</option>
-            <option value="az">{pT?.sortAZ ?? (language === 'he' ? 'א–ת' : 'A–Z')}</option>
-            <option value="za">{pT?.sortZA ?? (language === 'he' ? 'ת–א' : 'Z–A')}</option>
-          </select>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-500 whitespace-nowrap">
+              {language === 'he' ? 'לסדר לפי' : 'Sort by'}
+            </span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
+                         focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple
+                         py-2 px-3 cursor-pointer"
+              dir={direction}
+            >
+              <option value="default">{pT?.sortDefault ?? (language === 'he' ? 'המלצה' : 'Recommended')}</option>
+              <option value="az">{pT?.sortAZ ?? (language === 'he' ? 'א–ת' : 'A–Z')}</option>
+              <option value="za">{pT?.sortZA ?? (language === 'he' ? 'ת–א' : 'Z–A')}</option>
+            </select>
+          </div>
         </div>
       </div>
 
