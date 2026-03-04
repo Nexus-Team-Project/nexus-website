@@ -189,7 +189,7 @@ export default function PartnersPage() {
       </div>
 
       {/* ── Partner Grid ─────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-10 pb-24">
 
         {/* Count */}
         {!loading && (
@@ -282,6 +282,26 @@ export default function PartnersPage() {
           </div>
         )}
       </main>
+
+      {/* ── Become a Partner CTA ─────────────────────────────── */}
+      <div className="bg-white border-t border-slate-200 py-16">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <h2 className="text-2xl font-bold text-slate-900 mb-3">
+            {language === 'he' ? 'רוצה להצטרף כשותף?' : 'Want to become a partner?'}
+          </h2>
+          <p className="text-slate-500 mb-8">
+            {language === 'he'
+              ? 'הצטרפו לאקוסיסטם של נקסוס והציעו את ההטבות שלכם לאלפי משתמשים'
+              : 'Join the Nexus ecosystem and offer your benefits to thousands of users'}
+          </p>
+          <Link
+            to={signupLink}
+            className="inline-block bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+          >
+            {language === 'he' ? 'הצטרף כשותף' : 'Become a Partner'}
+          </Link>
+        </div>
+      </div>
 
       {/* ── Footer ───────────────────────────────────────────── */}
       <Suspense fallback={<div className="h-40 bg-slate-900" />}>
