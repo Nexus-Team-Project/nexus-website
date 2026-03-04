@@ -14,7 +14,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         {
           title: t.navbar.payments,
           items: [
-            { name: t.navbar.payments, desc: t.navbar.paymentsOnline, icon: CreditCard },
+            { name: t.navbar.payments, desc: t.navbar.paymentsOnline, icon: CreditCard, href: lang === 'he' ? '/he/payments' : '/payments' },
             { name: t.navbar.paymentLinks, desc: t.navbar.paymentLinksDesc, icon: LinkIcon },
             { name: t.navbar.checkout, desc: t.navbar.checkoutDesc, icon: ShoppingCart },
             { name: t.navbar.elements, desc: t.navbar.elementsDesc, icon: Layers },
