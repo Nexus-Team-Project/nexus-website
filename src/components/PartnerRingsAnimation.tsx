@@ -27,7 +27,7 @@ interface Props {
 }
 
 // ─── Component ────────────────────────────────────────────────
-export default function PartnerRingsAnimation({ partners, language: _language }: Props) {
+export default function PartnerRingsAnimation({ partners, language }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,9 +35,9 @@ export default function PartnerRingsAnimation({ partners, language: _language }:
     const container = containerRef.current;
     const { width, height } = container.getBoundingClientRect();
 
-    // Center = bottom-right corner + offset (mirrors original HTML animation)
+    // Center = bottom-right corner for LTR, bottom-left corner for RTL (Hebrew)
     const offset = 80;
-    const centerX = width + offset;
+    const centerX = language === 'he' ? -offset : width + offset;
     const centerY = height + offset;
 
     const circles: CircleObj[] = [];
@@ -136,7 +136,7 @@ export default function PartnerRingsAnimation({ partners, language: _language }:
       cancelAnimationFrame(rafId);
       circles.forEach((c) => c.wrapper.remove());
     };
-  }, [partners]);
+  }, [partners, language]);
 
   return (
     <div
