@@ -35,6 +35,43 @@ export async function sendWelcomeEmail(email: string, fullName: string) {
   });
 }
 
+// ─── Email verification ─────────────────────────────────────
+
+export async function sendVerificationEmail(
+  email: string,
+  fullName: string,
+  rawToken: string,
+) {
+  if (!resend) return; // email disabled
+  const verifyUrl = `${FRONTEND}/verify-email?token=${rawToken}`;
+
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: 'Verify your Nexus account',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h1 style="color: #6366f1;">Welcome to Nexus, ${fullName}!</h1>
+        <p>Thanks for signing up. Please verify your email address to activate your account.</p>
+        <p>The link is valid for <strong>24 hours</strong>.</p>
+        <a href="${verifyUrl}" style="
+          display: inline-block;
+          background: #6366f1;
+          color: white;
+          padding: 12px 24px;
+          border-radius: 8px;
+          text-decoration: none;
+          margin: 16px 0;
+          font-size: 15px;
+        ">Verify my email</a>
+        <p style="color: #6b7280; font-size: 14px;">
+          If you didn't create a Nexus account, you can safely ignore this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 // ─── Password reset ────────────────────────────────────────
 
 export async function sendPasswordResetEmail(

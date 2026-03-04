@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { api } from '../lib/api';
 import AnimatedGradient from '../components/AnimatedGradient';
 import GoogleSignIn from '../components/GoogleSignIn';
 import NexusLogo from '../components/NexusLogo';
@@ -43,6 +44,9 @@ export default function Signup() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [shouldShake, setShouldShake] = useState(false);
+  const [step, setStep] = useState<'form' | 'verify'>('form');
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [errors, setErrors] = useState({
     email: '',
     fullName: '',
@@ -153,7 +157,6 @@ export default function Signup() {
     e.preventDefault();
 
     if (!isFormValid) {
-      // Show errors when trying to submit with empty fields
       validateForm();
       return;
     }
@@ -161,22 +164,83 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      await register({ email, fullName, password, country, emailUpdates });
-      navigate(workspacePath);
+      const result = await register({ email, fullName, password, country, emailUpdates });
+      if (result?.requiresVerification) {
+        setVerificationEmail(result.email);
+        setStep('verify');
+      } else {
+        navigate(workspacePath);
+      }
     } catch (err: any) {
-      setIsLoading(false);
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 900);
-      // Surface specific field errors when available
       if (err?.field === 'email') {
         setErrors((prev) => ({ ...prev, email: err.error || 'Email already in use' }));
       } else if (err?.error) {
         setErrors((prev) => ({ ...prev, email: err.error }));
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const handleResend = useCallback(async () => {
+    if (resendCooldown > 0) return;
+    await api.post('/api/auth/resend-verification', { email: verificationEmail }).catch(() => {});
+    setResendCooldown(60);
+    const interval = setInterval(() => {
+      setResendCooldown((s) => {
+        if (s <= 1) { clearInterval(interval); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+  }, [verificationEmail, resendCooldown]);
+
   const getCountryName = (c: typeof countries[0]) => isHe ? c.nameHe : c.name;
+
+  // ── "Check your email" screen ─────────────────────────────────────────────
+  if (step === 'verify') {
+    return (
+      <div className="relative h-screen bg-white flex flex-col overflow-hidden">
+        <div className="fixed bottom-0 left-0 right-0 h-[45%] z-0">
+          <AnimatedGradient clipPath="polygon(0 40%, 100% 0%, 100% 100%, 0 100%)" />
+        </div>
+        <div className="relative z-10 flex-1 flex flex-col">
+          <div className="border-b border-gray-100 flex-shrink-0">
+            <div className="max-w-6xl mx-auto py-3 px-6" dir="ltr">
+              <Link to={homePath}>
+                <NexusLogo height={44} variant="black" page="auth" />
+              </Link>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center px-8">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-8 w-full max-w-md text-center">
+              {/* Email icon */}
+              <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2"/>
+                  <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+                </svg>
+              </div>
+              <h1 className="text-xl font-bold text-slate-800 mb-2">Check your inbox</h1>
+              <p className="text-sm text-slate-500 mb-1">We sent a verification link to</p>
+              <p className="text-sm font-semibold text-slate-700 mb-6">{verificationEmail}</p>
+              <p className="text-xs text-slate-400 mb-6">
+                Click the link in the email to activate your account. The link expires in 24 hours.
+              </p>
+              <button
+                onClick={handleResend}
+                disabled={resendCooldown > 0}
+                className="text-sm text-indigo-600 hover:underline disabled:text-slate-400 disabled:no-underline transition-colors"
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Didn't get it? Resend email"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen bg-white flex flex-col overflow-hidden">

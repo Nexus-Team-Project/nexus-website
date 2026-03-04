@@ -12,6 +12,7 @@ const Login              = lazy(() => import('./pages/Login'));
 const SignupHe           = lazy(() => import('./pages/SignupHe'));
 const LoginHe            = lazy(() => import('./pages/LoginHe'));
 const WorkspaceSetupPage = lazy(() => import('./pages/WorkspaceSetupPage'));
+const VerifyEmailPage    = lazy(() => import('./pages/VerifyEmailPage'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -62,6 +63,7 @@ function App() {
           <Route path="/he/login"    element={<LoginHe />} />
           <Route path="/workspace"    element={<LanguageProvider language="en"><WorkspaceSetupPage /></LanguageProvider>} />
           <Route path="/he/workspace" element={<LanguageProvider language="he"><WorkspaceSetupPage /></LanguageProvider>} />
+          <Route path="/verify-email" element={<LanguageProvider language="en"><VerifyEmailPage /></LanguageProvider>} />
         </Routes>
       </Suspense>
     </BrowserRouter>
