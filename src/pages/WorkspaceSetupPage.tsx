@@ -58,6 +58,7 @@ export default function WorkspaceSetupPage() {
           <OnboardingWizard
             onComplete={handleWizardComplete}
             onBack={() => navigate(homePath)}
+            user={user}
           />
         )}
 

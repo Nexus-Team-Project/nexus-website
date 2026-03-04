@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import nexusBlackLogo from '../../assets/logos/nexus-logo-black.png';
 import { useLanguage } from '../../i18n/LanguageContext';
 import type { OnboardingData } from '../../pages/WorkspaceSetupPage';
+import type { AuthUser } from '../../contexts/AuthContext';
 
 const TOTAL_STEPS = 3;
 
@@ -38,7 +39,7 @@ function getSuggested(desc: string, lang: 'he' | 'en'): string[] {
 // ── Bilingual UI text ──────────────────────────────────────────────────────
 const CONTENT = {
   he: {
-    welcomeTitle: 'ברוכים הבאים לנקסוס.',
+    welcomeTitle: (firstName?: string) => firstName ? `ברוכים הבאים לנקסוס, ${firstName}.` : 'ברוכים הבאים לנקסוס.',
     welcomeSubtitle: 'ספרו לנו קצת על הארגון שלכם כדי להתאים את הסביבה. תמיד ניתן לשנות זאת מאוחר יותר.',
     orgNameLabel: 'שם הארגון',
     orgNamePlaceholder: 'נקסוס בע"מ',
@@ -64,7 +65,7 @@ const CONTENT = {
     tooltipMsg: 'אנחנו צריכים עוד פרטים כדי להתקדם',
   },
   en: {
-    welcomeTitle: 'Welcome to Nexus.',
+    welcomeTitle: (firstName?: string) => firstName ? `Welcome to Nexus, ${firstName}.` : 'Welcome to Nexus.',
     welcomeSubtitle: 'Answer a few questions about your organization to customize your workspace. You can always change this later.',
     orgNameLabel: 'Organization name',
     orgNamePlaceholder: 'Nexus Ltd.',
@@ -95,12 +96,14 @@ const CONTENT = {
 interface OnboardingWizardProps {
   onComplete: (data: OnboardingData) => void;
   onBack: () => void;
+  user?: AuthUser | null;
 }
 
-export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) {
+export default function OnboardingWizard({ onComplete, user }: OnboardingWizardProps) {
   const { language, direction } = useLanguage();
   const lang = language === 'he' ? 'he' : 'en';
   const c = CONTENT[lang];
+  const firstName = user?.fullName?.split(' ')[0];
   const useCases = USE_CASES[lang];
 
   const [step, setStep] = useState(0);
@@ -285,7 +288,7 @@ export default function OnboardingWizard({ onComplete }: OnboardingWizardProps) 
           <>
             <div className="mb-7">
               <h1 className="text-[26px] font-bold text-indigo-600 leading-tight mb-2">
-                {c.welcomeTitle}
+                {c.welcomeTitle(firstName)}
               </h1>
               <p className="text-[14px] text-slate-500 leading-relaxed">
                 {c.welcomeSubtitle}
