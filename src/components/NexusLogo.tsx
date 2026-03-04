@@ -61,7 +61,7 @@ export default function NexusLogo({ className = '', height = 28, variant = 'whit
       onMouseLeave={handleMouseLeave}
       style={{ height }}
     >
-      {/* Static logo - shown when not hovered */}
+      {/* Static logo - in normal flow to keep container width stable */}
       <img
         src={staticSrc}
         alt="Nexus"
@@ -70,10 +70,10 @@ export default function NexusLogo({ className = '', height = 28, variant = 'whit
           opacity: isHovered ? 0 : 1,
           transition: 'opacity 0.2s ease-in-out',
         }}
-        className={`${imageStyles} absolute top-0 left-0`}
+        className={imageStyles}
       />
 
-      {/* Animated video - shown on hover (94% smaller than GIF!) */}
+      {/* Animated video - absolutely overlaid so it doesn't affect layout width */}
       <video
         ref={videoRef}
         style={{
@@ -81,7 +81,7 @@ export default function NexusLogo({ className = '', height = 28, variant = 'whit
           opacity: isHovered ? 1 : 0,
           transition: 'opacity 0.2s ease-in-out',
         }}
-        className={imageStyles}
+        className={`${imageStyles} absolute top-0 left-0`}
         muted
         playsInline
         loop
