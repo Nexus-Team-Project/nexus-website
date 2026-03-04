@@ -355,3 +355,19 @@ model PaymentEvent {
 
   @@index([orderId])
 }
+
+model Partner {
+  id           String   @id @default(cuid())
+  title        String
+  thumbnailUrl String
+  categories   String[]
+  discount     String?
+  description  String?
+  websiteUrl   String?
+  isActive     Boolean  @default(true)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive])
+}

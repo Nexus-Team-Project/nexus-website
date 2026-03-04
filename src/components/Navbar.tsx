@@ -23,7 +23,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         {
           title: t.navbar.revenue,
           items: [
-            { name: t.navbar.loyaltyPartnerships, desc: t.navbar.loyaltyPartnershipsDesc, icon: Gift },
+            { name: t.navbar.loyaltyPartnerships, desc: t.navbar.loyaltyPartnershipsDesc, icon: Gift, href: lang === 'he' ? '/he/partners' : '/partners' },
             { name: t.navbar.loyaltyClub, desc: t.navbar.loyaltyClubDesc, icon: Users },
             { name: t.navbar.giftsWelfare, desc: t.navbar.giftsWelfareDesc, icon: Heart },
           ],
@@ -208,6 +208,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
     },
   },
   { label: t.navbar.pricing, href: '#pricing' },
+  { label: t.navbar.partnersPageLabel, href: lang === 'he' ? '/he/partners' : '/partners' },
 ];
 
 // MegaMenuPanel: portal into document.body (eliminates nav stacking-context interference).
@@ -524,7 +525,7 @@ export default function Navbar() {
                                 return (
                                   <a
                                     key={subItem.name}
-                                    href="#"
+                                    href={(subItem as any).href || '#'}
                                     className="group flex items-start gap-3"
                                   >
                                     <Icon className="text-stripe-purple text-xl mt-0.5 group-hover:scale-110 transition-transform" size={20} />
