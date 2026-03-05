@@ -61,19 +61,16 @@ export default function PaymentsPage() {
     <div dir={direction} className="min-h-screen bg-white">
       <Navbar variant="dark" />
 
-      {/* Override payment-stage: no background, no frame, just the phone — all states including hover */}
+      {/* Override payment-stage: no background, no frame, no hover effects — phone only */}
       <style>{`
-        .payments-hero-anim .payment-stage,
-        .payments-hero-anim:hover .payment-stage,
-        .payments-hero-anim .payment-stage:hover {
+        /* Kill hover entirely — RTL hero autoplays, no need for hover triggers */
+        .payments-hero-anim { pointer-events: none; }
+        .payments-hero-anim .payment-stage {
           overflow: visible !important; background: none !important; border: none !important;
           box-shadow: none !important; outline: none !important;
         }
-        .payments-hero-anim .payment-stage::before,
-        .payments-hero-anim:hover .payment-stage::before,
-        .payment-card-expandable.payments-hero-anim:hover .payment-stage::before {
-          display: none !important; content: none !important; opacity: 0 !important;
-          background: none !important; animation: none !important;
+        .payments-hero-anim .payment-stage::before {
+          display: none !important; content: none !important;
         }
         .payments-hero-anim .payment-phone { left: 80px !important; }
         [dir="rtl"] .payments-hero-anim .payment-phone { left: 60px !important; right: auto !important; top: 40px !important; }
@@ -160,9 +157,14 @@ export default function PaymentsPage() {
         </div>
       </section>
 
-      {/* ── Gradient diagonal — visible parallelogram strip between hero and S2 ── */}
-      <div className="relative z-10 h-64 -mt-16">
-        <AnimatedGradient clipPath={isRtl ? "polygon(100% 0, 0 35%, 0 100%, 100% 65%)" : "polygon(0 0, 100% 35%, 100% 100%, 0 65%)"} />
+      {/* ── Gradient diagonal — visible parallelogram strip (wider, tube illusion) ── */}
+      <div className="relative z-10 h-80 -mt-16">
+        <AnimatedGradient clipPath={isRtl ? "polygon(0 0, 100% 25%, 100% 100%, 0 75%)" : "polygon(0 0, 100% 25%, 100% 100%, 0 75%)"} />
+        {/* Tube/cylinder highlight overlay — same clip to create 3D pipe illusion */}
+        <div className="absolute inset-0 pointer-events-none" style={{
+          clipPath: isRtl ? "polygon(0 0, 100% 25%, 100% 100%, 0 75%)" : "polygon(0 0, 100% 25%, 100% 100%, 0 75%)",
+          background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(0,0,0,0.18) 100%)'
+        }} />
       </div>
 
       {/* ══════════════════════════════════════════════════════════

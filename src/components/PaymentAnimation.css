@@ -709,20 +709,18 @@
   transform: translateY(0);
 }
 
-/* RTL Hero: autoplay all animations without requiring hover */
+/* RTL Hero: autoplay all animations without requiring hover.
+   IMPORTANT: Do NOT use !important on transform/opacity here — it overrides keyframe values and freezes the animation. */
 [dir="rtl"] .payments-hero-anim .payment-phone {
   animation: phoneFloat 4s ease-in-out infinite !important;
-  transform: translateY(0) !important;
 }
 
 [dir="rtl"] .payments-hero-anim .payment-sheet {
   animation: sheetSlideIn 10s ease-in-out infinite !important;
-  transform: translateY(110%) !important;
 }
 
 [dir="rtl"] .payments-hero-anim .payment-overlay {
   animation: overlayFadeIn 10s ease-in-out infinite !important;
-  opacity: 0 !important;
 }
 
 @keyframes phoneFloat {
