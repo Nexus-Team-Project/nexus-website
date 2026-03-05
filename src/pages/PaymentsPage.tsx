@@ -5,6 +5,8 @@ import Navbar from '../components/Navbar';
 import PaymentAnimation, { PaymentPricingPanel } from '../components/PaymentAnimation';
 import AnimatedGradient from '../components/AnimatedGradient';
 import { useLanguage } from '../i18n/LanguageContext';
+import visaLogo from '../assets/logos/visa-logo.png';
+import mastercardLogo from '../assets/logos/mastercard-logo.png';
 
 const Footer = lazy(() => import('../components/Footer'));
 
@@ -203,11 +205,28 @@ export default function PaymentsPage() {
               </p>
             </div>
 
-            {/* ── Pricing panel animation (דף מסלולי תשלום) ── */}
-            <div className="flex justify-center lg:justify-end items-start overflow-hidden">
-              <div style={{ transform: 'scale(0.82)', transformOrigin: 'top center', marginBottom: '-80px' }}>
-                <PaymentPricingPanel />
+            {/* ── Payment method logos ── */}
+            <div className="flex flex-col items-center gap-8">
+              <div className="grid grid-cols-3 gap-6 w-full max-w-md">
+                {[
+                  { src: visaLogo, alt: 'Visa', label: 'Visa' },
+                  { src: mastercardLogo, alt: 'Mastercard', label: 'Mastercard' },
+                  { src: '/bit-logo.png', alt: 'Bit', label: 'Bit' },
+                  { src: '/paybox-transparent.png', alt: 'PayBox', label: 'PayBox' },
+                  { src: '/apple-pay.png', alt: 'Apple Pay', label: 'Apple Pay' },
+                ].map((pm) => (
+                  <div key={pm.alt} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center gap-2 hover:shadow-md hover:border-stripe-purple/30 transition-all duration-300">
+                    <img src={pm.src} alt={pm.alt} className="h-8 object-contain" />
+                    <span className="text-xs text-slate-500 font-medium">{pm.label}</span>
+                  </div>
+                ))}
+                {/* Bank transfer — icon-based */}
+                <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center gap-2 hover:shadow-md hover:border-stripe-purple/30 transition-all duration-300">
+                  <Landmark size={28} className="text-slate-700" />
+                  <span className="text-xs text-slate-500 font-medium">{he ? 'העברה בנקאית' : 'Bank Transfer'}</span>
+                </div>
               </div>
+              <p className="text-sm text-slate-400">{he ? 'ועוד מגוון אמצעי תשלום נוספים' : 'And many more payment methods'}</p>
             </div>
 
           </div>
@@ -251,21 +270,11 @@ export default function PaymentsPage() {
               </ul>
             </div>
 
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 mt-8 lg:mt-16 text-right">
-              <p className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-5">
-                {he ? 'פתרון מושלם עבור:' : 'Perfect for:'}
-              </p>
-              <ul className="space-y-5">
-                {(he
-                  ? ['שירותים מקצועיים', 'מכירת מוצרים', 'גבייה מהירה מלקוחות']
-                  : ['Professional services', 'Product sales', 'Quick client billing']
-                ).map((item) => (
-                  <li key={item} className={`flex items-center gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
-                    <div className="w-2 h-2 rounded-full bg-stripe-purple flex-shrink-0" />
-                    <span className="text-slate-700 font-medium">{item}</span>
-                  </li>
-                ))}
-              </ul>
+            {/* ── Pricing panel (moved from S2), with slide-in animation ── */}
+            <div className="scroll-reveal flex justify-center lg:justify-end items-start overflow-hidden">
+              <div style={{ transform: 'scale(0.78)', transformOrigin: 'top center', marginBottom: '-80px' }}>
+                <PaymentPricingPanel />
+              </div>
             </div>
 
           </div>
