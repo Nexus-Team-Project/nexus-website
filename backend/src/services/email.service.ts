@@ -33,29 +33,33 @@ async function getAccessToken(): Promise<string> {
   return cachedToken.value;
 }
 
-async function sendMail(options: { to: string; toName?: string; subject: string; html: string }) {
+async function sendMail(options: { to: string; toName?: string; subject: string; html: string; text?: string }) {
   if (!env.SENDPULSE_CLIENT_ID || !env.SENDPULSE_CLIENT_SECRET) {
     console.warn('⚠️  Email not sent — SENDPULSE_CLIENT_ID/SECRET not configured');
     return;
   }
+  console.log(`📧  Sending email to ${options.to}, subject: "${options.subject}", html length: ${options.html?.length ?? 0}`);
   try {
     const token = await getAccessToken();
+    const body = JSON.stringify({
+      email: {
+        html: options.html,
+        text: options.text ?? options.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+        subject: options.subject,
+        from: { name: FROM_NAME, email: FROM_EMAIL },
+        to: [{ name: options.toName ?? options.to, email: options.to }],
+      },
+    });
     const res = await fetch('https://api.sendpulse.com/smtp/emails', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json; charset=utf-8',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        email: {
-          html: options.html,
-          subject: options.subject,
-          from: { name: FROM_NAME, email: FROM_EMAIL },
-          to: [{ name: options.toName ?? options.to, email: options.to }],
-        },
-      }),
+      body,
     });
     const data = await res.json() as { result?: boolean; message?: string };
+    console.log(`📬  SendPulse response:`, JSON.stringify(data));
     if (!res.ok || data.result === false) {
       throw new Error(data.message ?? `HTTP ${res.status}`);
     }
