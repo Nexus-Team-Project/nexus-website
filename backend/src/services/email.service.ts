@@ -111,6 +111,7 @@ export async function sendVerificationEmail(
     to: email,
     toName: fullName,
     subject: 'Verify your Nexus account',
+    text: `Welcome to Nexus, ${fullName}!\n\nPlease verify your email address by clicking the link below:\n\n${verifyUrl}\n\nThe link is valid for 24 hours.\n\nIf you didn't create a Nexus account, you can safely ignore this email.`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h1 style="color: #6366f1;">Welcome to Nexus, ${fullName}!</h1>
