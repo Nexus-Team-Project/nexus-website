@@ -430,16 +430,15 @@
   width: 620px;
   min-width: 620px;
   max-width: 620px;
-  height: 520px;
-  min-height: 520px;
-  background: #f9fafb;
-  border-radius: 20px;
-  padding: 24px 16px;
+  min-height: 420px;
+  background: transparent;
+  border-radius: 0;
+  padding: 16px 0;
   box-shadow: none;
   border: none;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   flex-shrink: 0;
   position: relative;
 }
@@ -766,11 +765,10 @@
   width: 620px;
   min-width: 620px;
   max-width: 620px;
-  height: 520px;
-  min-height: 520px;
-  background: #ffffff;
-  border-radius: 20px;
-  overflow: hidden;
+  min-height: 420px;
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
   flex-shrink: 0;
   box-shadow: none;
   border: none;
@@ -1074,7 +1072,7 @@
 }
 
 .checkout-dynamic .checkout-card {
-  border-radius: 20px;
+  border-radius: 0;
 }
 
 @keyframes checkoutFloat {
