@@ -16,8 +16,17 @@ function createTransport() {
 
 async function sendMail(options: { to: string; subject: string; html: string }) {
   const transport = createTransport();
-  if (!transport) return; // email disabled — SMTP not configured
-  await transport.sendMail({ from: FROM, ...options });
+  if (!transport) {
+    console.warn('⚠️  Email not sent — SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing)');
+    return;
+  }
+  try {
+    const info = await transport.sendMail({ from: FROM, ...options });
+    console.log(`✅  Email sent to ${options.to} — messageId: ${info.messageId}`);
+  } catch (err: any) {
+    console.error(`❌  Email send failed to ${options.to}:`, err?.message ?? err);
+    throw err;
+  }
 }
 
 // ─── Welcome email ─────────────────────────────────────────
