@@ -17,9 +17,9 @@ export default function NexusLogo({ className = '', height = 28, variant = 'whit
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isHovered, setIsHovered] = useState(false);
 
-  // For navbar, use white wide logo; for other pages use regular logos
+  // For navbar: use black logo when dark variant, otherwise white wide logo
   const staticSrc = page === 'navbar'
-    ? whiteWideLogo
+    ? (variant === 'black' ? staticLogoBlack : whiteWideLogo)
     : variant === 'black'
       ? staticLogoBlack
       : '/nexus-logo.png';

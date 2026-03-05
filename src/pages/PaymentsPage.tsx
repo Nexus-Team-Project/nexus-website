@@ -57,17 +57,31 @@ export default function PaymentsPage() {
     <div dir={direction} className="min-h-screen bg-white">
       <Navbar variant="dark" />
 
-      {/* Override payment-stage: overflow visible + phone centered in hero column */}
+      {/* Override payment-stage: overflow visible + phone left-aligned in hero column */}
       <style>{`
         .payments-hero-anim .payment-stage { overflow: visible !important; }
         .payments-hero-anim .payment-phone { left: 80px !important; }
-        [dir="rtl"] .payments-hero-anim .payment-phone { left: auto !important; right: 80px !important; }
+        [dir="rtl"] .payments-hero-anim .payment-phone { left: 0px !important; right: auto !important; }
       `}</style>
 
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
       <section className="relative pt-32 pb-20 bg-slate-50 overflow-x-hidden">
+        {/* RTL-only: animated gradient diagonal inside hero, overlapping phone (left side) */}
+        {isRtl && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              zIndex: 5,
+              opacity: 0.65,
+              maskImage: 'linear-gradient(to right, black 20%, transparent 65%)',
+              WebkitMaskImage: 'linear-gradient(to right, black 20%, transparent 65%)',
+            }}
+          >
+            <AnimatedGradient clipPath="polygon(0 0, 62% 0, 38% 100%, 0 100%)" />
+          </div>
+        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
@@ -101,7 +115,7 @@ export default function PaymentsPage() {
                   ? ['סליקת אשראי וארנקים דיגיטליים', 'מנויים ותשלומים חוזרים', 'קישורי תשלום ועמודי Checkout', 'אפשרות למכור גם בתוך קהילות וארגונים']
                   : ['Credit & digital wallet processing', 'Subscriptions & recurring payments', 'Payment links & Checkout pages', 'Sell within communities and organizations']
                 ).map((item) => (
-                  <li key={item} className="flex items-center gap-3 flex-row-reverse">
+                  <li key={item} className={`flex items-center gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
                     <Check size={16} className="text-stripe-purple flex-shrink-0" />
                     <span className="text-slate-700">{item}</span>
                   </li>
@@ -134,27 +148,23 @@ export default function PaymentsPage() {
         </div>
       </section>
 
-      {/* ── Gradient diagonal — floats between hero and S2, overlaps both ── */}
-      <div
-        className="relative z-10 h-64 -mt-16"
-        style={{
-          maskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
-        }}
-      >
-        <AnimatedGradient
-          clipPath={
-            isRtl
-              ? 'polygon(0 60%, 100% 0, 100% 100%, 0 100%)'
-              : 'polygon(0 0, 100% 60%, 100% 100%, 0 100%)'
-          }
-        />
-      </div>
+      {/* ── Gradient diagonal — floats between hero and S2, overlaps both (LTR only) ── */}
+      {!isRtl && (
+        <div
+          className="relative z-10 h-64 -mt-16"
+          style={{
+            maskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
+            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
+          }}
+        >
+          <AnimatedGradient clipPath="polygon(0 0, 100% 60%, 100% 100%, 0 100%)" />
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════════════════
           S2 — קבלו תשלומים מכל מקום  +  דף מסלולי תשלום
       ══════════════════════════════════════════════════════════ */}
-      <section className="scroll-reveal relative z-0 -mt-16 py-20 md:py-32 bg-white overflow-x-hidden">
+      <section className={`scroll-reveal relative z-0 ${!isRtl ? '-mt-16' : ''} py-20 md:py-32 bg-white overflow-x-hidden`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
