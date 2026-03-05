@@ -80,91 +80,94 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
-      <section className={`relative pt-32 bg-slate-50 overflow-x-hidden ${isRtl ? 'pb-12' : 'pb-20'}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
-
-          {/* RTL: Phone pulled out of grid, absolutely positioned on the left */}
-          {isRtl && (
-            <div className="payments-hero-anim payment-card-expandable absolute left-16 top-0 bottom-0 w-[280px] hidden lg:block z-10">
-              <PaymentAnimation show="phone" />
-            </div>
-          )}
-
-          <div className={`grid grid-cols-1 gap-12 items-center ${isRtl ? '' : 'lg:grid-cols-2'}`}>
-
-            {/* ── Text column (DOM first → right in RTL, left in LTR) ── */}
-            <div className={`text-right ${isRtl ? 'lg:pl-[300px]' : ''}`}>
-
-              {/* Label chip */}
-              <div className={`inline-flex items-center gap-2 bg-stripe-purple/10 border border-stripe-purple/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 text-stripe-purple ${isRtl ? '' : 'flex-row-reverse'}`}>
-                <CreditCard size={13} />
-                <span>{he ? 'סליקה' : 'Payments'}</span>
-              </div>
-
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 text-slate-900">
-                {he ? 'סליקה חכמה לעסקים' : 'Smart Payments for Business'}
-              </h1>
-
-              <p className="text-lg text-slate-700 mb-4 leading-relaxed">
-                {he
-                  ? 'קבלו תשלומים מכל מקום – באתר, בלינקים, במנויים או בתוך קהילות Nexus.'
-                  : 'Accept payments from anywhere – on your website, via links, subscriptions, or within Nexus communities.'}
-              </p>
-              <p className="text-lg text-slate-600 mb-8 leading-relaxed">
-                {he
-                  ? 'מערכת תשלומים אחת שמאפשרת לכם לנהל את כל ההכנסות של העסק במקום אחד.'
-                  : 'One payments system that lets you manage all your business revenue in one place.'}
-              </p>
-
-              {/* ✔ Bullets */}
-              <ul className="space-y-3 mb-10">
-                {(he
-                  ? ['סליקת אשראי וארנקים דיגיטליים', 'מנויים ותשלומים חוזרים', 'קישורי תשלום ועמודי Checkout', 'אפשרות למכור גם בתוך קהילות וארגונים']
-                  : ['Credit & digital wallet processing', 'Subscriptions & recurring payments', 'Payment links & Checkout pages', 'Sell within communities and organizations']
-                ).map((item) => (
-                  <li key={item} className={`flex items-center gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
-                    <Check size={16} className="text-stripe-purple flex-shrink-0" />
-                    <span className="text-slate-700">{item}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA buttons */}
-              <div className={`flex flex-wrap gap-4 ${isRtl ? 'justify-start' : 'justify-end'}`}>
-                <Link
-                  to={signupLink}
-                  className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
-                >
-                  {he ? 'פתחו חשבון סליקה' : 'Open a payments account'}
-                </Link>
-                <Link
-                  to={signupLink}
-                  className="inline-block border border-slate-300 bg-white text-slate-700 font-semibold px-8 py-3 rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  {he ? 'קבעו שיחת היכרות' : 'Schedule a call'}
-                </Link>
-              </div>
-            </div>
-
-            {/* ── LTR: Animation column — phone only, hover activates animations ── */}
-            {!isRtl && (
-              <div className="payments-hero-anim payment-card-expandable relative h-[520px]">
-                <PaymentAnimation show="phone" />
-              </div>
-            )}
-
+      {/* Wrapper for hero + diagonal so phone animation can overlap both */}
+      <div className="relative">
+        {/* RTL: Phone floats above hero + diagonal strip */}
+        {isRtl && (
+          <div className="payments-hero-anim payment-card-expandable absolute left-16 top-32 w-[280px] hidden lg:block z-20" style={{ bottom: '-2rem' }}>
+            <PaymentAnimation show="phone" />
           </div>
-        </div>
-      </section>
+        )}
 
-      {/* ── Gradient diagonal — visible parallelogram strip (wider, tube illusion) ── */}
-      <div className="relative z-10 h-80 -mt-16">
-        <AnimatedGradient clipPath={isRtl ? "polygon(0 0, 100% 25%, 100% 100%, 0 75%)" : "polygon(0 0, 100% 25%, 100% 100%, 0 75%)"} />
-        {/* Tube/cylinder highlight overlay — same clip to create 3D pipe illusion */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          clipPath: isRtl ? "polygon(0 0, 100% 25%, 100% 100%, 0 75%)" : "polygon(0 0, 100% 25%, 100% 100%, 0 75%)",
-          background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(0,0,0,0.18) 100%)'
-        }} />
+        <section className={`relative pt-32 bg-slate-50 overflow-x-hidden ${isRtl ? 'pb-12' : 'pb-20'}`}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
+
+            <div className={`grid grid-cols-1 gap-12 items-center ${isRtl ? '' : 'lg:grid-cols-2'}`}>
+
+              {/* ── Text column (DOM first → right in RTL, left in LTR) ── */}
+              <div className={`text-right ${isRtl ? 'lg:pl-[300px]' : ''}`}>
+
+                {/* Label chip */}
+                <div className={`inline-flex items-center gap-2 bg-stripe-purple/10 border border-stripe-purple/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 text-stripe-purple ${isRtl ? '' : 'flex-row-reverse'}`}>
+                  <CreditCard size={13} />
+                  <span>{he ? 'סליקה' : 'Payments'}</span>
+                </div>
+
+                <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-6 text-slate-900">
+                  {he ? 'סליקה חכמה לעסקים' : 'Smart Payments for Business'}
+                </h1>
+
+                <p className="text-lg text-slate-700 mb-4 leading-relaxed">
+                  {he
+                    ? 'קבלו תשלומים מכל מקום – באתר, בלינקים, במנויים או בתוך קהילות Nexus.'
+                    : 'Accept payments from anywhere – on your website, via links, subscriptions, or within Nexus communities.'}
+                </p>
+                <p className="text-lg text-slate-600 mb-8 leading-relaxed">
+                  {he
+                    ? 'מערכת תשלומים אחת שמאפשרת לכם לנהל את כל ההכנסות של העסק במקום אחד.'
+                    : 'One payments system that lets you manage all your business revenue in one place.'}
+                </p>
+
+                {/* ✔ Bullets */}
+                <ul className="space-y-3 mb-10">
+                  {(he
+                    ? ['סליקת אשראי וארנקים דיגיטליים', 'מנויים ותשלומים חוזרים', 'קישורי תשלום ועמודי Checkout', 'אפשרות למכור גם בתוך קהילות וארגונים']
+                    : ['Credit & digital wallet processing', 'Subscriptions & recurring payments', 'Payment links & Checkout pages', 'Sell within communities and organizations']
+                  ).map((item) => (
+                    <li key={item} className={`flex items-center gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
+                      <Check size={16} className="text-stripe-purple flex-shrink-0" />
+                      <span className="text-slate-700">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA buttons */}
+                <div className={`flex flex-wrap gap-4 ${isRtl ? 'justify-start' : 'justify-end'}`}>
+                  <Link
+                    to={signupLink}
+                    className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+                  >
+                    {he ? 'פתחו חשבון סליקה' : 'Open a payments account'}
+                  </Link>
+                  <Link
+                    to={signupLink}
+                    className="inline-block border border-slate-300 bg-white text-slate-700 font-semibold px-8 py-3 rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    {he ? 'קבעו שיחת היכרות' : 'Schedule a call'}
+                  </Link>
+                </div>
+              </div>
+
+              {/* ── LTR: Animation column — phone only, hover activates animations ── */}
+              {!isRtl && (
+                <div className="payments-hero-anim payment-card-expandable relative h-[520px]">
+                  <PaymentAnimation show="phone" />
+                </div>
+              )}
+
+            </div>
+          </div>
+        </section>
+
+        {/* ── Gradient diagonal — visible parallelogram strip (wider, tube illusion) ── */}
+        <div className="relative z-10 h-80 -mt-16">
+          <AnimatedGradient clipPath={isRtl ? "polygon(0 0, 100% 25%, 100% 100%, 0 75%)" : "polygon(0 0, 100% 25%, 100% 100%, 0 75%)"} />
+          {/* Tube/cylinder highlight overlay — same clip to create 3D pipe illusion */}
+          <div className="absolute inset-0 pointer-events-none" style={{
+            clipPath: isRtl ? "polygon(0 0, 100% 25%, 100% 100%, 0 75%)" : "polygon(0 0, 100% 25%, 100% 100%, 0 75%)",
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(0,0,0,0.18) 100%)'
+          }} />
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════
