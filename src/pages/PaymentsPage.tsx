@@ -57,22 +57,31 @@ export default function PaymentsPage() {
     <div dir={direction} className="min-h-screen bg-white">
       <Navbar variant="dark" />
 
-      {/* Override payment-stage: overflow visible + phone left-aligned in hero column */}
+      {/* Override payment-stage: overflow visible + phone positioning in hero */}
       <style>{`
         .payments-hero-anim .payment-stage { overflow: visible !important; }
         .payments-hero-anim .payment-phone { left: 80px !important; }
-        [dir="rtl"] .payments-hero-anim .payment-phone { left: 0px !important; right: auto !important; }
+        [dir="rtl"] .payments-hero-anim .payment-phone { left: 20px !important; right: auto !important; top: 40px !important; }
+        [dir="rtl"] .payments-hero-anim .payment-stage { height: 100%; }
       `}</style>
 
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
-      <section className="relative pt-32 pb-20 bg-slate-50 overflow-x-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className={`grid grid-cols-1 gap-12 items-center ${isRtl ? 'lg:grid-cols-[1fr_240px]' : 'lg:grid-cols-2'}`}>
+      <section className={`relative pt-32 bg-slate-50 overflow-x-hidden ${isRtl ? 'pb-12' : 'pb-20'}`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
+
+          {/* RTL: Phone pulled out of grid, absolutely positioned on the left */}
+          {isRtl && (
+            <div className="payments-hero-anim payment-card-expandable absolute left-6 top-0 bottom-0 w-[280px] hidden lg:block z-10">
+              <PaymentAnimation show="phone" />
+            </div>
+          )}
+
+          <div className={`grid grid-cols-1 gap-12 items-center ${isRtl ? '' : 'lg:grid-cols-2'}`}>
 
             {/* ── Text column (DOM first → right in RTL, left in LTR) ── */}
-            <div className="text-right">
+            <div className={`text-right ${isRtl ? 'lg:pl-[300px]' : ''}`}>
 
               {/* Label chip */}
               <div className="inline-flex items-center gap-2 bg-stripe-purple/10 border border-stripe-purple/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 text-stripe-purple flex-row-reverse">
@@ -109,7 +118,7 @@ export default function PaymentsPage() {
               </ul>
 
               {/* CTA buttons */}
-              <div className="flex flex-wrap gap-4 justify-end">
+              <div className={`flex flex-wrap gap-4 ${isRtl ? 'justify-start' : 'justify-end'}`}>
                 <Link
                   to={signupLink}
                   className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
@@ -125,10 +134,12 @@ export default function PaymentsPage() {
               </div>
             </div>
 
-            {/* ── Animation column — phone only, hover activates animations ── */}
-            <div className="payments-hero-anim payment-card-expandable relative h-[520px]">
-              <PaymentAnimation show="phone" />
-            </div>
+            {/* ── LTR: Animation column — phone only, hover activates animations ── */}
+            {!isRtl && (
+              <div className="payments-hero-anim payment-card-expandable relative h-[520px]">
+                <PaymentAnimation show="phone" />
+              </div>
+            )}
 
           </div>
         </div>
