@@ -13,7 +13,7 @@ function useScrollReveal() {
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => entries.forEach((e) => {
-        if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+        if (e.isIntersecting) { e.target.classList.add('revealed'); observer.unobserve(e.target); }
       }),
       { threshold: 0.1 }
     );
@@ -63,6 +63,7 @@ export default function PaymentsPage() {
         .payments-hero-anim .payment-phone { left: 80px !important; }
         [dir="rtl"] .payments-hero-anim .payment-phone { left: 20px !important; right: auto !important; top: 40px !important; }
         [dir="rtl"] .payments-hero-anim .payment-stage { height: 100%; }
+        [dir="rtl"] .payments-hero-anim .payment-stage::before { display: none !important; }
       `}</style>
 
       {/* ══════════════════════════════════════════════════════════
