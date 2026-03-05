@@ -1,32 +1,26 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { env } from '../config/env';
 
-const FROM = env.EMAIL_FROM ?? env.SMTP_USER ?? 'noreply@nexus-payment.com';
+const FROM = env.EMAIL_FROM ?? 'noreply@nexus-payment.com';
 const FRONTEND = env.FRONTEND_URL;
 
-function createTransport() {
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return null;
-  return nodemailer.createTransport({
-    host: env.SMTP_HOST,
-    port: env.SMTP_PORT ?? 587,
-    secure: (env.SMTP_PORT ?? 587) === 465,
-    auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-  });
+function getResend(): Resend | null {
+  if (!env.RESEND_API_KEY) return null;
+  return new Resend(env.RESEND_API_KEY);
 }
 
 async function sendMail(options: { to: string; subject: string; html: string }) {
-  const transport = createTransport();
-  if (!transport) {
-    console.warn('⚠️  Email not sent — SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS missing)');
+  const resend = getResend();
+  if (!resend) {
+    console.warn('⚠️  Email not sent — RESEND_API_KEY not configured');
     return;
   }
-  try {
-    const info = await transport.sendMail({ from: FROM, ...options });
-    console.log(`✅  Email sent to ${options.to} — messageId: ${info.messageId}`);
-  } catch (err: any) {
-    console.error(`❌  Email send failed to ${options.to}:`, err?.message ?? err);
-    throw err;
+  const { data, error } = await resend.emails.send({ from: FROM, ...options });
+  if (error) {
+    console.error(`❌  Email send failed to ${options.to}:`, error);
+    throw new Error(error.message);
   }
+  console.log(`✅  Email sent to ${options.to} — id: ${data?.id}`);
 }
 
 // ─── Welcome email ─────────────────────────────────────────
