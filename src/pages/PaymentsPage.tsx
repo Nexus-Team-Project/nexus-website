@@ -2,7 +2,7 @@ import { useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, CreditCard, Link2, RefreshCw, Users, Landmark, LayoutDashboard } from 'lucide-react';
 import Navbar from '../components/Navbar';
-import PaymentAnimation, { PaymentPricingPanel } from '../components/PaymentAnimation';
+import PaymentAnimation, { PaymentFlipPanel } from '../components/PaymentAnimation';
 import AnimatedGradient from '../components/AnimatedGradient';
 import { useLanguage } from '../i18n/LanguageContext';
 import visaLogo from '../assets/logos/visa-logo.png';
@@ -270,10 +270,10 @@ export default function PaymentsPage() {
               </ul>
             </div>
 
-            {/* ── Pricing panel (moved from S2), staggered entrance triggered by parent section's revealed class ── */}
+            {/* ── Pricing ↔ Checkout flip panel, staggered entrance + auto cross-fade triggered by parent section.revealed ── */}
             <div className="pricing-autoplay flex justify-center lg:justify-end items-start overflow-hidden">
               <div style={{ transform: 'scale(0.78)', transformOrigin: 'top center', marginBottom: '-80px' }}>
-                <PaymentPricingPanel />
+                <PaymentFlipPanel />
               </div>
             </div>
 

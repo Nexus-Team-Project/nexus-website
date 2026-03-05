@@ -4,7 +4,7 @@ import CheckoutPanel from './CheckoutPanel';
 import { useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 
-// ─── Named export: standalone pricing panel for use in PaymentsPage S2 ──────
+// ─── Named export: standalone pricing panel ──────────────────────────────────
 export function PaymentPricingPanel() {
   const { t } = useLanguage();
   return (
@@ -71,6 +71,24 @@ export function PaymentPricingPanel() {
         </div>
       </div>
     </BrowserMockup>
+  );
+}
+
+// ─── Named export: pricing ↔ checkout cross-fade panel for PaymentsPage S3 ──
+export function PaymentFlipPanel() {
+  return (
+    <div className="s3-flip-wrap">
+      {/* Front — Pricing (relative → defines container dimensions) */}
+      <div className="s3-flip-front">
+        <PaymentPricingPanel />
+      </div>
+      {/* Back — Checkout (absolute overlay, faded in by CSS animation) */}
+      <div className="s3-flip-back">
+        <BrowserMockup url="nexus.com/checkout">
+          <CheckoutPanel />
+        </BrowserMockup>
+      </div>
+    </div>
   );
 }
 

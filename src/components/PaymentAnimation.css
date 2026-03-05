@@ -981,6 +981,62 @@
   opacity: 1;
 }
 
+/* ── S3 Pricing ↔ Checkout auto cross-fade ─────────────────────────
+   After the plans stagger in (~1.2 s), we wait 2 s then loop a 12 s
+   cross-fade between the pricing front and the checkout back panel.
+   ─────────────────────────────────────────────────────────────────── */
+.s3-flip-wrap  { position: relative; }
+.s3-flip-front { position: relative; z-index: 2; }
+.s3-flip-back  { position: absolute; inset: 0; z-index: 1; opacity: 0; }
+
+/* Trigger cross-fade loop 2 s after section.revealed */
+.revealed .pricing-autoplay .s3-flip-front {
+  animation: s3FadeOut 12s ease-in-out 2s infinite;
+}
+.revealed .pricing-autoplay .s3-flip-back {
+  animation: s3FadeIn 12s ease-in-out 2s infinite;
+}
+
+/* Stagger checkout sections inside the back panel */
+.revealed .pricing-autoplay .checkout-section-1 {
+  animation: s3ContentIn1 12s ease-out 2s infinite;
+}
+.revealed .pricing-autoplay .checkout-section-2 {
+  animation: s3ContentIn2 12s ease-out 2s infinite;
+}
+.revealed .pricing-autoplay .checkout-section-3 {
+  animation: s3ContentIn3 12s ease-out 2s infinite;
+}
+
+/* Front fades out at 38-43 %, back in at 43 %; reverses at 87-92 % */
+@keyframes s3FadeOut {
+  0%,  38%  { opacity: 1; }
+  43%, 87%  { opacity: 0; }
+  92%, 100% { opacity: 1; }
+}
+@keyframes s3FadeIn {
+  0%,  38%  { opacity: 0; }
+  43%, 87%  { opacity: 1; }
+  92%, 100% { opacity: 0; }
+}
+
+/* Content sections appear slightly after back panel, staggered ~0.12 s */
+@keyframes s3ContentIn1 {
+  0%,  40%  { opacity: 0; transform: translateY(10px); }
+  45%, 87%  { opacity: 1; transform: translateY(0); }
+  92%, 100% { opacity: 0; transform: translateY(10px); }
+}
+@keyframes s3ContentIn2 {
+  0%,  41%  { opacity: 0; transform: translateY(10px); }
+  46%, 87%  { opacity: 1; transform: translateY(0); }
+  92%, 100% { opacity: 0; transform: translateY(10px); }
+}
+@keyframes s3ContentIn3 {
+  0%,  42%  { opacity: 0; transform: translateY(10px); }
+  47%, 87%  { opacity: 1; transform: translateY(0); }
+  92%, 100% { opacity: 0; transform: translateY(10px); }
+}
+
 /* Force white background on phone - override any other styles */
 .payment-phone {
   background: #ffffff !important;
