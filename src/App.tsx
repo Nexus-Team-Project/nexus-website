@@ -13,6 +13,8 @@ const SignupHe           = lazy(() => import('./pages/SignupHe'));
 const LoginHe            = lazy(() => import('./pages/LoginHe'));
 const WorkspaceSetupPage = lazy(() => import('./pages/WorkspaceSetupPage'));
 const VerifyEmailPage    = lazy(() => import('./pages/VerifyEmailPage'));
+const ForgotPassword     = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword      = lazy(() => import('./pages/ResetPassword'));
 const PartnersPage       = lazy(() => import('./pages/PartnersPage'));
 const PaymentsPage       = lazy(() => import('./pages/PaymentsPage'));
 
@@ -65,7 +67,10 @@ function App() {
           <Route path="/he/login"    element={<LoginHe />} />
           <Route path="/workspace"    element={<LanguageProvider language="en"><WorkspaceSetupPage /></LanguageProvider>} />
           <Route path="/he/workspace" element={<LanguageProvider language="he"><WorkspaceSetupPage /></LanguageProvider>} />
-          <Route path="/verify-email" element={<LanguageProvider language="en"><VerifyEmailPage /></LanguageProvider>} />
+          <Route path="/verify-email"     element={<LanguageProvider language="en"><VerifyEmailPage /></LanguageProvider>} />
+          <Route path="/forgot-password"  element={<LanguageProvider language="en"><ForgotPassword /></LanguageProvider>} />
+          <Route path="/he/forgot-password" element={<LanguageProvider language="he"><ForgotPassword /></LanguageProvider>} />
+          <Route path="/reset-password"   element={<LanguageProvider language="en"><ResetPassword /></LanguageProvider>} />
           <Route path="/partners"    element={<LanguageProvider language="en"><PartnersPage /></LanguageProvider>} />
           <Route path="/he/partners" element={<LanguageProvider language="he"><PartnersPage /></LanguageProvider>} />
           <Route path="/payments"    element={<LanguageProvider language="en"><PaymentsPage /></LanguageProvider>} />

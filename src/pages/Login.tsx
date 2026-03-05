@@ -141,9 +141,9 @@ export default function Login() {
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs text-stripe-dark font-medium">{t.auth.password}</label>
-                    <a href="#" className="text-[10px] font-semibold text-stripe-purple hover:text-stripe-purple/80">
+                    <Link to={isHe ? '/he/forgot-password' : '/forgot-password'} className="text-[10px] font-semibold text-stripe-purple hover:text-stripe-purple/80">
                       {t.auth.forgotYourPassword}
-                    </a>
+                    </Link>
                   </div>
                   <div className="relative">
                     <input
@@ -237,20 +237,6 @@ export default function Login() {
               {/* Social Sign In */}
               <div className="space-y-3">
                 <GoogleSignIn redirectTo={workspacePath} />
-
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-center px-4 py-2.5 border border-gray-200 rounded-lg shadow-sm bg-white text-sm font-semibold text-stripe-dark hover:bg-gray-50 transition-colors"
-                >
-                  {t.auth.signInWithPasskey}
-                </button>
-
-                <button
-                  type="button"
-                  className="w-full flex items-center justify-center px-4 py-2.5 border border-gray-200 rounded-lg shadow-sm bg-white text-sm font-semibold text-stripe-dark hover:bg-gray-50 transition-colors"
-                >
-                  {t.auth.signInWithSSO}
-                </button>
               </div>
 
               {/* New User Link */}
