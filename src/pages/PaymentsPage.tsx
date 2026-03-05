@@ -68,22 +68,8 @@ export default function PaymentsPage() {
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
       <section className="relative pt-32 pb-20 bg-slate-50 overflow-x-hidden">
-        {/* RTL-only: animated gradient diagonal inside hero, overlapping phone (left side) */}
-        {isRtl && (
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              zIndex: 5,
-              opacity: 0.65,
-              maskImage: 'linear-gradient(to right, black 20%, transparent 65%)',
-              WebkitMaskImage: 'linear-gradient(to right, black 20%, transparent 65%)',
-            }}
-          >
-            <AnimatedGradient clipPath="polygon(0 0, 62% 0, 38% 100%, 0 100%)" />
-          </div>
-        )}
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className={`grid grid-cols-1 gap-12 items-center ${isRtl ? 'lg:grid-cols-[1fr_240px]' : 'lg:grid-cols-2'}`}>
 
             {/* ── Text column (DOM first → right in RTL, left in LTR) ── */}
             <div className="text-right">
@@ -148,23 +134,21 @@ export default function PaymentsPage() {
         </div>
       </section>
 
-      {/* ── Gradient diagonal — floats between hero and S2, overlaps both (LTR only) ── */}
-      {!isRtl && (
-        <div
-          className="relative z-10 h-64 -mt-16"
-          style={{
-            maskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
-          }}
-        >
-          <AnimatedGradient clipPath="polygon(0 0, 100% 60%, 100% 100%, 0 100%)" />
-        </div>
-      )}
+      {/* ── Gradient diagonal — floats between hero and S2, overlaps both ── */}
+      <div
+        className="relative z-10 h-64 -mt-16"
+        style={{
+          maskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 28%, black 68%, transparent 100%)',
+        }}
+      >
+        <AnimatedGradient clipPath={isRtl ? "polygon(100% 0, 0 60%, 0 100%, 100% 100%)" : "polygon(0 0, 100% 60%, 100% 100%, 0 100%)"} />
+      </div>
 
       {/* ══════════════════════════════════════════════════════════
           S2 — קבלו תשלומים מכל מקום  +  דף מסלולי תשלום
       ══════════════════════════════════════════════════════════ */}
-      <section className={`scroll-reveal relative z-0 ${!isRtl ? '-mt-16' : ''} py-20 md:py-32 bg-white overflow-x-hidden`}>
+      <section className="scroll-reveal relative z-0 -mt-16 py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 

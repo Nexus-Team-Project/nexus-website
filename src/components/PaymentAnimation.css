@@ -709,6 +709,23 @@
   transform: translateY(0);
 }
 
+/* RTL Hero: autoplay all animations without requiring hover */
+[dir="rtl"] .payments-hero-anim .payment-phone {
+  animation: phoneFloat 4s ease-in-out infinite !important;
+}
+
+[dir="rtl"] .payments-hero-anim .payment-sheet {
+  animation: sheetSlideIn 10s ease-in-out infinite !important;
+}
+
+[dir="rtl"] .payments-hero-anim .payment-overlay {
+  animation: overlayFadeIn 10s ease-in-out infinite !important;
+}
+
+[dir="rtl"] .payments-hero-anim .payment-stage::before {
+  animation: backgroundFillIn 2s ease-out forwards !important;
+}
+
 @keyframes phoneFloat {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-7px); }
