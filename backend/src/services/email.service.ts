@@ -1,26 +1,69 @@
-import { Resend } from 'resend';
 import { env } from '../config/env';
 
-const FROM = env.EMAIL_FROM ?? 'noreply@nexus-payment.com';
+const FROM_EMAIL = env.EMAIL_FROM ?? 'noreply@nexus-payment.com';
+const FROM_NAME = 'Nexus';
 const FRONTEND = env.FRONTEND_URL;
 
-function getResend(): Resend | null {
-  if (!env.RESEND_API_KEY) return null;
-  return new Resend(env.RESEND_API_KEY);
+// ─── SendPulse HTTP API client ──────────────────────────────
+
+let cachedToken: { value: string; expiresAt: number } | null = null;
+
+async function getAccessToken(): Promise<string> {
+  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
+    return cachedToken.value;
+  }
+  const res = await fetch('https://api.sendpulse.com/oauth/access_token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'client_credentials',
+      client_id: env.SENDPULSE_CLIENT_ID,
+      client_secret: env.SENDPULSE_CLIENT_SECRET,
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`SendPulse auth failed: ${res.status} ${text}`);
+  }
+  const data = await res.json() as { access_token: string; expires_in: number };
+  cachedToken = {
+    value: data.access_token,
+    expiresAt: Date.now() + data.expires_in * 1000,
+  };
+  return cachedToken.value;
 }
 
-async function sendMail(options: { to: string; subject: string; html: string }) {
-  const resend = getResend();
-  if (!resend) {
-    console.warn('⚠️  Email not sent — RESEND_API_KEY not configured');
+async function sendMail(options: { to: string; toName?: string; subject: string; html: string }) {
+  if (!env.SENDPULSE_CLIENT_ID || !env.SENDPULSE_CLIENT_SECRET) {
+    console.warn('⚠️  Email not sent — SENDPULSE_CLIENT_ID/SECRET not configured');
     return;
   }
-  const { data, error } = await resend.emails.send({ from: FROM, ...options });
-  if (error) {
-    console.error(`❌  Email send failed to ${options.to}:`, error);
-    throw new Error(error.message);
+  try {
+    const token = await getAccessToken();
+    const res = await fetch('https://api.sendpulse.com/smtp/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        email: {
+          html: options.html,
+          subject: options.subject,
+          from: { name: FROM_NAME, email: FROM_EMAIL },
+          to: [{ name: options.toName ?? options.to, email: options.to }],
+        },
+      }),
+    });
+    const data = await res.json() as { result?: boolean; message?: string };
+    if (!res.ok || data.result === false) {
+      throw new Error(data.message ?? `HTTP ${res.status}`);
+    }
+    console.log(`✅  Email sent to ${options.to}`);
+  } catch (err: any) {
+    console.error(`❌  Email send failed to ${options.to}:`, err?.message ?? err);
+    throw err;
   }
-  console.log(`✅  Email sent to ${options.to} — id: ${data?.id}`);
 }
 
 // ─── Welcome email ─────────────────────────────────────────
@@ -28,6 +71,7 @@ async function sendMail(options: { to: string; subject: string; html: string }) 
 export async function sendWelcomeEmail(email: string, fullName: string) {
   await sendMail({
     to: email,
+    toName: fullName,
     subject: 'ברוכים הבאים ל-Nexus! 🎉',
     html: `
       <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -61,6 +105,7 @@ export async function sendVerificationEmail(
   const verifyUrl = `${FRONTEND}/verify-email?token=${rawToken}`;
   await sendMail({
     to: email,
+    toName: fullName,
     subject: 'Verify your Nexus account',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -95,6 +140,7 @@ export async function sendPasswordResetEmail(
   const resetUrl = `${FRONTEND}/reset-password?token=${rawToken}`;
   await sendMail({
     to: email,
+    toName: fullName,
     subject: 'איפוס סיסמה — Nexus',
     html: `
       <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
