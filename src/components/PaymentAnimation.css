@@ -435,8 +435,8 @@
   background: #f9fafb;
   border-radius: 20px;
   padding: 24px 16px;
-  box-shadow: 0 32px 60px -10px rgba(10, 20, 40, 0.12);
-  border: 1px solid rgba(10, 20, 40, 0.06);
+  box-shadow: none;
+  border: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -772,8 +772,8 @@
   border-radius: 20px;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: 0 32px 60px -10px rgba(10, 20, 40, 0.12);
-  border: 1px solid rgba(10, 20, 40, 0.06);
+  box-shadow: none;
+  border: none;
 }
 
 /* Glass Card Effect */
