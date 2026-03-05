@@ -80,8 +80,11 @@ export default function NexusLogo({ className = '', height = 28, variant = 'whit
           height,
           opacity: isHovered ? 1 : 0,
           transition: 'opacity 0.2s ease-in-out',
+          border: 'none',
+          outline: 'none',
+          display: 'block',
         }}
-        className={`${imageStyles} absolute top-0 left-0`}
+        className={`${imageStyles} absolute top-0 left-0 border-0 outline-none`}
         muted
         playsInline
         loop
