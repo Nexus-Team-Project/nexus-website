@@ -699,24 +699,19 @@
   }
 }
 
-/* RTL: Mirror phone animation for Hebrew version */
+/* RTL: Gentle float animation for Hebrew version (no horizontal slide) */
 [dir="rtl"] .payment-card-expandable:hover .payment-phone {
-  animation: phoneSlideOutRTL 16s ease-in-out infinite;
+  animation: phoneFloat 4s ease-in-out infinite;
 }
 
-@keyframes phoneSlideOutRTL {
-  0% {
-    opacity: 1;
-    transform: translateX(0);
-  }
-  50% {
-    opacity: 1;
-    transform: translateX(-80px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0);
-  }
+[dir="rtl"] .payment-card-expandable:not(:hover) .payment-phone {
+  animation: none;
+  transform: translateY(0);
+}
+
+@keyframes phoneFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
 }
 
 @keyframes panelSlideIn {
