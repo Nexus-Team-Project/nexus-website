@@ -20,8 +20,13 @@ export default function VerifyEmailPage() {
     }
 
     api.post<{ accessToken: string }>('/api/auth/verify-email', { token })
-      .then((data) => {
+      .then(async (data) => {
         setAccessToken(data.accessToken);
+        // Fetch profile so OnboardingWizard can show "Welcome, <firstName>"
+        const profile = await api.get<{ fullName?: string }>('/api/auth/me').catch(() => null);
+        if (profile?.fullName) {
+          sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
+        }
         setStatus('success');
         setTimeout(() => navigate('/workspace'), 2500);
       })
