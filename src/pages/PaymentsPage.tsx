@@ -270,8 +270,8 @@ export default function PaymentsPage() {
               </ul>
             </div>
 
-            {/* ── Pricing panel (moved from S2), with slide-in animation ── */}
-            <div className="scroll-reveal flex justify-center lg:justify-end items-start overflow-hidden">
+            {/* ── Pricing panel (moved from S2), staggered entrance triggered by parent section's revealed class ── */}
+            <div className="pricing-autoplay flex justify-center lg:justify-end items-start overflow-hidden">
               <div style={{ transform: 'scale(0.78)', transformOrigin: 'top center', marginBottom: '-80px' }}>
                 <PaymentPricingPanel />
               </div>
