@@ -4,82 +4,80 @@ import CheckoutPanel from './CheckoutPanel';
 import { useState } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 
-// ─── Named export: standalone pricing panel ──────────────────────────────────
+// ─── Named export: standalone pricing panel (no browser frame) ───────────────
 export function PaymentPricingPanel() {
   const { t } = useLanguage();
   return (
-    <BrowserMockup url="nexus.com/pricing">
-      <div className="pricing-card">
-        <div className="pricing-bg-blob pricing-bg-blob-1"></div>
-        <div className="pricing-bg-blob pricing-bg-blob-2"></div>
-        <div className="pricing-plans">
-          <div className="pricing-plan plan-1">
-            <div className="plan-content">
-              <div className="plan-header">
-                <h4>Starter</h4>
-                <p className="plan-subtitle">For side projects</p>
-              </div>
-              <div className="plan-price-section">
-                <div className="plan-price">$0</div>
-                <span className="plan-period">/ month</span>
-              </div>
-              <button className="plan-button plan-button-outline">Get started</button>
-              <ul className="plan-features">
-                <li><span className="feature-check">✓</span>Up to 3 projects</li>
-                <li><span className="feature-check">✓</span>Basic analytics</li>
-                <li><span className="feature-check">✓</span>Community support</li>
-              </ul>
+    <div className="pricing-card pricing-dynamic">
+      <div className="pricing-bg-blob pricing-bg-blob-1"></div>
+      <div className="pricing-bg-blob pricing-bg-blob-2"></div>
+      <div className="pricing-plans">
+        <div className="pricing-plan plan-1">
+          <div className="plan-content">
+            <div className="plan-header">
+              <h4>Starter</h4>
+              <p className="plan-subtitle">For side projects</p>
             </div>
+            <div className="plan-price-section">
+              <div className="plan-price">$0</div>
+              <span className="plan-period">/ month</span>
+            </div>
+            <button className="plan-button plan-button-outline">Get started</button>
+            <ul className="plan-features">
+              <li><span className="feature-check">✓</span>Up to 3 projects</li>
+              <li><span className="feature-check">✓</span>Basic analytics</li>
+              <li><span className="feature-check">✓</span>Community support</li>
+            </ul>
           </div>
-          <div className="pricing-plan plan-2 plan-featured">
-            <div className="popular-badge">Most Popular</div>
-            <div className="plan-content">
-              <div className="plan-header">
-                <h4>Professional</h4>
-                <p className="plan-subtitle">For growing teams</p>
-              </div>
-              <div className="plan-price-section">
-                <div className="plan-price">$29</div>
-                <span className="plan-period">/ month</span>
-              </div>
-              <button className="plan-button plan-button-primary">Try for free</button>
-              <ul className="plan-features">
-                <li><span className="feature-check">✓</span>Unlimited projects</li>
-                <li><span className="feature-check">✓</span>Advanced analytics</li>
-                <li><span className="feature-check">✓</span>Priority support</li>
-                <li><span className="feature-check">✓</span>Team collaboration</li>
-              </ul>
+        </div>
+        <div className="pricing-plan plan-2 plan-featured">
+          <div className="popular-badge">Most Popular</div>
+          <div className="plan-content">
+            <div className="plan-header">
+              <h4>Professional</h4>
+              <p className="plan-subtitle">For growing teams</p>
             </div>
+            <div className="plan-price-section">
+              <div className="plan-price">$29</div>
+              <span className="plan-period">/ month</span>
+            </div>
+            <button className="plan-button plan-button-primary">Try for free</button>
+            <ul className="plan-features">
+              <li><span className="feature-check">✓</span>Unlimited projects</li>
+              <li><span className="feature-check">✓</span>Advanced analytics</li>
+              <li><span className="feature-check">✓</span>Priority support</li>
+              <li><span className="feature-check">✓</span>Team collaboration</li>
+            </ul>
           </div>
-          <div className="pricing-plan plan-3">
-            <div className="plan-content">
-              <div className="plan-header">
-                <h4>Enterprise</h4>
-                <p className="plan-subtitle">For large organizations</p>
-              </div>
-              <div className="plan-price-section">
-                <div className="plan-price-custom">Custom</div>
-              </div>
-              <button className="plan-button plan-button-outline">{t.buttons.contactSales}</button>
-              <ul className="plan-features">
-                <li><span className="feature-check">✓</span>Dedicated manager</li>
-                <li><span className="feature-check">✓</span>SSO &amp; SAML</li>
-                <li><span className="feature-check">✓</span>99.99% SLA</li>
-              </ul>
+        </div>
+        <div className="pricing-plan plan-3">
+          <div className="plan-content">
+            <div className="plan-header">
+              <h4>Enterprise</h4>
+              <p className="plan-subtitle">For large organizations</p>
             </div>
+            <div className="plan-price-section">
+              <div className="plan-price-custom">Custom</div>
+            </div>
+            <button className="plan-button plan-button-outline">{t.buttons.contactSales}</button>
+            <ul className="plan-features">
+              <li><span className="feature-check">✓</span>Dedicated manager</li>
+              <li><span className="feature-check">✓</span>SSO &amp; SAML</li>
+              <li><span className="feature-check">✓</span>99.99% SLA</li>
+            </ul>
           </div>
         </div>
       </div>
-    </BrowserMockup>
+    </div>
   );
 }
 
-// ─── Named export: standalone checkout panel for PaymentsPage S3 ─────────────
+// ─── Named export: standalone checkout panel (no browser frame) ──────────────
 export function PaymentCheckoutPanel() {
   return (
-    <BrowserMockup url="nexus.com/checkout">
+    <div className="checkout-dynamic">
       <CheckoutPanel />
-    </BrowserMockup>
+    </div>
   );
 }
 
