@@ -1,6 +1,6 @@
 import { env } from '../config/env';
 
-const FROM_EMAIL = env.EMAIL_FROM ?? 'noreply@nexus-payment.com';
+const FROM_EMAIL = env.EMAIL_FROM ?? 'hello@nexus-payment.com';
 const FROM_NAME = 'Nexus';
 const FRONTEND = env.FRONTEND_URL;
 

@@ -261,10 +261,15 @@ export default function Signup() {
                 {isHe ? 'שלחנו קישור אימות אל' : 'We sent a verification link to'}
               </p>
               <p className="text-sm font-semibold text-slate-700 mb-6">{verificationEmail}</p>
-              <p className="text-xs text-slate-400 mb-6">
+              <p className="text-xs text-slate-400 mb-3">
                 {isHe
                   ? 'לחצו על הקישור במייל כדי להפעיל את החשבון שלכם. הקישור תקף ל-24 שעות.'
                   : 'Click the link in the email to activate your account. The link expires in 24 hours.'}
+              </p>
+              <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-6">
+                {isHe
+                  ? '📬 לא רואים? בדקו תיקיית Updates, קידומי מכירות או ספאם'
+                  : '📬 Can\'t find it? Check your Updates, Promotions or Spam folder'}
               </p>
               <button
                 onClick={handleResend}
