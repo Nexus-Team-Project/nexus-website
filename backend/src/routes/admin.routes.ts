@@ -5,6 +5,7 @@ import { authenticate, requireAdmin } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
 import * as AiService from '../services/ai.service';
+import * as EmailService from '../services/email.service';
 
 const router = Router();
 router.use(authenticate, requireAdmin, apiLimiter);
@@ -197,6 +198,22 @@ router.post('/test', async (req: Request, res: Response, next: NextFunction) => 
     res.json(result);
   } catch (err) {
     next(err);
+  }
+});
+
+// ════════════════════════════════════════════════════════════
+// TEST EMAIL
+// ════════════════════════════════════════════════════════════
+
+// POST /api/admin/ai/test-email  — sends a test verification email and returns result
+router.post('/test-email', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const to = (req.body?.to as string) || req.user!.email;
+    const lang = (req.body?.lang as 'en' | 'he') ?? 'he';
+    await EmailService.sendVerificationEmail(to, 'Test User', 'TEST_TOKEN_123', lang);
+    res.json({ ok: true, sentTo: to });
+  } catch (err: any) {
+    res.status(500).json({ ok: false, error: err?.message ?? String(err) });
   }
 });
 
