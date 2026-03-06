@@ -15,14 +15,19 @@ export function scheduleDailyDigest(): void {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        const [visitors, chats, leads, pendingChats] = await Promise.all([
+        const [visitors, chats, leads, pendingChats, signupsRows] = await Promise.all([
           prisma.pageView
             .groupBy({ by: ['visitorId'], where: { createdAt: { gte: yesterday, lt: today } } })
             .then((r) => r.length),
           prisma.chatSession.count({ where: { createdAt: { gte: yesterday, lt: today } } }),
           prisma.lead.count({ where: { createdAt: { gte: yesterday, lt: today } } }),
           prisma.chatSession.count({ where: { status: 'PENDING_HUMAN' } }),
+          prisma.$queryRaw<[{ count: bigint }]>`
+            SELECT COUNT(DISTINCT "userId")::int AS count FROM "EventLog"
+            WHERE "eventName" = 'User_Signed_Up'
+              AND "receivedAt" >= ${yesterday} AND "receivedAt" < ${today}`,
         ]);
+        const signups = Number(signupsRows[0]?.count ?? 0);
 
         const dateStr = yesterday.toLocaleDateString('he-IL', {
           day: 'numeric',
@@ -38,10 +43,11 @@ export function scheduleDailyDigest(): void {
             visitors,
             chats,
             leads,
+            signups,
             pendingChats,
             date: dateStr,
           });
-          console.log(`[DailyDigest] Sent: v=${visitors} c=${chats} l=${leads}`);
+          console.log(`[DailyDigest] Sent: v=${visitors} c=${chats} l=${leads} s=${signups}`);
         }
       } catch (err) {
         console.error('[DailyDigest] Error:', err);

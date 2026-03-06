@@ -179,6 +179,7 @@ export async function sendDailyDigest(
     visitors: number;
     chats: number;
     leads: number;
+    signups: number;
     pendingChats: number;
     date: string;
   },
@@ -201,6 +202,10 @@ export async function sendDailyDigest(
           <tr style="background: #f3f4f6;">
             <td style="padding: 12px;">📩 לידים חדשים</td>
             <td style="padding: 12px; font-weight: bold; text-align: left;">${stats.leads}</td>
+          </tr>
+          <tr>
+            <td style="padding: 12px;">✅ הרשמות חדשות</td>
+            <td style="padding: 12px; font-weight: bold; text-align: left;">${stats.signups}</td>
           </tr>
           ${
             stats.pendingChats > 0
