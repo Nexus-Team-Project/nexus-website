@@ -303,7 +303,16 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         sender: 'user',
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, userMsg]);
+      setMessages((prev) => {
+        const next = [...prev, userMsg];
+        const messageIndex = next.filter((m) => m.sender === 'user').length;
+        track(PRODUCT.CHAT_MESSAGE_SENT, 'PRODUCT', {
+          session_id: sessionId ?? undefined,
+          message_index: messageIndex,
+          channel: 'web',
+        });
+        return next;
+      });
       setIsTyping(true);
 
       if (sessionId) {
@@ -345,7 +354,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         }, 2000);
       }
     },
-    [sessionId, t],
+    [sessionId, t, track],
   );
 
   const handleSend = () => {
