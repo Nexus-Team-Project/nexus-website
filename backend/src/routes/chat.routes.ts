@@ -215,8 +215,7 @@ const rateSchema = z.object({
 
 router.post(
   '/messages/:id/rate',
-  authenticate,
-  requireAgent,
+  chatLimiter,
   validate(rateSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
