@@ -5,7 +5,7 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { WALLET } from '../lib/analyticsEvents';
 import {
   ShoppingBag, CreditCard, MessageSquare, TrendingUp,
-  LogOut, ChevronRight, Clock, CheckCircle, XCircle, RefreshCw,
+  LogOut, ChevronRight, Clock, CheckCircle, XCircle, RefreshCw, Mail,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -102,6 +102,7 @@ export default function UserDashboard() {
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent'>('idle');
 
   useEffect(() => {
     // Track dashboard view
@@ -127,6 +128,16 @@ export default function UserDashboard() {
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const handleResendVerification = async () => {
+    setResendState('sending');
+    try {
+      await api.post('/api/auth/resend-verification');
+      setResendState('sent');
+    } catch {
+      setResendState('idle');
+    }
   };
 
   const toggleOrder = (id: string) => {
@@ -180,6 +191,23 @@ export default function UserDashboard() {
           <h1 className="text-2xl font-bold">Hey, {user?.fullName?.split(' ')[0]} 👋</h1>
           <p className="text-white/40 text-sm mt-1">{user?.email}</p>
         </div>
+
+        {/* Email verification banner */}
+        {user && !user.emailVerified && (
+          <div className="flex items-center gap-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3">
+            <Mail size={18} className="text-yellow-400 shrink-0" />
+            <div className="flex-1 text-sm text-yellow-200">
+              Please verify your email address to access all features.
+            </div>
+            <button
+              onClick={handleResendVerification}
+              disabled={resendState !== 'idle'}
+              className="text-xs font-semibold text-yellow-400 hover:text-yellow-300 disabled:opacity-50 shrink-0 transition-colors"
+            >
+              {resendState === 'sending' ? 'Sending…' : resendState === 'sent' ? 'Sent ✓' : 'Resend email'}
+            </button>
+          </div>
+        )}
 
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

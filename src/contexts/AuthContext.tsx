@@ -15,6 +15,7 @@ export interface AuthUser {
   fullName: string;
   role: 'USER' | 'ADMIN' | 'AGENT';
   avatarUrl?: string;
+  emailVerified: boolean;
 }
 
 interface RegisterData {

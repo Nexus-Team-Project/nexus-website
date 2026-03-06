@@ -6,6 +6,7 @@ import { apiLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
 import * as NotificationService from '../services/notification.service';
 import * as ApolloService from '../services/apollo.service';
+import { ingest } from '../services/analytics.service';
 
 const router = Router();
 
@@ -58,6 +59,21 @@ router.post(
         leadId: lead.id,
         ...req.body,
       }).catch(console.error);
+
+      // Analytics: fire-and-forget
+      void ingest({
+        anonymousId: (req.headers['x-anonymous-id'] as string | undefined) ?? `anon_lead_${lead.id}`,
+        eventName: 'Lead_Form_Submitted',
+        channel: 'MARKETING',
+        properties: {
+          lead_id: lead.id,
+          form_name: req.body.source ?? 'contact_sales',
+          has_email: !!req.body.email,
+          has_company: !!req.body.company,
+          source_page: req.headers['referer'] ?? undefined,
+        },
+        context: { ip: req.ip, userAgent: req.headers['user-agent'] ?? '' },
+      }).catch(() => {});
 
       res.status(201).json({ id: lead.id, message: 'Lead received' });
     } catch (err) {

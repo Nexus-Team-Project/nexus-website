@@ -97,6 +97,7 @@ function App() {
               <UserDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
               <AdminDashboard />
