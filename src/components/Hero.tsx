@@ -2,7 +2,6 @@ import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import AnimatedGradient from './AnimatedGradient';
-import GoogleSignIn from './GoogleSignIn';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
 
@@ -71,7 +70,12 @@ export default function Hero() {
                     <ArrowRight size={16} className={`inline ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`} />
                   </span>
                 </Link>
-                <GoogleSignIn variant="hero" />
+                <Link
+                  to={language === 'he' ? '/he/login' : '/login'}
+                  className="inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 border border-gray-300 rounded-lg shadow-sm bg-white text-xs sm:text-sm font-bold text-stripe-dark hover:bg-gray-50 hover:border-stripe-purple transition-colors whitespace-nowrap"
+                >
+                  {t.navbar.signIn}
+                </Link>
               </div>
             </div>
 
