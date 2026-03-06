@@ -25,9 +25,11 @@ interface Message {
 interface LiveChatProps {
   onClose: () => void;
   onMinimize: () => void;
+  existingSessionId?: string | null;
+  onSessionCreated?: (id: string) => void;
 }
 
-export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
+export default function LiveChat({ onClose, onMinimize, existingSessionId, onSessionCreated }: LiveChatProps) {
   const { t, direction } = useLanguage();
   const isRtl = direction === 'rtl';
   const { track } = useAnalytics();
@@ -164,7 +166,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
     scrollToBottom();
   }, [messages, isTyping]);
 
-  // Create session + connect socket on mount
+  // Create or resume session + connect socket on mount
   useEffect(() => {
     let mounted = true;
     const visitorId = getVisitorId();
@@ -175,95 +177,113 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
       trigger_type: 'manual',
     });
 
-    // Create chat session
-    api
-      .post<{ id: string; welcomeMessage?: string }>('/api/chat/sessions', {
-        visitorId,
-        page: window.location.pathname,
-        language: navigator.language,
-      })
-      .then((data) => {
-        if (!mounted) return;
-        const sid = data.id;
-        setSessionId(sid);
-        track(PRODUCT.CHAT_SESSION_STARTED, 'PRODUCT', {
-          session_id: sid,
-          trigger_type: 'manual',
-        });
+    /** Connect socket to a session and wire up message handlers */
+    const connectSocket = (sid: string) => {
+      const socket = io(API_URL, { withCredentials: true });
+      socketRef.current = socket;
+      socket.emit('join_session', { sessionId: sid, visitorId });
 
-        // Connect socket and join session room
-        const socket = io(API_URL, { withCredentials: true });
-        socketRef.current = socket;
-
-        socket.emit('join_session', { sessionId: sid, visitorId });
-
-        // Receive AI / agent replies
-        socket.on(
-          'new_message',
-          (msg: { id: string; text: string; sender: string; timestamp: string; actions?: ChatAction[] }) => {
-            if (!mounted) return;
-            // Customer messages are already in local state — only add AI/agent replies
-            if (msg.sender === 'CUSTOMER') return;
-            setIsTyping(false);
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: msg.id,
-                text: msg.text,
-                sender: 'agent',
-                timestamp: new Date(msg.timestamp),
-                actions: msg.actions,
-              },
-            ]);
-          },
-        );
-
-        socket.on('agent_typing', () => {
-          if (mounted) setIsTyping(true);
-        });
-
-        // Show welcome message — prefer server-provided, fall back to locale string
-        if (data.welcomeMessage) {
+      socket.on(
+        'new_message',
+        (msg: { id: string; text: string; sender: string; timestamp: string; actions?: ChatAction[] }) => {
+          if (!mounted) return;
+          if (msg.sender === 'CUSTOMER') return;
           setIsTyping(false);
-          setMessages([
+          setMessages((prev) => [
+            ...prev,
             {
-              id: 'welcome',
-              text: data.welcomeMessage,
+              id: msg.id,
+              text: msg.text,
               sender: 'agent',
-              timestamp: new Date(),
+              timestamp: new Date(msg.timestamp),
+              actions: msg.actions,
             },
           ]);
-        } else {
+        },
+      );
+
+      socket.on('agent_typing', () => {
+        if (mounted) setIsTyping(true);
+      });
+    };
+
+    // Resume existing session if provided
+    if (existingSessionId) {
+      setSessionId(existingSessionId);
+      setIsTyping(false);
+
+      // Fetch existing messages
+      api
+        .get<Array<{ id: string; text: string; sender: string; createdAt: string }>>(
+          `/api/chat/sessions/${existingSessionId}/messages`,
+        )
+        .then((msgs) => {
+          if (!mounted) return;
+          setMessages(
+            msgs.map((m) => ({
+              id: m.id,
+              text: m.text,
+              sender: m.sender === 'CUSTOMER' ? 'user' as const : 'agent' as const,
+              timestamp: new Date(m.createdAt),
+            })),
+          );
+          setShowQuickActions(false); // Hide quick actions for resumed sessions
+          connectSocket(existingSessionId);
+        })
+        .catch(() => {
+          if (!mounted) return;
+          setIsTyping(false);
+          setMessages([
+            { id: 'welcome', text: t.liveChat.welcomeMessage, sender: 'agent', timestamp: new Date() },
+          ]);
+          connectSocket(existingSessionId);
+        });
+    } else {
+      // Create new chat session
+      api
+        .post<{ id: string; welcomeMessage?: string }>('/api/chat/sessions', {
+          visitorId,
+          page: window.location.pathname,
+          language: navigator.language,
+        })
+        .then((data) => {
+          if (!mounted) return;
+          const sid = data.id;
+          setSessionId(sid);
+          onSessionCreated?.(sid);
+          track(PRODUCT.CHAT_SESSION_STARTED, 'PRODUCT', {
+            session_id: sid,
+            trigger_type: 'manual',
+          });
+          connectSocket(sid);
+
+          // Show welcome message
+          if (data.welcomeMessage) {
+            setIsTyping(false);
+            setMessages([
+              { id: 'welcome', text: data.welcomeMessage, sender: 'agent', timestamp: new Date() },
+            ]);
+          } else {
+            setTimeout(() => {
+              if (!mounted) return;
+              setIsTyping(false);
+              setMessages([
+                { id: 'welcome', text: t.liveChat.welcomeMessage, sender: 'agent', timestamp: new Date() },
+              ]);
+            }, 900);
+          }
+        })
+        .catch(() => {
+          if (!mounted) return;
           setTimeout(() => {
             if (!mounted) return;
             setIsTyping(false);
             setMessages([
-              {
-                id: 'welcome',
-                text: t.liveChat.welcomeMessage,
-                sender: 'agent',
-                timestamp: new Date(),
-              },
+              { id: 'welcome', text: t.liveChat.welcomeMessage, sender: 'agent', timestamp: new Date() },
             ]);
           }, 900);
-        }
-      })
-      .catch(() => {
-        // Session creation failed — show local welcome so UI isn't stuck
-        if (!mounted) return;
-        setTimeout(() => {
-          if (!mounted) return;
-          setIsTyping(false);
-          setMessages([
-            {
-              id: 'welcome',
-              text: t.liveChat.welcomeMessage,
-              sender: 'agent',
-              timestamp: new Date(),
-            },
-          ]);
-        }, 900);
-      });
+        });
+    }
 
     return () => {
       mounted = false;
@@ -463,7 +483,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 flex-shrink-0">
               <img
-                src="/nexus-circle-logo.png"
+                src="/nexus-favicon.png"
                 alt="Nexus"
                 className="w-10 h-10 rounded-full object-cover border-2 border-white/60 shadow-sm"
               />
@@ -510,7 +530,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
               {/* Agent avatar */}
               {message.sender === 'agent' && (
                 <img
-                  src="/nexus-circle-logo.png"
+                  src="/nexus-favicon.png"
                   alt=""
                   className="w-6 h-6 rounded-full flex-shrink-0 mt-1"
                 />
@@ -537,58 +557,58 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
                 >
                   {message.text}
                 </div>
-                {/* Inline navigation links */}
+                {/* Inline navigation buttons — always open in new tab */}
                 {message.actions && message.actions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 px-1 mt-1">
+                  <div className="flex flex-wrap gap-1.5 px-1 mt-1.5">
                     {message.actions.map((action, i) => (
                       <button
                         key={i}
-                        onClick={() => {
-                          if (action.type === 'external_link') {
-                            window.open(action.url, '_blank');
-                          } else {
-                            window.location.href = action.url;
-                          }
+                        onClick={() => window.open(action.url, '_blank')}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all hover:shadow-sm"
+                        style={{
+                          background: 'rgba(99, 91, 255, 0.08)',
+                          color: '#635BFF',
+                          border: '1px solid rgba(99, 91, 255, 0.2)',
                         }}
-                        className="text-xs font-medium text-stripe-purple hover:underline underline-offset-2 transition-colors hover:text-stripe-purple/80"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(99, 91, 255, 0.15)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(99, 91, 255, 0.08)';
+                        }}
                       >
-                        {isRtl ? action.label_he : action.label_en} →
+                        {isRtl ? action.label_he : action.label_en}
+                        <span className="text-[10px]">↗</span>
                       </button>
                     ))}
                   </div>
                 )}
-                <span className={`text-[10px] text-slate-400 font-medium px-1 ${message.sender === 'user' ? 'text-end' : ''}`}>
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 px-2">
-                <span className="text-[11px] text-slate-400 font-medium">
-                  {message.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </span>
-                {message.sender === 'agent' && message.id !== 'welcome' && (
-                  <div className="flex items-center gap-1 ml-1">
-                    <button
-                      onClick={() => handleRate(message.id, 'up')}
-                      className={`text-[13px] transition-all ${ratings[message.id] === 'up' ? 'opacity-100 scale-110' : ratings[message.id] ? 'opacity-20' : 'opacity-40 hover:opacity-80'}`}
-                      title="Helpful"
-                    >
-                      👍
-                    </button>
-                    <button
-                      onClick={() => handleRate(message.id, 'down')}
-                      className={`text-[13px] transition-all ${ratings[message.id] === 'down' ? 'opacity-100 scale-110' : ratings[message.id] ? 'opacity-20' : 'opacity-40 hover:opacity-80'}`}
-                      title="Not helpful"
-                    >
-                      👎
-                    </button>
-                  </div>
-                )}
+                <div className={`flex items-center gap-2 px-1 ${message.sender === 'user' ? 'justify-end' : ''}`}>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {message.timestamp.toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                  {message.sender === 'agent' && message.id !== 'welcome' && (
+                    <div className="flex items-center gap-1 ml-1">
+                      <button
+                        onClick={() => handleRate(message.id, 'up')}
+                        className={`text-[13px] transition-all ${ratings[message.id] === 'up' ? 'opacity-100 scale-110' : ratings[message.id] ? 'opacity-20' : 'opacity-40 hover:opacity-80'}`}
+                        title="Helpful"
+                      >
+                        👍
+                      </button>
+                      <button
+                        onClick={() => handleRate(message.id, 'down')}
+                        className={`text-[13px] transition-all ${ratings[message.id] === 'down' ? 'opacity-100 scale-110' : ratings[message.id] ? 'opacity-20' : 'opacity-40 hover:opacity-80'}`}
+                        title="Not helpful"
+                      >
+                        👎
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -630,7 +650,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
           {/* Typing indicator */}
           {isTyping && (
             <div className="flex items-end gap-2 px-2" style={{ animation: 'messageSlideIn 0.3s ease-out' }}>
-              <img src="/nexus-circle-logo.png" alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
+              <img src="/nexus-favicon.png" alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
               <div
                 className="flex gap-1.5 items-center px-4 py-3 rounded-2xl"
                 style={{

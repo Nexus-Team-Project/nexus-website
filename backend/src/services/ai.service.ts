@@ -33,8 +33,15 @@ const DEFAULT_SYSTEM_PROMPT = `אתה נציג תמיכה ומכירות של Ne
 הנחיות:
 • תשובות קצרות ולעניין — עד 3 משפטים
 • אל תמציא מחירים — השתמש רק בפרטים מהידע שסופק לך
-• אם אין לך תשובה מדויקת — אמור בכנות ותציע נציג
-• אם הלקוח מבקש נציג אנושי — ענה: ESCALATE
+• אם אין לך תשובה מדויקת — אמור בכנות ונסה לעזור בדרך אחרת
+• אל תאיץ את השיחה — תן ללקוח להסביר את הצורך שלו
+
+חוקים קריטיים להעברה לנציג:
+• לעולם אל תציע להעביר לנציג לפני שאספת לפחות שם + (מייל או טלפון) מהלקוח
+• אם הלקוח מבקש נציג — אמור: "בשמחה! כדי שהנציג יוכל לחזור אליך — מה שמך ומספר הטלפון או המייל שלך?"
+• רק אחרי שקיבלת פרטי קשר — אמור ESCALATE
+• אם אין לך מידע מספיק לענות — נסה לשאול שאלה ממוקדת במקום להעביר לנציג
+• העברה לנציג היא אפשרות אחרונה, לא ראשונה
 
 הנחיות קווליפיקציה (חשוב מאוד — לפני שאתה ממליץ על פתרון):
 
@@ -78,9 +85,10 @@ const DEFAULT_SYSTEM_PROMPT = `אתה נציג תמיכה ומכירות של Ne
 
 משפט escalation: "אני מחבר אותך עכשיו לנציג מומחה שיוכל לעזור — הוא יחזור אליך תוך דקות."`;
 
+// Only explicit "I want a human" triggers — removed sales-related words
+// that the bot should handle itself (דמו, demo, מחיר מדויק, הצעת מחיר, quote)
 const ESCALATION_TRIGGERS = [
-  'נציג', 'אדם', 'בן אדם', 'דמו', 'demo', 'human', 'agent',
-  'מחיר מדויק', 'הצעת מחיר', 'quote',
+  'נציג', 'אדם', 'בן אדם', 'human', 'agent',
 ];
 
 // ─── Navigation map for in-chat page links ───────────────
@@ -229,12 +237,18 @@ function detectEscalation(
   userText: string,
   bestSimilarity: number,
   messageCount: number,
-): boolean {
+): { shouldEscalate: boolean; reason?: string; isExplicitRequest?: boolean } {
   const textLower = userText.toLowerCase();
-  if (ESCALATION_TRIGGERS.some((t) => textLower.includes(t.toLowerCase()))) return true;
-  if (bestSimilarity < 0.35 && messageCount > 2) return true; // Very low confidence
-  if (messageCount >= 5) return true; // Max AI messages
-  return false;
+  if (ESCALATION_TRIGGERS.some((t) => textLower.includes(t.toLowerCase()))) {
+    return { shouldEscalate: true, reason: 'trigger_keyword', isExplicitRequest: true };
+  }
+  if (bestSimilarity < 0.25 && messageCount > 5) {
+    return { shouldEscalate: true, reason: 'low_confidence' };
+  }
+  if (messageCount >= 12) {
+    return { shouldEscalate: true, reason: 'max_messages' };
+  }
+  return { shouldEscalate: false };
 }
 
 // ─── Main: generate AI reply ──────────────────────────────
@@ -280,14 +294,29 @@ export async function generateReply(
     // 3. Detect escalation before calling GPT
     const chunksUsedMeta = chunks.map((c) => ({ id: c.id, title: c.title, similarity: c.similarity }));
     const messageCount = recentMessages.filter((m) => m.sender === 'CUSTOMER').length;
-    if (detectEscalation(userMessage, bestSimilarity, messageCount)) {
-      const reason = ESCALATION_TRIGGERS.some((t) => userMessage.toLowerCase().includes(t.toLowerCase()))
-        ? 'trigger_keyword' : bestSimilarity < 0.35 ? 'low_confidence' : 'max_messages';
-      return {
-        text: 'אני מחבר אותך עכשיו לנציג מומחה שיוכל לעזור — הוא יחזור אליך תוך דקות.',
-        shouldEscalate: true,
-        aiMetadata: { chunksUsed: chunksUsedMeta, bestSimilarity, escalationReason: reason },
-      };
+    const escalation = detectEscalation(userMessage, bestSimilarity, messageCount);
+
+    if (escalation.shouldEscalate) {
+      // Check if we have lead data before allowing escalation
+      const session = await prisma.chatSession.findUnique({
+        where: { id: sessionId },
+        select: { metadata: true },
+      });
+      const meta = (session?.metadata as Record<string, unknown>) ?? {};
+      const leadInfo = (meta.leadData as Record<string, string>) ?? {};
+      const hasLeadData = leadInfo.name || leadInfo.email || leadInfo.phone;
+
+      // Only escalate immediately if: explicit "I want human" request AND we have lead data,
+      // OR max_messages reached (safety valve)
+      if ((escalation.isExplicitRequest && hasLeadData) || escalation.reason === 'max_messages') {
+        return {
+          text: 'אני מחבר אותך עכשיו לנציג מומחה שיוכל לעזור — הוא יחזור אליך תוך דקות.',
+          shouldEscalate: true,
+          aiMetadata: { chunksUsed: chunksUsedMeta, bestSimilarity, escalationReason: escalation.reason },
+        };
+      }
+      // If explicit request but no lead data → let GPT ask for details (system prompt handles this)
+      // If low_confidence but no explicit request → let GPT try to help
     }
 
     // 4. Get dynamic system prompt from DB
