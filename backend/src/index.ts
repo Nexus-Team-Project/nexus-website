@@ -70,6 +70,90 @@ async function seedKnowledgeIfEmpty() {
   console.log(`✅ ${chunks.length} knowledge chunks seeded (${ok} with embeddings)`);
 }
 
+// ─── Seed technical knowledge chunks (idempotent) ──────
+async function seedTechnicalChunks() {
+  const techChunks = [
+    {
+      title: 'API ואינטגרציות — סקירה כללית',
+      content: `Nexus מספקת REST API מלא עם אימות JWT ומפתח API. ה-API מאפשר ניהול מועדונים, הטבות, שוברים, עסקאות ולקוחות באופן פרוגרמטי. Rate limit: 100 בקשות/דקה (Standard), 500/דקה (Enterprise). תיעוד מלא זמין ב-nexus-api-docs-production.up.railway.app. SDKs זמינים ל-JavaScript, React, Node.js ו-Python.`,
+    },
+    {
+      title: 'מערכת Webhooks',
+      content: `Nexus שולחת Webhooks בזמן אמת לאירועים כמו: עסקה חדשה, מימוש שובר, הרשמה למועדון, עדכון פרופיל. כל Webhook מאובטח עם HMAC-SHA256 signature. ניתן להגדיר URLs שונים לכל סוג אירוע דרך ה-Dashboard או דרך ה-API. Retry policy: 3 ניסיונות עם exponential backoff.`,
+    },
+    {
+      title: 'יכולות White-Label',
+      content: `Nexus מאפשרת לשלב את הפתרונות כ-White-Label בתוך האפליקציה או האתר של הארגון. ניתן להתאים צבעים, לוגו, פונטים ודומיין מותאם אישית. Embedded widgets מאפשרים להטמיע רכיבי UI (כמו כרטיס הטבות, ארנק דיגיטלי) ישירות באתר. Custom domains נתמכים עם SSL אוטומטי.`,
+    },
+    {
+      title: 'SDKs וספריות קוד',
+      content: `Nexus מספקת SDKs רשמיים: JavaScript (Browser), React Components, Node.js Server SDK, ו-Python SDK. ה-React SDK כולל רכיבים מוכנים כמו <BenefitCard>, <WalletWidget>, <LoyaltyPoints>. Server SDKs כוללים type-safe clients עם TypeScript definitions מלאים. התקנה דרך npm/pip.`,
+    },
+    {
+      title: 'אבטחה ופרטיות נתונים',
+      content: `Nexus עומדת בתקני PCI-DSS Level 1 לעיבוד תשלומים. כל הנתונים מוצפנים ב-AES-256 ובמעבר ב-TLS 1.3. התאימות ל-GDPR כוללת: זכות למחיקה, ייצוא נתונים, DPA, ואחסון בשרתים באירופה. SOC 2 Type II בתהליך. Two-factor authentication זמין לכל חשבון admin.`,
+    },
+    {
+      title: 'מדריך התחלה מהירה למפתחים',
+      content: `להתחיל לעבוד עם Nexus API: 1) הירשם ב-Dashboard וצור API Key. 2) התקן SDK: npm install @nexus/sdk. 3) אתחל: const nexus = new Nexus({ apiKey: 'YOUR_KEY' }). 4) צור מועדון ראשון: nexus.clubs.create({ name: '...' }). 5) הוסף חברים והטבות. תיעוד מלא עם דוגמאות קוד זמין בעמוד ה-API Docs.`,
+    },
+  ];
+
+  const canEmbed = !!env.OPENAI_API_KEY;
+  let added = 0;
+
+  for (const chunk of techChunks) {
+    const exists = await prisma.knowledgeChunk.findFirst({ where: { title: chunk.title } });
+    if (exists) continue;
+
+    let embedding: number[] = [];
+    if (canEmbed) {
+      try { embedding = await embedText(`${chunk.title}\n${chunk.content}`); } catch {}
+    }
+    await prisma.knowledgeChunk.create({
+      data: { title: chunk.title, content: chunk.content, source: 'kb_seed_tech', language: 'he', isActive: true, embedding },
+    });
+    added++;
+  }
+
+  if (added > 0) console.log(`📚 Seeded ${added} technical knowledge chunks`);
+
+  // Also seed technical few-shot examples
+  const techExamples = [
+    {
+      question: 'יש לכם API?',
+      answer: 'בהחלט! Nexus מספקת REST API מלא עם תיעוד מפורט, אימות JWT ו-SDKs ל-JavaScript, React, Node.js ו-Python. אתה יכול לנהל מועדונים, הטבות, שוברים ועסקאות באופן פרוגרמטי. [NAV:api_docs]',
+      category: 'technical',
+    },
+    {
+      question: 'אפשר לשלב את Nexus באפליקציה שלנו?',
+      answer: 'כן, Nexus תוכננה בדיוק בשביל זה. יש לנו Embedded Widgets שמטמיעים ישירות באתר שלכם, SDKs עם React Components מוכנים, ו-REST API מלא. ניתן גם לעבוד ב-White-Label עם דומיין מותאם. [NAV:api_docs]',
+      category: 'technical',
+    },
+    {
+      question: 'מה לגבי אבטחה?',
+      answer: 'האבטחה ב-Nexus ברמה הגבוהה ביותר: PCI-DSS Level 1 לתשלומים, הצפנת AES-256, TLS 1.3, תאימות GDPR מלאה כולל זכות מחיקה וייצוא נתונים, ו-2FA לכל חשבון. SOC 2 Type II בתהליך.',
+      category: 'technical',
+    },
+    {
+      question: 'כמה זמן לוקח להקים מועדון הטבות?',
+      answer: 'מועדון הטבות בסיסי יכול לפעול תוך דקות דרך ה-Dashboard שלנו. פתרונות סליקה — עד כשבועיים. פתרונות מתקדמים כמו כרטיסים וארנקים דיגיטליים — עד 4 חודשים. רוצה שנתאם שיחה כדי לתכנן את ההטמעה? [NAV:schedule]',
+      category: 'sales',
+    },
+  ];
+
+  let examplesAdded = 0;
+  for (const ex of techExamples) {
+    const exists = await prisma.aiExample.findFirst({ where: { question: ex.question } });
+    if (exists) continue;
+    await prisma.aiExample.create({
+      data: { question: ex.question, answer: ex.answer, category: ex.category, isActive: true },
+    });
+    examplesAdded++;
+  }
+  if (examplesAdded > 0) console.log(`📝 Seeded ${examplesAdded} AI few-shot examples`);
+}
+
 async function bootstrap() {
   // 1. Test DB connection
   try {
@@ -83,6 +167,7 @@ async function bootstrap() {
   // 2. Auto-seed knowledge base on first boot
   try {
     await seedKnowledgeIfEmpty();
+    await seedTechnicalChunks();
   } catch (err) {
     console.error('⚠️  Knowledge seed failed (non-fatal):', (err as Error).message);
   }

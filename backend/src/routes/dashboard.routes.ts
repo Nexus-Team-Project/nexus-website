@@ -275,24 +275,96 @@ router.get('/revenue', apiLimiter, async (req: Request, res: Response, next: Nex
 
 // ─── GET /api/dashboard/ai-stats ──────────────────────────
 
-router.get('/ai-stats', apiLimiter, async (_req: Request, res: Response, next: NextFunction) => {
+router.get('/ai-stats', apiLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const [totalRatings, avgRatingResult, lowRatedCount, knowledgeCount] = await Promise.all([
+    const days = Math.min(Number(req.query.days) || 30, 90);
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+    const [
+      totalRatings, avgRatingResult, lowRatedCount, knowledgeCount,
+      totalSessions, escalatedSessions, aiResolvedSessions,
+      exampleCount, gapCount, topGaps,
+      // Previous period for trend comparison
+      prevAvgRating,
+    ] = await Promise.all([
       prisma.aiRating.count(),
       prisma.aiRating.aggregate({ _avg: { rating: true } }),
       prisma.aiRating.count({ where: { rating: { lte: 2 } } }),
       prisma.knowledgeChunk.count({ where: { isActive: true } }),
+      // Sessions in period
+      prisma.chatSession.count({ where: { createdAt: { gte: since } } }),
+      // Escalated sessions (went to HUMAN mode)
+      prisma.chatSession.count({ where: { createdAt: { gte: since }, mode: 'HUMAN' } }),
+      // AI-resolved sessions (closed without escalation)
+      prisma.chatSession.count({
+        where: { createdAt: { gte: since }, status: { in: ['CLOSED', 'RESOLVED'] }, mode: 'AI' },
+      }),
+      // Auto-generated examples from corrections
+      prisma.aiExample.count({ where: { category: 'auto_correction' } }),
+      // Unresolved knowledge gaps
+      prisma.knowledgeGap.count({ where: { resolved: false } }),
+      // Top knowledge gaps (most recent unresolved)
+      prisma.knowledgeGap.findMany({
+        where: { resolved: false },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: { id: true, question: true, bestScore: true, createdAt: true },
+      }),
+      // Previous period avg rating for trend
+      prisma.aiRating.aggregate({
+        _avg: { rating: true },
+        where: {
+          createdAt: { gte: new Date(Date.now() - 2 * days * 24 * 60 * 60 * 1000), lt: since },
+        },
+      }),
     ]);
+
+    const avgRating = Math.round((avgRatingResult._avg.rating ?? 0) * 10) / 10;
+    const prevAvg = Math.round((prevAvgRating._avg.rating ?? 0) * 10) / 10;
+    const resolutionRate = totalSessions > 0
+      ? Math.round((aiResolvedSessions / totalSessions) * 1000) / 10
+      : 0;
+    const escalationRate = totalSessions > 0
+      ? Math.round((escalatedSessions / totalSessions) * 1000) / 10
+      : 0;
 
     res.json({
       totalRatings,
-      avgRating: Math.round((avgRatingResult._avg.rating ?? 0) * 10) / 10,
+      avgRating,
+      ratingTrend: prevAvg > 0 ? Math.round((avgRating - prevAvg) * 10) / 10 : null,
       lowRatedCount,
       knowledgeChunks: knowledgeCount,
+      // New Phase 8 metrics
+      resolutionRate,
+      escalationRate,
+      totalSessions,
+      aiResolvedSessions,
+      escalatedSessions,
+      autoExamplesCount: exampleCount,
+      unresolvedGaps: gapCount,
+      topKnowledgeGaps: topGaps,
     });
   } catch (err) {
     next(err);
   }
 });
+
+// ─── PATCH /api/dashboard/knowledge-gaps/:id/resolve ─────
+
+router.patch(
+  '/knowledge-gaps/:id/resolve',
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const gap = await prisma.knowledgeGap.update({
+        where: { id: req.params.id },
+        data: { resolved: true },
+      });
+      res.json(gap);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;

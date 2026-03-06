@@ -1,17 +1,25 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { X, Send, Minimize2, Settings, Search } from 'lucide-react';
+import { X, Send, Minimize2 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { api, API_URL } from '../lib/api';
 import { getVisitorId } from '../lib/visitorId';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING, PRODUCT } from '../lib/analyticsEvents';
 
+interface ChatAction {
+  type: 'navigate' | 'external_link';
+  label_he: string;
+  label_en: string;
+  url: string;
+}
+
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'agent';
   timestamp: Date;
+  actions?: ChatAction[];
 }
 
 interface LiveChatProps {
@@ -107,31 +115,16 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
-  // ── Action menu state ──
-  const [actionView, setActionView] = useState<'main' | 'more'>('main');
+  // ── Contact details ──
+  const WA_SALES_NUMBER = '972554339345';
+  const WA_TECH_NUMBER  = '972554339191';
+  const CALENDAR_LINK   = 'https://app.apollo.io/#/meet/inbound-router/mis-xdv-oyk';
 
-  // ── First-message re-show logic ──
-  const [firstMessageSent, setFirstMessageSent] = useState(false);
-  const needsTopicPromptRef = useRef(false);
-
-  // ⚠️ Replace these with real values:
-  const WA_SALES_NUMBER = '972501234567';   // WhatsApp sales number
-  const WA_TECH_NUMBER  = '972509876543';   // WhatsApp tech number
-  const CALENDAR_LINK   = 'https://calendly.com/your-link'; // Calendar booking link
-
-  // WhatsApp SVG logo component
-  const WhatsAppIcon = () => (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="#25D366" xmlns="http://www.w3.org/2000/svg">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/>
-      <path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.553 4.122 1.519 5.862L.057 23.857a.5.5 0 00.611.611l6.034-1.463A11.945 11.945 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.75a9.714 9.714 0 01-5.03-1.397l-.36-.213-3.732.905.922-3.635-.234-.374A9.714 9.714 0 012.25 12C2.25 6.615 6.615 2.25 12 2.25S21.75 6.615 21.75 12 17.385 21.75 12 21.75z"/>
-    </svg>
-  );
-
-  const primaryActions = [
+  // Flat list of quick actions — Stripe-style compact grid
+  const quickActions = [
     {
       id: 'whatsapp-sales',
       label: t.liveChat.whatsappSales,
-      icon: <WhatsAppIcon />,
       action: () => {
         sendMessage(t.liveChat.whatsappSalesResponse);
         setTimeout(() => window.open(`https://wa.me/${WA_SALES_NUMBER}`, '_blank'), 800);
@@ -140,25 +133,14 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
     {
       id: 'schedule',
       label: t.liveChat.schedulemeeting,
-      icon: '📅',
       action: () => {
         sendMessage(t.liveChat.scheduleMeetingResponse);
         setTimeout(() => window.open(CALENDAR_LINK, '_blank'), 800);
       },
     },
     {
-      id: 'more',
-      label: t.liveChat.moreOptions,
-      icon: '⚙️',
-      action: () => setActionView('more'),
-    },
-  ];
-
-  const secondaryActions = [
-    {
       id: 'whatsapp-tech',
       label: t.liveChat.whatsappTech,
-      icon: <WhatsAppIcon />,
       action: () => {
         sendMessage(t.liveChat.whatsappTechResponse);
         setTimeout(() => window.open(`https://wa.me/${WA_TECH_NUMBER}`, '_blank'), 800);
@@ -167,8 +149,10 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
     {
       id: 'integration',
       label: t.liveChat.integration,
-      icon: '⚙️',
-      action: () => { sendMessage(t.liveChat.integrationResponse); setTimeout(() => window.open('https://nexus-api-docs-production.up.railway.app/', '_blank'), 800); },
+      action: () => {
+        sendMessage(t.liveChat.integrationResponse);
+        setTimeout(() => window.open('https://nexus-api-docs-production.up.railway.app/', '_blank'), 800);
+      },
     },
   ];
 
@@ -216,24 +200,21 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         // Receive AI / agent replies
         socket.on(
           'new_message',
-          (msg: { id: string; text: string; sender: string; timestamp: string }) => {
+          (msg: { id: string; text: string; sender: string; timestamp: string; actions?: ChatAction[] }) => {
             if (!mounted) return;
+            // Customer messages are already in local state — only add AI/agent replies
+            if (msg.sender === 'CUSTOMER') return;
             setIsTyping(false);
             setMessages((prev) => [
               ...prev,
               {
                 id: msg.id,
                 text: msg.text,
-                sender: msg.sender === 'CUSTOMER' ? 'user' : 'agent',
+                sender: 'agent',
                 timestamp: new Date(msg.timestamp),
+                actions: msg.actions,
               },
             ]);
-            // Re-show quick actions once after the first AI reply
-            if (needsTopicPromptRef.current) {
-              needsTopicPromptRef.current = false;
-              setShowQuickActions(true);
-              setActionView('main');
-            }
           },
         );
 
@@ -323,8 +304,6 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         } catch {
           // If the request fails, stop the spinner and show a fallback
           setIsTyping(false);
-          // Also clear the topic prompt ref so we don't accidentally re-show
-          needsTopicPromptRef.current = false;
           setMessages((prev) => [
             ...prev,
             {
@@ -339,7 +318,6 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         // Session not ready yet — graceful fallback
         setTimeout(() => {
           setIsTyping(false);
-          needsTopicPromptRef.current = false;
           setMessages((prev) => [
             ...prev,
             {
@@ -357,11 +335,6 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
 
   const handleSend = () => {
     if (!inputValue.trim()) return;
-    // On first user message: set flag so quick actions re-appear after AI reply
-    if (!firstMessageSent) {
-      setFirstMessageSent(true);
-      needsTopicPromptRef.current = true;
-    }
     setShowQuickActions(false);
     sendMessage(inputValue);
     setInputValue('');
@@ -412,6 +385,26 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
           }
         }
 
+        @keyframes messageSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes typingBounce {
+          0%, 60%, 100% {
+            transform: translateY(0);
+          }
+          30% {
+            transform: translateY(-4px);
+          }
+        }
+
         /* Mobile: full-screen chat */
         @media (max-width: 639px) {
           .chat-container {
@@ -430,16 +423,17 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
 
       <div
         dir={direction}
-        className="chat-container fixed bottom-6 right-6 flex flex-col z-50 rounded-[2.5rem] overflow-hidden shadow-2xl"
+        className="chat-container fixed bottom-6 right-6 flex flex-col z-50 rounded-[2.5rem] overflow-hidden"
         style={{
           width: `${width}px`,
           height: `${height}px`,
           maxWidth: 'calc(100vw - 3rem)',
           maxHeight: 'calc(100vh - 3rem)',
-          background: 'rgba(255, 255, 255, 0.25)',
-          backdropFilter: 'blur(50px) saturate(200%)',
-          WebkitBackdropFilter: 'blur(50px) saturate(200%)',
-          border: '1px solid rgba(255, 255, 255, 0.5)',
+          background: 'linear-gradient(180deg, rgba(248, 248, 252, 0.95) 0%, rgba(243, 243, 248, 0.92) 100%)',
+          backdropFilter: 'blur(40px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(40px) saturate(180%)',
+          border: '1px solid rgba(255, 255, 255, 0.4)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.1) inset',
           animation: isClosing
             ? 'chatSlideOut 0.3s cubic-bezier(0.4, 0, 1, 1) forwards'
             : 'chatSlideIn 0.4s cubic-bezier(0, 0, 0.2, 1) forwards',
@@ -465,42 +459,35 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         />
 
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-4">
-            <div className="relative w-12 h-12 rounded-full border-2 border-white shadow-inner bg-white/20 p-0.5">
-              <div className="w-full h-full rounded-full bg-gradient-to-br from-stripe-purple to-stripe-blue flex items-center justify-center text-white font-bold text-sm">
-                ST
-              </div>
-              <div
-                className="absolute inset-[-2px] rounded-full -z-10 opacity-60"
-                style={{
-                  background: 'linear-gradient(45deg, #635BFF, #0074D9)',
-                  filter: 'blur(8px)',
-                }}
+        <header className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.2)' }}>
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 flex-shrink-0">
+              <img
+                src="/nexus-circle-logo.png"
+                alt="Nexus"
+                className="w-10 h-10 rounded-full object-cover border-2 border-white/60 shadow-sm"
               />
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white" />
             </div>
             <div>
-              <h1 className="text-slate-900 font-semibold text-base tracking-tight">
+              <h1 className="text-slate-900 font-semibold text-sm tracking-tight">
                 {t.liveChat.salesTeam}
               </h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-                <span className="text-slate-500 text-xs font-medium">{t.liveChat.alwaysOnline}</span>
-              </div>
+              <span className="text-slate-500 text-xs font-medium">{t.liveChat.alwaysOnline}</span>
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/40 transition-colors text-slate-600">
-              <Search size={18} />
-            </button>
-            <button className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/40 transition-colors text-slate-600">
-              <Settings size={18} />
+            <button
+              onClick={handleMinimize}
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors text-slate-500"
+            >
+              <Minimize2 size={16} />
             </button>
             <button
               onClick={handleClose}
-              className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-white/40 transition-colors text-slate-600"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-black/5 transition-colors text-slate-500"
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
         </header>
@@ -513,33 +500,69 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex flex-col gap-2 ${
+              className={`flex gap-2 ${
                 message.sender === 'user'
-                  ? `items-end ${isRtl ? 'mr-auto' : 'ml-auto'} max-w-[85%]`
-                  : 'items-start max-w-[85%]'
+                  ? `flex-row-reverse ${isRtl ? 'mr-auto' : 'ml-auto'} max-w-[85%]`
+                  : 'max-w-[85%]'
               }`}
+              style={{ animation: 'messageSlideIn 0.3s ease-out' }}
             >
-              <div
-                className={`px-5 py-4 text-sm leading-relaxed ${
-                  message.sender === 'user'
-                    ? `rounded-[1.75rem] ${isRtl ? 'rounded-tl-lg' : 'rounded-tr-lg'} text-white font-medium`
-                    : `rounded-[1.75rem] ${isRtl ? 'rounded-tr-lg' : 'rounded-tl-lg'} text-slate-800`
-                }`}
-                style={
-                  message.sender === 'user'
-                    ? {
-                        background: 'linear-gradient(180deg, #635BFF 0%, #5348E6 100%)',
-                        boxShadow: '0 4px 15px rgba(99, 91, 255, 0.25)',
-                      }
-                    : {
-                        background: 'rgba(255, 255, 255, 0.75)',
-                        backdropFilter: 'blur(12px)',
-                        border: '1px solid rgba(255, 255, 255, 0.8)',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-                      }
-                }
-              >
-                {message.text}
+              {/* Agent avatar */}
+              {message.sender === 'agent' && (
+                <img
+                  src="/nexus-circle-logo.png"
+                  alt=""
+                  className="w-6 h-6 rounded-full flex-shrink-0 mt-1"
+                />
+              )}
+              <div className="flex flex-col gap-1">
+                <div
+                  className={`px-4 py-3 text-sm leading-relaxed ${
+                    message.sender === 'user'
+                      ? `rounded-2xl ${isRtl ? 'rounded-tl-md' : 'rounded-tr-md'} text-white font-medium`
+                      : `rounded-2xl ${isRtl ? 'rounded-tr-md' : 'rounded-tl-md'} text-slate-800`
+                  }`}
+                  style={
+                    message.sender === 'user'
+                      ? {
+                          background: 'linear-gradient(180deg, #635BFF 0%, #5348E6 100%)',
+                          boxShadow: '0 2px 8px rgba(99, 91, 255, 0.2)',
+                        }
+                      : {
+                          background: 'rgba(255, 255, 255, 0.85)',
+                          border: '1px solid rgba(0, 0, 0, 0.06)',
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        }
+                  }
+                >
+                  {message.text}
+                </div>
+                {/* Inline navigation links */}
+                {message.actions && message.actions.length > 0 && (
+                  <div className="flex flex-wrap gap-2 px-1 mt-1">
+                    {message.actions.map((action, i) => (
+                      <button
+                        key={i}
+                        onClick={() => {
+                          if (action.type === 'external_link') {
+                            window.open(action.url, '_blank');
+                          } else {
+                            window.location.href = action.url;
+                          }
+                        }}
+                        className="text-xs font-medium text-stripe-purple hover:underline underline-offset-2 transition-colors hover:text-stripe-purple/80"
+                      >
+                        {isRtl ? action.label_he : action.label_en} →
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <span className={`text-[10px] text-slate-400 font-medium px-1 ${message.sender === 'user' ? 'text-end' : ''}`}>
+                  {message.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
               </div>
               <div className="flex items-center gap-2 px-2">
                 <span className="text-[11px] text-slate-400 font-medium">
@@ -570,103 +593,64 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
             </div>
           ))}
 
-          {/* Action Menu */}
-          {showQuickActions && messages.length > 0 && !isTyping && (
-            <div className="flex flex-col gap-2 px-2">
-              <p className="text-[11px] text-slate-500 font-medium px-1">
-                {firstMessageSent ? t.liveChat.selectTopicPrompt : t.liveChat.quickActionsLabel}
-              </p>
-
-              {/* ── Main view: 3 primary actions ── */}
-              {actionView === 'main' && (
-                <div className="flex flex-col gap-1.5">
-                  {primaryActions.map((action) => (
-                    <button
-                      key={action.id}
-                      onClick={() => {
-                        if (action.id !== 'more') setShowQuickActions(false);
-                        action.action();
-                      }}
-                      className="w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 text-right"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.6)',
-                        backdropFilter: 'blur(8px)',
-                        border: '1px solid rgba(255, 255, 255, 0.7)',
-                        color: '#1e293b',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                      }}
-                    >
-                      <span className="flex-shrink-0 flex items-center">{action.icon}</span>
-                      <span className="flex-1">{action.label}</span>
-                      {action.id === 'more' && <span className="text-slate-400 text-xs">›</span>}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* ── More options: 2 secondary actions + back ── */}
-              {actionView === 'more' && (
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => setActionView('main')}
-                    className="text-xs text-slate-500 font-medium px-1 mb-1 text-right hover:text-slate-700 transition-colors"
-                  >
-                    {t.liveChat.back}
-                  </button>
-                  {secondaryActions.map((action) => (
-                    <button
-                      key={action.id}
-                      onClick={() => {
-                        setShowQuickActions(false);
-                        action.action();
-                      }}
-                      className="w-full px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all hover:-translate-y-0.5 active:scale-95 text-right"
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.6)',
-                        backdropFilter: 'blur(8px)',
-                        border: '1px solid rgba(255, 255, 255, 0.7)',
-                        color: '#1e293b',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-                        e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                      }}
-                    >
-                      <span className="flex-shrink-0 flex items-center">{action.icon}</span>
-                      <span className="flex-1">{action.label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+          {/* Quick Actions — Stripe-style compact grid */}
+          <div
+            className="px-2 transition-all duration-300 ease-in-out"
+            style={{
+              opacity: showQuickActions && messages.length > 0 && !isTyping ? 1 : 0,
+              maxHeight: showQuickActions && messages.length > 0 && !isTyping ? '200px' : '0',
+              overflow: 'hidden',
+              transform: showQuickActions && messages.length > 0 && !isTyping ? 'translateY(0)' : 'translateY(8px)',
+            }}
+          >
+            <p className="text-[10px] text-slate-400 font-medium px-1 mb-2">
+              {t.liveChat.quickActionsLabel}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {quickActions.map((action) => (
+                <button
+                  key={action.id}
+                  onClick={() => {
+                    setShowQuickActions(false);
+                    action.action();
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all active:scale-95 hover:border-stripe-purple/40 hover:shadow-sm"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.9)',
+                    border: '1px solid rgba(0, 0, 0, 0.08)',
+                    color: '#334155',
+                  }}
+                >
+                  {action.label}
+                </button>
+              ))}
             </div>
-          )}
+          </div>
 
           {/* Typing indicator */}
           {isTyping && (
-            <div className="flex items-center gap-3 px-2">
-              <div className="flex gap-1.5 items-center bg-white/30 px-3 py-2 rounded-full">
+            <div className="flex items-end gap-2 px-2" style={{ animation: 'messageSlideIn 0.3s ease-out' }}>
+              <img src="/nexus-circle-logo.png" alt="" className="w-6 h-6 rounded-full flex-shrink-0" />
+              <div
+                className="flex gap-1.5 items-center px-4 py-3 rounded-2xl"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.85)',
+                  border: '1px solid rgba(0, 0, 0, 0.06)',
+                  borderTopLeftRadius: '6px',
+                }}
+              >
                 <span
-                  className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"
-                  style={{ animationDelay: '-0.3s' }}
+                  className="w-1.5 h-1.5 bg-slate-400 rounded-full"
+                  style={{ animation: 'typingBounce 1.2s ease-in-out infinite', animationDelay: '0s' }}
                 />
                 <span
-                  className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"
-                  style={{ animationDelay: '-0.15s' }}
+                  className="w-1.5 h-1.5 bg-slate-400 rounded-full"
+                  style={{ animation: 'typingBounce 1.2s ease-in-out infinite', animationDelay: '0.15s' }}
                 />
-                <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" />
+                <span
+                  className="w-1.5 h-1.5 bg-slate-400 rounded-full"
+                  style={{ animation: 'typingBounce 1.2s ease-in-out infinite', animationDelay: '0.3s' }}
+                />
               </div>
             </div>
           )}
@@ -674,14 +658,13 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         </section>
 
         {/* Input */}
-        <footer className="px-6 pb-6 pt-4">
+        <footer className="px-6 pb-4 pt-3">
           <div
-            className="group flex items-center gap-3 px-5 py-3.5 rounded-3xl transition-all focus-within:ring-2 focus-within:ring-stripe-purple/20"
+            className="group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all focus-within:ring-2 focus-within:ring-stripe-purple/20"
             style={{
-              background: 'rgba(255, 255, 255, 0.4)',
-              backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255, 255, 255, 0.5)',
-              boxShadow: '0 10px 30px -10px rgba(0, 0, 0, 0.1)',
+              background: 'rgba(255, 255, 255, 0.7)',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
             }}
           >
             <input
@@ -689,16 +672,17 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder={t.liveChat.inputPlaceholder}
-              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-800 placeholder:text-slate-400 text-sm py-1"
+              className="flex-1 bg-transparent border-none focus:ring-0 focus:outline-none text-slate-800 placeholder:text-slate-400 text-sm py-0.5"
             />
             <button
               onClick={handleSend}
               disabled={!inputValue.trim()}
-              className="bg-stripe-purple text-white w-9 h-9 rounded-full flex items-center justify-center shadow-lg hover:brightness-110 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-stripe-purple text-white w-8 h-8 rounded-full flex items-center justify-center shadow-sm hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Send size={16} className={isRtl ? 'rotate-180' : ''} />
+              <Send size={14} className={isRtl ? 'rotate-180' : ''} />
             </button>
           </div>
+          <p className="text-center text-[10px] text-slate-400/60 mt-2 font-medium">Powered by Nexus AI</p>
         </footer>
       </div>
     </>

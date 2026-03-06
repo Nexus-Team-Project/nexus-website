@@ -112,12 +112,34 @@ export async function handleChatOpened(data: {
 
 // ─── Chat escalated to human ──────────────────────────────
 
-export async function handleChatEscalated(data: { sessionId: string }): Promise<void> {
+export async function handleChatEscalated(data: {
+  sessionId: string;
+  topic?: string;
+  leadData?: Record<string, string>;
+  recentMessages?: Array<{ sender: string; text: string }>;
+  page?: string;
+}): Promise<void> {
+  const topicLabels: Record<string, string> = {
+    sales: 'מכירות', technical: 'טכני', billing: 'חיוב', general: 'כללי',
+  };
+  const topicLabel = topicLabels[data.topic ?? 'general'] ?? 'כללי';
+
+  // Build enriched notification body
+  let body = `סשן: ${data.sessionId.slice(-8)}\nנושא: ${topicLabel}`;
+  if (data.page) body += `\nעמוד: ${data.page}`;
+  if (data.leadData) {
+    const ld = data.leadData;
+    if (ld.name) body += `\n👤 ${ld.name}`;
+    if (ld.company) body += ` | ${ld.company}`;
+    if (ld.email) body += `\n📧 ${ld.email}`;
+    if (ld.phone) body += `\n📱 ${ld.phone}`;
+  }
+
   const notification = await prisma.notification.create({
     data: {
       type: 'chat_escalated',
-      title: `🚨 צ'אט דורש נציג אנושי`,
-      body: `סשן: ${data.sessionId.slice(-8)}`,
+      title: `🚨 צ'אט דורש נציג — ${topicLabel}`,
+      body,
       metadata: data,
     },
   });
@@ -125,12 +147,32 @@ export async function handleChatEscalated(data: { sessionId: string }): Promise<
   broadcastToAdmins('chat_escalated', {
     id: notification.id,
     sessionId: data.sessionId,
+    topic: data.topic,
+    leadData: data.leadData,
     timestamp: notification.createdAt,
   });
 
-  await WhatsApp.notifyAgent(
-    `🚨 *צ'אט דורש נציג*\nסשן: ${data.sessionId.slice(-8)}\nהלקוח מחכה לתגובה!`,
-  );
+  // Build rich WhatsApp handoff message
+  let waMessage = `🔴 *העברה לנציג — ${topicLabel}*\n\n`;
+  if (data.leadData) {
+    const ld = data.leadData;
+    if (ld.name || ld.company) waMessage += `👤 ${ld.name ?? ''}${ld.company ? ` | ${ld.company}` : ''}\n`;
+    if (ld.email) waMessage += `📧 ${ld.email}\n`;
+    if (ld.phone) waMessage += `📱 ${ld.phone}\n`;
+  }
+  if (data.page) waMessage += `📄 עמוד: ${data.page}\n`;
+
+  // Include last messages for context
+  if (data.recentMessages && data.recentMessages.length > 0) {
+    waMessage += `\n💬 *הודעות אחרונות:*\n`;
+    for (const msg of data.recentMessages) {
+      waMessage += `- ${msg.sender}: ${msg.text}\n`;
+    }
+  }
+
+  waMessage += `\nסשן: ${data.sessionId.slice(-8)}\nהלקוח מחכה לתגובה!`;
+
+  await WhatsApp.notifyAgent(waMessage);
 }
 
 // ─── Lead submitted ───────────────────────────────────────
