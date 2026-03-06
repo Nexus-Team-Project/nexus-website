@@ -6,9 +6,8 @@ import { api } from '../lib/api';
 import DashboardMock from '../components/workspace/DashboardMock';
 import OnboardingWizard from '../components/workspace/OnboardingWizard';
 import SetupAnimation from '../components/workspace/SetupAnimation';
-import ScheduleStep from '../components/workspace/ScheduleStep';
 
-type Phase = 'wizard' | 'animation' | 'schedule';
+type Phase = 'wizard' | 'animation';
 
 export interface OnboardingData {
   org_name: string;
@@ -21,7 +20,6 @@ export interface OnboardingData {
 
 export default function WorkspaceSetupPage() {
   const [phase, setPhase] = useState<Phase>('wizard');
-  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null);
   const { user } = useAuth();
   const { direction } = useLanguage();
   const navigate = useNavigate();
@@ -42,7 +40,6 @@ export default function WorkspaceSetupPage() {
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleWizardComplete = async (data: OnboardingData) => {
-    setOnboardingData(data);
     setPhase('animation');
     // Save to backend (fire-and-forget — animation plays while this runs)
     api.post('/api/user/workspace/setup', {
@@ -55,11 +52,7 @@ export default function WorkspaceSetupPage() {
     }).catch(console.error);
   };
 
-  // Very little blur — dashboard clearly visible in background
-  const dashFilter =
-    phase === 'schedule'
-      ? 'blur(0px) brightness(0.72)'
-      : 'blur(0.4px) brightness(0.60)';
+  const dashFilter = 'blur(0.4px) brightness(0.60)';
 
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#080C14]">
@@ -86,16 +79,7 @@ export default function WorkspaceSetupPage() {
         )}
 
         {phase === 'animation' && (
-          <SetupAnimation onComplete={() => setPhase('schedule')} />
-        )}
-
-        {phase === 'schedule' && (
-          <ScheduleStep
-            user={user}
-            onboardingData={onboardingData}
-            onBackToSite={() => navigate(getPostOnboardingPath())}
-            onExplore={() => navigate(getPostOnboardingPath())}
-          />
+          <SetupAnimation onComplete={() => window.location.replace(getPostOnboardingPath())} />
         )}
       </div>
 
