@@ -63,7 +63,13 @@ app.use(cookieParser());
 
 // ─── Health check ─────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString(), env: env.NODE_ENV, build: '2026-03-07b' });
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: env.NODE_ENV,
+    build: '2026-03-07c',
+    emailConfigured: !!(env.SENDPULSE_CLIENT_ID && env.SENDPULSE_CLIENT_SECRET),
+  });
 });
 
 // ─── API Routes ───────────────────────────────────────────

@@ -43,8 +43,14 @@ router.post(
       });
       // Send verification email instead of welcome email — account is not active until verified
       const lang = (req.body.language as 'en' | 'he') ?? 'en';
-      EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken, lang).catch(console.error);
-      res.status(201).json({ requiresVerification: true, email: result.email });
+      let emailError: string | undefined;
+      try {
+        await EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken, lang);
+      } catch (err: any) {
+        emailError = err?.message ?? String(err);
+        console.error('[REGISTER EMAIL FAIL]', emailError);
+      }
+      res.status(201).json({ requiresVerification: true, email: result.email, ...(emailError ? { _emailError: emailError } : {}) });
     } catch (err: any) {
       console.error('[REGISTER]', err?.message, err?.constructor?.name, err?.code, err?.meta);
       next(err);
