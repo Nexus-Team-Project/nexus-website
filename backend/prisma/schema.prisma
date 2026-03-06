@@ -2,12 +2,14 @@
 // PostgreSQL on Railway
 
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
 }
 
 // ─── ENUMS ─────────────────────────────────────────────────────────
@@ -187,14 +189,15 @@ model AiConfig {
 }
 
 model KnowledgeChunk {
-  id        String                       @id @default(cuid())
+  id        String                                @id @default(cuid())
   title     String
-  content   String                       @db.Text
+  content   String                                @db.Text
   source    String?
-  language  String   @default("he")
-  isActive  Boolean  @default(true)
-  createdAt DateTime                     @default(now())
-  updatedAt DateTime                     @updatedAt
+  language  String                                @default("he")
+  isActive  Boolean                               @default(true)
+  embedding Unsupported("vector(1536)")?
+  createdAt DateTime                              @default(now())
+  updatedAt DateTime                              @updatedAt
 
   @@index([isActive])
 }

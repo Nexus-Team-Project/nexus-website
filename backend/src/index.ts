@@ -84,8 +84,13 @@ async function bootstrap() {
   try {
     await prisma.$connect();
     console.log('✅ Database connected');
+  } catch (err) {
+    console.error('❌ Database connection failed:', err);
+    process.exit(1);
+  }
 
-    // Ensure pgvector extension + embedding column exist (Prisma can't manage vector types)
+  // 2. Ensure pgvector extension + embedding column (safety net; Prisma schema also declares these)
+  try {
     await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector;');
     await prisma.$executeRawUnsafe(`
       DO $$
@@ -98,28 +103,33 @@ async function bootstrap() {
         END IF;
       END $$;
     `);
-    // Auto-seed knowledge chunks + embeddings if table is empty
-    await seedKnowledgeIfEmpty();
+    console.log('✅ pgvector ready');
   } catch (err) {
-    console.error('❌ Database connection failed:', err);
-    process.exit(1);
+    console.warn('⚠️  pgvector setup skipped (may already exist via prisma db push):', (err as Error).message);
   }
 
-  // 2. Create HTTP server + Socket.io
+  // 3. Auto-seed knowledge base on first boot
+  try {
+    await seedKnowledgeIfEmpty();
+  } catch (err) {
+    console.error('⚠️  Knowledge seed failed (non-fatal):', (err as Error).message);
+  }
+
+  // 4. Create HTTP server + Socket.io
   const httpServer = http.createServer(app);
   initSocket(httpServer);
   console.log('✅ Socket.io initialized');
 
-  // 3. Schedule cron jobs
+  // 5. Schedule cron jobs
   scheduleDailyDigest();
   console.log('✅ Cron jobs scheduled');
 
-  // 4. Start listening
+  // 6. Start listening
   httpServer.listen(PORT, () => {
     console.log(`🚀 Nexus backend running on port ${PORT} [${env.NODE_ENV}]`);
   });
 
-  // 5. Graceful shutdown
+  // 7. Graceful shutdown
   process.on('SIGTERM', async () => {
     console.log('SIGTERM received — shutting down gracefully');
     httpServer.close(async () => {
