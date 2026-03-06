@@ -6,6 +6,8 @@ import BorderlessGlobe from './BorderlessGlobe';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { MouseEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { MARKETING } from '../lib/analyticsEvents';
 
 interface BorderHighlightCardProps {
   children: React.ReactNode;
@@ -300,13 +302,35 @@ export default function Features() {
   const [isGlobeHovered, setIsGlobeHovered] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const { t, direction } = useLanguage();
+  const { track } = useAnalytics();
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Fire Pricing_Section_Viewed once when section scrolls into view
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          track(MARKETING.PRICING_SECTION_VIEWED, 'MARKETING', {
+            page_path: window.location.pathname,
+          });
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleCard = (cardId: string) => {
     setExpandedCard(prev => prev === cardId ? null : cardId);
   };
 
   return (
-    <section className="pt-32 pb-16 bg-white relative">
+    <section id="pricing" ref={sectionRef} className="pt-32 pb-16 bg-white relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">
