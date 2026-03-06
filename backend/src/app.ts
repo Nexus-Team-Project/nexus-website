@@ -37,7 +37,7 @@ app.use(
         'frame-src': ["'self'", 'https://accounts.google.com'],
         'connect-src': ["'self'", 'https://nexus-website-production.up.railway.app', 'https://accounts.google.com', 'https://oauth2.googleapis.com', 'https://*.googleapis.com'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://fonts.googleapis.com'],
-        'font-src': ["'self'", 'https://fonts.gstatic.com'],
+        'font-src': ["'self'", 'data:', 'https://fonts.gstatic.com'],
       },
     },
   }),
