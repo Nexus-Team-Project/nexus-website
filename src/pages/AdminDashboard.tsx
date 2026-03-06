@@ -5,9 +5,10 @@ import {
   Star, Brain, CreditCard, RefreshCw, LogOut, Bell,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { PRODUCT } from '../lib/analyticsEvents';
+import NexusLogo from '../components/NexusLogo';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ interface Lead {
 
 function Sparkline({
   data,
-  color = '#8b5cf6',
+  color = '#635bff',
   height = 60,
 }: {
   data: number[];
@@ -111,14 +112,11 @@ function Sparkline({
     <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="w-full" style={{ height }}>
       <defs>
         <linearGradient id={`sg-${color.replace('#', '')}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity={0.3} />
+          <stop offset="0%" stopColor={color} stopOpacity={0.2} />
           <stop offset="100%" stopColor={color} stopOpacity={0} />
         </linearGradient>
       </defs>
-      <polygon
-        points={areaPoints}
-        fill={`url(#sg-${color.replace('#', '')})`}
-      />
+      <polygon points={areaPoints} fill={`url(#sg-${color.replace('#', '')})`} />
       <polyline
         points={points.join(' ')}
         fill="none"
@@ -152,21 +150,21 @@ function MetricCard({
 }) {
   const positive = change === null || change >= 0;
   return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col gap-3">
+    <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm text-white/60">{title}</span>
-        <div className={`w-9 h-9 rounded-lg flex items-center justify-center`} style={{ background: `${color}33` }}>
-          <Icon size={18} style={{ color }} />
+        <span className="text-xs font-medium text-stripe-gray">{title}</span>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}18` }}>
+          <Icon size={16} style={{ color }} />
         </div>
       </div>
       <div>
-        <span className="text-3xl font-bold text-white">
+        <span className="text-2xl font-bold text-stripe-dark">
           {unit === '$' ? `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : value.toLocaleString()}
         </span>
-        {unit && unit !== '$' && <span className="text-white/50 text-sm ml-1">{unit}</span>}
+        {unit && unit !== '$' && <span className="text-stripe-gray text-sm ml-1">{unit}</span>}
       </div>
       {change !== null && (
-        <span className={`text-xs font-medium ${positive ? 'text-green-400' : 'text-red-400'}`}>
+        <span className={`text-xs font-medium ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
           {positive ? '+' : ''}{change}% vs prev period
         </span>
       )}
@@ -180,7 +178,7 @@ function MetricCard({
 function LineChart({ data }: { data: ChartPoint[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
-  if (!data.length) return <div className="h-48 flex items-center justify-center text-white/30 text-sm">No data</div>;
+  if (!data.length) return <div className="h-48 flex items-center justify-center text-stripe-gray/40 text-sm">No data</div>;
 
   const overallMax = Math.max(...data.map(d => Math.max(d.visitors, d.chats, d.leads, d.signups)), 1);
 
@@ -209,18 +207,17 @@ function LineChart({ data }: { data: ChartPoint[] }) {
     }));
 
   const series = [
-    { key: 'visitors' as const, color: '#8b5cf6', label: 'Visitors' },
-    { key: 'chats' as const, color: '#06b6d4', label: 'Chats' },
-    { key: 'leads' as const, color: '#10b981', label: 'Leads' },
-    { key: 'signups' as const, color: '#f59e0b', label: 'Signups' },
+    { key: 'visitors' as const, color: '#635bff', label: 'Visitors' },
+    { key: 'chats' as const,    color: '#0ea5e9', label: 'Chats' },
+    { key: 'leads' as const,    color: '#10b981', label: 'Leads' },
+    { key: 'signups' as const,  color: '#f59e0b', label: 'Signups' },
   ];
 
   return (
     <div className="relative">
-      {/* Legend */}
       <div className="flex gap-4 mb-3">
         {series.map(s => (
-          <div key={s.key} className="flex items-center gap-1.5 text-xs text-white/60">
+          <div key={s.key} className="flex items-center gap-1.5 text-xs text-stripe-gray">
             <span className="w-3 h-0.5 rounded-full inline-block" style={{ background: s.color }} />
             {s.label}
           </div>
@@ -234,27 +231,24 @@ function LineChart({ data }: { data: ChartPoint[] }) {
         style={{ height: h }}
         onMouseLeave={() => setHovered(null)}
       >
-        {/* Grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map(frac => {
           const y = padT + innerH * (1 - frac);
           return (
             <g key={frac}>
-              <line x1={padL} y1={y} x2={w - padR} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-              <text x={padL - 4} y={y + 4} textAnchor="end" fontSize="9" fill="rgba(255,255,255,0.3)">
+              <line x1={padL} y1={y} x2={w - padR} y2={y} stroke="#e2e8f0" strokeWidth="1" />
+              <text x={padL - 4} y={y + 4} textAnchor="end" fontSize="9" fill="#94a3b8">
                 {Math.round(overallMax * frac)}
               </text>
             </g>
           );
         })}
 
-        {/* X labels */}
         {xLabels.map(({ label, x }) => (
-          <text key={label} x={x} y={h - 4} textAnchor="middle" fontSize="9" fill="rgba(255,255,255,0.35)">
+          <text key={label} x={x} y={h - 4} textAnchor="middle" fontSize="9" fill="#94a3b8">
             {label}
           </text>
         ))}
 
-        {/* Lines */}
         {series.map(s => (
           <polyline
             key={s.key}
@@ -267,22 +261,18 @@ function LineChart({ data }: { data: ChartPoint[] }) {
           />
         ))}
 
-        {/* Hover hitboxes + dots */}
         {data.map((d, i) => {
           const x = padL + i * step;
           return (
             <g key={i}>
               <rect
-                x={x - step / 2}
-                y={padT}
-                width={step}
-                height={innerH}
+                x={x - step / 2} y={padT} width={step} height={innerH}
                 fill="transparent"
                 onMouseEnter={() => setHovered(i)}
               />
               {hovered === i && (
                 <>
-                  <line x1={x} y1={padT} x2={x} y2={padT + innerH} stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="4 2" />
+                  <line x1={x} y1={padT} x2={x} y2={padT + innerH} stroke="#cbd5e1" strokeWidth="1" strokeDasharray="4 2" />
                   {series.map(s => {
                     const y = padT + innerH - (d[s.key] / overallMax) * innerH;
                     return <circle key={s.key} cx={x} cy={y} r="4" fill={s.color} />;
@@ -294,10 +284,9 @@ function LineChart({ data }: { data: ChartPoint[] }) {
         })}
       </svg>
 
-      {/* Hover tooltip */}
       {hovered !== null && (
         <div
-          className="absolute top-6 bg-gray-900 border border-white/10 rounded-lg px-3 py-2 text-xs text-white pointer-events-none z-10 shadow-xl"
+          className="absolute top-6 bg-stripe-dark border border-gray-200 rounded-lg px-3 py-2 text-xs text-white pointer-events-none z-10 shadow-xl"
           style={{ left: `${((hovered / Math.max(data.length - 1, 1)) * 100).toFixed(1)}%`, transform: 'translateX(-50%)' }}
         >
           <div className="font-semibold mb-1 text-white/70">
@@ -364,212 +353,178 @@ export default function AdminDashboard() {
     }
   }, [period]);
 
-  useEffect(() => {
-    void fetchAll();
-  }, [fetchAll]);
+  useEffect(() => { void fetchAll(); }, [fetchAll]);
 
   useEffect(() => {
     track(PRODUCT.DASHBOARD_VIEWED, 'PRODUCT', { section: 'admin' });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
+  const handleLogout = async () => { await logout(); navigate('/login'); };
 
   const markAllRead = async () => {
     if (!notifications.length) return;
-    const ids = notifications.map(n => n.id);
-    await api.post('/api/dashboard/notifications/read', { ids }).catch(() => {});
+    await api.post('/api/dashboard/notifications/read', { ids: notifications.map(n => n.id) }).catch(() => {});
     setNotifications([]);
     setNotifOpen(false);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-purple-500 animate-spin" />
+      <div className="min-h-screen bg-stripe-light flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-stripe-purple animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
-      {/* Top bar */}
-      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 bg-gray-950/90 backdrop-blur-sm z-20">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg" />
-          <span className="font-semibold text-lg">Nexus Admin</span>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* Period selector */}
-          <div className="flex gap-1 bg-white/5 rounded-lg p-1">
-            {(['day', 'week', 'month'] as const).map(p => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${period === p ? 'bg-purple-600 text-white' : 'text-white/50 hover:text-white'}`}
-              >
-                {p.charAt(0).toUpperCase() + p.slice(1)}
-              </button>
-            ))}
-          </div>
-          <button
-            onClick={() => void fetchAll(true)}
-            disabled={refreshing}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all disabled:opacity-50"
-            title="Refresh"
-          >
-            <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
-          </button>
-          {/* Notifications bell */}
-          <div className="relative">
+    <div className="min-h-screen bg-stripe-light" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+
+      {/* Header */}
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+          <Link to="/" dir="ltr">
+            <NexusLogo height={40} variant="black" page="auth" />
+          </Link>
+
+          <div className="flex items-center gap-2">
+            {/* Period selector */}
+            <div className="flex gap-0.5 bg-gray-100 rounded-lg p-1">
+              {(['day', 'week', 'month'] as const).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    period === p
+                      ? 'bg-white text-stripe-dark shadow-sm border border-gray-200'
+                      : 'text-stripe-gray hover:text-stripe-dark'
+                  }`}
+                >
+                  {p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+
             <button
-              onClick={() => setNotifOpen(o => !o)}
-              className="relative p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all"
-              title="Notifications"
+              onClick={() => void fetchAll(true)}
+              disabled={refreshing}
+              className="p-2 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all disabled:opacity-50"
+              title="Refresh"
             >
-              <Bell size={16} />
-              {notifications.length > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
-                  {notifications.length > 9 ? '9+' : notifications.length}
-                </span>
-              )}
+              <RefreshCw size={14} className={`text-stripe-gray ${refreshing ? 'animate-spin' : ''}`} />
             </button>
 
-            {notifOpen && (
-              <div className="absolute right-0 top-10 w-80 bg-gray-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-                  <span className="text-sm font-semibold text-white">Notifications</span>
-                  {notifications.length > 0 && (
-                    <button onClick={markAllRead} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
-                      Mark all read
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-72 overflow-y-auto divide-y divide-white/5">
-                  {notifications.length === 0 ? (
-                    <div className="px-4 py-6 text-center text-white/30 text-sm">All caught up!</div>
-                  ) : (
-                    notifications.map(n => (
-                      <div key={n.id} className="px-4 py-3">
-                        <div className="text-sm text-white/80">{n.title}</div>
-                        {n.body && <div className="text-xs text-white/40 mt-0.5">{n.body}</div>}
-                        <div className="text-[10px] text-white/30 mt-1">
-                          {new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
+            {/* Notifications */}
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen(o => !o)}
+                className="relative p-2 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all"
+                title="Notifications"
+              >
+                <Bell size={14} className="text-stripe-gray" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
+                    {notifications.length > 9 ? '9+' : notifications.length}
+                  </span>
+                )}
+              </button>
 
-          <span className="text-sm text-white/40">{user?.fullName}</span>
-          <button onClick={handleLogout} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all" title="Logout">
-            <LogOut size={16} />
-          </button>
+              {notifOpen && (
+                <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <span className="text-sm font-semibold text-stripe-dark">Notifications</span>
+                    {notifications.length > 0 && (
+                      <button onClick={markAllRead} className="text-xs text-stripe-purple hover:text-stripe-purple/80 transition-colors">
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-stripe-gray/50 text-sm">All caught up!</div>
+                    ) : (
+                      notifications.map(n => (
+                        <div key={n.id} className="px-4 py-3 hover:bg-stripe-light transition-colors">
+                          <div className="text-sm text-stripe-dark">{n.title}</div>
+                          {n.body && <div className="text-xs text-stripe-gray mt-0.5">{n.body}</div>}
+                          <div className="text-[10px] text-stripe-gray/50 mt-1">
+                            {new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <span className="text-sm text-stripe-gray hidden sm:block">{user?.fullName}</span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-xs font-medium text-stripe-gray hover:text-stripe-dark px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all"
+              title="Logout"
+            >
+              <LogOut size={13} />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-red-400 text-sm">
-            {error}
-          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm">{error}</div>
         )}
 
         {/* Metric cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <MetricCard
-            title="Unique Visitors"
-            value={metrics?.visitors.value ?? 0}
-            change={metrics?.visitors.change ?? null}
-            icon={Users}
-            color="#8b5cf6"
-            sparkData={chart.map(d => d.visitors)}
-          />
-          <MetricCard
-            title="Chat Sessions"
-            value={metrics?.chats.value ?? 0}
-            change={metrics?.chats.change ?? null}
-            icon={MessageSquare}
-            color="#06b6d4"
-            sparkData={chart.map(d => d.chats)}
-          />
-          <MetricCard
-            title="Leads"
-            value={metrics?.leads.value ?? 0}
-            change={metrics?.leads.change ?? null}
-            icon={TrendingUp}
-            color="#10b981"
-            sparkData={chart.map(d => d.leads)}
-          />
-          <MetricCard
-            title="Signups"
-            value={metrics?.signups.value ?? 0}
-            change={metrics?.signups.change ?? null}
-            icon={Users}
-            color="#f59e0b"
-            sparkData={chart.map(d => d.signups)}
-          />
-          <MetricCard
-            title="Conversion Rate"
-            value={metrics?.conversion.value ?? 0}
-            change={null}
-            unit="%"
-            icon={Percent}
-            color="#ec4899"
-          />
+          <MetricCard title="Unique Visitors"   value={metrics?.visitors.value ?? 0}   change={metrics?.visitors.change ?? null}   icon={Users}        color="#635bff" sparkData={chart.map(d => d.visitors)} />
+          <MetricCard title="Chat Sessions"     value={metrics?.chats.value ?? 0}      change={metrics?.chats.change ?? null}      icon={MessageSquare} color="#0ea5e9" sparkData={chart.map(d => d.chats)} />
+          <MetricCard title="Leads"             value={metrics?.leads.value ?? 0}      change={metrics?.leads.change ?? null}      icon={TrendingUp}   color="#10b981" sparkData={chart.map(d => d.leads)} />
+          <MetricCard title="Signups"           value={metrics?.signups.value ?? 0}    change={metrics?.signups.change ?? null}    icon={Users}        color="#f59e0b" sparkData={chart.map(d => d.signups)} />
+          <MetricCard title="Conversion Rate"   value={metrics?.conversion.value ?? 0} change={null} unit="%" icon={Percent} color="#ec4899" />
         </div>
 
-        {/* Chart + Revenue row */}
+        {/* Chart + Revenue */}
         <div className="grid lg:grid-cols-3 gap-4">
-          {/* Line chart */}
-          <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-2xl p-6">
-            <h2 className="text-sm font-semibold text-white/70 mb-4">Traffic Overview</h2>
+          <div className="lg:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6">
+            <h2 className="text-sm font-semibold text-stripe-dark mb-4">Traffic Overview</h2>
             <LineChart data={chart} />
           </div>
 
-          {/* Revenue summary */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-4">
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <CreditCard size={16} className="text-purple-400" />
-              <h2 className="text-sm font-semibold text-white/70">Revenue</h2>
+              <CreditCard size={15} className="text-stripe-purple" />
+              <h2 className="text-sm font-semibold text-stripe-dark">Revenue</h2>
             </div>
             <div>
-              <div className="text-3xl font-bold text-white">
+              <div className="text-3xl font-bold text-stripe-dark">
                 ₪{(revenue?.total_revenue ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-xs text-white/40 mt-1">{revenue?.total_transactions ?? 0} transactions</div>
+              <div className="text-xs text-stripe-gray mt-1">{revenue?.total_transactions ?? 0} transactions</div>
             </div>
             {revenue?.points && revenue.points.length > 0 && (
               <div className="mt-auto">
-                <Sparkline data={revenue.points.map(p => p.revenue)} color="#8b5cf6" height={50} />
+                <Sparkline data={revenue.points.map(p => p.revenue)} color="#635bff" height={50} />
               </div>
             )}
             {!revenue?.total_revenue && (
-              <div className="flex-1 flex items-center justify-center text-white/20 text-sm">
-                No payments yet
-              </div>
+              <div className="flex-1 flex items-center justify-center text-stripe-gray/40 text-sm">No payments yet</div>
             )}
           </div>
         </div>
 
-        {/* AI Stats + Visitors row */}
+        {/* AI Stats + Visitors */}
         <div className="grid lg:grid-cols-3 gap-4">
-          {/* AI stats */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-2 mb-5">
-              <Brain size={16} className="text-cyan-400" />
-              <h2 className="text-sm font-semibold text-white/70">AI Assistant</h2>
+              <Brain size={15} className="text-stripe-purple" />
+              <h2 className="text-sm font-semibold text-stripe-dark">AI Assistant</h2>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="text-2xl font-bold text-white">{aiStats?.avgRating.toFixed(1) ?? '—'}</div>
-                <div className="text-xs text-white/40 mt-1">Avg Rating</div>
+                <div className="text-2xl font-bold text-stripe-dark">{aiStats?.avgRating.toFixed(1) ?? '—'}</div>
+                <div className="text-xs text-stripe-gray mt-1">Avg Rating</div>
                 <div className="flex gap-0.5 mt-1">
                   {[1, 2, 3, 4, 5].map(i => (
                     <Star key={i} size={10} fill={i <= Math.round(aiStats?.avgRating ?? 0) ? '#f59e0b' : 'none'} stroke="#f59e0b" />
@@ -577,33 +532,32 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-white">{aiStats?.totalRatings ?? 0}</div>
-                <div className="text-xs text-white/40 mt-1">Total Ratings</div>
+                <div className="text-2xl font-bold text-stripe-dark">{aiStats?.totalRatings ?? 0}</div>
+                <div className="text-xs text-stripe-gray mt-1">Total Ratings</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-400">{aiStats?.lowRatedCount ?? 0}</div>
-                <div className="text-xs text-white/40 mt-1">Low Rated ≤2</div>
+                <div className="text-2xl font-bold text-red-500">{aiStats?.lowRatedCount ?? 0}</div>
+                <div className="text-xs text-stripe-gray mt-1">Low Rated ≤2</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-400">{aiStats?.knowledgeChunks ?? 0}</div>
-                <div className="text-xs text-white/40 mt-1">Knowledge Chunks</div>
+                <div className="text-2xl font-bold text-emerald-600">{aiStats?.knowledgeChunks ?? 0}</div>
+                <div className="text-xs text-stripe-gray mt-1">Knowledge Chunks</div>
               </div>
             </div>
           </div>
 
-          {/* Visitors table */}
-          <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-2xl p-6 overflow-hidden">
+          <div className="lg:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6 overflow-hidden">
             <div className="flex items-center gap-2 mb-4">
-              <Users size={16} className="text-purple-400" />
-              <h2 className="text-sm font-semibold text-white/70">Recent Visitors</h2>
+              <Users size={15} className="text-stripe-purple" />
+              <h2 className="text-sm font-semibold text-stripe-dark">Recent Visitors</h2>
             </div>
             {visitors.length === 0 ? (
-              <div className="text-center py-8 text-white/20 text-sm">No visitor data yet</div>
+              <div className="text-center py-8 text-stripe-gray/40 text-sm">No visitor data yet</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-white/30 border-b border-white/10">
+                    <tr className="text-stripe-gray/60 border-b border-gray-100">
                       <th className="text-left pb-2 font-medium">Visitor</th>
                       <th className="text-left pb-2 font-medium">Location</th>
                       <th className="text-left pb-2 font-medium">Device</th>
@@ -611,23 +565,23 @@ export default function AdminDashboard() {
                       <th className="text-right pb-2 font-medium">Last Seen</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-gray-50">
                     {visitors.map(v => (
-                      <tr key={v.visitorId} className="hover:bg-white/5 transition-colors">
+                      <tr key={v.visitorId} className="hover:bg-stripe-light transition-colors">
                         <td className="py-2 pr-4">
-                          <div className="font-mono text-white/50 truncate max-w-[80px]" title={v.visitorId}>
+                          <div className="font-mono text-stripe-gray truncate max-w-[80px]" title={v.visitorId}>
                             {v.visitorId.slice(-8)}
                           </div>
-                          <div className="text-white/30 truncate max-w-[80px]">{v.ip ?? '—'}</div>
+                          <div className="text-stripe-gray/50 truncate max-w-[80px]">{v.ip ?? '—'}</div>
                         </td>
-                        <td className="py-2 pr-4 text-white/60">
+                        <td className="py-2 pr-4 text-stripe-gray">
                           {[v.city, v.country].filter(Boolean).join(', ') || '—'}
                         </td>
-                        <td className="py-2 pr-4 text-white/60">
+                        <td className="py-2 pr-4 text-stripe-gray">
                           {[v.device, v.browser].filter(Boolean).join(' / ') || '—'}
                         </td>
-                        <td className="py-2 text-right text-white/70 font-medium">{v.pageViews}</td>
-                        <td className="py-2 text-right text-white/40">
+                        <td className="py-2 text-right text-stripe-dark font-semibold">{v.pageViews}</td>
+                        <td className="py-2 text-right text-stripe-gray/60">
                           {new Date(v.lastSeen).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </td>
                       </tr>
@@ -639,17 +593,17 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Leads table */}
+        {/* Leads */}
         {leads.length > 0 && (
-          <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-6 overflow-hidden">
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 overflow-hidden">
             <div className="flex items-center gap-2 mb-4">
-              <TrendingUp size={16} className="text-emerald-400" />
-              <h2 className="text-sm font-semibold text-white/70">Recent Leads</h2>
+              <TrendingUp size={15} className="text-emerald-600" />
+              <h2 className="text-sm font-semibold text-stripe-dark">Recent Leads</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-white/30 border-b border-white/10">
+                  <tr className="text-stripe-gray/60 border-b border-gray-100">
                     <th className="text-left pb-2 font-medium">Name</th>
                     <th className="text-left pb-2 font-medium">Email</th>
                     <th className="text-left pb-2 font-medium">Company</th>
@@ -657,21 +611,21 @@ export default function AdminDashboard() {
                     <th className="text-right pb-2 font-medium">Date</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className="divide-y divide-gray-50">
                   {leads.map(lead => (
-                    <tr key={lead.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-2 pr-4 text-white/80">{lead.fullName ?? '—'}</td>
-                      <td className="py-2 pr-4 text-white/60 font-mono text-[10px]">{lead.email ?? '—'}</td>
-                      <td className="py-2 pr-4 text-white/60">{lead.company ?? '—'}</td>
+                    <tr key={lead.id} className="hover:bg-stripe-light transition-colors">
+                      <td className="py-2 pr-4 text-stripe-dark">{lead.fullName ?? '—'}</td>
+                      <td className="py-2 pr-4 text-stripe-gray font-mono text-[10px]">{lead.email ?? '—'}</td>
+                      <td className="py-2 pr-4 text-stripe-gray">{lead.company ?? '—'}</td>
                       <td className="py-2 pr-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                          lead.status === 'NEW'       ? 'bg-blue-500/20 text-blue-300' :
-                          lead.status === 'CONTACTED' ? 'bg-amber-500/20 text-amber-300' :
-                          lead.status === 'QUALIFIED' ? 'bg-green-500/20 text-green-300' :
-                                                        'bg-red-500/20 text-red-300'
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                          lead.status === 'NEW'       ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                          lead.status === 'CONTACTED' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                          lead.status === 'QUALIFIED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                                        'bg-red-50 text-red-600 border-red-200'
                         }`}>{lead.status}</span>
                       </td>
-                      <td className="py-2 text-right text-white/40">
+                      <td className="py-2 text-right text-stripe-gray/60">
                         {new Date(lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </td>
                     </tr>
