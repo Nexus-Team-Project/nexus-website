@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../lib/api';
 import NexusLogo from '../components/NexusLogo';
 import AnimatedGradient from '../components/AnimatedGradient';
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('');
@@ -11,6 +12,10 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const { language, direction } = useLanguage();
+  const isHe = language === 'he';
+  const forgotPath = isHe ? '/he/forgot-password' : '/forgot-password';
+  const loginPath = isHe ? '/he/login' : '/login';
 
   const token = new URLSearchParams(window.location.search).get('token');
 
@@ -18,7 +23,7 @@ export default function ResetPassword() {
     e.preventDefault();
     if (!token) return;
     if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+      setError(isHe ? 'הסיסמה חייבת להכיל לפחות 8 תווים.' : 'Password must be at least 8 characters.');
       return;
     }
     setIsLoading(true);
@@ -26,9 +31,9 @@ export default function ResetPassword() {
     try {
       await api.post('/api/auth/reset-password', { token, newPassword: password });
       setSuccess(true);
-      setTimeout(() => navigate('/login'), 2500);
+      setTimeout(() => navigate(loginPath), 2500);
     } catch (err: any) {
-      setError(err?.error ?? 'Link expired or invalid. Please request a new one.');
+      setError(err?.error ?? (isHe ? 'הקישור פג תוקף או לא תקין. בקש קישור חדש.' : 'Link expired or invalid. Please request a new one.'));
     } finally {
       setIsLoading(false);
     }
@@ -41,16 +46,20 @@ export default function ResetPassword() {
           <AnimatedGradient clipPath="polygon(40% 0, 70% 0, 90% 100%, 70% 100%)" />
         </div>
         <div className="relative z-10 flex-1 flex items-center justify-center px-8">
-          <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-8 w-full max-w-md text-center">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-8 w-full max-w-md text-center" dir={direction}>
             <div className="w-14 h-14 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" /><path d="M15 9l-6 6M9 9l6 6" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-slate-800 mb-2">Invalid link</h1>
-            <p className="text-sm text-slate-500 mb-5">This reset link is missing or invalid.</p>
-            <Link to="/forgot-password" className="text-sm text-stripe-purple hover:underline font-semibold">
-              Request a new reset link
+            <h1 className="text-xl font-bold text-slate-800 mb-2">
+              {isHe ? 'קישור לא תקין' : 'Invalid link'}
+            </h1>
+            <p className="text-sm text-slate-500 mb-5">
+              {isHe ? 'הקישור לאיפוס סיסמה חסר או לא תקין.' : 'This reset link is missing or invalid.'}
+            </p>
+            <Link to={forgotPath} className="text-sm text-stripe-purple hover:underline font-semibold">
+              {isHe ? 'בקש קישור איפוס חדש' : 'Request a new reset link'}
             </Link>
           </div>
         </div>
@@ -75,7 +84,7 @@ export default function ResetPassword() {
 
         <div className="flex-1 flex items-start md:items-center justify-center px-8 pt-6 md:pt-0">
           <div className="w-full max-w-md">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-6">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-6" dir={direction}>
 
               {success ? (
                 <div className="text-center py-4">
@@ -84,17 +93,27 @@ export default function ResetPassword() {
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   </div>
-                  <h1 className="text-xl font-bold text-slate-800 mb-2">Password updated!</h1>
-                  <p className="text-sm text-slate-500">Taking you to sign in…</p>
+                  <h1 className="text-xl font-bold text-slate-800 mb-2">
+                    {isHe ? 'הסיסמה עודכנה!' : 'Password updated!'}
+                  </h1>
+                  <p className="text-sm text-slate-500">
+                    {isHe ? 'מעביר אותך לדף ההתחברות…' : 'Taking you to sign in…'}
+                  </p>
                 </div>
               ) : (
                 <>
-                  <h1 className="text-xl font-bold text-stripe-dark mb-1">Set new password</h1>
-                  <p className="text-sm text-slate-500 mb-5">Choose a strong password for your account.</p>
+                  <h1 className="text-xl font-bold text-stripe-dark mb-1">
+                    {isHe ? 'איפוס סיסמה' : 'Set new password'}
+                  </h1>
+                  <p className="text-sm text-slate-500 mb-5">
+                    {isHe ? 'בחר סיסמה חזקה לחשבון שלך.' : 'Choose a strong password for your account.'}
+                  </p>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-xs text-stripe-dark font-medium mb-1">New password</label>
+                      <label className="block text-xs text-stripe-dark font-medium mb-1">
+                        {isHe ? 'סיסמה חדשה' : 'New password'}
+                      </label>
                       <div className="relative">
                         <input
                           type={showPassword ? 'text' : 'password'}
@@ -114,7 +133,9 @@ export default function ResetPassword() {
                           </svg>
                         </button>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1">Minimum 8 characters</p>
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        {isHe ? 'מינימום 8 תווים' : 'Minimum 8 characters'}
+                      </p>
                     </div>
 
                     {error && <p className="text-xs text-red-500">{error}</p>}
@@ -131,7 +152,7 @@ export default function ResetPassword() {
                       {isLoading ? (
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        'Update password'
+                        isHe ? 'עדכן סיסמה' : 'Update password'
                       )}
                     </button>
                   </form>

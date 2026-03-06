@@ -443,7 +443,7 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
 
       <div
         dir={direction}
-        className="chat-container fixed bottom-6 right-6 flex flex-col z-50 rounded-[2.5rem] overflow-hidden"
+        className="chat-container fixed bottom-6 right-6 flex flex-col z-50 rounded-2xl overflow-hidden"
         style={{
           width: `${width}px`,
           height: `${height}px`,
@@ -463,19 +463,19 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
         <div
           onMouseDown={startResize('left')}
           className="hidden sm:block absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-stripe-purple/20 transition-colors z-10"
-          style={{ borderRadius: '2.5rem 0 0 2.5rem' }}
+          style={{ borderRadius: '1rem 0 0 1rem' }}
         />
 
         <div
           onMouseDown={startResize('top')}
           className="hidden sm:block absolute top-0 left-0 right-0 h-2 cursor-ns-resize hover:bg-stripe-purple/20 transition-colors z-10"
-          style={{ borderRadius: '2.5rem 2.5rem 0 0' }}
+          style={{ borderRadius: '1rem 1rem 0 0' }}
         />
 
         <div
           onMouseDown={startResize('top-left')}
           className="hidden sm:block absolute top-0 left-0 w-8 h-8 cursor-nwse-resize hover:bg-stripe-purple/30 transition-colors z-20"
-          style={{ borderRadius: '2.5rem 0 0 0' }}
+          style={{ borderRadius: '1rem 0 0 0' }}
         />
 
         {/* Header */}

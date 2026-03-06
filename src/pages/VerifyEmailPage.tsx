@@ -3,12 +3,16 @@ import { useNavigate, Link } from 'react-router-dom';
 import { api, setAccessToken } from '../lib/api';
 import NexusLogo from '../components/NexusLogo';
 import AnimatedGradient from '../components/AnimatedGradient';
+import { useLanguage } from '../i18n/LanguageContext';
 
 type Status = 'verifying' | 'success' | 'error' | 'expired';
 
 export default function VerifyEmailPage() {
   const [status, setStatus] = useState<Status>('verifying');
   const navigate = useNavigate();
+  const { language, direction } = useLanguage();
+  const isHe = language === 'he';
+  const signupPath = isHe ? '/he/signup' : '/signup';
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -22,7 +26,6 @@ export default function VerifyEmailPage() {
     api.post<{ accessToken: string }>('/api/auth/verify-email', { token })
       .then(async (data) => {
         setAccessToken(data.accessToken);
-        // Fetch profile so OnboardingWizard can show "Welcome, <firstName>"
         const profile = await api.get<{ fullName?: string }>('/api/auth/me').catch(() => null);
         if (profile?.fullName) {
           sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
@@ -55,13 +58,17 @@ export default function VerifyEmailPage() {
         </div>
 
         <div className="flex-1 flex items-center justify-center px-8">
-          <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-8 w-full max-w-md text-center">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-8 w-full max-w-md text-center" dir={direction}>
 
             {status === 'verifying' && (
               <>
                 <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-5" />
-                <h1 className="text-xl font-bold text-slate-800 mb-2">Verifying your email…</h1>
-                <p className="text-sm text-slate-400">Just a moment, please.</p>
+                <h1 className="text-xl font-bold text-slate-800 mb-2">
+                  {isHe ? 'מאמת את המייל שלך…' : 'Verifying your email…'}
+                </h1>
+                <p className="text-sm text-slate-400">
+                  {isHe ? 'רק רגע, בבקשה.' : 'Just a moment, please.'}
+                </p>
               </>
             )}
 
@@ -72,8 +79,12 @@ export default function VerifyEmailPage() {
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 </div>
-                <h1 className="text-xl font-bold text-slate-800 mb-2">Email verified!</h1>
-                <p className="text-sm text-slate-500">Taking you to your workspace…</p>
+                <h1 className="text-xl font-bold text-slate-800 mb-2">
+                  {isHe ? 'המייל אומת בהצלחה!' : 'Email verified!'}
+                </h1>
+                <p className="text-sm text-slate-500">
+                  {isHe ? 'מעביר אותך לסביבת העבודה…' : 'Taking you to your workspace…'}
+                </p>
               </>
             )}
 
@@ -85,15 +96,19 @@ export default function VerifyEmailPage() {
                     <path d="M12 8v4M12 16h.01" />
                   </svg>
                 </div>
-                <h1 className="text-xl font-bold text-slate-800 mb-2">Link expired</h1>
+                <h1 className="text-xl font-bold text-slate-800 mb-2">
+                  {isHe ? 'הקישור פג תוקף' : 'Link expired'}
+                </h1>
                 <p className="text-sm text-slate-500 mb-5">
-                  This verification link has expired or already been used.
+                  {isHe
+                    ? 'קישור האימות פג תוקף או שכבר נעשה בו שימוש.'
+                    : 'This verification link has expired or already been used.'}
                 </p>
                 <Link
-                  to="/signup"
+                  to={signupPath}
                   className="text-sm text-indigo-600 hover:underline font-medium"
                 >
-                  Back to sign up to request a new link
+                  {isHe ? 'חזרה להרשמה לבקשת קישור חדש' : 'Back to sign up to request a new link'}
                 </Link>
               </>
             )}
@@ -106,15 +121,19 @@ export default function VerifyEmailPage() {
                     <path d="M15 9l-6 6M9 9l6 6" />
                   </svg>
                 </div>
-                <h1 className="text-xl font-bold text-slate-800 mb-2">Verification failed</h1>
+                <h1 className="text-xl font-bold text-slate-800 mb-2">
+                  {isHe ? 'האימות נכשל' : 'Verification failed'}
+                </h1>
                 <p className="text-sm text-slate-500 mb-5">
-                  Something went wrong. Please try again or contact support.
+                  {isHe
+                    ? 'משהו השתבש. נסה שוב או פנה לתמיכה.'
+                    : 'Something went wrong. Please try again or contact support.'}
                 </p>
                 <Link
-                  to="/signup"
+                  to={signupPath}
                   className="text-sm text-indigo-600 hover:underline font-medium"
                 >
-                  Back to sign up
+                  {isHe ? 'חזרה להרשמה' : 'Back to sign up'}
                 </Link>
               </>
             )}

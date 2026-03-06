@@ -107,31 +107,60 @@ export async function sendVerificationEmail(
   rawToken: string,
 ) {
   const verifyUrl = `${FRONTEND}/verify-email?token=${rawToken}`;
+  const logoUrl = `${FRONTEND}/nexus-logo-black.png`;
   await sendMail({
     to: email,
     toName: fullName,
-    subject: 'Verify your Nexus account',
-    text: `Welcome to Nexus, ${fullName}!\n\nPlease verify your email address by clicking the link below:\n\n${verifyUrl}\n\nThe link is valid for 24 hours.\n\nIf you didn't create a Nexus account, you can safely ignore this email.`,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #6366f1;">Welcome to Nexus, ${fullName}!</h1>
-        <p>Thanks for signing up. Please verify your email address to activate your account.</p>
-        <p>The link is valid for <strong>24 hours</strong>.</p>
-        <a href="${verifyUrl}" style="
-          display: inline-block;
-          background: #6366f1;
-          color: white;
-          padding: 12px 24px;
-          border-radius: 8px;
-          text-decoration: none;
-          margin: 16px 0;
-          font-size: 15px;
-        ">Verify my email</a>
-        <p style="color: #6b7280; font-size: 14px;">
-          If you didn't create a Nexus account, you can safely ignore this email.
-        </p>
-      </div>
-    `,
+    subject: 'ברוכים הבאים לנקסוס — אימות חשבון',
+    text: `שלום ${fullName},\n\nברוכים הבאים לנקסוס!\n\nיש לאמת את כתובת המייל כדי להפעיל את החשבון:\n\n${verifyUrl}\n\nהקישור בתוקף ל-24 שעות.\n\nאם לא יצרת חשבון, ניתן להתעלם מהמייל.`,
+    html: `<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:40px 20px;">
+<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<tr><td align="center">
+  <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus" />
+  <h1 style="margin:0;color:#111;font-size:26px;">ברוכים הבאים לנקסוס</h1>
+  <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
+    שלום ${fullName},<br>עוד רגע מתחילים.<br>יש רק לאמת את כתובת המייל כדי להפעיל את החשבון.
+  </p>
+</td></tr>
+<tr><td align="center" style="padding:30px 0;">
+  <a href="${verifyUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
+    אימות והמשך לנקסוס
+  </a>
+</td></tr>
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;padding:18px;margin-top:10px;">
+  <tr><td style="font-size:14px;color:#333;line-height:1.9;">
+    <strong>לאחר האימות תוכלו:</strong><br><br>
+    &#10004; להקים מועדון הטבות דיגיטלי<br>
+    &#10004; להוסיף הטבות לחברי הקהילה<br>
+    &#10004; לנהל משתמשים והרשאות<br>
+    &#10004; לעקוב אחרי פעילות ורכישות
+  </td></tr></table>
+</td></tr>
+<tr><td align="center" style="padding-top:30px;">
+  <div style="font-size:13px;color:#777;line-height:1.7;">
+    שלב 1 &#10003; יצירת חשבון<br>
+    שלב 2 &#8594; אימות מייל<br>
+    שלב 3 &nbsp;&nbsp; התחלה בדאשבורד
+  </div>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:13px;color:#888;margin-top:25px;">אם הכפתור לא עובד ניתן להיכנס דרך הקישור:</p>
+  <p style="font-size:13px;color:#444;word-break:break-all;">${verifyUrl}</p>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
+    קישור זה תקף ל-24 שעות מטעמי אבטחה.<br>אם לא ניסית ליצור חשבון ניתן להתעלם מהמייל.
+  </p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`,
   });
 }
 

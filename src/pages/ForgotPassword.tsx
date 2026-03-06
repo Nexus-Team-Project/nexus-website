@@ -11,7 +11,7 @@ export default function ForgotPassword() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
 
-  const { language } = useLanguage();
+  const { language, direction } = useLanguage();
   const isHe = language === 'he';
   const loginPath = isHe ? '/he/login' : '/login';
 
@@ -24,7 +24,7 @@ export default function ForgotPassword() {
       await api.post('/api/auth/forgot-password', { email: email.trim().toLowerCase() });
       setSubmitted(true);
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError(isHe ? 'משהו השתבש. נסה שוב.' : 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -47,7 +47,7 @@ export default function ForgotPassword() {
 
         <div className="flex-1 flex items-start md:items-center justify-center px-8 pt-6 md:pt-0">
           <div className="w-full max-w-md">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-6">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-6" dir={direction}>
 
               {submitted ? (
                 <div className="text-center py-4">
@@ -56,24 +56,34 @@ export default function ForgotPassword() {
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
                   </div>
-                  <h1 className="text-xl font-bold text-slate-800 mb-2">Check your email</h1>
+                  <h1 className="text-xl font-bold text-slate-800 mb-2">
+                    {isHe ? 'בדוק את המייל שלך' : 'Check your email'}
+                  </h1>
                   <p className="text-sm text-slate-500 mb-5">
-                    If <span className="font-medium text-slate-700">{email}</span> is registered, you'll receive a reset link shortly.
+                    {isHe ? (
+                      <>אם <span className="font-medium text-slate-700">{email}</span> רשום במערכת, תקבל קישור לאיפוס בקרוב.</>
+                    ) : (
+                      <>If <span className="font-medium text-slate-700">{email}</span> is registered, you'll receive a reset link shortly.</>
+                    )}
                   </p>
                   <Link to={loginPath} className="text-sm text-stripe-purple hover:underline font-semibold">
-                    Back to sign in
+                    {isHe ? 'חזרה להתחברות' : 'Back to sign in'}
                   </Link>
                 </div>
               ) : (
                 <>
-                  <h1 className="text-xl font-bold text-stripe-dark mb-1">Reset your password</h1>
+                  <h1 className="text-xl font-bold text-stripe-dark mb-1">
+                    {isHe ? 'איפוס סיסמה' : 'Reset your password'}
+                  </h1>
                   <p className="text-sm text-slate-500 mb-5">
-                    Enter your email and we'll send you a reset link.
+                    {isHe ? 'הכנס את המייל שלך ונשלח לך קישור לאיפוס.' : "Enter your email and we'll send you a reset link."}
                   </p>
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-xs text-stripe-dark font-medium mb-1">Email</label>
+                      <label className="block text-xs text-stripe-dark font-medium mb-1">
+                        {isHe ? 'אימייל' : 'Email'}
+                      </label>
                       <input
                         type="email"
                         autoComplete="email"
@@ -99,14 +109,14 @@ export default function ForgotPassword() {
                       {isLoading ? (
                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        'Send reset link'
+                        isHe ? 'שלח קישור לאיפוס' : 'Send reset link'
                       )}
                     </button>
                   </form>
 
                   <div className="text-center mt-4 pt-4 -mx-6 -mb-6 px-6 pb-4 bg-slate-50 rounded-b-xl border-t border-gray-100">
                     <Link to={loginPath} className="text-sm text-stripe-gray hover:text-stripe-purple font-medium">
-                      ← Back to sign in
+                      {isHe ? '→ חזרה להתחברות' : '← Back to sign in'}
                     </Link>
                   </div>
                 </>

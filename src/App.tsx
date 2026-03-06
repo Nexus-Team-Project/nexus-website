@@ -118,7 +118,7 @@ function ChatWidget() {
           onClick={() => setChatState('open')}
           className="fixed bottom-0 z-50 bg-white rounded-t-2xl px-5 py-3 flex items-center gap-3 border border-b-0 border-slate-200 hover:bg-slate-50 transition-all cursor-pointer"
           style={{
-            [isHebrew ? 'left' : 'right']: '1.5rem',
+            [isHebrew ? 'right' : 'left']: '1.5rem',
             boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
           }}
         >
@@ -162,10 +162,12 @@ function App() {
           <Route path="/he/login"    element={<LoginHe />} />
           <Route path="/workspace"    element={<LanguageProvider language="en"><WorkspaceSetupPage /></LanguageProvider>} />
           <Route path="/he/workspace" element={<LanguageProvider language="he"><WorkspaceSetupPage /></LanguageProvider>} />
-          <Route path="/verify-email"     element={<LanguageProvider language="en"><VerifyEmailPage /></LanguageProvider>} />
-          <Route path="/forgot-password"  element={<LanguageProvider language="en"><ForgotPassword /></LanguageProvider>} />
+          <Route path="/verify-email"       element={<LanguageProvider language="en"><VerifyEmailPage /></LanguageProvider>} />
+          <Route path="/he/verify-email"   element={<LanguageProvider language="he"><VerifyEmailPage /></LanguageProvider>} />
+          <Route path="/forgot-password"   element={<LanguageProvider language="en"><ForgotPassword /></LanguageProvider>} />
           <Route path="/he/forgot-password" element={<LanguageProvider language="he"><ForgotPassword /></LanguageProvider>} />
-          <Route path="/reset-password"   element={<LanguageProvider language="en"><ResetPassword /></LanguageProvider>} />
+          <Route path="/reset-password"    element={<LanguageProvider language="en"><ResetPassword /></LanguageProvider>} />
+          <Route path="/he/reset-password" element={<LanguageProvider language="he"><ResetPassword /></LanguageProvider>} />
           <Route path="/partners"    element={<LanguageProvider language="en"><PartnersPage /></LanguageProvider>} />
           <Route path="/he/partners" element={<LanguageProvider language="he"><PartnersPage /></LanguageProvider>} />
           <Route path="/payments"    element={<LanguageProvider language="en"><PaymentsPage /></LanguageProvider>} />
@@ -175,7 +177,6 @@ function App() {
               <UserDashboard />
             </ProtectedRoute>
           } />
-          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
               <AdminDashboard />
