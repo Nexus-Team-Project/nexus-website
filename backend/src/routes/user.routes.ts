@@ -113,4 +113,63 @@ router.get('/stats', apiLimiter, async (req: Request, res: Response, next: NextF
   }
 });
 
+// ─── POST /api/user/workspace/setup ───────────────────────
+
+router.post('/workspace/setup', apiLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.user!.sub;
+    const { org_name, website, business_desc, primary_use_cases, phone, role } = req.body;
+
+    if (!org_name || !business_desc) {
+      res.status(400).json({ error: 'org_name and business_desc are required' });
+      return;
+    }
+
+    // Upsert Account and link to user
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { accountId: true },
+    });
+
+    let accountId = existingUser?.accountId;
+
+    if (accountId) {
+      await prisma.account.update({
+        where: { id: accountId },
+        data: {
+          name: org_name,
+          websiteUrl: website || null,
+          businessDesc: business_desc,
+          useCases: primary_use_cases ?? [],
+        },
+      });
+    } else {
+      const account = await prisma.account.create({
+        data: {
+          name: org_name,
+          websiteUrl: website || null,
+          businessDesc: business_desc,
+          useCases: primary_use_cases ?? [],
+          type: 'B2B',
+        },
+      });
+      accountId = account.id;
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        accountId,
+        phone: phone || null,
+        jobTitle: role || null,
+        onboardingDone: true,
+      },
+    });
+
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

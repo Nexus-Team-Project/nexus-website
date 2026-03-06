@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
+import { api } from '../lib/api';
 import DashboardMock from '../components/workspace/DashboardMock';
 import OnboardingWizard from '../components/workspace/OnboardingWizard';
 import SetupAnimation from '../components/workspace/SetupAnimation';
@@ -25,11 +26,28 @@ export default function WorkspaceSetupPage() {
   const { direction } = useLanguage();
   const navigate = useNavigate();
 
+  const dashboardPath = direction === 'rtl' ? '/he/dashboard' : '/dashboard';
   const homePath = direction === 'rtl' ? '/he' : '/';
 
-  const handleWizardComplete = (data: OnboardingData) => {
+  // If already completed onboarding, skip to dashboard
+  useEffect(() => {
+    if (user?.onboardingDone) {
+      navigate(dashboardPath, { replace: true });
+    }
+  }, [user, dashboardPath, navigate]);
+
+  const handleWizardComplete = async (data: OnboardingData) => {
     setOnboardingData(data);
     setPhase('animation');
+    // Save to backend (fire-and-forget — animation plays while this runs)
+    api.post('/api/user/workspace/setup', {
+      org_name: data.org_name,
+      website: data.website,
+      business_desc: data.business_desc,
+      primary_use_cases: data.primary_use_cases,
+      phone: data.phone,
+      role: data.role,
+    }).catch(console.error);
   };
 
   // Very little blur — dashboard clearly visible in background
@@ -70,8 +88,8 @@ export default function WorkspaceSetupPage() {
           <ScheduleStep
             user={user}
             onboardingData={onboardingData}
-            onBackToSite={() => navigate(homePath)}
-            onExplore={() => navigate(homePath)}
+            onBackToSite={() => navigate(dashboardPath)}
+            onExplore={() => navigate(dashboardPath)}
           />
         )}
       </div>

@@ -82,15 +82,18 @@ enum AccountType {
 // ─── ACCOUNTS (B2B/B2C hierarchy) ─────────────────────────────────
 
 model Account {
-  id        String      @id @default(cuid())
-  name      String
-  type      AccountType @default(B2C)
-  domain    String?
-  plan      String?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id           String      @id @default(cuid())
+  name         String
+  type         AccountType @default(B2C)
+  domain       String?
+  plan         String?
+  websiteUrl   String?
+  businessDesc String?
+  useCases     String[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 
-  users     User[]
+  users        User[]
 
   @@index([domain])
 }
@@ -107,13 +110,16 @@ model User {
   role          UserRole     @default(USER)
   emailUpdates  Boolean      @default(true)
   avatarUrl     String?
-  provider      AuthProvider @default(EMAIL)
-  googleId      String?      @unique
-  accountId     String?
-  account       Account?     @relation(fields: [accountId], references: [id])
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  lastLoginAt   DateTime?
+  provider        AuthProvider @default(EMAIL)
+  googleId        String?      @unique
+  accountId       String?
+  account         Account?     @relation(fields: [accountId], references: [id])
+  phone           String?
+  jobTitle        String?
+  onboardingDone  Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  lastLoginAt     DateTime?
 
   refreshTokens RefreshToken[]
   chatSessions  ChatSession[]

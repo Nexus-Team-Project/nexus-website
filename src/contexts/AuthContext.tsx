@@ -16,6 +16,7 @@ export interface AuthUser {
   role: 'USER' | 'ADMIN' | 'AGENT';
   avatarUrl?: string;
   emailVerified: boolean;
+  onboardingDone: boolean;
 }
 
 interface RegisterData {

@@ -320,6 +320,7 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
         provider: true,
         lastLoginAt: true,
         createdAt: true,
+        onboardingDone: true,
       },
     });
     if (!user) {

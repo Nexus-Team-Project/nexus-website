@@ -29,6 +29,7 @@ export default function Login() {
   const homePath = isHe ? '/he' : '/';
   const signupPath = isHe ? '/he/signup' : '/signup';
   const workspacePath = isHe ? '/he/workspace' : '/workspace';
+  const dashboardPath = isHe ? '/he/dashboard' : '/dashboard';
 
   const isFormValid = email.trim() !== '' && password.trim() !== '';
 
@@ -62,7 +63,7 @@ export default function Login() {
     try {
       const user = await login(email, password, rememberMe);
       identify(user.id, 'login');
-      navigate(workspacePath);
+      navigate(user.onboardingDone ? dashboardPath : workspacePath);
     } catch (err: any) {
       setIsLoading(false);
       // 403 = registered but email not verified yet
