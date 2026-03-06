@@ -92,10 +92,11 @@ router.get(
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const status = req.query.status as string | undefined;
+      const limit = Math.min(100, Number(req.query.limit) || 100);
       const leads = await prisma.lead.findMany({
         where: status ? { status: status as 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'LOST' } : undefined,
         orderBy: { createdAt: 'desc' },
-        take: 100,
+        take: limit,
       });
       res.json(leads);
     } catch (err) {
