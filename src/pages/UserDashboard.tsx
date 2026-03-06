@@ -213,7 +213,7 @@ export default function UserDashboard() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
             { label: 'Total Orders',    value: stats?.totalOrders ?? 0,     icon: ShoppingBag, color: '#8b5cf6' },
-            { label: 'Total Spent',     value: `$${(stats?.totalSpent ?? 0).toFixed(2)}`, icon: CreditCard, color: '#10b981' },
+            { label: 'Total Spent',     value: `₪${(stats?.totalSpent ?? 0).toFixed(2)}`, icon: CreditCard, color: '#10b981' },
             { label: 'Successful Pays', value: stats?.succeededOrders ?? 0,  icon: TrendingUp, color: '#06b6d4' },
             { label: 'Support Chats',   value: stats?.chatSessions ?? 0,     icon: MessageSquare, color: '#f59e0b' },
           ].map(({ label, value, icon: Icon, color }) => (

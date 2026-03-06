@@ -76,7 +76,9 @@ router.get(
       }
 
       // Only return order to the owner or admin
-      const isOwner = order.userId === req.user?.sub || order.guestEmail === req.body.email;
+      // Guest email comes from query param (GET has no body): /orders/:id?email=guest@example.com
+      const guestEmail = typeof req.query.email === 'string' ? req.query.email : undefined;
+      const isOwner = order.userId === req.user?.sub || (!!guestEmail && order.guestEmail === guestEmail);
       const isAdmin = req.user?.role === 'ADMIN';
       if (!isOwner && !isAdmin) {
         res.status(403).json({ error: 'Forbidden' });
