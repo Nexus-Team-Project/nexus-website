@@ -20,7 +20,7 @@ export interface OnboardingData {
 
 export default function WorkspaceSetupPage() {
   const [phase, setPhase] = useState<Phase>('wizard');
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { direction } = useLanguage();
   const navigate = useNavigate();
 
@@ -79,7 +79,11 @@ export default function WorkspaceSetupPage() {
         )}
 
         {phase === 'animation' && (
-          <SetupAnimation onComplete={() => navigate('/dashboard', { replace: true })} />
+          <SetupAnimation onComplete={() => {
+            refreshUser()
+              .catch(() => {})
+              .finally(() => navigate('/dashboard', { replace: true }));
+          }} />
         )}
       </div>
 

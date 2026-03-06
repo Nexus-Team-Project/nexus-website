@@ -34,6 +34,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<{ requiresVerification: true; email: string } | void>;
   googleLogin: (accessToken: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
@@ -132,8 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    const profile = await api.get<AuthUser>('/api/auth/me');
+    setUser(profile);
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, googleLogin, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, login, register, googleLogin, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
