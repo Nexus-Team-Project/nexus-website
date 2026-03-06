@@ -192,7 +192,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
 
     // Create chat session
     api
-      .post<{ sessionId: string; welcomeMessage?: string }>('/api/chat/sessions', {
+      .post<{ id: string; welcomeMessage?: string }>('/api/chat/sessions', {
         visitorId,
         metadata: {
           url: window.location.href,
@@ -202,13 +202,14 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
       })
       .then((data) => {
         if (!mounted) return;
-        setSessionId(data.sessionId);
+        const sid = data.id;
+        setSessionId(sid);
 
         // Connect socket and join session room
         const socket = io(API_URL, { withCredentials: true });
         socketRef.current = socket;
 
-        socket.emit('join_session', { sessionId: data.sessionId, visitorId });
+        socket.emit('join_session', { sessionId: sid, visitorId });
 
         // Receive AI / agent replies
         socket.on(
