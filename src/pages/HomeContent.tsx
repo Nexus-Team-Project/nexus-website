@@ -457,7 +457,7 @@ export default function HomeContent() {
             <a
               href="#"
               className="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-900 font-medium px-8 py-4 rounded-lg transition-all text-sm"
-              onClick={(e) => { e.preventDefault(); track(MARKETING.CHAT_WIDGET_OPENED, 'MARKETING', { source_page: window.location.pathname, trigger_type: 'manual' }); setIsChatOpen(true); }}
+              onClick={(e) => { e.preventDefault(); setIsChatOpen(true); }}
             >
               {t.cta.contactSales}
             </a>
