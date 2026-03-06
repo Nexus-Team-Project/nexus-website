@@ -32,7 +32,7 @@ export default function WorkspaceSetupPage() {
   const homePath = isRtl ? '/he' : '/';
 
   const getPostOnboardingPath = () =>
-    (user?.role === 'ADMIN' || user?.role === 'AGENT') ? adminPath : dashboardPath;
+    user?.role === 'ADMIN' ? adminPath : dashboardPath;
 
   // If already completed onboarding, skip to the right dashboard
   useEffect(() => {
