@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "C:/Users/Eran"]
+    },
+    "postgres": {
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-postgres", "postgresql://postgres:MuRUZFJAaeEnNSYhlvQVXzsDZktFOxNh@shuttle.proxy.rlwy.net:43919/railway"]
+    }
+  }
+}
