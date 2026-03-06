@@ -96,6 +96,10 @@ router.put('/config/:key', async (req: Request, res: Response, next: NextFunctio
         updatedBy: req.user?.sub,
       },
     });
+    // Bust the in-memory cache so AI picks up the new prompt immediately
+    if (req.params.key === 'system_prompt') {
+      AiService.invalidatePromptCache();
+    }
     res.json(config);
   } catch (err) {
     next(err);

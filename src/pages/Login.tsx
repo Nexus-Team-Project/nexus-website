@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAnalytics } from '../hooks/useAnalytics';
 import AnimatedGradient from '../components/AnimatedGradient';
 import GoogleSignIn from '../components/GoogleSignIn';
 import NexusLogo from '../components/NexusLogo';
@@ -23,10 +24,12 @@ export default function Login() {
   const { t, language, direction } = useLanguage();
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { identify } = useAnalytics();
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
   const signupPath = isHe ? '/he/signup' : '/signup';
   const workspacePath = isHe ? '/he/workspace' : '/workspace';
+  const dashboardPath = isHe ? '/he/dashboard' : '/dashboard';
 
   const isFormValid = email.trim() !== '' && password.trim() !== '';
 
@@ -58,8 +61,9 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      await login(email, password, rememberMe);
-      navigate(workspacePath);
+      const user = await login(email, password, rememberMe);
+      identify(user.id, 'login');
+      navigate(user.onboardingDone ? dashboardPath : workspacePath);
     } catch (err: any) {
       setIsLoading(false);
       // 403 = registered but email not verified yet

@@ -18,6 +18,7 @@ import adminRoutes from './routes/admin.routes';
 import webhookRoutes from './routes/webhook.routes';
 import paymentsRoutes from './routes/payments.routes';
 import partnersRoutes from './routes/partners.route';
+import userRoutes from './routes/user.routes';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -48,7 +49,7 @@ app.use(
     origin: env.FRONTEND_URL,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-anonymous-id'],
   }),
 );
 
@@ -74,6 +75,7 @@ app.use('/api/leads', leadsRoutes);
 app.use('/api/admin/ai', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/partners', partnersRoutes);
+app.use('/api/user', userRoutes);
 
 // ─── Serve frontend (SPA) ─────────────────────────────────
 const frontendDist = path.resolve(__dirname, '../public');

@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { MARKETING } from '../lib/analyticsEvents';
 import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, ShoppingCart, Layers, Receipt, BarChart3, Scale, TrendingUp, Building2, Globe, Wallet, Bitcoin, Network, FileText, HelpCircle, AppWindow, Users, Store, Briefcase, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
@@ -249,6 +251,7 @@ function MegaMenuPanel({
 
 export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dark' }) {
   const { t, direction, language } = useLanguage();
+  const { track } = useAnalytics();
 
   // Get nav items with current language
   const navItems = getNavItems(t, language);
@@ -630,6 +633,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
           <Link
             to={language === 'he' ? '/he/signup' : '/signup'}
             className="group flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-stripe-purple/25"
+            onClick={() => track(MARKETING.NAVBAR_CTA_CLICKED, 'MARKETING', { button_text: t.navbar.getStarted, destination: 'signup' })}
           >
             {t.navbar.getStarted}
             <span className="inline-block w-0 overflow-hidden group-hover:w-4 transition-all duration-300 ease-out">

@@ -2,12 +2,15 @@ import { ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { MARKETING } from '../lib/analyticsEvents';
 
 export default function CTA() {
   const [isCopied, setIsCopied] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const { t, direction, language } = useLanguage();
+  const { track } = useAnalytics();
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -83,6 +86,7 @@ export default function CTA() {
               <Link
                 to={language === 'he' ? '/he/signup' : '/signup'}
                 className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/90 text-white font-medium px-8 py-4 rounded-lg transition-all hover:shadow-xl hover:shadow-stripe-purple/25 text-sm"
+                onClick={() => track(MARKETING.HERO_CTA_CLICKED, 'MARKETING', { button_text: t.cta.startBuilding, variant: 'cta_section' })}
               >
                 {t.cta.startBuilding}
                 <span className="inline-block w-0 overflow-hidden group-hover:w-5 transition-all duration-300 ease-out">

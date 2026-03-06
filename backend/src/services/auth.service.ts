@@ -130,6 +130,7 @@ export async function googleAuth(
     where: { OR: [{ googleId: payload.sub }, { email: payload.email }] },
   });
 
+  let isNew = false;
   if (user) {
     if (!user.googleId) {
       user = await prisma.user.update({
@@ -138,6 +139,7 @@ export async function googleAuth(
       });
     }
   } else {
+    isNew = true;
     user = await prisma.user.create({
       data: {
         email: payload.email,
@@ -155,7 +157,8 @@ export async function googleAuth(
     data: { lastLoginAt: new Date() },
   });
 
-  return issueTokens(user.id, user.email, user.role, false, meta);
+  const tokens = await issueTokens(user.id, user.email, user.role, false, meta);
+  return { ...tokens, isNew };
 }
 
 export async function googleAuthFromCode(
@@ -189,6 +192,7 @@ export async function googleAuthFromAccessToken(
     where: { OR: [{ googleId: payload.sub }, { email: payload.email }] },
   });
 
+  let isNew = false;
   if (user) {
     if (!user.googleId) {
       user = await prisma.user.update({
@@ -197,6 +201,7 @@ export async function googleAuthFromAccessToken(
       });
     }
   } else {
+    isNew = true;
     user = await prisma.user.create({
       data: {
         email: payload.email,
@@ -214,7 +219,8 @@ export async function googleAuthFromAccessToken(
     data: { lastLoginAt: new Date() },
   });
 
-  return issueTokens(user.id, user.email, user.role, false, meta);
+  const tokens = await issueTokens(user.id, user.email, user.role, false, meta);
+  return { ...tokens, isNew };
 }
 
 export async function refreshTokens(

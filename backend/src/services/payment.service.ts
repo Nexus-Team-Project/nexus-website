@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { createError } from '../middleware/errorHandler';
+import { ingest } from './analytics.service';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -176,33 +177,75 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
     });
   }
 
-  // Update order status
+  // Update order status + fire analytics events
   switch (event.type) {
-    case 'payment_intent.succeeded':
+    case 'payment_intent.succeeded': {
       if (orderId) {
-        await prisma.order.update({
+        const order = await prisma.order.update({
           where: { id: orderId },
           data: { status: 'SUCCEEDED' },
         });
+        void ingest({
+          anonymousId: `server_${orderId}`,
+          userId: order.userId ?? undefined,
+          eventName: 'Payment_Completed',
+          channel: 'PRODUCT',
+          properties: {
+            order_id: orderId,
+            amount_cents: order.totalAmount,
+            currency: order.currency,
+            payment_method: 'card',
+          },
+          context: { source: 'stripe_webhook' },
+        }).catch(console.error);
       }
       break;
+    }
 
-    case 'payment_intent.payment_failed':
+    case 'payment_intent.payment_failed': {
       if (orderId) {
-        await prisma.order.update({
+        const order = await prisma.order.update({
           where: { id: orderId },
           data: { status: 'FAILED' },
         });
+        void ingest({
+          anonymousId: `server_${orderId}`,
+          userId: order.userId ?? undefined,
+          eventName: 'Payment_Failed',
+          channel: 'PRODUCT',
+          properties: {
+            order_id: orderId,
+            amount_cents: order.totalAmount,
+            currency: order.currency,
+            error_code: intent.last_payment_error?.code ?? 'unknown',
+            reason: intent.last_payment_error?.message ?? 'unknown',
+          },
+          context: { source: 'stripe_webhook' },
+        }).catch(console.error);
       }
       break;
+    }
 
-    case 'charge.refunded':
+    case 'charge.refunded': {
       if (orderId) {
-        await prisma.order.update({
+        const order = await prisma.order.update({
           where: { id: orderId },
           data: { status: 'REFUNDED' },
         });
+        void ingest({
+          anonymousId: `server_${orderId}`,
+          userId: order.userId ?? undefined,
+          eventName: 'Payment_Refunded',
+          channel: 'PRODUCT',
+          properties: {
+            order_id: orderId,
+            amount_cents: order.totalAmount,
+            currency: order.currency,
+          },
+          context: { source: 'stripe_webhook' },
+        }).catch(console.error);
       }
       break;
+    }
   }
 }

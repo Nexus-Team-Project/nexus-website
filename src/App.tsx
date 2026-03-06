@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { LanguageProvider } from './i18n/LanguageContext';
+import { useAnalytics } from './hooks/useAnalytics';
+import ProtectedRoute from './components/ProtectedRoute';
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
@@ -20,12 +22,27 @@ const ForgotPassword     = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword      = lazy(() => import('./pages/ResetPassword'));
 const PartnersPage       = lazy(() => import('./pages/PartnersPage'));
 const PaymentsPage       = lazy(() => import('./pages/PaymentsPage'));
+const AdminDashboard     = lazy(() => import('./pages/AdminDashboard'));
+const UserDashboard      = lazy(() => import('./pages/UserDashboard'));
 
-function ScrollToTop() {
+// ─── Global analytics tracker ────────────────────────────
+// Fires Page_Viewed on every route change.
+// Lives inside BrowserRouter so it can access useLocation.
+function RouteAnalytics() {
   const { pathname } = useLocation();
+  const { page } = useAnalytics();
+
   useEffect(() => {
+    // Determine channel from path
+    const channel =
+      pathname.startsWith('/dashboard') || pathname.startsWith('/admin')
+        ? 'PRODUCT'
+        : 'MARKETING';
+    page(channel, pathname);
     window.scrollTo(0, 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
+
   return null;
 }
 
@@ -84,7 +101,7 @@ function ChatWidget() {
 function App() {
   return (
     <BrowserRouter>
-      <ScrollToTop />
+      <RouteAnalytics />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/"         element={<Home />} />
@@ -103,6 +120,17 @@ function App() {
           <Route path="/he/partners" element={<LanguageProvider language="he"><PartnersPage /></LanguageProvider>} />
           <Route path="/payments"    element={<LanguageProvider language="en"><PaymentsPage /></LanguageProvider>} />
           <Route path="/he/payments" element={<LanguageProvider language="he"><PaymentsPage /></LanguageProvider>} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute redirectTo="/login">
+              <UserDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/admin" element={
+            <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
         </Routes>
       </Suspense>
       <ChatWidget />

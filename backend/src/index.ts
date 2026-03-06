@@ -6,6 +6,7 @@ import { env } from './config/env';
 import { prisma } from './config/database';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
 import { embedText } from './services/ai.service';
+import { scheduleBiRefresh } from './jobs/biRefresh';
 
 const PORT = env.PORT;
 
@@ -178,6 +179,7 @@ async function bootstrap() {
 
   // 5. Schedule cron jobs
   scheduleDailyDigest();
+  scheduleBiRefresh();
   console.log('✅ Cron jobs scheduled');
 
   // 6. Start listening

@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { EventChannel } from '@prisma/client';
 import { validate } from '../middleware/validate';
 import { authenticate, requireAdmin } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
@@ -7,6 +8,55 @@ import * as AnalyticsService from '../services/analytics.service';
 import * as NotificationService from '../services/notification.service';
 
 const router = Router();
+
+// ─── POST /api/analytics/track  (unified event ingestion) ─
+
+const trackSchema = z.object({
+  body: z.object({
+    anonymousId: z.string().min(1),
+    userId: z.string().optional(),
+    eventName: z.string().min(1),
+    channel: z.nativeEnum(EventChannel),
+    properties: z.record(z.unknown()).default({}),
+    context: z.record(z.unknown()).default({}),
+    sentAt: z.string().optional(),
+    mergeSource: z.enum(['signup', 'login', 'oauth']).optional(),
+  }),
+});
+
+router.post(
+  '/track',
+  apiLimiter,
+  validate(trackSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ip = req.ip;
+      const ua = req.headers['user-agent'] ?? '';
+
+      // Enrich context with server-side data
+      const enrichedContext = {
+        ...req.body.context,
+        ip,
+        userAgent: ua,
+      };
+
+      await AnalyticsService.ingest({ ...req.body, context: enrichedContext });
+
+      // Fire visitor notification for page views (fire-and-forget)
+      if (req.body.eventName === 'Page_Viewed') {
+        NotificationService.handleVisitorArrival({
+          visitorId: req.body.anonymousId,
+          page: String(req.body.properties?.page_path ?? '/'),
+          country: String((enrichedContext as any).device?.country ?? ''),
+        }).catch(console.error);
+      }
+
+      res.status(204).end();
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 // ─── POST /api/analytics/pageview ─────────────────────────
 

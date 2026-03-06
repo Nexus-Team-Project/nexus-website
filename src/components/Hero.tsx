@@ -3,9 +3,12 @@ import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import AnimatedGradient from './AnimatedGradient';
 import GoogleSignIn from './GoogleSignIn';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { MARKETING } from '../lib/analyticsEvents';
 
 export default function Hero() {
   const { t, direction, language } = useLanguage();
+  const { track } = useAnalytics();
 
   return (
     <section className="relative min-h-[85vh] md:min-h-screen flex items-center overflow-visible">
@@ -61,21 +64,14 @@ export default function Hero() {
                 <Link
                   to={language === 'he' ? '/he/signup' : '/signup'}
                   className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/85 text-white font-semibold px-5 sm:px-8 py-3.5 sm:py-4 rounded-lg transition-all duration-300 hover:shadow-xl hover:shadow-stripe-purple/30 sm:hover:px-10 text-sm"
+                  onClick={() => track(MARKETING.HERO_CTA_CLICKED, 'MARKETING', { button_text: t.hero.startNow, page_path: window.location.pathname })}
                 >
                   {t.hero.startNow}
                   <span className="inline-block w-0 overflow-hidden group-hover:w-5 transition-all duration-300 ease-out">
                     <ArrowRight size={16} className={`inline ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`} />
                   </span>
                 </Link>
-                <GoogleSignIn
-                  variant="hero"
-                  onSuccess={(user) => {
-                    console.log('Google login success:', user);
-                  }}
-                  onError={() => {
-                    console.log('Google login failed');
-                  }}
-                />
+                <GoogleSignIn variant="hero" />
               </div>
             </div>
 

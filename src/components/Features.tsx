@@ -6,6 +6,8 @@ import BorderlessGlobe from './BorderlessGlobe';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { MouseEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { MARKETING } from '../lib/analyticsEvents';
 
 interface BorderHighlightCardProps {
   children: React.ReactNode;
@@ -103,23 +105,17 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
 
   // Function to rotate cards
   const rotateCards = useCallback(() => {
-    console.log('Moving cards to next slot');
-
     // Move each card to the next slot (rotate right)
     setCardSlots(prev => {
       const newSlots = [...prev];
       const lastCard = newSlots.pop()!;
       newSlots.unshift(lastCard);
 
-      console.log('New card in front slot:', giftCards[newSlots[0]].name);
-
       // Trigger pulse after rotation animation completes
       setTimeout(() => {
-        console.log('🔥 Pulse starting');
         setIsPulsing(true);
 
         setTimeout(() => {
-          console.log('Pulse ending');
           setIsPulsing(false);
         }, 500);
       }, 1500);
@@ -133,8 +129,6 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
   // Rotation interval - moves cards to next slot
   useEffect(() => {
     if (isActive) {
-      console.log('Starting rotation - immediate first rotation');
-
       // Trigger first rotation immediately
       rotateCards();
 
@@ -144,7 +138,6 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
       }, 3000); // Rotate every 3 seconds
     } else {
       if (intervalRef.current) {
-        console.log('Stopping rotation interval');
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
@@ -177,8 +170,6 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
     }
   }, [isPulsing]);
 
-  console.log('=== RENDER === cardSlots:', cardSlots, 'isPulsing:', isPulsing);
-
   return (
     <BorderHighlightCard className={`order-1 md:order-none feature-expandable md:col-span-7 md:row-span-1 md:col-start-6 group overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 rounded-lg border border-slate-200 shadow-sm transition-all duration-500 ${isGlobeHovered ? 'md:-translate-y-20' : ''} ${isMobileActive ? 'mobile-active' : ''}`} onClick={onMobileClick}>
       <div className="p-6 relative">
@@ -192,14 +183,8 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
         {/* Circular Carousel */}
         <div
           className="relative h-40 md:h-64 cursor-pointer loyalty-carousel"
-          onMouseEnter={() => {
-            console.log('Hover started');
-            setIsHovered(true);
-          }}
-          onMouseLeave={() => {
-            console.log('Hover ended');
-            setIsHovered(false);
-          }}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
         >
           <div
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full"
@@ -227,10 +212,6 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
                 // In collapsed view, show slots 0, 1, and 5 (front and immediate neighbors)
                 const isVisibleSlot = slotIndex === 0 || slotIndex === 1 || slotIndex === 5;
                 const cardOpacity = isActive ? (slot.isFront ? 1 : 0.55) : (isVisibleSlot ? 1 : 0.55);
-
-                if (shouldPulse) {
-                  console.log(`🔥 PULSING: ${card.name} in front slot`);
-                }
 
                 return (
                   <div
@@ -300,13 +281,35 @@ export default function Features() {
   const [isGlobeHovered, setIsGlobeHovered] = useState(false);
   const [expandedCard, setExpandedCard] = useState<string | null>(null);
   const { t, direction } = useLanguage();
+  const { track } = useAnalytics();
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Fire Pricing_Section_Viewed once when section scrolls into view
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          track(MARKETING.PRICING_SECTION_VIEWED, 'MARKETING', {
+            page_path: window.location.pathname,
+          });
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.2 },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleCard = (cardId: string) => {
     setExpandedCard(prev => prev === cardId ? null : cardId);
   };
 
   return (
-    <section className="pt-32 pb-16 bg-white relative">
+    <section id="pricing" ref={sectionRef} className="pt-32 pb-16 bg-white relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-12">

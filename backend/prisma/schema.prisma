@@ -68,6 +68,36 @@ enum PaymentMethod {
   COD
 }
 
+enum EventChannel {
+  MARKETING
+  PRODUCT
+  WALLET
+}
+
+enum AccountType {
+  B2B
+  B2C
+}
+
+// ─── ACCOUNTS (B2B/B2C hierarchy) ─────────────────────────────────
+
+model Account {
+  id           String      @id @default(cuid())
+  name         String
+  type         AccountType @default(B2C)
+  domain       String?
+  plan         String?
+  websiteUrl   String?
+  businessDesc String?
+  useCases     String[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  users        User[]
+
+  @@index([domain])
+}
+
 // ─── AUTH ─────────────────────────────────────────────────────────
 
 model User {
@@ -80,11 +110,16 @@ model User {
   role          UserRole     @default(USER)
   emailUpdates  Boolean      @default(true)
   avatarUrl     String?
-  provider      AuthProvider @default(EMAIL)
-  googleId      String?      @unique
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  lastLoginAt   DateTime?
+  provider        AuthProvider @default(EMAIL)
+  googleId        String?      @unique
+  accountId       String?
+  account         Account?     @relation(fields: [accountId], references: [id])
+  phone           String?
+  jobTitle        String?
+  onboardingDone  Boolean      @default(false)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  lastLoginAt     DateTime?
 
   refreshTokens RefreshToken[]
   chatSessions  ChatSession[]
@@ -92,6 +127,7 @@ model User {
 
   @@index([email])
   @@index([googleId])
+  @@index([accountId])
 }
 
 model RefreshToken {
@@ -277,12 +313,49 @@ model VisitorProfile {
   firstSeen      DateTime @default(now())
   lastSeen       DateTime @updatedAt
   pageViewCount  Int      @default(0)
+  pageViews      Int      @default(0)
   chatCount      Int      @default(0)
   apolloData     Json?
   apolloEnriched Boolean  @default(false)
+  ip             String?
+  city           String?
+  country        String?
+  device         String?
+  browser        String?
 
   @@index([visitorId])
   @@index([lastSeen])
+}
+
+model EventLog {
+  id          String       @id @default(cuid())
+  anonymousId String?
+  userId      String?
+  accountId   String?
+  eventName   String
+  channel     EventChannel
+  properties  Json
+  context     Json
+  sentAt      DateTime?
+  receivedAt  DateTime     @default(now())
+
+  @@index([anonymousId])
+  @@index([userId])
+  @@index([accountId])
+  @@index([eventName, receivedAt])
+  @@index([channel, receivedAt])
+}
+
+model IdentityMap {
+  id          String   @id @default(cuid())
+  anonymousId String
+  userId      String
+  mergeSource String
+  mergedAt    DateTime @default(now())
+
+  @@unique([anonymousId, userId])
+  @@index([anonymousId])
+  @@index([userId])
 }
 
 // ─── NOTIFICATIONS ─────────────────────────────────────────────────

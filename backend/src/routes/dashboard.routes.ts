@@ -25,6 +25,8 @@ router.get('/metrics', apiLimiter, async (req: Request, res: Response, next: Nex
       [{ count: prevVisitors }],
       currentChats, prevChats,
       currentLeads, prevLeads,
+      [{ count: currentSignups }],
+      [{ count: prevSignups }],
     ] = await Promise.all([
       prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(DISTINCT "visitorId")::int AS count FROM "PageView"
@@ -36,10 +38,18 @@ router.get('/metrics', apiLimiter, async (req: Request, res: Response, next: Nex
       prisma.chatSession.count({ where: { createdAt: { gte: prevSince, lt: since } } }),
       prisma.lead.count({ where: { createdAt: { gte: since } } }),
       prisma.lead.count({ where: { createdAt: { gte: prevSince, lt: since } } }),
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT "userId")::int AS count FROM "EventLog"
+        WHERE "eventName" = 'User_Signed_Up' AND "receivedAt" >= ${since}`,
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT "userId")::int AS count FROM "EventLog"
+        WHERE "eventName" = 'User_Signed_Up' AND "receivedAt" >= ${prevSince} AND "receivedAt" < ${since}`,
     ]);
 
-    const cv = Number(currentVisitors);
-    const pv = Number(prevVisitors);
+    const cv  = Number(currentVisitors);
+    const pv  = Number(prevVisitors);
+    const cs  = Number(currentSignups);
+    const ps  = Number(prevSignups);
 
     const pct = (curr: number, prev: number) =>
       prev === 0 ? null : Math.round(((curr - prev) / prev) * 100);
@@ -53,6 +63,7 @@ router.get('/metrics', apiLimiter, async (req: Request, res: Response, next: Nex
       visitors:   { value: cv,           change: pct(cv, pv) },
       chats:      { value: currentChats,  change: pct(currentChats, prevChats) },
       leads:      { value: currentLeads,  change: pct(currentLeads, prevLeads) },
+      signups:    { value: cs,            change: pct(cs, ps) },
       conversion: { value: conversionRate, unit: '%' },
     });
   } catch (err) {
@@ -70,8 +81,8 @@ router.get('/chart', apiLimiter, async (req: Request, res: Response, next: NextF
     since.setDate(since.getDate() - (days - 1));
     since.setHours(0, 0, 0, 0);
 
-    // Fetch ALL data in 3 queries total (not 3×days queries in a loop)
-    const [pageViewRows, chatRows, leadRows] = await Promise.all([
+    // Fetch ALL data in 4 queries total (not N×days queries in a loop)
+    const [pageViewRows, chatRows, leadRows, signupRows] = await Promise.all([
       // Unique visitors per day via COUNT(DISTINCT) grouped by date
       prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
         SELECT DATE("createdAt") AS day, COUNT(DISTINCT "visitorId")::int AS count
@@ -91,12 +102,20 @@ router.get('/chart', apiLimiter, async (req: Request, res: Response, next: NextF
         WHERE "createdAt" >= ${since}
         GROUP BY DATE("createdAt")
         ORDER BY day ASC`,
+      // Signups from EventLog (source of truth)
+      prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
+        SELECT DATE("receivedAt") AS day, COUNT(DISTINCT "userId")::int AS count
+        FROM "EventLog"
+        WHERE "eventName" = 'User_Signed_Up' AND "receivedAt" >= ${since}
+        GROUP BY DATE("receivedAt")
+        ORDER BY day ASC`,
     ]);
 
     // Build lookup maps for O(1) access
-    const pvMap = new Map(pageViewRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
-    const chatMap = new Map(chatRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
-    const leadMap = new Map(leadRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const pvMap     = new Map(pageViewRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const chatMap   = new Map(chatRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const leadMap   = new Map(leadRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const signupMap = new Map(signupRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
 
     // Build response array filling in zeros for days with no data
     const points = [];
@@ -106,9 +125,10 @@ router.get('/chart', apiLimiter, async (req: Request, res: Response, next: NextF
       const key = d.toISOString().split('T')[0];
       points.push({
         date:     key,
-        visitors: pvMap.get(key)   ?? 0,
-        chats:    chatMap.get(key) ?? 0,
-        leads:    leadMap.get(key) ?? 0,
+        visitors: pvMap.get(key)     ?? 0,
+        chats:    chatMap.get(key)   ?? 0,
+        leads:    leadMap.get(key)   ?? 0,
+        signups:  signupMap.get(key) ?? 0,
       });
     }
 
@@ -201,6 +221,57 @@ router.post(
     }
   },
 );
+
+// ─── GET /api/dashboard/revenue ───────────────────────────
+
+router.get('/revenue', apiLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const days = Math.min(Number(req.query.days) || 30, 90);
+
+    const since = new Date();
+    since.setDate(since.getDate() - (days - 1));
+    since.setHours(0, 0, 0, 0);
+
+    const [rows, totals] = await Promise.all([
+      prisma.$queryRaw<Array<{ day: string; revenue: number; transactions: bigint }>>`
+        SELECT
+          DATE("receivedAt") AS day,
+          COALESCE(SUM((properties->>'amount_cents')::int), 0) / 100.0 AS revenue,
+          COUNT(*)::int AS transactions
+        FROM "EventLog"
+        WHERE "eventName" = 'Payment_Completed'
+          AND "receivedAt" >= ${since}
+        GROUP BY DATE("receivedAt")
+        ORDER BY day ASC`,
+      prisma.$queryRaw<[{ total_revenue: number; total_transactions: bigint }]>`
+        SELECT
+          COALESCE(SUM((properties->>'amount_cents')::int), 0) / 100.0 AS total_revenue,
+          COUNT(*)::int AS total_transactions
+        FROM "EventLog"
+        WHERE "eventName" = 'Payment_Completed'
+          AND "receivedAt" >= ${since}`,
+    ]);
+
+    const points: Array<{ date: string; revenue: number; transactions: number }> = [];
+    const rowMap = new Map(rows.map(r => [String(r.day).slice(0, 10), r]));
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().split('T')[0];
+      const row = rowMap.get(key);
+      points.push({ date: key, revenue: row ? Number(row.revenue) : 0, transactions: row ? Number(row.transactions) : 0 });
+    }
+
+    res.json({
+      days,
+      total_revenue: Number(totals[0]?.total_revenue ?? 0),
+      total_transactions: Number(totals[0]?.total_transactions ?? 0),
+      points,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── GET /api/dashboard/ai-stats ──────────────────────────
 

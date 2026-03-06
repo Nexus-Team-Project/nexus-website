@@ -1,0 +1,263 @@
+{
+  "version": "1.0.0",
+  "convention": "Object_Action",
+  "identity": {
+    "anonymousId": "localStorage key: nexus_vid — persistent UUID, set before any auth",
+    "userId": "set after login/signup — triggers IdentityMap merge + EventLog backfill",
+    "accountId": "resolved from User.accountId — B2B company or userId for B2C"
+  },
+  "channels": {
+    "MARKETING": {
+      "description": "B2B website — acquisition and conversion tracking",
+      "events": [
+        {
+          "name": "Page_Viewed",
+          "trigger": "User navigates to any page (fired globally on route change)",
+          "properties": {
+            "page_path": "string",
+            "page_title": "string"
+          }
+        },
+        {
+          "name": "Hero_CTA_Clicked",
+          "trigger": "User clicks the main CTA button in the hero section",
+          "properties": {
+            "button_text": "string",
+            "page_path": "string"
+          }
+        },
+        {
+          "name": "Navbar_CTA_Clicked",
+          "trigger": "User clicks the Get Started button in the navbar",
+          "properties": {
+            "button_text": "string",
+            "destination": "string"
+          }
+        },
+        {
+          "name": "Pricing_Section_Viewed",
+          "trigger": "Pricing section scrolls into view (IntersectionObserver)",
+          "properties": {
+            "page_path": "string",
+            "plan_highlighted": "string | null"
+          }
+        },
+        {
+          "name": "Lead_Form_Submitted",
+          "trigger": "User submits a contact or demo request form",
+          "properties": {
+            "form_name": "string",
+            "source_page": "string"
+          }
+        },
+        {
+          "name": "Chat_Widget_Opened",
+          "trigger": "User opens the live chat widget",
+          "properties": {
+            "source_page": "string",
+            "trigger_type": "manual | auto"
+          }
+        },
+        {
+          "name": "Signup_Page_Viewed",
+          "trigger": "User lands on the signup page",
+          "properties": {
+            "referrer": "string | null",
+            "source_page": "string | null"
+          }
+        },
+        {
+          "name": "Demo_Requested",
+          "trigger": "User submits a demo request",
+          "properties": {
+            "plan": "string | null",
+            "source": "string"
+          }
+        }
+      ]
+    },
+    "PRODUCT": {
+      "description": "Dashboard — product usage and activation tracking",
+      "events": [
+        {
+          "name": "User_Signed_Up",
+          "trigger": "User completes registration (also triggers Identity Resolution)",
+          "properties": {
+            "method": "email | google | oauth"
+          },
+          "identity_resolution": true,
+          "merge_source": "signup"
+        },
+        {
+          "name": "User_Logged_In",
+          "trigger": "User authenticates (also triggers Identity Resolution)",
+          "properties": {
+            "method": "email | google | oauth"
+          },
+          "identity_resolution": true,
+          "merge_source": "login"
+        },
+        {
+          "name": "Dashboard_Viewed",
+          "trigger": "User opens their dashboard",
+          "properties": {
+            "section": "string"
+          }
+        },
+        {
+          "name": "Chat_Session_Started",
+          "trigger": "User initiates a new chat session",
+          "properties": {
+            "session_id": "string",
+            "trigger_type": "manual | auto"
+          }
+        },
+        {
+          "name": "Chat_Message_Sent",
+          "trigger": "User sends a message in chat",
+          "properties": {
+            "session_id": "string",
+            "message_index": "number",
+            "channel": "web | whatsapp"
+          }
+        },
+        {
+          "name": "AI_Rating_Submitted",
+          "trigger": "User rates an AI response",
+          "properties": {
+            "session_id": "string",
+            "rating": "1-5",
+            "has_feedback": "boolean"
+          }
+        },
+        {
+          "name": "Payment_Initiated",
+          "trigger": "User starts the checkout flow",
+          "properties": {
+            "order_id": "string",
+            "amount_cents": "number",
+            "currency": "string",
+            "items_count": "number"
+          }
+        },
+        {
+          "name": "Payment_Completed",
+          "trigger": "Stripe confirms payment success (server-side webhook)",
+          "properties": {
+            "order_id": "string",
+            "amount_cents": "number",
+            "currency": "string",
+            "payment_method": "card | wallet | cod"
+          }
+        },
+        {
+          "name": "Payment_Failed",
+          "trigger": "Payment attempt fails",
+          "properties": {
+            "order_id": "string",
+            "error_code": "string",
+            "reason": "string"
+          }
+        },
+        {
+          "name": "Payment_Refunded",
+          "trigger": "Stripe charge.refunded webhook",
+          "properties": {
+            "order_id": "string",
+            "amount_cents": "number",
+            "currency": "string"
+          }
+        },
+        {
+          "name": "Feature_Used",
+          "trigger": "User activates a named product feature",
+          "properties": {
+            "feature_name": "string",
+            "duration_ms": "number | null"
+          }
+        }
+      ]
+    },
+    "WALLET": {
+      "description": "B2C customer dashboard — personal data view (Row-Level isolated by userId)",
+      "isolation": "Application-layer: all queries require userId = req.user.sub. Future: PostgreSQL RLS.",
+      "events": [
+        {
+          "name": "Wallet_Dashboard_Viewed",
+          "trigger": "Customer opens their wallet view",
+          "properties": {
+            "section": "overview | transactions | benefits"
+          }
+        },
+        {
+          "name": "Transaction_Viewed",
+          "trigger": "Customer clicks on a specific transaction",
+          "properties": {
+            "transaction_id": "string",
+            "amount_cents": "number",
+            "status": "succeeded | failed | refunded"
+          }
+        },
+        {
+          "name": "Wallet_Benefit_Claimed",
+          "trigger": "Customer redeems a benefit or reward",
+          "properties": {
+            "benefit_id": "string",
+            "benefit_type": "string",
+            "value_cents": "number | null"
+          }
+        },
+        {
+          "name": "Statement_Downloaded",
+          "trigger": "Customer downloads their statement",
+          "properties": {
+            "period": "string (e.g. 2025-Q1)",
+            "format": "pdf | csv"
+          }
+        },
+        {
+          "name": "Report_Exported",
+          "trigger": "Customer exports a custom report",
+          "properties": {
+            "report_type": "string",
+            "date_range_days": "number",
+            "format": "pdf | csv | excel"
+          }
+        }
+      ]
+    }
+  },
+  "context": {
+    "description": "Auto-enriched by useAnalytics hook on every event",
+    "schema": {
+      "ip": "string (server-injected)",
+      "userAgent": "string",
+      "device": {
+        "type": "desktop | tablet | mobile",
+        "browser": "Chrome | Firefox | Safari | Edge | Other",
+        "os": "Windows | macOS | Linux | Android | iOS | Other"
+      },
+      "locale": "string (e.g. he-IL)",
+      "timezone": "string (e.g. Asia/Jerusalem)",
+      "page": {
+        "path": "string",
+        "title": "string",
+        "url": "string",
+        "referrer": "string | null"
+      },
+      "campaign": {
+        "utm_source": "string | null",
+        "utm_medium": "string | null",
+        "utm_campaign": "string | null",
+        "utm_content": "string | null",
+        "utm_term": "string | null"
+      }
+    }
+  },
+  "bi_layer": {
+    "tool": "Metabase (self-hosted on Railway)",
+    "views": ["bi_payments", "bi_marketing_funnel", "bi_account_activity", "bi_top_pages"],
+    "refresh": "Hourly REFRESH MATERIALIZED VIEW CONCURRENTLY via cron job",
+    "migration_path": "PostgreSQL → pg_logical CDC → ClickHouse when EventLog exceeds ~5M rows"
+  }
+}

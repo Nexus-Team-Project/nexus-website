@@ -4,6 +4,8 @@ import { X, Send, Minimize2 } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { api, API_URL } from '../lib/api';
 import { getVisitorId } from '../lib/visitorId';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { MARKETING, PRODUCT } from '../lib/analyticsEvents';
 
 interface ChatAction {
   type: 'navigate' | 'external_link';
@@ -28,6 +30,7 @@ interface LiveChatProps {
 export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
   const { t, direction } = useLanguage();
   const isRtl = direction === 'rtl';
+  const { track } = useAnalytics();
   const [isClosing, setIsClosing] = useState(false);
 
   const handleClose = () => {
@@ -105,6 +108,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(true);
   const [showQuickActions, setShowQuickActions] = useState(true);
+  const [ratings, setRatings] = useState<Record<string, 'up' | 'down'>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Real backend state
@@ -165,29 +169,27 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
     let mounted = true;
     const visitorId = getVisitorId();
 
-    // Fire-and-forget analytics pageview
-    api
-      .post('/api/analytics/pageview', {
-        visitorId,
-        page: window.location.pathname,
-        referrer: document.referrer || undefined,
-      })
-      .catch(() => {});
+    // Track chat widget opened
+    track(MARKETING.CHAT_WIDGET_OPENED, 'MARKETING', {
+      source_page: window.location.pathname,
+      trigger_type: 'manual',
+    });
 
     // Create chat session
     api
       .post<{ id: string; welcomeMessage?: string }>('/api/chat/sessions', {
         visitorId,
-        metadata: {
-          url: window.location.href,
-          language: navigator.language,
-          userAgent: navigator.userAgent,
-        },
+        page: window.location.pathname,
+        language: navigator.language,
       })
       .then((data) => {
         if (!mounted) return;
         const sid = data.id;
         setSessionId(sid);
+        track(PRODUCT.CHAT_SESSION_STARTED, 'PRODUCT', {
+          session_id: sid,
+          trigger_type: 'manual',
+        });
 
         // Connect socket and join session room
         const socket = io(API_URL, { withCredentials: true });
@@ -280,7 +282,16 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         sender: 'user',
         timestamp: new Date(),
       };
-      setMessages((prev) => [...prev, userMsg]);
+      setMessages((prev) => {
+        const next = [...prev, userMsg];
+        const messageIndex = next.filter((m) => m.sender === 'user').length;
+        track(PRODUCT.CHAT_MESSAGE_SENT, 'PRODUCT', {
+          session_id: sessionId ?? undefined,
+          message_index: messageIndex,
+          channel: 'web',
+        });
+        return next;
+      });
       setIsTyping(true);
 
       if (sessionId) {
@@ -319,7 +330,7 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
         }, 2000);
       }
     },
-    [sessionId, t],
+    [sessionId, t, track],
   );
 
   const handleSend = () => {
@@ -327,6 +338,19 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
     setShowQuickActions(false);
     sendMessage(inputValue);
     setInputValue('');
+  };
+
+  const handleRate = (messageId: string, rating: 'up' | 'down') => {
+    if (ratings[messageId]) return; // already rated
+    setRatings((prev) => ({ ...prev, [messageId]: rating }));
+    // Persist to AiRating table (👍 = 5, 👎 = 1) — fire and forget
+    void api.post(`/api/chat/messages/${messageId}/rate`, { rating: rating === 'up' ? 5 : 1 }).catch(() => {});
+    track(PRODUCT.AI_RATING_SUBMITTED, 'PRODUCT', {
+      session_id: sessionId ?? undefined,
+      message_id: messageId,
+      rating,
+      has_feedback: false,
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -539,6 +563,32 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
                     minute: '2-digit',
                   })}
                 </span>
+              </div>
+              <div className="flex items-center gap-2 px-2">
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {message.timestamp.toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+                {message.sender === 'agent' && message.id !== 'welcome' && (
+                  <div className="flex items-center gap-1 ml-1">
+                    <button
+                      onClick={() => handleRate(message.id, 'up')}
+                      className={`text-[13px] transition-all ${ratings[message.id] === 'up' ? 'opacity-100 scale-110' : ratings[message.id] ? 'opacity-20' : 'opacity-40 hover:opacity-80'}`}
+                      title="Helpful"
+                    >
+                      👍
+                    </button>
+                    <button
+                      onClick={() => handleRate(message.id, 'down')}
+                      className={`text-[13px] transition-all ${ratings[message.id] === 'down' ? 'opacity-100 scale-110' : ratings[message.id] ? 'opacity-20' : 'opacity-40 hover:opacity-80'}`}
+                      title="Not helpful"
+                    >
+                      👎
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}

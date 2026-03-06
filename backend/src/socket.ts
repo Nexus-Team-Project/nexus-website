@@ -25,8 +25,8 @@ export function initSocket(httpServer: HttpServer): SocketServer {
 
     // ── Join admin room (agents watching dashboard) ────
     socket.on('join_admin', ({ agentId }: { agentId: string }) => {
-      socket.join(`admin:${agentId}`);
-      console.log(`[Socket] Agent ${agentId} joined admin room`);
+      socket.join('__admins');
+      console.log(`[Socket] Agent ${agentId} joined admin broadcast room`);
     });
 
     // ── Typing indicators ──────────────────────────────
@@ -52,8 +52,8 @@ export function getIO(): SocketServer {
   return io;
 }
 
-/** Broadcast a notification to all connected admin rooms */
+/** Broadcast a notification to the admin room only (not to customer sockets) */
 export function broadcastToAdmins(event: string, data: unknown): void {
   if (!io) return;
-  io.emit(`admin:${event}`, data); // All connected admins receive it
+  io.to('__admins').emit(`admin:${event}`, data);
 }

@@ -7,6 +7,7 @@ import { prisma } from '../config/database';
 import { env } from '../config/env';
 import * as AuthService from '../services/auth.service';
 import * as EmailService from '../services/email.service';
+import { signEmailVerificationToken, verifyEmailVerificationToken } from '../utils/jwt';
 
 const router = Router();
 
@@ -105,7 +106,7 @@ router.post(
         result = await AuthService.googleAuth(req.body.idToken, meta);
       }
       res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
-      res.json({ accessToken: result.accessToken });
+      res.json({ accessToken: result.accessToken, isNew: result.isNew ?? false });
     } catch (err) {
       next(err);
     }
@@ -169,7 +170,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     });
     const user = await prisma.user.findUnique({
       where: { id: result.userId },
-      select: { id: true, email: true, fullName: true, role: true, avatarUrl: true },
+      select: { id: true, email: true, fullName: true, role: true, avatarUrl: true, emailVerified: true },
     });
     const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
     res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
@@ -235,6 +236,74 @@ router.post(
   },
 );
 
+// ─── GET /api/auth/verify-email?token=... ─────────────────
+
+router.get('/verify-email', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = req.query.token as string | undefined;
+    if (!token) {
+      res.status(400).json({ error: 'Missing token' });
+      return;
+    }
+
+    let payload;
+    try {
+      payload = verifyEmailVerificationToken(token);
+    } catch {
+      res.status(400).json({ error: 'Invalid or expired verification link' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+    if (user.emailVerified) {
+      res.json({ message: 'Email already verified' });
+      return;
+    }
+    if (user.email !== payload.email) {
+      res.status(400).json({ error: 'Verification link is no longer valid' });
+      return;
+    }
+
+    await prisma.user.update({ where: { id: payload.sub }, data: { emailVerified: true } });
+    res.json({ message: 'Email verified successfully' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── POST /api/auth/resend-verification ───────────────────
+
+router.post(
+  '/resend-verification',
+  resetLimiter,
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.sub },
+        select: { id: true, email: true, fullName: true, emailVerified: true },
+      });
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+      if (user.emailVerified) {
+        res.json({ message: 'Email already verified' });
+        return;
+      }
+      const token = signEmailVerificationToken(user.id, user.email);
+      await EmailService.sendVerificationEmail(user.email, user.fullName, token);
+      res.json({ message: 'Verification email sent' });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findUnique({
@@ -251,6 +320,7 @@ router.get('/me', authenticate, async (req: Request, res: Response, next: NextFu
         provider: true,
         lastLoginAt: true,
         createdAt: true,
+        onboardingDone: true,
       },
     });
     if (!user) {
