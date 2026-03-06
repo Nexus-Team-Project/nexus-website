@@ -28,7 +28,7 @@ export default function VerifyEmailPage() {
           sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
         }
         setStatus('success');
-        setTimeout(() => navigate('/workspace'), 2500);
+        setTimeout(() => window.location.replace('/workspace'), 2500);
       })
       .catch((err) => {
         if (err?.status === 400) {
