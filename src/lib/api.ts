@@ -1,11 +1,18 @@
 // ─── Shared API client ────────────────────────────────────────────────────────
 // Access token is stored in memory (never localStorage) for XSS protection.
 // The httpOnly refresh token cookie is sent automatically via `credentials: 'include'`.
+// x-anonymous-id is always forwarded so server-side events can resolve identity.
 
 // Use the explicit VITE_API_URL when set (local dev: http://localhost:3001).
 // In production the SPA is served by the same Express server, so relative paths work —
 // .env.production sets VITE_API_URL='' which collapses to empty string via ??.
 const API_URL = import.meta.env.VITE_API_URL ?? '';
+
+// ─── Anonymous ID ─────────────────────────────────────────────────────────────
+// Lazy-read from localStorage so we don't import visitorId.ts at module level.
+function getAnonymousId(): string | null {
+  try { return localStorage.getItem('nexus_vid'); } catch { return null; }
+}
 
 let _accessToken: string | null = null;
 
@@ -62,6 +69,8 @@ async function request<T>(
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (_accessToken) headers['Authorization'] = `Bearer ${_accessToken}`;
+  const anonId = getAnonymousId();
+  if (anonId) headers['x-anonymous-id'] = anonId;
 
   const res = await fetch(`${API_URL}${path}`, {
     method,
