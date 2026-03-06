@@ -15,8 +15,8 @@ export function errorHandler(
   const statusCode = err.statusCode ?? 500;
   const message = err.isOperational ? err.message : 'Internal server error';
 
-  if (statusCode >= 500) {
-    console.error('[ERROR]', err);
+  if (statusCode >= 400) {
+    console.error(`[ERROR ${statusCode}]`, err?.message, err?.constructor?.name, (err as any)?.code);
   }
 
   res.status(statusCode).json({

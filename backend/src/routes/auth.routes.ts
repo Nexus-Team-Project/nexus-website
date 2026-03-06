@@ -45,7 +45,8 @@ router.post(
       const lang = (req.body.language as 'en' | 'he') ?? 'en';
       EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken, lang).catch(console.error);
       res.status(201).json({ requiresVerification: true, email: result.email });
-    } catch (err) {
+    } catch (err: any) {
+      console.error('[REGISTER]', err?.message, err?.constructor?.name, err?.code, err?.meta);
       next(err);
     }
   },
