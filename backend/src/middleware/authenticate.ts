@@ -27,6 +27,19 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   }
 }
 
+/** Silently attach user if a valid Bearer token is present — never 401 */
+export function optionalAuthenticate(req: Request, _res: Response, next: NextFunction): void {
+  const header = req.headers.authorization;
+  if (header?.startsWith('Bearer ')) {
+    try {
+      req.user = verifyAccessToken(header.slice(7));
+    } catch {
+      // Invalid/expired token — treat as unauthenticated (guest)
+    }
+  }
+  next();
+}
+
 /** Require ADMIN role */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (req.user?.role !== 'ADMIN') {

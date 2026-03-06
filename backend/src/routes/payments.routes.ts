@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
-import { authenticate } from '../middleware/authenticate';
+import { authenticate, optionalAuthenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import * as PaymentService from '../services/payment.service';
 import { ingest } from '../services/analytics.service';
@@ -31,6 +31,7 @@ const createOrderSchema = z.object({
 
 router.post(
   '/orders',
+  optionalAuthenticate,
   apiLimiter,
   validate(createOrderSchema),
   async (req: Request, res: Response, next: NextFunction) => {
