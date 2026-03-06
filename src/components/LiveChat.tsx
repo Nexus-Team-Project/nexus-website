@@ -195,11 +195,8 @@ export default function LiveChat({ onClose, onMinimize }: LiveChatProps) {
     api
       .post<{ id: string; welcomeMessage?: string }>('/api/chat/sessions', {
         visitorId,
-        metadata: {
-          url: window.location.href,
-          language: navigator.language,
-          userAgent: navigator.userAgent,
-        },
+        page: window.location.pathname,
+        language: navigator.language,
       })
       .then((data) => {
         if (!mounted) return;
