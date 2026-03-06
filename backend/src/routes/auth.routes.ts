@@ -170,7 +170,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     });
     const user = await prisma.user.findUnique({
       where: { id: result.userId },
-      select: { id: true, email: true, fullName: true, role: true, avatarUrl: true },
+      select: { id: true, email: true, fullName: true, role: true, avatarUrl: true, emailVerified: true },
     });
     const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
     res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
