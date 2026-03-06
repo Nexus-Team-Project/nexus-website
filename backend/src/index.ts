@@ -13,6 +13,20 @@ async function bootstrap() {
   try {
     await prisma.$connect();
     console.log('✅ Database connected');
+
+    // Ensure pgvector extension + embedding column exist (Prisma can't manage vector types)
+    await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector;');
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'KnowledgeChunk' AND column_name = 'embedding'
+        ) THEN
+          ALTER TABLE "KnowledgeChunk" ADD COLUMN embedding vector(1536);
+        END IF;
+      END $$;
+    `);
   } catch (err) {
     console.error('❌ Database connection failed:', err);
     process.exit(1);
