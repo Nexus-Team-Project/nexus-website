@@ -20,6 +20,7 @@ interface MetricsData {
   visitors: Metric;
   chats: Metric;
   leads: Metric;
+  signups: Metric;
   conversion: Metric;
 }
 
@@ -397,7 +398,7 @@ export default function AdminDashboard() {
         )}
 
         {/* Metric cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <MetricCard
             title="Unique Visitors"
             value={metrics?.visitors.value ?? 0}
@@ -423,12 +424,20 @@ export default function AdminDashboard() {
             sparkData={chart.map(d => d.leads)}
           />
           <MetricCard
+            title="Signups"
+            value={metrics?.signups.value ?? 0}
+            change={metrics?.signups.change ?? null}
+            icon={Users}
+            color="#f59e0b"
+            sparkData={chart.map(d => d.signups)}
+          />
+          <MetricCard
             title="Conversion Rate"
             value={metrics?.conversion.value ?? 0}
             change={null}
             unit="%"
             icon={Percent}
-            color="#f59e0b"
+            color="#ec4899"
           />
         </div>
 

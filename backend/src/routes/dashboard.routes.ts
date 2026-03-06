@@ -25,6 +25,8 @@ router.get('/metrics', apiLimiter, async (req: Request, res: Response, next: Nex
       [{ count: prevVisitors }],
       currentChats, prevChats,
       currentLeads, prevLeads,
+      [{ count: currentSignups }],
+      [{ count: prevSignups }],
     ] = await Promise.all([
       prisma.$queryRaw<[{ count: bigint }]>`
         SELECT COUNT(DISTINCT "visitorId")::int AS count FROM "PageView"
@@ -36,10 +38,18 @@ router.get('/metrics', apiLimiter, async (req: Request, res: Response, next: Nex
       prisma.chatSession.count({ where: { createdAt: { gte: prevSince, lt: since } } }),
       prisma.lead.count({ where: { createdAt: { gte: since } } }),
       prisma.lead.count({ where: { createdAt: { gte: prevSince, lt: since } } }),
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT "userId")::int AS count FROM "EventLog"
+        WHERE "eventName" = 'User_Signed_Up' AND "receivedAt" >= ${since}`,
+      prisma.$queryRaw<[{ count: bigint }]>`
+        SELECT COUNT(DISTINCT "userId")::int AS count FROM "EventLog"
+        WHERE "eventName" = 'User_Signed_Up' AND "receivedAt" >= ${prevSince} AND "receivedAt" < ${since}`,
     ]);
 
-    const cv = Number(currentVisitors);
-    const pv = Number(prevVisitors);
+    const cv  = Number(currentVisitors);
+    const pv  = Number(prevVisitors);
+    const cs  = Number(currentSignups);
+    const ps  = Number(prevSignups);
 
     const pct = (curr: number, prev: number) =>
       prev === 0 ? null : Math.round(((curr - prev) / prev) * 100);
@@ -53,6 +63,7 @@ router.get('/metrics', apiLimiter, async (req: Request, res: Response, next: Nex
       visitors:   { value: cv,           change: pct(cv, pv) },
       chats:      { value: currentChats,  change: pct(currentChats, prevChats) },
       leads:      { value: currentLeads,  change: pct(currentLeads, prevLeads) },
+      signups:    { value: cs,            change: pct(cs, ps) },
       conversion: { value: conversionRate, unit: '%' },
     });
   } catch (err) {
