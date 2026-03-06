@@ -2,7 +2,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { hashPassword, comparePassword, generateToken, hashToken } from '../utils/crypto';
-import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt';
+import { signAccessToken } from '../utils/jwt';
 import { createError } from '../middleware/errorHandler';
 
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
@@ -227,20 +227,13 @@ export async function refreshTokens(
   rawToken: string,
   meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
-  let payload: ReturnType<typeof verifyRefreshToken>;
-  try {
-    payload = verifyRefreshToken(rawToken);
-  } catch {
-    throw createError('Invalid refresh token', 401);
-  }
-
   const tokenHash = hashToken(rawToken);
   const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
 
   if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
     if (stored?.revokedAt) {
       await prisma.refreshToken.updateMany({
-        where: { userId: payload.sub },
+        where: { userId: stored.userId },
         data: { revokedAt: new Date() },
       });
     }
@@ -252,7 +245,7 @@ export async function refreshTokens(
     data: { revokedAt: new Date() },
   });
 
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+  const user = await prisma.user.findUnique({ where: { id: stored.userId } });
   if (!user) throw createError('User not found', 401);
 
   return issueTokens(user.id, user.email, user.role, false, meta);
