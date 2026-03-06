@@ -108,6 +108,7 @@ router.post(
       res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
       res.json({ accessToken: result.accessToken, isNew: result.isNew ?? false });
     } catch (err) {
+      console.error('[Google OAuth] error:', err);
       next(err);
     }
   },
