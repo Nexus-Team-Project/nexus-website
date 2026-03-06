@@ -56,27 +56,36 @@ export async function embedText(text: string): Promise<number[]> {
   return response.data[0].embedding;
 }
 
+// ─── Cosine similarity (computed in JS — no pgvector needed) ─
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0, magA = 0, magB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    magA += a[i] * a[i];
+    magB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(magA) * Math.sqrt(magB);
+  return denom === 0 ? 0 : dot / denom;
+}
+
 // ─── RAG search ───────────────────────────────────────────
 
 async function searchKnowledge(queryEmbedding: number[], limit = 3) {
-  // pgvector cosine similarity search using raw query
-  const vector = `[${queryEmbedding.join(',')}]`;
+  const chunks = await prisma.knowledgeChunk.findMany({
+    where: { isActive: true, embedding: { isEmpty: false } },
+    select: { id: true, title: true, content: true, embedding: true },
+  });
 
-  const results = await prisma.$queryRawUnsafe<
-    Array<{ id: string; title: string; content: string; similarity: number }>
-  >(
-    `SELECT id, title, content,
-       1 - (embedding <=> $1::vector) AS similarity
-     FROM "KnowledgeChunk"
-     WHERE "isActive" = true
-       AND embedding IS NOT NULL
-     ORDER BY embedding <=> $1::vector
-     LIMIT $2`,
-    vector,
-    limit,
-  );
-
-  return results;
+  return chunks
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      content: c.content,
+      similarity: cosineSimilarity(queryEmbedding, c.embedding),
+    }))
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, limit);
 }
 
 // ─── Get system prompt from DB (cached 5 min) ────────────
@@ -216,20 +225,19 @@ export async function addKnowledgeChunk(data: {
   language?: string;
 }) {
   const embedding = await embedText(`${data.title}\n${data.content}`);
-  const vector = `[${embedding.join(',')}]`;
 
-  const chunk = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
-    `INSERT INTO "KnowledgeChunk" (id, title, content, source, language, embedding, "isActive", "createdAt", "updatedAt")
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5::vector, true, NOW(), NOW())
-     RETURNING id`,
-    data.title,
-    data.content,
-    data.source ?? null,
-    data.language ?? 'he',
-    vector,
-  );
+  const chunk = await prisma.knowledgeChunk.create({
+    data: {
+      title: data.title,
+      content: data.content,
+      source: data.source ?? null,
+      language: data.language ?? 'he',
+      embedding,
+      isActive: true,
+    },
+  });
 
-  return chunk[0];
+  return { id: chunk.id };
 }
 
 export async function updateKnowledgeChunk(id: string, data: {
@@ -246,16 +254,17 @@ export async function updateKnowledgeChunk(id: string, data: {
     const newTitle = data.title ?? existing.title;
     const newContent = data.content ?? existing.content;
     const embedding = await embedText(`${newTitle}\n${newContent}`);
-    const vector = `[${embedding.join(',')}]`;
 
-    await prisma.$queryRawUnsafe(
-      `UPDATE "KnowledgeChunk"
-       SET title = $1, content = $2, source = $3, "isActive" = $4,
-           embedding = $5::vector, "updatedAt" = NOW()
-       WHERE id = $6`,
-      newTitle, newContent, data.source ?? existing.source,
-      data.isActive ?? existing.isActive, vector, id,
-    );
+    await prisma.knowledgeChunk.update({
+      where: { id },
+      data: {
+        title: newTitle,
+        content: newContent,
+        source: data.source ?? existing.source,
+        isActive: data.isActive ?? existing.isActive,
+        embedding,
+      },
+    });
   } else {
     await prisma.knowledgeChunk.update({
       where: { id },

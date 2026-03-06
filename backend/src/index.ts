@@ -45,38 +45,28 @@ async function seedKnowledgeIfEmpty() {
     { title: 'איך מתחילים לעבוד עם Nexus', content: 'ניתן להתחיל בצורה עצמאית דרך ה-Dashboard. במקרים פשוטים כמו מתנות לעובדים או סליקה בסיסית ניתן להתחיל לעבוד מיד. לפרויקטים מורכבים ניתן לקבוע שיחה עם הצוות.' },
   ];
 
-  for (const chunk of chunks) {
-    await prisma.knowledgeChunk.create({
-      data: { title: chunk.title, content: chunk.content, source: 'kb_seed', language: 'he', isActive: true },
-    });
+  // Generate embeddings inline if OpenAI key is available
+  const canEmbed = !!env.OPENAI_API_KEY;
+  if (!canEmbed) {
+    console.log('⚠️  OPENAI_API_KEY not set — seeding without embeddings');
   }
-  console.log(`✅ ${chunks.length} knowledge chunks seeded`);
-
-  // Generate embeddings if OpenAI key is available
-  if (!env.OPENAI_API_KEY) {
-    console.log('⚠️  OPENAI_API_KEY not set — skipping embedding generation');
-    return;
-  }
-
-  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; title: string; content: string }>>(
-    `SELECT id, title, content FROM "KnowledgeChunk" WHERE "isActive" = true AND embedding IS NULL`,
-  );
 
   let ok = 0;
-  for (const row of rows) {
-    try {
-      const emb = await embedText(`${row.title}\n${row.content}`);
-      const vec = `[${emb.join(',')}]`;
-      await prisma.$executeRawUnsafe(
-        `UPDATE "KnowledgeChunk" SET embedding = $1::vector, "updatedAt" = NOW() WHERE id = $2`,
-        vec, row.id,
-      );
-      ok++;
-    } catch (e) {
-      console.error(`  embed failed: ${row.title}`, e);
+  for (const chunk of chunks) {
+    let embedding: number[] = [];
+    if (canEmbed) {
+      try {
+        embedding = await embedText(`${chunk.title}\n${chunk.content}`);
+        ok++;
+      } catch (e) {
+        console.error(`  embed failed: ${chunk.title}`, (e as Error).message);
+      }
     }
+    await prisma.knowledgeChunk.create({
+      data: { title: chunk.title, content: chunk.content, source: 'kb_seed', language: 'he', isActive: true, embedding },
+    });
   }
-  console.log(`✅ ${ok}/${rows.length} knowledge chunks embedded`);
+  console.log(`✅ ${chunks.length} knowledge chunks seeded (${ok} with embeddings)`);
 }
 
 async function bootstrap() {
@@ -89,26 +79,7 @@ async function bootstrap() {
     process.exit(1);
   }
 
-  // 2. Ensure pgvector extension + embedding column (safety net; Prisma schema also declares these)
-  try {
-    await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector;');
-    await prisma.$executeRawUnsafe(`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM information_schema.columns
-          WHERE table_name = 'KnowledgeChunk' AND column_name = 'embedding'
-        ) THEN
-          ALTER TABLE "KnowledgeChunk" ADD COLUMN embedding vector(1536);
-        END IF;
-      END $$;
-    `);
-    console.log('✅ pgvector ready');
-  } catch (err) {
-    console.warn('⚠️  pgvector setup skipped (may already exist via prisma db push):', (err as Error).message);
-  }
-
-  // 3. Auto-seed knowledge base on first boot
+  // 2. Auto-seed knowledge base on first boot
   try {
     await seedKnowledgeIfEmpty();
   } catch (err) {
