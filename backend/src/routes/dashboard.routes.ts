@@ -70,8 +70,8 @@ router.get('/chart', apiLimiter, async (req: Request, res: Response, next: NextF
     since.setDate(since.getDate() - (days - 1));
     since.setHours(0, 0, 0, 0);
 
-    // Fetch ALL data in 3 queries total (not 3×days queries in a loop)
-    const [pageViewRows, chatRows, leadRows] = await Promise.all([
+    // Fetch ALL data in 4 queries total (not N×days queries in a loop)
+    const [pageViewRows, chatRows, leadRows, signupRows] = await Promise.all([
       // Unique visitors per day via COUNT(DISTINCT) grouped by date
       prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
         SELECT DATE("createdAt") AS day, COUNT(DISTINCT "visitorId")::int AS count
@@ -91,12 +91,20 @@ router.get('/chart', apiLimiter, async (req: Request, res: Response, next: NextF
         WHERE "createdAt" >= ${since}
         GROUP BY DATE("createdAt")
         ORDER BY day ASC`,
+      // Signups from EventLog (source of truth)
+      prisma.$queryRaw<Array<{ day: string; count: bigint }>>`
+        SELECT DATE("receivedAt") AS day, COUNT(DISTINCT "userId")::int AS count
+        FROM "EventLog"
+        WHERE "eventName" = 'User_Signed_Up' AND "receivedAt" >= ${since}
+        GROUP BY DATE("receivedAt")
+        ORDER BY day ASC`,
     ]);
 
     // Build lookup maps for O(1) access
-    const pvMap = new Map(pageViewRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
-    const chatMap = new Map(chatRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
-    const leadMap = new Map(leadRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const pvMap     = new Map(pageViewRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const chatMap   = new Map(chatRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const leadMap   = new Map(leadRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
+    const signupMap = new Map(signupRows.map(r => [String(r.day).slice(0, 10), Number(r.count)]));
 
     // Build response array filling in zeros for days with no data
     const points = [];
@@ -106,9 +114,10 @@ router.get('/chart', apiLimiter, async (req: Request, res: Response, next: NextF
       const key = d.toISOString().split('T')[0];
       points.push({
         date:     key,
-        visitors: pvMap.get(key)   ?? 0,
-        chats:    chatMap.get(key) ?? 0,
-        leads:    leadMap.get(key) ?? 0,
+        visitors: pvMap.get(key)     ?? 0,
+        chats:    chatMap.get(key)   ?? 0,
+        leads:    leadMap.get(key)   ?? 0,
+        signups:  signupMap.get(key) ?? 0,
       });
     }
 

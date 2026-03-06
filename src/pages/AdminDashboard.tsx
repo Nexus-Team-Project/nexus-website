@@ -28,6 +28,7 @@ interface ChartPoint {
   visitors: number;
   chats: number;
   leads: number;
+  signups: number;
 }
 
 interface Visitor {
@@ -161,10 +162,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
 
   if (!data.length) return <div className="h-48 flex items-center justify-center text-white/30 text-sm">No data</div>;
 
-  const maxV = Math.max(...data.map(d => d.visitors), 1);
-  const maxC = Math.max(...data.map(d => d.chats), 1);
-  const maxL = Math.max(...data.map(d => d.leads), 1);
-  const overallMax = Math.max(maxV, maxC, maxL, 1);
+  const overallMax = Math.max(...data.map(d => Math.max(d.visitors, d.chats, d.leads, d.signups)), 1);
 
   const w = 700;
   const h = 160;
@@ -176,7 +174,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
   const innerH = h - padT - padB;
   const step = innerW / Math.max(data.length - 1, 1);
 
-  const line = (key: 'visitors' | 'chats' | 'leads') =>
+  const line = (key: 'visitors' | 'chats' | 'leads' | 'signups') =>
     data.map((d, i) => {
       const x = padL + i * step;
       const y = padT + innerH - (d[key] / overallMax) * innerH;
@@ -185,7 +183,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
 
   const xLabels = data
     .filter((_, i) => i % Math.ceil(data.length / 7) === 0 || i === data.length - 1)
-    .map((d, _, arr) => ({
+    .map((d) => ({
       label: new Date(d.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       x: padL + data.indexOf(d) * step,
     }));
@@ -194,6 +192,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
     { key: 'visitors' as const, color: '#8b5cf6', label: 'Visitors' },
     { key: 'chats' as const, color: '#06b6d4', label: 'Chats' },
     { key: 'leads' as const, color: '#10b981', label: 'Leads' },
+    { key: 'signups' as const, color: '#f59e0b', label: 'Signups' },
   ];
 
   return (
