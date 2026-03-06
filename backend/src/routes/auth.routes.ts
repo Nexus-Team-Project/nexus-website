@@ -106,7 +106,7 @@ router.post(
         result = await AuthService.googleAuth(req.body.idToken, meta);
       }
       res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
-      res.json({ accessToken: result.accessToken });
+      res.json({ accessToken: result.accessToken, isNew: result.isNew ?? false });
     } catch (err) {
       next(err);
     }

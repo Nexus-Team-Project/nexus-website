@@ -42,20 +42,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const googleLogin = useCallback(async (accessToken: string): Promise<AuthUser> => {
-    const data = await api.post<{ accessToken: string }>('/api/auth/google', { accessToken });
+    const data = await api.post<{ accessToken: string; isNew?: boolean }>('/api/auth/google', { accessToken });
     setAccessToken(data.accessToken);
     const profile = await api.get<AuthUser>('/api/auth/me');
     setUser(profile);
     // Identity resolution — cannot use useAnalytics hook here (circular dep), call api directly
+    // Fire User_Signed_Up for new Google accounts, User_Logged_In for returning users
     void api.post('/api/analytics/track', {
       anonymousId: getVisitorId(),
       userId: profile.id,
-      eventName: 'User_Logged_In',
+      eventName: data.isNew ? 'User_Signed_Up' : 'User_Logged_In',
       channel: 'PRODUCT',
       properties: { method: 'google' },
       context: {},
       sentAt: new Date().toISOString(),
-      mergeSource: 'oauth',
+      mergeSource: data.isNew ? 'signup' : 'oauth',
     }).catch(() => {});
     return profile;
   }, []);
