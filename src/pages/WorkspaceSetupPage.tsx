@@ -26,15 +26,20 @@ export default function WorkspaceSetupPage() {
   const { direction } = useLanguage();
   const navigate = useNavigate();
 
-  const dashboardPath = direction === 'rtl' ? '/he/dashboard' : '/dashboard';
-  const homePath = direction === 'rtl' ? '/he' : '/';
+  const isRtl = direction === 'rtl';
+  const dashboardPath = isRtl ? '/he/dashboard' : '/dashboard';
+  const adminPath = isRtl ? '/he/admin' : '/admin';
+  const homePath = isRtl ? '/he' : '/';
 
-  // If already completed onboarding, skip to dashboard
+  const getPostOnboardingPath = () =>
+    (user?.role === 'ADMIN' || user?.role === 'AGENT') ? adminPath : dashboardPath;
+
+  // If already completed onboarding, skip to the right dashboard
   useEffect(() => {
     if (user?.onboardingDone) {
-      navigate(dashboardPath, { replace: true });
+      navigate(getPostOnboardingPath(), { replace: true });
     }
-  }, [user, dashboardPath, navigate]);
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleWizardComplete = async (data: OnboardingData) => {
     setOnboardingData(data);
@@ -88,8 +93,8 @@ export default function WorkspaceSetupPage() {
           <ScheduleStep
             user={user}
             onboardingData={onboardingData}
-            onBackToSite={() => navigate(dashboardPath)}
-            onExplore={() => navigate(dashboardPath)}
+            onBackToSite={() => navigate(getPostOnboardingPath())}
+            onExplore={() => navigate(getPostOnboardingPath())}
           />
         )}
       </div>
