@@ -41,10 +41,11 @@ async function sendMail(options: { to: string; toName?: string; subject: string;
   console.log(`📧  Sending email to ${options.to}, subject: "${options.subject}", html length: ${options.html?.length ?? 0}`);
   try {
     const token = await getAccessToken();
+    const plainText = options.text ?? options.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const body = JSON.stringify({
       email: {
-        html: options.html,
-        text: options.text ?? options.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+        html: Buffer.from(options.html, 'utf8').toString('base64'),
+        text: Buffer.from(plainText, 'utf8').toString('base64'),
         subject: options.subject,
         from: { name: FROM_NAME, email: FROM_EMAIL },
         to: [{ name: options.toName ?? options.to, email: options.to }],
