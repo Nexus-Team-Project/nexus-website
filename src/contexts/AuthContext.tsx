@@ -86,9 +86,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Navigate to the destination that was saved before the Google redirect.
           // window.location.replace is used because useNavigate isn't available here
           // (AuthContext lives outside the Router boundary).
-          const redirect = sessionStorage.getItem('google_oauth_redirect');
           sessionStorage.removeItem('google_oauth_redirect');
-          window.location.replace(redirect ?? '/');
+          const lang = window.location.pathname.startsWith('/he') ? '/he' : '';
+          let dest: string;
+          if (profile.role === 'ADMIN') {
+            dest = `${lang}/admin`;
+          } else if (profile.onboardingDone) {
+            dest = `${lang}/dashboard`;
+          } else {
+            dest = `${lang}/workspace`;
+          }
+          window.location.replace(dest);
         })
         .catch(console.error)
         .finally(() => setIsLoading(false));
