@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import * as PaymentService from '../services/payment.service';
+import { ingest } from '../services/analytics.service';
 
 const router = Router();
 
@@ -39,6 +40,19 @@ router.post(
         ...req.body,
         userId,
       });
+      void ingest({
+        anonymousId: (req.headers['x-anonymous-id'] as string | undefined) ?? `anon_order_${result.orderId}`,
+        userId,
+        eventName: 'Payment_Initiated',
+        channel: 'PRODUCT',
+        properties: {
+          order_id: result.orderId,
+          amount_cents: result.totalAmount,
+          currency: req.body.currency ?? 'ILS',
+          items_count: (req.body.items as unknown[]).length,
+        },
+        context: { ip: req.ip, userAgent: req.headers['user-agent'] ?? '' },
+      }).catch(() => {});
       res.status(201).json(result);
     } catch (err) {
       next(err);
