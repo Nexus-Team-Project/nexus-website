@@ -44,7 +44,7 @@ async function sendMail(options: { to: string; toName?: string; subject: string;
     const plainText = options.text ?? options.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     const body = JSON.stringify({
       email: {
-        html: options.html,
+        html: Buffer.from(options.html, 'utf8').toString('base64'),
         text: plainText,
         subject: options.subject,
         from: { name: FROM_NAME, email: FROM_EMAIL },
