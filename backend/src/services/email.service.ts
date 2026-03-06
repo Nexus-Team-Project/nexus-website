@@ -105,15 +105,24 @@ export async function sendVerificationEmail(
   email: string,
   fullName: string,
   rawToken: string,
+  language: 'en' | 'he' = 'en',
 ) {
-  const verifyUrl = `${FRONTEND}/verify-email?token=${rawToken}`;
+  const prefix = language === 'he' ? '/he' : '';
+  const verifyUrl = `${FRONTEND}${prefix}/verify-email?token=${rawToken}`;
   const logoUrl = `${FRONTEND}/nexus-logo-black.png`;
-  await sendMail({
-    to: email,
-    toName: fullName,
-    subject: 'ברוכים הבאים לנקסוס — אימות חשבון',
-    text: `שלום ${fullName},\n\nברוכים הבאים לנקסוס!\n\nיש לאמת את כתובת המייל כדי להפעיל את החשבון:\n\n${verifyUrl}\n\nהקישור בתוקף ל-24 שעות.\n\nאם לא יצרת חשבון, ניתן להתעלם מהמייל.`,
-    html: `<!doctype html>
+
+  const isHe = language === 'he';
+
+  const subject = isHe
+    ? 'ברוכים הבאים לנקסוס — אימות חשבון'
+    : 'Welcome to Nexus — Verify Your Account';
+
+  const text = isHe
+    ? `ברוכים הבאים לנקסוס!\n\nיש לאמת את כתובת המייל כדי להפעיל את החשבון:\n\n${verifyUrl}\n\nאם לא יצרת חשבון, ניתן להתעלם מהמייל.`
+    : `Welcome to Nexus!\n\nPlease verify your email to activate your account:\n\n${verifyUrl}\n\nIf you didn't create an account, you can ignore this email.`;
+
+  const html = isHe
+    ? `<!doctype html>
 <html lang="he" dir="rtl">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
@@ -124,7 +133,7 @@ export async function sendVerificationEmail(
   <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus" />
   <h1 style="margin:0;color:#111;font-size:26px;">ברוכים הבאים לנקסוס</h1>
   <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
-    שלום ${fullName},<br>עוד רגע מתחילים.<br>יש רק לאמת את כתובת המייל כדי להפעיל את החשבון.
+    עוד רגע מתחילים.<br>יש רק לאמת את כתובת המייל כדי להפעיל את החשבון.
   </p>
 </td></tr>
 <tr><td align="center" style="padding:30px 0;">
@@ -136,16 +145,16 @@ export async function sendVerificationEmail(
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;padding:18px;margin-top:10px;">
   <tr><td style="font-size:14px;color:#333;line-height:1.9;">
     <strong>לאחר האימות תוכלו:</strong><br><br>
-    &#10004; להקים מועדון הטבות דיגיטלי<br>
-    &#10004; להוסיף הטבות לחברי הקהילה<br>
-    &#10004; לנהל משתמשים והרשאות<br>
-    &#10004; לעקוב אחרי פעילות ורכישות
+    ✔ להקים מועדון הטבות דיגיטלי<br>
+    ✔ להוסיף הטבות לחברי הקהילה<br>
+    ✔ לנהל משתמשים והרשאות<br>
+    ✔ לעקוב אחרי פעילות ורכישות
   </td></tr></table>
 </td></tr>
 <tr><td align="center" style="padding-top:30px;">
   <div style="font-size:13px;color:#777;line-height:1.7;">
-    שלב 1 &#10003; יצירת חשבון<br>
-    שלב 2 &#8594; אימות מייל<br>
+    שלב 1 ✓ יצירת חשבון<br>
+    שלב 2 → אימות מייל<br>
     שלב 3 &nbsp;&nbsp; התחלה בדאשבורד
   </div>
 </td></tr>
@@ -155,13 +164,62 @@ export async function sendVerificationEmail(
 </td></tr>
 <tr><td align="center">
   <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
-    קישור זה תקף ל-24 שעות מטעמי אבטחה.<br>אם לא ניסית ליצור חשבון ניתן להתעלם מהמייל.
+    קישור זה תקף לזמן מוגבל מטעמי אבטחה.<br>אם לא ניסית ליצור חשבון ניתן להתעלם מהמייל.
   </p>
 </td></tr>
 </table>
 </td></tr></table>
-</body></html>`,
-  });
+</body></html>`
+    : `<!doctype html>
+<html lang="en" dir="ltr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:40px 20px;">
+<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<tr><td align="center">
+  <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus" />
+  <h1 style="margin:0;color:#111;font-size:26px;">Welcome to Nexus</h1>
+  <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
+    Almost there.<br>Just verify your email to activate your account.
+  </p>
+</td></tr>
+<tr><td align="center" style="padding:30px 0;">
+  <a href="${verifyUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
+    Verify &amp; Continue to Nexus
+  </a>
+</td></tr>
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;padding:18px;margin-top:10px;">
+  <tr><td style="font-size:14px;color:#333;line-height:1.9;">
+    <strong>After verifying you can:</strong><br><br>
+    ✔ Set up a digital loyalty club<br>
+    ✔ Add perks for your community members<br>
+    ✔ Manage users and permissions<br>
+    ✔ Track activity and purchases
+  </td></tr></table>
+</td></tr>
+<tr><td align="center" style="padding-top:30px;">
+  <div style="font-size:13px;color:#777;line-height:1.7;">
+    Step 1 ✓ Account created<br>
+    Step 2 → Verify email<br>
+    Step 3 &nbsp;&nbsp; Start on dashboard
+  </div>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:13px;color:#888;margin-top:25px;">If the button doesn't work, use this link:</p>
+  <p style="font-size:13px;color:#444;word-break:break-all;">${verifyUrl}</p>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
+    This link is valid for a limited time for security reasons.<br>If you didn't create an account, you can ignore this email.
+  </p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+  await sendMail({ to: email, toName: fullName, subject, text, html });
 }
 
 // ─── Password reset ────────────────────────────────────────
@@ -170,34 +228,85 @@ export async function sendPasswordResetEmail(
   email: string,
   fullName: string,
   rawToken: string,
+  language: 'en' | 'he' = 'en',
 ) {
-  const resetUrl = `${FRONTEND}/reset-password?token=${rawToken}`;
-  await sendMail({
-    to: email,
-    toName: fullName,
-    subject: 'איפוס סיסמה — Nexus',
-    text: `שלום ${fullName},\n\nקיבלנו בקשה לאיפוס הסיסמה שלך.\n\nלאיפוס הסיסמה לחץ על הקישור:\n\n${resetUrl}\n\nהקישור בתוקף לשעה אחת.\n\nאם לא ביקשת לאפס סיסמה, אנא התעלם מהאימייל הזה.`,
-    html: `
-      <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #6366f1;">שלום ${fullName},</h1>
-        <p>קיבלנו בקשה לאיפוס הסיסמה שלך.</p>
-        <p>לחץ על הכפתור למטה לאיפוס הסיסמה (בתוקף לשעה אחת):</p>
-        <a href="${resetUrl}" style="
-          display: inline-block;
-          background: #6366f1;
-          color: white;
-          padding: 12px 24px;
-          border-radius: 8px;
-          text-decoration: none;
-          margin: 16px 0;
-        ">איפוס סיסמה</a>
-        <p style="color: #6b7280; font-size: 14px;">
-          אם לא ביקשת לאפס סיסמה, אנא התעלם מהאימייל הזה.<br/>
-          הקישור יפוג תוך שעה אחת.
-        </p>
-      </div>
-    `,
-  });
+  const prefix = language === 'he' ? '/he' : '';
+  const resetUrl = `${FRONTEND}${prefix}/reset-password?token=${rawToken}`;
+  const logoUrl = `${FRONTEND}/nexus-logo-black.png`;
+
+  const isHe = language === 'he';
+
+  const subject = isHe ? 'איפוס סיסמה — Nexus' : 'Password Reset — Nexus';
+
+  const text = isHe
+    ? `שלום ${fullName},\n\nקיבלנו בקשה לאיפוס הסיסמה שלך.\n\nלאיפוס הסיסמה לחץ על הקישור:\n\n${resetUrl}\n\nהקישור בתוקף לשעה אחת.\n\nאם לא ביקשת לאפס סיסמה, אנא התעלם מהאימייל הזה.`
+    : `Hi ${fullName},\n\nWe received a request to reset your password.\n\nClick the link to reset your password:\n\n${resetUrl}\n\nThis link is valid for one hour.\n\nIf you didn't request a password reset, please ignore this email.`;
+
+  const html = isHe
+    ? `<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:40px 20px;">
+<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<tr><td align="center">
+  <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus" />
+  <h1 style="margin:0;color:#111;font-size:26px;">איפוס סיסמה</h1>
+  <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
+    שלום ${fullName},<br>קיבלנו בקשה לאיפוס הסיסמה שלך.
+  </p>
+</td></tr>
+<tr><td align="center" style="padding:30px 0;">
+  <a href="${resetUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
+    איפוס סיסמה
+  </a>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:13px;color:#888;margin-top:25px;">אם הכפתור לא עובד ניתן להיכנס דרך הקישור:</p>
+  <p style="font-size:13px;color:#444;word-break:break-all;">${resetUrl}</p>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
+    הקישור תקף לשעה אחת מטעמי אבטחה.<br>אם לא ביקשת לאפס סיסמה, ניתן להתעלם מהמייל.
+  </p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`
+    : `<!doctype html>
+<html lang="en" dir="ltr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:40px 20px;">
+<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<tr><td align="center">
+  <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus" />
+  <h1 style="margin:0;color:#111;font-size:26px;">Password Reset</h1>
+  <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
+    Hi ${fullName},<br>We received a request to reset your password.
+  </p>
+</td></tr>
+<tr><td align="center" style="padding:30px 0;">
+  <a href="${resetUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
+    Reset Password
+  </a>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:13px;color:#888;margin-top:25px;">If the button doesn't work, use this link:</p>
+  <p style="font-size:13px;color:#444;word-break:break-all;">${resetUrl}</p>
+</td></tr>
+<tr><td align="center">
+  <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
+    This link is valid for one hour for security reasons.<br>If you didn't request a password reset, you can ignore this email.
+  </p>
+</td></tr>
+</table>
+</td></tr></table>
+</body></html>`;
+
+  await sendMail({ to: email, toName: fullName, subject, text, html });
 }
 
 // ─── Daily digest ──────────────────────────────────────────

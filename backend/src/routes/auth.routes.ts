@@ -27,6 +27,7 @@ const registerSchema = z.object({
     password: z.string().min(8).max(128),
     country: z.string().length(2).optional(),
     emailUpdates: z.boolean().optional(),
+    language: z.enum(['en', 'he']).optional(),
   }),
 });
 
@@ -41,7 +42,8 @@ router.post(
         ipAddress: req.ip,
       });
       // Send verification email instead of welcome email — account is not active until verified
-      EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken).catch(console.error);
+      const lang = (req.body.language as 'en' | 'he') ?? 'en';
+      EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken, lang).catch(console.error);
       res.status(201).json({ requiresVerification: true, email: result.email });
     } catch (err) {
       next(err);
@@ -137,7 +139,10 @@ router.post(
 );
 
 const resendVerificationSchema = z.object({
-  body: z.object({ email: z.string().email() }),
+  body: z.object({
+    email: z.string().email(),
+    language: z.enum(['en', 'he']).optional(),
+  }),
 });
 
 router.post(
@@ -148,7 +153,8 @@ router.post(
     try {
       const result = await AuthService.resendVerification(req.body.email);
       if (result) {
-        EmailService.sendVerificationEmail(result.email, result.fullName, result.rawToken).catch(console.error);
+        const lang = (req.body.language as 'en' | 'he') ?? 'en';
+        EmailService.sendVerificationEmail(result.email, result.fullName, result.rawToken, lang).catch(console.error);
       }
       // Always return 200 to avoid leaking which emails are registered
       res.json({ message: 'If your email is registered and unverified, a new link has been sent.' });
@@ -193,7 +199,10 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 });
 
 const forgotSchema = z.object({
-  body: z.object({ email: z.string().email() }),
+  body: z.object({
+    email: z.string().email(),
+    language: z.enum(['en', 'he']).optional(),
+  }),
 });
 
 router.post(
@@ -206,7 +215,8 @@ router.post(
       if (rawToken) {
         const user = await prisma.user.findUnique({ where: { email: req.body.email } });
         if (user) {
-          EmailService.sendPasswordResetEmail(user.email, user.fullName, rawToken).catch(console.error);
+          const lang = (req.body.language as 'en' | 'he') ?? 'en';
+          EmailService.sendPasswordResetEmail(user.email, user.fullName, rawToken, lang).catch(console.error);
         }
       }
       res.json({ message: 'If the email exists, a reset link has been sent.' });
@@ -297,7 +307,8 @@ router.post(
         return;
       }
       const token = signEmailVerificationToken(user.id, user.email);
-      await EmailService.sendVerificationEmail(user.email, user.fullName, token);
+      const lang = (req.body?.language as 'en' | 'he') ?? 'en';
+      await EmailService.sendVerificationEmail(user.email, user.fullName, token, lang);
       res.json({ message: 'Verification email sent' });
     } catch (err) {
       next(err);

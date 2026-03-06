@@ -31,7 +31,8 @@ export default function VerifyEmailPage() {
           sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
         }
         setStatus('success');
-        setTimeout(() => window.location.replace('/workspace'), 2500);
+        const dest = window.location.pathname.startsWith('/he') ? '/he/workspace' : '/workspace';
+        setTimeout(() => window.location.replace(dest), 2500);
       })
       .catch((err) => {
         if (err?.status === 400) {

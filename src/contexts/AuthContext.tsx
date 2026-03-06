@@ -25,6 +25,7 @@ interface RegisterData {
   password: string;
   country?: string;
   emailUpdates?: boolean;
+  language?: string;
 }
 
 interface AuthContextType {

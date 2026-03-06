@@ -151,7 +151,7 @@ export default function Signup() {
       setVerificationEmail(resendEmail);
       setStep('verify');
       // Auto-trigger resend
-      api.post('/api/auth/resend-verification', { email: resendEmail }).catch(() => {});
+      api.post('/api/auth/resend-verification', { email: resendEmail, language }).catch(() => {});
       setResendCooldown(60);
       const interval = setInterval(() => {
         setResendCooldown((s) => {
@@ -196,7 +196,7 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      const result = await register({ email, fullName, password, country, emailUpdates });
+      const result = await register({ email, fullName, password, country, emailUpdates, language });
       if (result?.requiresVerification) {
         setVerificationEmail(result.email);
         setStep('verify');
@@ -218,7 +218,7 @@ export default function Signup() {
 
   const handleResend = useCallback(async () => {
     if (resendCooldown > 0) return;
-    await api.post('/api/auth/resend-verification', { email: verificationEmail }).catch(() => {});
+    await api.post('/api/auth/resend-verification', { email: verificationEmail, language }).catch(() => {});
     setResendCooldown(60);
     const interval = setInterval(() => {
       setResendCooldown((s) => {

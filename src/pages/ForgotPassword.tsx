@@ -21,7 +21,7 @@ export default function ForgotPassword() {
     setIsLoading(true);
     setError('');
     try {
-      await api.post('/api/auth/forgot-password', { email: email.trim().toLowerCase() });
+      await api.post('/api/auth/forgot-password', { email: email.trim().toLowerCase(), language });
       setSubmitted(true);
     } catch {
       setError(isHe ? 'משהו השתבש. נסה שוב.' : 'Something went wrong. Please try again.');
