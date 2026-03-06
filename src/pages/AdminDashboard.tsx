@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useAnalytics } from '../hooks/useAnalytics';
+import { PRODUCT } from '../lib/analyticsEvents';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -302,6 +304,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { track } = useAnalytics();
 
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week');
   const [metrics, setMetrics] = useState<MetricsData | null>(null);
@@ -340,6 +343,11 @@ export default function AdminDashboard() {
   useEffect(() => {
     void fetchAll();
   }, [fetchAll]);
+
+  useEffect(() => {
+    track(PRODUCT.DASHBOARD_VIEWED, 'PRODUCT', { section: 'admin' });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogout = async () => {
     await logout();
