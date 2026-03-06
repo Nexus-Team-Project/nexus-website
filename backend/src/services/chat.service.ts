@@ -57,6 +57,7 @@ export async function saveMessage(data: {
   sender: 'CUSTOMER' | 'AI' | 'AGENT' | 'SYSTEM';
   channel?: 'WEB' | 'WHATSAPP';
   waMessageId?: string;
+  aiMetadata?: object;
 }) {
   return prisma.chatMessage.create({
     data: {
@@ -65,6 +66,7 @@ export async function saveMessage(data: {
       sender: data.sender,
       channel: data.channel ?? 'WEB',
       waMessageId: data.waMessageId,
+      aiMetadata: data.aiMetadata ?? undefined,
     },
   });
 }
@@ -127,6 +129,44 @@ export async function findSessionByWaThread(waThreadId: string) {
     where: { waThreadId, status: { in: ['OPEN', 'PENDING_HUMAN'] } },
     orderBy: { createdAt: 'desc' },
   });
+}
+
+// ─── Upsert lead from AI chat conversation ────────────────
+
+export async function upsertLeadFromChat(sessionId: string, leadData: Record<string, string>) {
+  const session = await prisma.chatSession.findUnique({ where: { id: sessionId } });
+  if (!session) return;
+
+  // Accumulate lead data in session metadata
+  const existingMeta = (session.metadata as Record<string, unknown>) ?? {};
+  const existingLead = (existingMeta.leadData as Record<string, string>) ?? {};
+  const mergedLead = { ...existingLead, ...leadData };
+
+  await prisma.chatSession.update({
+    where: { id: sessionId },
+    data: { metadata: { ...existingMeta, leadData: mergedLead } },
+  });
+
+  // If we have an email, upsert the Lead record
+  if (mergedLead.email) {
+    await prisma.lead.upsert({
+      where: { id: existingMeta.leadId as string ?? 'no-match' },
+      create: {
+        email: mergedLead.email,
+        fullName: mergedLead.name,
+        company: mergedLead.company,
+        phone: mergedLead.phone,
+        source: 'chat_ai',
+        metadata: { sessionId, visitorId: session.visitorId },
+      },
+      update: {
+        fullName: mergedLead.name ?? undefined,
+        company: mergedLead.company ?? undefined,
+        phone: mergedLead.phone ?? undefined,
+        metadata: { sessionId, visitorId: session.visitorId },
+      },
+    });
+  }
 }
 
 // ─── Update session metadata (Apollo enrichment) ──────────

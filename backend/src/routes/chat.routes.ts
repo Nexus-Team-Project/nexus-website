@@ -109,8 +109,15 @@ router.post(
         // Return customer message confirmation first
         res.status(201).json(customerMsg);
 
-        // Generate AI reply in background
-        AiService.generateReply(sessionId, text, session.messages)
+        // Detect language from session metadata or default to Hebrew
+        const sessionMeta = (session as any).metadata ?? {};
+        const sessionLang = sessionMeta.language?.startsWith?.('en') ? 'en' : 'he';
+
+        // Generate AI reply in background (with visitor + page context)
+        AiService.generateReply(sessionId, text, session.messages, sessionLang, {
+          visitorId: session.visitorId,
+          page: sessionMeta.page,
+        })
           .then(async (aiReply) => {
             if (!aiReply) return;
             const aiMsg = await ChatService.saveMessage({
@@ -118,6 +125,7 @@ router.post(
               text: aiReply.text,
               sender: 'AI',
               channel: 'WEB',
+              aiMetadata: aiReply.aiMetadata,
             });
 
             io.to(`session:${sessionId}`).emit('new_message', {
@@ -126,7 +134,13 @@ router.post(
               sender: aiMsg.sender,
               channel: aiMsg.channel,
               timestamp: aiMsg.createdAt,
+              actions: aiReply.actions,
             });
+
+            // Save lead data if AI extracted any
+            if (aiReply.leadData && Object.keys(aiReply.leadData).length > 0) {
+              ChatService.upsertLeadFromChat(sessionId, aiReply.leadData).catch(console.error);
+            }
 
             // Auto-escalate if AI signals it
             if (aiReply.shouldEscalate) {
@@ -156,7 +170,35 @@ router.post(
       const session = await ChatService.escalateSession(req.params.id);
       const io = getIO();
       io.to(`session:${req.params.id}`).emit('mode_changed', { mode: 'HUMAN' });
-      NotificationService.handleChatEscalated({ sessionId: req.params.id }).catch(console.error);
+
+      // Auto-extract lead data + detect topic on escalation (async, non-blocking)
+      const fullSession = await ChatService.getSession(req.params.id);
+      if (fullSession?.messages) {
+        const msgs = fullSession.messages.map((m) => ({ sender: m.sender, text: m.text }));
+        const topic = AiService.detectEscalationTopic(msgs);
+
+        // Get last 5 messages for WhatsApp handoff context
+        const recentMsgs = msgs.slice(-5).map((m) => ({
+          sender: m.sender === 'CUSTOMER' ? 'לקוח' : 'AI',
+          text: m.text.slice(0, 200),
+        }));
+        const page = (fullSession.metadata as Record<string, unknown>)?.page as string | undefined;
+
+        AiService.extractLeadData(msgs).then(async (leadData) => {
+          if (Object.keys(leadData).length > 0) {
+            await ChatService.upsertLeadFromChat(req.params.id, leadData);
+          }
+          NotificationService.handleChatEscalated({
+            sessionId: req.params.id, topic, leadData, recentMessages: recentMsgs, page,
+          }).catch(console.error);
+        }).catch(() => {
+          NotificationService.handleChatEscalated({
+            sessionId: req.params.id, topic, recentMessages: recentMsgs, page,
+          }).catch(console.error);
+        });
+      } else {
+        NotificationService.handleChatEscalated({ sessionId: req.params.id }).catch(console.error);
+      }
       res.json(session);
     } catch (err) {
       next(err);
@@ -219,7 +261,8 @@ router.post(
   validate(rateSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rating = await (await import('../config/database')).prisma.aiRating.upsert({
+      const { prisma: db } = await import('../config/database');
+      const rating = await db.aiRating.upsert({
         where: { messageId: req.params.id },
         create: {
           messageId: req.params.id,
@@ -235,6 +278,51 @@ router.post(
           ratedBy: req.user?.sub,
         },
       });
+
+      // Auto-generate few-shot example from low-rated corrections (Phase 8B)
+      if (req.body.rating <= 2 && req.body.correction) {
+        (async () => {
+          try {
+            // Find the customer message that preceded this AI message
+            const aiMessage = await db.chatMessage.findUnique({
+              where: { id: req.params.id },
+              select: { sessionId: true, createdAt: true },
+            });
+            if (!aiMessage) return;
+
+            const customerMsg = await db.chatMessage.findFirst({
+              where: {
+                sessionId: aiMessage.sessionId,
+                sender: 'CUSTOMER',
+                createdAt: { lt: aiMessage.createdAt },
+              },
+              orderBy: { createdAt: 'desc' },
+            });
+            if (!customerMsg) return;
+
+            // Generate embedding for the example
+            const embedding = await AiService.embedText(
+              `${customerMsg.text}\n${req.body.correction}`,
+            );
+
+            // Create auto-generated few-shot example
+            await db.aiExample.create({
+              data: {
+                question: customerMsg.text,
+                answer: req.body.correction,
+                category: 'auto_correction',
+                language: 'he',
+                isActive: true,
+                embedding,
+              },
+            });
+            console.log('[AI] Auto-created example from correction for message', req.params.id);
+          } catch (e) {
+            console.error('[AI] Failed to auto-create example from correction:', e);
+          }
+        })();
+      }
+
       res.json(rating);
     } catch (err) {
       next(err);

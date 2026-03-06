@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -17,8 +17,6 @@ const GlobalSection = lazy(() => import('../components/GlobalSection'));
 const Testimonials = lazy(() => import('../components/Testimonials'));
 const CTA = lazy(() => import('../components/CTA'));
 const Footer = lazy(() => import('../components/Footer'));
-const ContactSalesButton = lazy(() => import('../components/ContactSalesButton'));
-const LiveChat = lazy(() => import('../components/LiveChat'));
 
 // ─── Skeleton Components ──────────────────────────────────────────────────────
 
@@ -212,7 +210,6 @@ function FooterSkeleton() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function HomeContent() {
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const { t, direction, language } = useLanguage();
   const { track } = useAnalytics();
 
@@ -475,23 +472,6 @@ export default function HomeContent() {
           <FooterSkeleton />
         )}
       </div>
-
-      {/* Contact Sales Button - only show when chat is closed */}
-      {!isChatOpen && (
-        <Suspense fallback={null}>
-          <ContactSalesButton onClick={() => setIsChatOpen(true)} />
-        </Suspense>
-      )}
-
-      {/* Live Chat */}
-      {isChatOpen && (
-        <Suspense fallback={null}>
-          <LiveChat
-            onClose={() => setIsChatOpen(false)}
-            onMinimize={() => setIsChatOpen(false)}
-          />
-        </Suspense>
-      )}
 
       {/* Language Switcher */}
       <LanguageSwitcher />

@@ -197,6 +197,7 @@ model ChatMessage {
   text        String         @db.Text
   waMessageId String?
   status      String?
+  aiMetadata  Json?          // chunks used, similarity scores, token usage
   createdAt   DateTime       @default(now())
 
   rating AiRating?
@@ -237,6 +238,7 @@ model AiExample {
   category  String?
   language  String   @default("he")
   isActive  Boolean  @default(true)
+  embedding Float[]  // for similarity-matched retrieval
   createdAt DateTime @default(now())
 
   @@index([isActive])
@@ -252,6 +254,19 @@ model AiRating {
   correction String?     @db.Text
   ratedBy    String?
   createdAt  DateTime    @default(now())
+}
+
+model KnowledgeGap {
+  id        String   @id @default(cuid())
+  question  String   @db.Text
+  bestScore Float
+  chunkId   String?
+  sessionId String?
+  resolved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([resolved])
+  @@index([createdAt])
 }
 
 // ─── ANALYTICS ────────────────────────────────────────────────────
