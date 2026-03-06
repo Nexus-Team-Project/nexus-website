@@ -60,6 +60,15 @@ interface RevenueData {
   points: Array<{ date: string; revenue: number; transactions: number }>;
 }
 
+interface Lead {
+  id: string;
+  name: string | null;
+  email: string;
+  company: string | null;
+  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'LOST';
+  createdAt: string;
+}
+
 // ─── Sparkline (SVG) ─────────────────────────────────────
 
 function Sparkline({
@@ -312,6 +321,7 @@ export default function AdminDashboard() {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [aiStats, setAiStats] = useState<AiStats | null>(null);
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -320,18 +330,20 @@ export default function AdminDashboard() {
     if (showRefreshing) setRefreshing(true);
     setError(null);
     try {
-      const [m, c, v, ai, rev] = await Promise.all([
+      const [m, c, v, ai, rev, lds] = await Promise.all([
         api.get<MetricsData>(`/api/dashboard/metrics?period=${period}`),
         api.get<ChartPoint[]>(`/api/dashboard/chart?days=${period === 'day' ? 1 : period === 'month' ? 30 : 7}`),
         api.get<Visitor[]>('/api/dashboard/visitors?limit=10'),
         api.get<AiStats>('/api/dashboard/ai-stats'),
         api.get<RevenueData>(`/api/dashboard/revenue?days=${period === 'day' ? 1 : period === 'month' ? 30 : 7}`),
+        api.get<Lead[]>('/api/leads?limit=10').catch(() => [] as Lead[]),
       ]);
       setMetrics(m);
       setChart(c);
       setVisitors(v);
       setAiStats(ai);
       setRevenue(rev);
+      setLeads(lds);
     } catch (e: any) {
       setError(e?.error ?? 'Failed to load dashboard data');
     } finally {
@@ -562,6 +574,49 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+
+        {/* Leads table */}
+        {leads.length > 0 && (
+          <div className="mt-6 bg-white/5 border border-white/10 rounded-2xl p-6 overflow-hidden">
+            <div className="flex items-center gap-2 mb-4">
+              <TrendingUp size={16} className="text-emerald-400" />
+              <h2 className="text-sm font-semibold text-white/70">Recent Leads</h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-white/30 border-b border-white/10">
+                    <th className="text-left pb-2 font-medium">Name</th>
+                    <th className="text-left pb-2 font-medium">Email</th>
+                    <th className="text-left pb-2 font-medium">Company</th>
+                    <th className="text-left pb-2 font-medium">Status</th>
+                    <th className="text-right pb-2 font-medium">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {leads.map(lead => (
+                    <tr key={lead.id} className="hover:bg-white/5 transition-colors">
+                      <td className="py-2 pr-4 text-white/80">{lead.name ?? '—'}</td>
+                      <td className="py-2 pr-4 text-white/60 font-mono text-[10px]">{lead.email}</td>
+                      <td className="py-2 pr-4 text-white/60">{lead.company ?? '—'}</td>
+                      <td className="py-2 pr-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          lead.status === 'NEW'       ? 'bg-blue-500/20 text-blue-300' :
+                          lead.status === 'CONTACTED' ? 'bg-amber-500/20 text-amber-300' :
+                          lead.status === 'QUALIFIED' ? 'bg-green-500/20 text-green-300' :
+                                                        'bg-red-500/20 text-red-300'
+                        }`}>{lead.status}</span>
+                      </td>
+                      <td className="py-2 text-right text-white/40">
+                        {new Date(lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
