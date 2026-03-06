@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { api } from '../lib/api';
 import {
   Users, MessageSquare, TrendingUp, Percent,
-  Star, Brain, CreditCard, RefreshCw, LogOut,
+  Star, Brain, CreditCard, RefreshCw, LogOut, Bell,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -58,6 +58,14 @@ interface RevenueData {
   total_revenue: number;
   total_transactions: number;
   points: Array<{ date: string; revenue: number; transactions: number }>;
+}
+
+interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  createdAt: string;
 }
 
 interface Lead {
@@ -322,6 +330,8 @@ export default function AdminDashboard() {
   const [aiStats, setAiStats] = useState<AiStats | null>(null);
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -330,13 +340,14 @@ export default function AdminDashboard() {
     if (showRefreshing) setRefreshing(true);
     setError(null);
     try {
-      const [m, c, v, ai, rev, lds] = await Promise.all([
+      const [m, c, v, ai, rev, lds, notifs] = await Promise.all([
         api.get<MetricsData>(`/api/dashboard/metrics?period=${period}`),
         api.get<ChartPoint[]>(`/api/dashboard/chart?days=${period === 'day' ? 1 : period === 'month' ? 30 : 7}`),
         api.get<Visitor[]>('/api/dashboard/visitors?limit=10'),
         api.get<AiStats>('/api/dashboard/ai-stats'),
         api.get<RevenueData>(`/api/dashboard/revenue?days=${period === 'day' ? 1 : period === 'month' ? 30 : 7}`),
         api.get<Lead[]>('/api/leads?limit=10').catch(() => [] as Lead[]),
+        api.get<Notification[]>('/api/dashboard/notifications').catch(() => [] as Notification[]),
       ]);
       setMetrics(m);
       setChart(c);
@@ -344,6 +355,7 @@ export default function AdminDashboard() {
       setAiStats(ai);
       setRevenue(rev);
       setLeads(lds);
+      setNotifications(notifs);
     } catch (e: any) {
       setError(e?.error ?? 'Failed to load dashboard data');
     } finally {
@@ -364,6 +376,14 @@ export default function AdminDashboard() {
   const handleLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const markAllRead = async () => {
+    if (!notifications.length) return;
+    const ids = notifications.map(n => n.id);
+    await api.post('/api/dashboard/notifications/read', { ids }).catch(() => {});
+    setNotifications([]);
+    setNotifOpen(false);
   };
 
   if (loading) {
@@ -403,6 +423,50 @@ export default function AdminDashboard() {
           >
             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
           </button>
+          {/* Notifications bell */}
+          <div className="relative">
+            <button
+              onClick={() => setNotifOpen(o => !o)}
+              className="relative p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all"
+              title="Notifications"
+            >
+              <Bell size={16} />
+              {notifications.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
+                  {notifications.length > 9 ? '9+' : notifications.length}
+                </span>
+              )}
+            </button>
+
+            {notifOpen && (
+              <div className="absolute right-0 top-10 w-80 bg-gray-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+                  <span className="text-sm font-semibold text-white">Notifications</span>
+                  {notifications.length > 0 && (
+                    <button onClick={markAllRead} className="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-72 overflow-y-auto divide-y divide-white/5">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-6 text-center text-white/30 text-sm">All caught up!</div>
+                  ) : (
+                    notifications.map(n => (
+                      <div key={n.id} className="px-4 py-3">
+                        <div className="text-sm text-white/80">{n.title}</div>
+                        {n.body && <div className="text-xs text-white/40 mt-0.5">{n.body}</div>}
+                        <div className="text-[10px] text-white/30 mt-1">
+                          {new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
           <span className="text-sm text-white/40">{user?.fullName}</span>
           <button onClick={handleLogout} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-all" title="Logout">
             <LogOut size={16} />
