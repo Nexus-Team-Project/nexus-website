@@ -33,7 +33,7 @@ export default function Login() {
   const adminPath = isHe ? '/he/admin' : '/admin';
 
   const getPostLoginPath = (user: { role: string; onboardingDone: boolean }) => {
-    if (user.role === 'ADMIN' || user.role === 'AGENT') return adminPath;
+    if (user.role === 'ADMIN') return adminPath;
     if (user.onboardingDone) return dashboardPath;
     return workspacePath;
   };
