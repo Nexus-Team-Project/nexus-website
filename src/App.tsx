@@ -76,21 +76,71 @@ function PageLoader() {
 /** Chat widget rendered outside Routes so it persists across navigation. */
 function ChatWidget() {
   const { pathname } = useLocation();
-  const [isChatOpen, setIsChatOpen] = useState(false);
   const language = pathname.startsWith('/he') ? 'he' : 'en';
+  const isHebrew = language === 'he';
+
+  // Three states: closed (initial), open (chat visible), minimized (compact bar)
+  type ChatState = 'closed' | 'open' | 'minimized';
+  const [chatState, setChatState] = useState<ChatState>(() => {
+    // If there's an active session in sessionStorage, start minimized
+    return sessionStorage.getItem('nexus-chat-session') ? 'minimized' : 'closed';
+  });
+  const [chatSessionId, setChatSessionId] = useState<string | null>(
+    () => sessionStorage.getItem('nexus-chat-session'),
+  );
+
+  const handleSessionCreated = (id: string) => {
+    setChatSessionId(id);
+    sessionStorage.setItem('nexus-chat-session', id);
+  };
+
+  const handleClose = () => {
+    // Full close — clear session so next open starts fresh
+    setChatState('closed');
+    setChatSessionId(null);
+    sessionStorage.removeItem('nexus-chat-session');
+  };
+
+  const handleMinimize = () => {
+    // Minimize — keep session so it can be resumed
+    setChatState('minimized');
+  };
 
   return (
     <LanguageProvider language={language}>
-      {!isChatOpen && (
+      {chatState === 'closed' && (
         <Suspense fallback={null}>
-          <ContactSalesButton onClick={() => setIsChatOpen(true)} />
+          <ContactSalesButton onClick={() => setChatState('open')} />
         </Suspense>
       )}
-      {isChatOpen && (
+      {chatState === 'minimized' && (
+        <button
+          onClick={() => setChatState('open')}
+          className="fixed bottom-0 z-50 bg-white rounded-t-2xl px-5 py-3 flex items-center gap-3 border border-b-0 border-slate-200 hover:bg-slate-50 transition-all cursor-pointer"
+          style={{
+            [isHebrew ? 'left' : 'right']: '1.5rem',
+            boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
+          }}
+        >
+          <div className="relative">
+            <img src="/nexus-favicon.png" alt="" className="w-8 h-8 rounded-full" />
+            <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+          </div>
+          <div className={isHebrew ? 'text-right' : 'text-left'}>
+            <span className="text-sm font-semibold text-slate-800 block">Nexus AI</span>
+            <span className="text-[11px] text-slate-500">
+              {isHebrew ? 'לחץ להמשך שיחה' : 'Click to continue chat'}
+            </span>
+          </div>
+        </button>
+      )}
+      {chatState === 'open' && (
         <Suspense fallback={null}>
           <LiveChat
-            onClose={() => setIsChatOpen(false)}
-            onMinimize={() => setIsChatOpen(false)}
+            onClose={handleClose}
+            onMinimize={handleMinimize}
+            existingSessionId={chatSessionId}
+            onSessionCreated={handleSessionCreated}
           />
         </Suspense>
       )}
