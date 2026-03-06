@@ -40,9 +40,8 @@ export default function WorkspaceSetupPage() {
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleWizardComplete = async (data: OnboardingData) => {
-    setPhase('animation');
-    // Save to backend (fire-and-forget — animation plays while this runs)
-    api.post('/api/user/workspace/setup', {
+    // Persist to backend first so onboardingDone=true is in DB before redirect
+    await api.post('/api/user/workspace/setup', {
       org_name: data.org_name,
       website: data.website,
       business_desc: data.business_desc,
@@ -50,6 +49,7 @@ export default function WorkspaceSetupPage() {
       phone: data.phone,
       role: data.role,
     }).catch(console.error);
+    setPhase('animation');
   };
 
   const dashFilter = 'blur(0.4px) brightness(0.60)';
@@ -79,7 +79,7 @@ export default function WorkspaceSetupPage() {
         )}
 
         {phase === 'animation' && (
-          <SetupAnimation onComplete={() => window.location.replace(getPostOnboardingPath())} />
+          <SetupAnimation onComplete={() => navigate('/dashboard', { replace: true })} />
         )}
       </div>
 
