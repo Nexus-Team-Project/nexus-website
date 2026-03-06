@@ -24,6 +24,7 @@ export const PRODUCT = {
   PAYMENT_INITIATED:      'Payment_Initiated',
   PAYMENT_COMPLETED:      'Payment_Completed',
   PAYMENT_FAILED:         'Payment_Failed',
+  PAYMENT_REFUNDED:       'Payment_Refunded',
   FEATURE_USED:           'Feature_Used',
 } as const;
 

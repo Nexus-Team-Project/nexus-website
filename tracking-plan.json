@@ -160,6 +160,15 @@
           }
         },
         {
+          "name": "Payment_Refunded",
+          "trigger": "Stripe charge.refunded webhook",
+          "properties": {
+            "order_id": "string",
+            "amount_cents": "number",
+            "currency": "string"
+          }
+        },
+        {
           "name": "Feature_Used",
           "trigger": "User activates a named product feature",
           "properties": {
