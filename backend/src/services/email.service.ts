@@ -124,52 +124,83 @@ export async function sendVerificationEmail(
   const html = isHe
     ? `<!doctype html>
 <html lang="he" dir="rtl">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>ברוכים הבאים לנקסוס</title></head>
 <body style="margin:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td align="center" style="padding:40px 20px;">
+<tr>
+<td align="center" style="padding:40px 20px;">
 <table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
-<tr><td align="center">
-  <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus" />
-  <h1 style="margin:0;color:#111;font-size:26px;">ברוכים הבאים לנקסוס</h1>
-  <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
-    עוד רגע מתחילים.<br>יש רק לאמת את כתובת המייל כדי להפעיל את החשבון.
-  </p>
-</td></tr>
-<tr><td align="center" style="padding:30px 0;">
-  <a href="${verifyUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
-    אימות והמשך לנקסוס
-  </a>
-</td></tr>
-<tr><td>
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;padding:18px;margin-top:10px;">
-  <tr><td style="font-size:14px;color:#333;line-height:1.9;">
-    <strong>לאחר האימות תוכלו:</strong><br><br>
-    ✔ להקים מועדון הטבות דיגיטלי<br>
-    ✔ להוסיף הטבות לחברי הקהילה<br>
-    ✔ לנהל משתמשים והרשאות<br>
-    ✔ לעקוב אחרי פעילות ורכישות
-  </td></tr></table>
-</td></tr>
-<tr><td align="center" style="padding-top:30px;">
-  <div style="font-size:13px;color:#777;line-height:1.7;">
-    שלב 1 ✓ יצירת חשבון<br>
-    שלב 2 → אימות מייל<br>
-    שלב 3 &nbsp;&nbsp; התחלה בדאשבורד
-  </div>
-</td></tr>
-<tr><td align="center">
-  <p style="font-size:13px;color:#888;margin-top:25px;">אם הכפתור לא עובד ניתן להיכנס דרך הקישור:</p>
-  <p style="font-size:13px;color:#444;word-break:break-all;">${verifyUrl}</p>
-</td></tr>
-<tr><td align="center">
-  <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
-    קישור זה תקף לזמן מוגבל מטעמי אבטחה.<br>אם לא ניסית ליצור חשבון ניתן להתעלם מהמייל.
-  </p>
-</td></tr>
+<tr>
+<td align="center">
+<img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus">
+<h1 style="margin:0;color:#111;font-size:26px;">ברוכים הבאים לנקסוס</h1>
+<p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
+עוד רגע מתחילים.<br>
+יש רק לאמת את כתובת המייל כדי להפעיל את החשבון.
+</p>
+</td>
+</tr>
+<tr>
+<td align="center" style="padding:30px 0;">
+<a href="${verifyUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
+אימות והמשך לנקסוס
+</a>
+</td>
+</tr>
+<tr>
+<td>
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;padding:18px;margin-top:10px;">
+<tr>
+<td style="font-size:14px;color:#333;line-height:1.9;">
+<strong>לאחר האימות תוכלו:</strong>
+<br><br>
+✔ להקים מועדון הטבות דיגיטלי
+<br>
+✔ להוסיף הטבות לחברי הקהילה
+<br>
+✔ לנהל משתמשים והרשאות
+<br>
+✔ לעקוב אחרי פעילות ורכישות
+</td>
+</tr>
 </table>
-</td></tr></table>
-</body></html>`
+</td>
+</tr>
+<tr>
+<td align="center" style="padding-top:30px;">
+<div style="font-size:13px;color:#777;line-height:1.7;">
+שלב 1 ✓ יצירת חשבון
+<br>
+שלב 2 → אימות מייל
+<br>
+שלב 3 התחלה בדאשבורד
+</div>
+</td>
+</tr>
+<tr>
+<td align="center">
+<p style="font-size:13px;color:#888;margin-top:25px;">
+אם הכפתור לא עובד ניתן להיכנס דרך הקישור:
+</p>
+<p style="font-size:13px;color:#444;word-break:break-all;">
+${verifyUrl}
+</p>
+</td>
+</tr>
+<tr>
+<td align="center">
+<p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
+קישור זה תקף לזמן מוגבל מטעמי אבטחה.<br>
+אם לא ניסית ליצור חשבון ניתן להתעלם מהמייל.
+</p>
+</td>
+</tr>
+</table>
+</td>
+</tr>
+</table>
+</body>
+</html>`
     : `<!doctype html>
 <html lang="en" dir="ltr">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>

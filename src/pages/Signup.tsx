@@ -246,7 +246,7 @@ export default function Signup() {
             </div>
           </div>
           <div className="flex-1 flex items-center justify-center px-8">
-            <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-8 w-full max-w-md text-center">
+            <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-8 w-full max-w-md text-center" dir={direction}>
               {/* Email icon */}
               <div className="w-16 h-16 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-5">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -254,18 +254,26 @@ export default function Signup() {
                   <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
                 </svg>
               </div>
-              <h1 className="text-xl font-bold text-slate-800 mb-2">Check your inbox</h1>
-              <p className="text-sm text-slate-500 mb-1">We sent a verification link to</p>
+              <h1 className="text-xl font-bold text-slate-800 mb-2">
+                {isHe ? 'בדקו את תיבת הדואר' : 'Check your inbox'}
+              </h1>
+              <p className="text-sm text-slate-500 mb-1">
+                {isHe ? 'שלחנו קישור אימות אל' : 'We sent a verification link to'}
+              </p>
               <p className="text-sm font-semibold text-slate-700 mb-6">{verificationEmail}</p>
               <p className="text-xs text-slate-400 mb-6">
-                Click the link in the email to activate your account. The link expires in 24 hours.
+                {isHe
+                  ? 'לחצו על הקישור במייל כדי להפעיל את החשבון שלכם. הקישור תקף ל-24 שעות.'
+                  : 'Click the link in the email to activate your account. The link expires in 24 hours.'}
               </p>
               <button
                 onClick={handleResend}
                 disabled={resendCooldown > 0}
                 className="text-sm text-indigo-600 hover:underline disabled:text-slate-400 disabled:no-underline transition-colors"
               >
-                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Didn't get it? Resend email"}
+                {resendCooldown > 0
+                  ? (isHe ? `שליחה חוזרת בעוד ${resendCooldown} שניות` : `Resend in ${resendCooldown}s`)
+                  : (isHe ? 'לא קיבלתם? שלחו שוב' : "Didn't get it? Resend email")}
               </button>
             </div>
           </div>
