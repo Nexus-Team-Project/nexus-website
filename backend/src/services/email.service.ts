@@ -150,16 +150,6 @@ export async function sendVerificationEmail(
 </tr>
 <tr>
 <td align="center">
-<p style="font-size:13px;color:#888;margin-top:25px;">
-אם הכפתור לא עובד ניתן להיכנס דרך הקישור:
-</p>
-<p style="font-size:13px;color:#444;word-break:break-all;">
-${verifyUrl}
-</p>
-</td>
-</tr>
-<tr>
-<td align="center">
 <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
 קישור זה תקף לזמן מוגבל מטעמי אבטחה.<br>
 אם לא ניסית ליצור חשבון ניתן להתעלם מהמייל.
@@ -167,6 +157,12 @@ ${verifyUrl}
 </td>
 </tr>
 </table>
+<p style="font-size:13px;color:#888;margin-top:25px;text-align:center;">
+אם הכפתור לא עובד ניתן להיכנס דרך הקישור:
+</p>
+<p style="font-size:13px;color:#444;word-break:break-all;text-align:center;">
+${verifyUrl}
+</p>
 </td>
 </tr>
 </table>
@@ -199,16 +195,6 @@ Verify &amp; Continue to Nexus
 </tr>
 <tr>
 <td align="center">
-<p style="font-size:13px;color:#888;margin-top:25px;">
-If the button doesn't work, use this link:
-</p>
-<p style="font-size:13px;color:#444;word-break:break-all;">
-${verifyUrl}
-</p>
-</td>
-</tr>
-<tr>
-<td align="center">
 <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
 This link is valid for a limited time for security reasons.<br>
 If you didn't create an account, you can ignore this email.
@@ -216,6 +202,12 @@ If you didn't create an account, you can ignore this email.
 </td>
 </tr>
 </table>
+<p style="font-size:13px;color:#888;margin-top:25px;text-align:center;">
+If the button doesn't work, use this link:
+</p>
+<p style="font-size:13px;color:#444;word-break:break-all;text-align:center;">
+${verifyUrl}
+</p>
 </td>
 </tr>
 </table>
@@ -266,15 +258,13 @@ export async function sendPasswordResetEmail(
   </a>
 </td></tr>
 <tr><td align="center">
-  <p style="font-size:13px;color:#888;margin-top:25px;">אם הכפתור לא עובד ניתן להיכנס דרך הקישור:</p>
-  <p style="font-size:13px;color:#444;word-break:break-all;">${resetUrl}</p>
-</td></tr>
-<tr><td align="center">
   <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
     הקישור תקף לשעה אחת מטעמי אבטחה.<br>אם לא ביקשת לאפס סיסמה, ניתן להתעלם מהמייל.
   </p>
 </td></tr>
 </table>
+<p style="font-size:13px;color:#888;margin-top:25px;text-align:center;">אם הכפתור לא עובד ניתן להיכנס דרך הקישור:</p>
+<p style="font-size:13px;color:#444;word-break:break-all;text-align:center;">${resetUrl}</p>
 </td></tr></table>
 </body></html>`
     : `<!doctype html>
@@ -297,15 +287,13 @@ export async function sendPasswordResetEmail(
   </a>
 </td></tr>
 <tr><td align="center">
-  <p style="font-size:13px;color:#888;margin-top:25px;">If the button doesn't work, use this link:</p>
-  <p style="font-size:13px;color:#444;word-break:break-all;">${resetUrl}</p>
-</td></tr>
-<tr><td align="center">
   <p style="font-size:12px;color:#999;margin-top:30px;line-height:1.6;">
     This link is valid for one hour for security reasons.<br>If you didn't request a password reset, you can ignore this email.
   </p>
 </td></tr>
 </table>
+<p style="font-size:13px;color:#888;margin-top:25px;text-align:center;">If the button doesn't work, use this link:</p>
+<p style="font-size:13px;color:#444;word-break:break-all;text-align:center;">${resetUrl}</p>
 </td></tr></table>
 </body></html>`;
 
