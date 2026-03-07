@@ -211,8 +211,8 @@ export default function ArticleContent() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex gap-12">
           {/* TOC Sidebar — desktop only */}
-          <aside className="hidden lg:block w-64 flex-shrink-0">
-            <nav className="sticky top-24">
+          <aside className="hidden lg:block w-64 flex-shrink-0 self-start sticky top-24">
+            <nav>
               <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">
                 {language === 'he' ? 'תוכן עניינים' : 'Table of Contents'}
               </h4>
