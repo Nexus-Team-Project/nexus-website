@@ -1,4 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { useAnalytics } from './hooks/useAnalytics';
@@ -33,6 +33,50 @@ const ArticlePageHe      = lazy(() => import('./pages/ArticleHe'));
 const PrivacyPolicyPage  = lazy(() => import('./pages/PrivacyPolicyPage'));
 const AccessibilityPage  = lazy(() => import('./pages/AccessibilityPage'));
 const TermsOfUsePage     = lazy(() => import('./pages/TermsOfUsePage'));
+
+const LANG_PREF_KEY = 'nexus-lang-preference';
+
+// ─── Geo-language detection for root route ────────────────
+// Checks stored preference first; falls back to IP geolocation.
+// Default (on failure) is Hebrew.
+function GeoDetectHome() {
+  const navigate = useNavigate();
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(LANG_PREF_KEY);
+    if (stored) {
+      if (stored === 'he') {
+        navigate('/he', { replace: true });
+      } else {
+        setReady(true); // show English home
+      }
+      return;
+    }
+
+    // Detect country via free IP geolocation API
+    fetch('https://ipapi.co/country/')
+      .then((r) => r.text())
+      .then((country) => {
+        const lang = country.trim() === 'IL' ? 'he' : 'en';
+        localStorage.setItem(LANG_PREF_KEY, lang);
+        if (lang === 'he') {
+          navigate('/he', { replace: true });
+        } else {
+          setReady(true);
+        }
+      })
+      .catch(() => {
+        // Default: Hebrew
+        localStorage.setItem(LANG_PREF_KEY, 'he');
+        navigate('/he', { replace: true });
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!ready) return <PageLoader />;
+  return <Home />;
+}
 
 // ─── Global analytics tracker ────────────────────────────
 // Fires Page_Viewed on every route change.
@@ -173,7 +217,7 @@ function App() {
       <RouteAnalytics />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/"         element={<Home />} />
+          <Route path="/"         element={<GeoDetectHome />} />
           <Route path="/he"       element={<HomeHe />} />
           <Route path="/signup"   element={<LanguageProvider language="en"><Signup /></LanguageProvider>} />
           <Route path="/login"    element={<LanguageProvider language="en"><Login /></LanguageProvider>} />

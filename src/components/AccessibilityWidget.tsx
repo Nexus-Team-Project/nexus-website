@@ -43,6 +43,7 @@ const DEFAULT_SETTINGS: A11ySettings = {
 };
 
 const STORAGE_KEY = 'nexus-a11y-settings';
+const BTN_SIZE = 52;
 
 // ─── CSS class application ────────────────────────────────────────────────────
 
@@ -173,6 +174,8 @@ function ToggleRow({ icon, label, checked, onChange, id }: ToggleRowProps) {
 
 export default function AccessibilityWidget() {
   const [open, setOpen] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const [hovering, setHovering] = useState(false);
   const [settings, setSettings] = useState<A11ySettings>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
@@ -182,8 +185,27 @@ export default function AccessibilityWidget() {
     }
   });
 
+  // Position state: { x, y } = top-left of the button (px from viewport top-left)
+  // null = use default bottom-left (24, window.innerHeight - 24 - BTN_SIZE)
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Drag tracking (no re-renders during drag, only on pointer-up)
+  const dragRef = useRef({
+    active: false,
+    moved: false,
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0,
+  });
+
+  // Initialize position to bottom-left after mount
+  useEffect(() => {
+    setPos({ x: 24, y: window.innerHeight - 24 - BTN_SIZE });
+  }, []);
 
   // Apply settings on mount + on change
   useEffect(() => {
@@ -208,7 +230,7 @@ export default function AccessibilityWidget() {
     return () => document.removeEventListener('keydown', handler);
   }, [open]);
 
-  // Close on outside click
+  // Close panel on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -232,15 +254,68 @@ export default function AccessibilityWidget() {
     setSettings(DEFAULT_SETTINGS);
   }, []);
 
+  // ── Drag handlers (pointer events for mouse + touch support) ──────────────
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      // Capture pointer so we get events even when dragging fast
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const currentPos = pos ?? { x: 24, y: window.innerHeight - 24 - BTN_SIZE };
+      dragRef.current = {
+        active: true,
+        moved: false,
+        startX: e.clientX,
+        startY: e.clientY,
+        origX: currentPos.x,
+        origY: currentPos.y,
+      };
+    },
+    [pos],
+  );
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!dragRef.current.active) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      dragRef.current.moved = true;
+      const newX = Math.max(0, Math.min(window.innerWidth - BTN_SIZE, dragRef.current.origX + dx));
+      const newY = Math.max(
+        0,
+        Math.min(window.innerHeight - BTN_SIZE, dragRef.current.origY + dy),
+      );
+      setPos({ x: newX, y: newY });
+    }
+  }, []);
+
+  const handlePointerUp = useCallback(() => {
+    if (!dragRef.current.active) return;
+    dragRef.current.active = false;
+    // If not dragged, treat as a click (toggle panel)
+    if (!dragRef.current.moved) {
+      setOpen((v) => !v);
+    }
+  }, []);
+
   const modified = isModified(settings);
+
+  // ── Derived position values ───────────────────────────────────────────────
+
+  // Container uses flex-direction: column-reverse → button at bottom, panel grows upward
+  // Position the container so the button sits at (pos.x, pos.y)
+  const containerBottom = pos ? window.innerHeight - pos.y - BTN_SIZE : 24;
+  const containerLeft = pos?.x ?? 24;
+
+  // If dismissed, render nothing
+  if (dismissed) return null;
 
   return (
     <div
       data-a11y-widget="true"
       style={{
         position: 'fixed',
-        bottom: 24,
-        left: 24,
+        bottom: containerBottom,
+        left: containerLeft,
         zIndex: 9999,
         display: 'flex',
         flexDirection: 'column-reverse',
@@ -274,7 +349,8 @@ export default function AccessibilityWidget() {
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '14px 16px',
-              background: 'linear-gradient(90deg, rgba(99,91,255,0.18) 0%, rgba(0,212,255,0.08) 100%)',
+              background:
+                'linear-gradient(90deg, rgba(99,91,255,0.18) 0%, rgba(0,212,255,0.08) 100%)',
               borderBottom: '1px solid rgba(255,255,255,0.08)',
             }}
           >
@@ -292,7 +368,10 @@ export default function AccessibilityWidget() {
             </div>
             <button
               aria-label="סגור הגדרות נגישות"
-              onClick={() => { setOpen(false); triggerRef.current?.focus(); }}
+              onClick={() => {
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
               style={{
                 background: 'none',
                 border: 'none',
@@ -320,7 +399,6 @@ export default function AccessibilityWidget() {
 
           {/* Body */}
           <div style={{ padding: '4px 16px 8px' }}>
-
             {/* Font size */}
             <div
               style={{
@@ -492,8 +570,12 @@ export default function AccessibilityWidget() {
                 textDecoration: 'none',
                 transition: 'color 0.15s',
               }}
-              onMouseEnter={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)')}
-              onMouseLeave={(e) => ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.35)')}
+              onMouseEnter={(e) =>
+                ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.7)')
+              }
+              onMouseLeave={(e) =>
+                ((e.currentTarget as HTMLAnchorElement).style.color = 'rgba(255,255,255,0.35)')
+              }
             >
               <Mail size={11} />
               לפנייה בנושא נגישות: hello@nexus-pay.com
@@ -502,78 +584,115 @@ export default function AccessibilityWidget() {
         </div>
       )}
 
-      {/* ── Trigger button ────────────────────────────────────────────────── */}
-      <button
-        ref={triggerRef}
-        aria-label={open ? 'סגור הגדרות נגישות' : 'פתח הגדרות נגישות'}
-        aria-expanded={open}
-        aria-haspopup="dialog"
-        onClick={() => setOpen((v) => !v)}
-        title="הגדרות נגישות"
-        style={{
-          width: 52,
-          height: 52,
-          borderRadius: '50%',
-          border: 'none',
-          cursor: 'pointer',
-          background: open
-            ? 'linear-gradient(135deg, #4f46e5, #0ea5e9)'
-            : 'linear-gradient(135deg, #635bff, #00d4ff)',
-          boxShadow: open
-            ? '0 4px 20px rgba(99,91,255,0.6)'
-            : '0 4px 16px rgba(99,91,255,0.45)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          position: 'relative',
-          transition: 'transform 0.2s, box-shadow 0.2s',
-        }}
-        onMouseEnter={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.08)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 6px 24px rgba(99,91,255,0.65)';
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-          (e.currentTarget as HTMLButtonElement).style.boxShadow = open
-            ? '0 4px 20px rgba(99,91,255,0.6)'
-            : '0 4px 16px rgba(99,91,255,0.45)';
-        }}
+      {/* ── Trigger button (draggable FAB) ────────────────────────────────── */}
+      <div
+        style={{ position: 'relative', display: 'inline-block' }}
+        onMouseEnter={() => setHovering(true)}
+        onMouseLeave={() => setHovering(false)}
       >
-        {/* Universal Accessibility Icon */}
-        <svg
-          width="26"
-          height="26"
-          viewBox="0 0 24 24"
-          fill="none"
-          aria-hidden="true"
-          style={{ flexShrink: 0 }}
+        <button
+          ref={triggerRef}
+          aria-label={open ? 'סגור הגדרות נגישות' : 'פתח הגדרות נגישות'}
+          aria-expanded={open}
+          aria-haspopup="dialog"
+          title="גרור להזזה • לחץ לפתיחה"
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          style={{
+            width: BTN_SIZE,
+            height: BTN_SIZE,
+            borderRadius: '50%',
+            border: 'none',
+            cursor: dragRef.current.active ? 'grabbing' : 'grab',
+            background: open
+              ? 'linear-gradient(135deg, #4f46e5, #0ea5e9)'
+              : 'linear-gradient(135deg, #635bff, #00d4ff)',
+            boxShadow: open
+              ? '0 4px 20px rgba(99,91,255,0.6)'
+              : '0 4px 16px rgba(99,91,255,0.45)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            position: 'relative',
+            transition: 'box-shadow 0.2s',
+            touchAction: 'none', // prevent scroll interference during drag
+            userSelect: 'none',
+          }}
         >
-          <circle cx="12" cy="4.5" r="2" fill="white" />
-          <path
-            d="M6.5 8.5h11M12 8.5V14m0 0l-2.5 5.5M12 14l2.5 5.5"
-            stroke="white"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+          {/* Universal Accessibility Icon */}
+          <svg
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            style={{ flexShrink: 0, pointerEvents: 'none' }}
+          >
+            <circle cx="12" cy="4.5" r="2" fill="white" />
+            <path
+              d="M6.5 8.5h11M12 8.5V14m0 0l-2.5 5.5M12 14l2.5 5.5"
+              stroke="white"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
 
-        {/* Active indicator dot */}
-        {modified && !open && (
-          <span
+          {/* Active indicator dot */}
+          {modified && !open && (
+            <span
+              style={{
+                position: 'absolute',
+                top: 2,
+                right: 2,
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                background: '#f97316',
+                border: '2px solid white',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+        </button>
+
+        {/* Dismiss (close widget entirely) button — appears on hover */}
+        {hovering && !open && (
+          <button
+            aria-label="הסתר ווידג'ט נגישות"
+            title="הסתר"
+            onClick={() => setDismissed(true)}
             style={{
               position: 'absolute',
-              top: 2,
-              right: 2,
-              width: 12,
-              height: 12,
+              top: -6,
+              right: -6,
+              width: 20,
+              height: 20,
               borderRadius: '50%',
-              background: '#f97316',
-              border: '2px solid white',
+              border: '2px solid rgba(99,91,255,0.5)',
+              background: '#0a2540',
+              color: 'rgba(255,255,255,0.7)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1,
+              transition: 'background 0.15s, color 0.15s',
             }}
-          />
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#635bff';
+              (e.currentTarget as HTMLButtonElement).style.color = '#fff';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = '#0a2540';
+              (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.7)';
+            }}
+          >
+            <X size={10} />
+          </button>
         )}
-      </button>
+      </div>
 
       {/* Keyframe animation */}
       <style>{`
