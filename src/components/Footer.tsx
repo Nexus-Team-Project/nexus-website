@@ -1,5 +1,6 @@
 import NexusLogo from './NexusLogo';
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const languages = [
@@ -168,16 +169,32 @@ export default function Footer({ light = false }: { light?: boolean }) {
             <div key={category.title}>
               <h4 className="text-slate-900 font-semibold text-sm mb-6">{category.title}</h4>
               <ul className="space-y-4">
-                {category.links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#"
-                      className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
+                {category.links.map((link) => {
+                  // Blog link should route via React Router
+                  if (link === t.footer.blog) {
+                    const blogPath = direction === 'rtl' ? '/he/blog' : '/blog';
+                    return (
+                      <li key={link}>
+                        <Link
+                          to={blogPath}
+                          className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
+                        >
+                          {link}
+                        </Link>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={link}>
+                      <a
+                        href="#"
+                        className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
+                      >
+                        {link}
+                      </a>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
