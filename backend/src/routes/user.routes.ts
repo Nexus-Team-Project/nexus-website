@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
+import { getUserOrgs } from '../services/org.service';
 
 const router = Router();
 
@@ -167,6 +168,17 @@ router.post('/workspace/setup', apiLimiter, async (req: Request, res: Response, 
     });
 
     res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/user/orgs — Current user's org memberships ──
+
+router.get('/orgs', apiLimiter, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const memberships = await getUserOrgs(req.user!.sub);
+    res.json(memberships);
   } catch (err) {
     next(err);
   }
