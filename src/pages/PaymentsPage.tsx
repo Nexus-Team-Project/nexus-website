@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import PaymentAnimation, { PaymentPricingPanel, PaymentCheckoutPanel } from '../components/PaymentAnimation';
 import AnimatedGradient from '../components/AnimatedGradient';
 import { useLanguage } from '../i18n/LanguageContext';
-import visaLogo from '../assets/logos/visa-logo.png';
+import visaLogo from '../assets/logos/visa-logo-white.svg';
 import mastercardLogo from '../assets/logos/mastercard-logo.png';
 
 const Footer = lazy(() => import('../components/Footer'));
@@ -52,10 +52,10 @@ function CheckRow({ text }: { text: string }) {
 
 // ─── Pricing Calculator Section ───────────────────────────
 const MILESTONES = [
-  { pct: '1.2%', labelHe: 'התחלה',     labelEn: 'Start'  },
-  { pct: '0.9%', labelHe: 'מיליון ₪',  labelEn: '₪1M'    },
-  { pct: '0.8%', labelHe: '5 מיליון ₪', labelEn: '₪5M'   },
-  { pct: '0.7%', labelHe: '10 מיליון ₪', labelEn: '₪10M' },
+  { pct: '1.2%', labelHe: 'התחלה',              labelEn: 'Starting rate' },
+  { pct: '0.9%', labelHe: 'מעל ₪1M בחודש',     labelEn: 'Above ₪1M/mo'  },
+  { pct: '0.8%', labelHe: 'מעל ₪5M בחודש',     labelEn: 'Above ₪5M/mo'  },
+  { pct: '0.7%', labelHe: 'מעל ₪10M בחודש',    labelEn: 'Above ₪10M/mo' },
 ];
 
 function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: boolean; signupLink: string }) {
@@ -309,7 +309,7 @@ export default function PaymentsPage() {
                   { src: visaLogo, alt: 'Visa', label: 'Visa' },
                   { src: mastercardLogo, alt: 'Mastercard', label: 'Mastercard' },
                   { src: '/bit-logo.png', alt: 'Bit', label: 'Bit' },
-                  { src: '/paybox-transparent.png', alt: 'PayBox', label: 'PayBox' },
+                  { src: '/paybox-logo.png', alt: 'PayBox', label: 'PayBox' },
                   { src: '/apple-pay.png', alt: 'Apple Pay', label: 'Apple Pay' },
                   { src: '/google-pay.png', alt: 'Google Pay', label: 'Google Pay' },
                 ].map((pm) => (
