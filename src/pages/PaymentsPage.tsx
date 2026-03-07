@@ -306,7 +306,7 @@ export default function PaymentsPage() {
             </div>
 
             {/* ── Pricing plans panel, staggered entrance triggered by parent section.revealed ── */}
-            <div className="pricing-autoplay flex justify-center lg:justify-end items-start overflow-hidden">
+            <div className="pricing-autoplay flex justify-center lg:justify-end items-start">
               <div style={{ transform: 'scale(0.85)', transformOrigin: 'top center', marginBottom: '-60px' }}>
                 <PaymentPricingPanel />
               </div>
