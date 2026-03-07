@@ -12,7 +12,7 @@ export const articlesEn: Article[] = [
     metaDescription:
       'How to build an employee gift program that lasts all year: budget models, operational checklists, real-world examples, and insights on gift cards and vouchers. Includes email templates & FAQ.',
     category: 'gifts',
-    heroImage: '/blog/employee-gifts-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&q=80',
     author: { name: 'Nexus Team', role: 'Loyalty & Payments Infrastructure' },
     publishDate: '2026-04-01',
     readTime: 10,
@@ -365,7 +365,7 @@ export const articlesEn: Article[] = [
     metaDescription:
       'A practical guide to setting up a benefits club for employees/members: economic model, vendor partnerships, redemption UX, success metrics, and technology infrastructure.',
     category: 'benefits',
-    heroImage: '/blog/benefits-club-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
     author: { name: 'Nexus Team', role: 'Loyalty & Payments Infrastructure' },
     publishDate: '2026-04-08',
     readTime: 9,
@@ -577,7 +577,7 @@ export const articlesEn: Article[] = [
     metaDescription:
       'A full breakdown of the stack behind benefits, points, and budgets in organizations: digital wallet, redemption engine, settlement, PCI DSS, and regulatory considerations in Israel.',
     category: 'loyalty',
-    heroImage: '/blog/loyalty-payments-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80',
     author: { name: 'Nexus Team', role: 'Loyalty & Payments Infrastructure' },
     publishDate: '2026-04-15',
     readTime: 12,

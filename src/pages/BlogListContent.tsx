@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, ArrowRight, Tag } from 'lucide-react';
+import { Clock, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -14,11 +14,6 @@ const CATEGORY_COLORS: Record<ArticleCategory, string> = {
   loyalty: 'bg-emerald-100 text-emerald-700',
 };
 
-const HERO_GRADIENTS: Record<ArticleCategory, string> = {
-  gifts: 'from-purple-600 to-indigo-700',
-  benefits: 'from-blue-600 to-cyan-700',
-  loyalty: 'from-emerald-600 to-teal-700',
-};
 
 export default function BlogListContent() {
   const { language, direction } = useLanguage();
@@ -87,10 +82,8 @@ export default function BlogListContent() {
             >
               <div className="grid md:grid-cols-5 gap-0">
                 {/* Image / gradient placeholder */}
-                <div className={`md:col-span-3 relative h-64 md:h-auto min-h-[220px] bg-gradient-to-br ${HERO_GRADIENTS[featured.category]}`}>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Tag className="w-20 h-20 text-white/20" />
-                  </div>
+                <div className="md:col-span-3 relative h-64 md:h-auto min-h-[220px] overflow-hidden">
+                  <img src={featured.heroImage} alt={featured.title} className="absolute inset-0 w-full h-full object-cover" />
                 </div>
 
                 {/* Content */}
@@ -198,12 +191,8 @@ function ArticleCard({
       className="group flex flex-col rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
     >
       {/* Image placeholder */}
-      <div
-        className={`h-48 bg-gradient-to-br ${HERO_GRADIENTS[article.category]} relative`}
-      >
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Tag className="w-12 h-12 text-white/20" />
-        </div>
+      <div className="h-48 relative overflow-hidden">
+        <img src={article.heroImage} alt={article.title} className="w-full h-full object-cover" />
       </div>
 
       <div className="p-6 flex flex-col flex-1">

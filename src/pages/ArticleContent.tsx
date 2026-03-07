@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Clock, ArrowLeft, ArrowRight, Tag, ChevronRight, AlertCircle, ExternalLink } from 'lucide-react';
+import { Clock, ArrowLeft, ArrowRight, ChevronRight, AlertCircle, ExternalLink } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
@@ -13,11 +13,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   gifts: 'bg-purple-100 text-purple-700',
   benefits: 'bg-blue-100 text-blue-700',
   loyalty: 'bg-emerald-100 text-emerald-700',
-};
-const HERO_GRADIENTS: Record<string, string> = {
-  gifts: 'from-purple-600 to-indigo-700',
-  benefits: 'from-blue-600 to-cyan-700',
-  loyalty: 'from-emerald-600 to-teal-700',
 };
 
 export default function ArticleContent() {
@@ -207,6 +202,15 @@ export default function ArticleContent() {
         </div>
       </section>
 
+      {/* ─── Hero Image ─── */}
+      <div className="max-w-4xl mx-auto px-6 -mt-8 mb-8">
+        <img
+          src={article.heroImage}
+          alt={article.title}
+          className="w-full max-h-[400px] object-cover rounded-2xl shadow-sm"
+        />
+      </div>
+
       {/* ─── Content + TOC ─── */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex gap-12">
@@ -300,10 +304,8 @@ export default function ArticleContent() {
                   to={`${prefix}/blog/${r.slug}`}
                   className="group flex flex-col rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-lg transition-all"
                 >
-                  <div className={`h-40 bg-gradient-to-br ${HERO_GRADIENTS[r.category]} relative`}>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Tag className="w-10 h-10 text-white/20" />
-                    </div>
+                  <div className="h-40 relative overflow-hidden">
+                    <img src={r.heroImage} alt={r.title} className="w-full h-full object-cover" />
                   </div>
                   <div className="p-6">
                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-3 ${CATEGORY_COLORS[r.category]}`}>

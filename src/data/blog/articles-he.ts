@@ -12,7 +12,7 @@ export const articlesHe: Article[] = [
     metaDescription:
       'איך בונים תוכנית מתנות לעובדים שמחזיקה שנה שלמה: מודלים לתקציב, צ\'קליסט תפעולי, דוגמאות מהשטח, ותובנות על תווי שי ושוברים בישראל. כולל תבניות מייל ו‑FAQ.',
     category: 'gifts',
-    heroImage: '/blog/employee-gifts-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&q=80',
     author: { name: 'צוות Nexus', role: 'תשתיות נאמנות ותשלומים' },
     publishDate: '2026-04-01',
     readTime: 10,
@@ -392,7 +392,7 @@ export const articlesHe: Article[] = [
     metaDescription:
       'מדריך מעשי להקמת מועדון הטבות לעובדים/חברים: מודל כלכלי, שיתופי פעולה עם ספקים, UX מימוש, מדדי הצלחה ותשתית טכנולוגית.',
     category: 'benefits',
-    heroImage: '/blog/benefits-club-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
     author: { name: 'צוות Nexus', role: 'תשתיות נאמנות ותשלומים' },
     publishDate: '2026-04-08',
     readTime: 9,
@@ -619,7 +619,7 @@ export const articlesHe: Article[] = [
     metaDescription:
       'פירוק מלא של ה‑stack שמאחורי הטבות, נקודות ותקציבים בארגון: ארנק דיגיטלי, מנוע מימוש, התחשבנות, PCI DSS, ושיקולי רגולציה בישראל.',
     category: 'loyalty',
-    heroImage: '/blog/loyalty-payments-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&q=80',
     author: { name: 'צוות Nexus', role: 'תשתיות נאמנות ותשלומים' },
     publishDate: '2026-04-15',
     readTime: 12,
@@ -850,7 +850,7 @@ export const articlesHe: Article[] = [
     metaDescription:
       'מדריך רגולטורי ותפעולי לתווי שי בארגון: תוקף לפי חוק, דרישות גילוי תנאים, תהליכי אובדן/גניבה, תבניות מייל וספק ו-FAQ מוכן לסכמה.',
     category: 'gifts',
-    heroImage: '/blog/voucher-regulation-israel-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=800&q=80',
     author: { name: 'צוות Nexus', role: 'תשתיות נאמנות ותשלומים' },
     publishDate: '2026-03-24',
     readTime: 12,
@@ -1066,7 +1066,7 @@ export const articlesHe: Article[] = [
     metaDescription:
       'איך למדוד הצלחה של הטבות/תווי שי: KPI תפעולי ופיננסי, נוסחאות, דשבורד אקסל, דוגמאות מישראל ו-FAQ מוכן לסכמה.',
     category: 'benefits',
-    heroImage: '/blog/benefits-roi-kpis-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&q=80',
     author: { name: 'צוות Nexus', role: 'תשתיות נאמנות ותשלומים' },
     publishDate: '2026-04-14',
     readTime: 11,
@@ -1370,7 +1370,7 @@ export const articlesHe: Article[] = [
     metaDescription:
       'תבנית מלאה ל-RFP ובחירת ספק נאמנות ותשלומים: דרישות אבטחה לפי Stripe, פרטיות ומיקור חוץ לפי gov.il, שאלון שרשרת אספקה, Scorecard ופיילוט.',
     category: 'loyalty',
-    heroImage: '/blog/rfp-vendor-selection-hero.jpg',
+    heroImage: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80',
     author: { name: 'צוות Nexus', role: 'תשתיות נאמנות ותשלומים' },
     publishDate: '2026-04-28',
     readTime: 13,
