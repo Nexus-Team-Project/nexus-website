@@ -202,6 +202,26 @@ export default function Footer({ light = false }: { light?: boolean }) {
 
         <div className="border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-xs text-slate-400">{t.footer.allRightsReserved}</p>
+          <div className="flex items-center gap-6">
+            <Link
+              to={direction === 'rtl' ? '/he/privacy' : '/privacy'}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {t.footer.privacyPolicy}
+            </Link>
+            <Link
+              to={direction === 'rtl' ? '/he/terms' : '/terms'}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {t.footer.termsOfUse}
+            </Link>
+            <Link
+              to={direction === 'rtl' ? '/he/accessibility' : '/accessibility'}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {t.footer.accessibility}
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

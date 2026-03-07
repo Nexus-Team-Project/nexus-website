@@ -30,6 +30,9 @@ const BlogList           = lazy(() => import('./pages/BlogList'));
 const BlogListHe         = lazy(() => import('./pages/BlogListHe'));
 const ArticlePage        = lazy(() => import('./pages/Article'));
 const ArticlePageHe      = lazy(() => import('./pages/ArticleHe'));
+const PrivacyPolicyPage  = lazy(() => import('./pages/PrivacyPolicyPage'));
+const AccessibilityPage  = lazy(() => import('./pages/AccessibilityPage'));
+const TermsOfUsePage     = lazy(() => import('./pages/TermsOfUsePage'));
 
 // ─── Global analytics tracker ────────────────────────────
 // Fires Page_Viewed on every route change.
@@ -192,6 +195,12 @@ function App() {
           <Route path="/he/blog"         element={<BlogListHe />} />
           <Route path="/blog/:slug"      element={<ArticlePage />} />
           <Route path="/he/blog/:slug"   element={<ArticlePageHe />} />
+          <Route path="/privacy"         element={<LanguageProvider language="en"><PrivacyPolicyPage /></LanguageProvider>} />
+          <Route path="/he/privacy"      element={<LanguageProvider language="he"><PrivacyPolicyPage /></LanguageProvider>} />
+          <Route path="/accessibility"   element={<LanguageProvider language="en"><AccessibilityPage /></LanguageProvider>} />
+          <Route path="/he/accessibility" element={<LanguageProvider language="he"><AccessibilityPage /></LanguageProvider>} />
+          <Route path="/terms"           element={<LanguageProvider language="en"><TermsOfUsePage /></LanguageProvider>} />
+          <Route path="/he/terms"        element={<LanguageProvider language="he"><TermsOfUsePage /></LanguageProvider>} />
           <Route path="/dashboard" element={
             <ProtectedRoute redirectTo="/login">
               <UserDashboard />
