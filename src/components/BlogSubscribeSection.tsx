@@ -17,12 +17,12 @@ export default function BlogSubscribeSection() {
   };
 
   return (
-    <section className="bg-slate-50 border-t border-slate-200 py-16 md:py-20" dir={direction}>
+    <section className="bg-slate-50 border-t border-slate-200 py-20 md:py-28" dir={direction}>
       <div className="max-w-7xl mx-auto px-6">
         {/* Three-column grid */}
-        <div className="grid md:grid-cols-3 gap-8 md:gap-12">
+        <div className="grid md:grid-cols-3 gap-10 md:gap-16">
           {/* Column 1: Subscribe */}
-          <div className="border-s-4 border-[#635BFF] ps-6">
+          <div>
             <div className="flex items-center gap-3 mb-3">
               <Mail className="w-5 h-5 text-[#635BFF]" />
               <h3 className="text-base font-semibold text-slate-900">
@@ -59,7 +59,7 @@ export default function BlogSubscribeSection() {
           </div>
 
           {/* Column 2: We're hiring */}
-          <div className="border-s-4 border-emerald-500 ps-6">
+          <div>
             <div className="flex items-center gap-3 mb-3">
               <Users className="w-5 h-5 text-emerald-500" />
               <h3 className="text-base font-semibold text-slate-900">
@@ -81,7 +81,7 @@ export default function BlogSubscribeSection() {
           </div>
 
           {/* Column 3: Feedback */}
-          <div className="border-s-4 border-cyan-500 ps-6">
+          <div>
             <div className="flex items-center gap-3 mb-3">
               <MessageSquare className="w-5 h-5 text-cyan-500" />
               <h3 className="text-base font-semibold text-slate-900">
@@ -104,7 +104,7 @@ export default function BlogSubscribeSection() {
         </div>
 
         {/* Social icons */}
-        <div className="mt-12 pt-8 border-t border-slate-200 flex items-center justify-between">
+        <div className="mt-16 pt-10 border-t border-slate-200 flex items-center justify-between">
           <span className="text-sm text-slate-400">
             {isHe ? 'עקבו אחרינו' : 'Follow us'}
           </span>
