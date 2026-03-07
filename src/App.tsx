@@ -25,6 +25,10 @@ const PartnersPage       = lazy(() => import('./pages/PartnersPage'));
 const PaymentsPage       = lazy(() => import('./pages/PaymentsPage'));
 const AdminDashboard     = lazy(() => import('./pages/AdminDashboard'));
 const UserDashboard      = lazy(() => import('./pages/UserDashboard'));
+const BlogList           = lazy(() => import('./pages/BlogList'));
+const BlogListHe         = lazy(() => import('./pages/BlogListHe'));
+const ArticlePage        = lazy(() => import('./pages/Article'));
+const ArticlePageHe      = lazy(() => import('./pages/ArticleHe'));
 
 // ─── Global analytics tracker ────────────────────────────
 // Fires Page_Viewed on every route change.
@@ -183,6 +187,10 @@ function App() {
           <Route path="/he/partners" element={<LanguageProvider language="he"><PartnersPage /></LanguageProvider>} />
           <Route path="/payments"    element={<LanguageProvider language="en"><PaymentsPage /></LanguageProvider>} />
           <Route path="/he/payments" element={<LanguageProvider language="he"><PaymentsPage /></LanguageProvider>} />
+          <Route path="/blog"            element={<BlogList />} />
+          <Route path="/he/blog"         element={<BlogListHe />} />
+          <Route path="/blog/:slug"      element={<ArticlePage />} />
+          <Route path="/he/blog/:slug"   element={<ArticlePageHe />} />
           <Route path="/dashboard" element={
             <ProtectedRoute redirectTo="/login">
               <UserDashboard />

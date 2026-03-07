@@ -167,7 +167,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         {
           title: t.navbar.learn,
           items: [
-            { name: t.navbar.blog, desc: t.navbar.newsInsights, icon: Newspaper },
+            { name: t.navbar.blog, desc: t.navbar.newsInsights, icon: Newspaper, href: lang === 'he' ? '/he/blog' : '/blog' },
             { name: t.navbar.guides, desc: t.navbar.bestPractices, icon: Book },
             { name: t.navbar.webinars, desc: t.navbar.liveTraining, icon: Youtube },
             { name: t.navbar.videoTutorials, desc: t.navbar.watchAndLearn, icon: Youtube },
