@@ -149,36 +149,6 @@ export async function sendVerificationEmail(
 </td>
 </tr>
 <tr>
-<td>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;padding:18px;margin-top:10px;">
-<tr>
-<td style="font-size:14px;color:#333;line-height:1.9;">
-<strong>לאחר האימות תוכלו:</strong>
-<br><br>
-✔ להקים מועדון הטבות דיגיטלי
-<br>
-✔ להוסיף הטבות לחברי הקהילה
-<br>
-✔ לנהל משתמשים והרשאות
-<br>
-✔ לעקוב אחרי פעילות ורכישות
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-top:30px;">
-<div style="font-size:13px;color:#777;line-height:1.7;">
-שלב 1 ✓ יצירת חשבון
-<br>
-שלב 2 → אימות מייל
-<br>
-שלב 3 &nbsp;&nbsp; התחלה בדאשבורד
-</div>
-</td>
-</tr>
-<tr>
 <td align="center">
 <p style="font-size:13px;color:#888;margin-top:25px;">
 אם הכפתור לא עובד ניתן להיכנס דרך הקישור:
@@ -225,36 +195,6 @@ Just verify your email to activate your account.
 <a href="${verifyUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
 Verify &amp; Continue to Nexus
 </a>
-</td>
-</tr>
-<tr>
-<td>
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border-radius:10px;padding:18px;margin-top:10px;">
-<tr>
-<td style="font-size:14px;color:#333;line-height:1.9;">
-<strong>After verifying you can:</strong>
-<br><br>
-✔ Set up a digital loyalty club
-<br>
-✔ Add perks for your community members
-<br>
-✔ Manage users and permissions
-<br>
-✔ Track activity and purchases
-</td>
-</tr>
-</table>
-</td>
-</tr>
-<tr>
-<td align="center" style="padding-top:30px;">
-<div style="font-size:13px;color:#777;line-height:1.7;">
-Step 1 ✓ Account created
-<br>
-Step 2 → Verify email
-<br>
-Step 3 &nbsp;&nbsp; Start on dashboard
-</div>
 </td>
 </tr>
 <tr>
