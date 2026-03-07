@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import AnimatedGradient from '../components/AnimatedGradient';
 import GoogleSignIn from '../components/GoogleSignIn';
@@ -26,6 +26,14 @@ export default function Login() {
   const navigate = useNavigate();
   const { identify } = useAnalytics();
   const isHe = language === 'he';
+
+  // Preload the likely post-login chunks in the background so navigation is instant.
+  useEffect(() => {
+    void import('./UserDashboard');
+    void import('./WorkspaceSetupPage');
+    void import('./AdminDashboard');
+  }, []);
+
   const homePath = isHe ? '/he' : '/';
   const signupPath = isHe ? '/he/signup' : '/signup';
   const workspacePath = isHe ? '/he/workspace' : '/workspace';

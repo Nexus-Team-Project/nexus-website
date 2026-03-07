@@ -2,7 +2,13 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { useAnalytics } from './hooks/useAnalytics';
+import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+
+// Detect a Google OAuth callback at module load time (before any render).
+// If true, we suppress route rendering while AuthContext exchanges the code
+// → prevents a brief flash of the Home page before the redirect to /dashboard.
+const startedWithOAuthCode = new URLSearchParams(window.location.search).has('code');
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
@@ -149,6 +155,12 @@ function ChatWidget() {
 }
 
 function App() {
+  const { isLoading } = useAuth();
+
+  // While an OAuth code is being exchanged, render only the full-screen loader.
+  // This prevents the Home route from briefly rendering during the redirect.
+  if (startedWithOAuthCode && isLoading) return <PageLoader />;
+
   return (
     <BrowserRouter>
       <RouteAnalytics />
