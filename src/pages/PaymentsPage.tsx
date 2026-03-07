@@ -51,30 +51,16 @@ function CheckRow({ text }: { text: string }) {
 }
 
 // ─── Pricing Calculator Section ───────────────────────────
-function PricingCalculatorSection({ he, isRtl, signupLink }: { he: boolean; isRtl: boolean; signupLink: string }) {
-  const MAX = 10_000_000;
-  const [volume, setVolume] = useState(300_000);
+const MILESTONES = [
+  { pct: '1.2%', labelHe: 'התחלה',     labelEn: 'Start'  },
+  { pct: '0.9%', labelHe: 'מיליון ₪',  labelEn: '₪1M'    },
+  { pct: '0.8%', labelHe: '5 מיליון ₪', labelEn: '₪5M'   },
+  { pct: '0.7%', labelHe: '10 מיליון ₪', labelEn: '₪10M' },
+];
 
-  // milestone positions as % of the slider (log scale for UX)
-  const toPercent = (v: number) => (Math.log(v) - Math.log(1)) / (Math.log(MAX) - Math.log(1)) * 100;
-  const fromPercent = (p: number) => Math.round(Math.exp((p / 100) * (Math.log(MAX) - Math.log(1)) + Math.log(1)));
-
-  const milestones = [
-    { value: 0,         pct: '1.2%', label: he ? 'התחלה' : 'Start' },
-    { value: 1_000_000, pct: '0.9%', label: he ? 'מיליון ₪' : '₪1M' },
-    { value: 5_000_000, pct: '0.8%', label: he ? '5 מיליון ₪' : '₪5M' },
-  ];
-
-  const currentRate =
-    volume >= 5_000_000 ? '0.8%' :
-    volume >= 1_000_000 ? '0.9%' :
-    '1.2%';
-
-  const activeIdx =
-    volume >= 5_000_000 ? 2 :
-    volume >= 1_000_000 ? 1 : 0;
-
-  const sliderPct = toPercent(Math.max(volume, 1));
+function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: boolean; signupLink: string }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  const fillPct = (activeIdx / (MILESTONES.length - 1)) * 100;
 
   return (
     <section className="scroll-reveal relative py-20 md:py-32 bg-slate-50 overflow-x-hidden">
@@ -89,81 +75,74 @@ function PricingCalculatorSection({ he, isRtl, signupLink }: { he: boolean; isRt
             {he ? 'עמלת סליקה לעסקים בישראל' : 'Processing Fees for Israeli Businesses'}
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto text-sm leading-relaxed">
-            {he
-              ? 'ככל שנפח הסליקה שלכם גדל — העמלה יורדת.'
-              : 'The more you process, the lower your rate.'}
+            {he ? 'ככל שנפח הסליקה שלכם גדל — העמלה יורדת.' : 'The more you process, the lower your rate.'}
           </p>
         </div>
 
         {/* Current rate display */}
-        <div className="text-center mb-10">
-          <div className="inline-flex flex-col items-center gap-1">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">
-              {he ? 'העמלה שלך' : 'Your rate'}
-            </span>
-            <span className="text-7xl font-black text-stripe-purple transition-all duration-300">
-              {currentRate}
-            </span>
-            <span className="text-sm text-slate-500">
-              {he
-                ? `נפח חודשי: ₪${volume === 0 ? '0' : volume.toLocaleString('he-IL')}`
-                : `Monthly volume: ₪${volume.toLocaleString()}`}
-            </span>
-          </div>
+        <div className="text-center mb-12">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-2">
+            {he ? 'העמלה שלך' : 'Your rate'}
+          </span>
+          <span className="text-8xl font-black text-stripe-purple transition-all duration-300">
+            {MILESTONES[activeIdx].pct}
+          </span>
         </div>
 
-        {/* Progress bar with milestones */}
-        <div className="relative px-2 mb-16">
-          {/* Track */}
-          <div className="relative h-2 bg-slate-200 rounded-full mx-6">
-            {/* Filled portion */}
+        {/* Progress bar — always LTR so slider behaves correctly */}
+        <div className="relative mb-16" dir="ltr">
+          {/* Track background */}
+          <div className="relative h-2 bg-slate-200 rounded-full mx-4">
+            {/* Fill */}
             <div
-              className="absolute inset-y-0 left-0 bg-stripe-purple rounded-full transition-all duration-150"
-              style={{ width: `${sliderPct}%` }}
+              className="absolute inset-y-0 left-0 bg-stripe-purple rounded-full transition-all duration-300"
+              style={{ width: `${fillPct}%` }}
             />
 
             {/* Milestone dots */}
-            {milestones.map((m, i) => {
-              const pos = i === 0 ? 0 : toPercent(m.value);
+            {MILESTONES.map((m, i) => {
+              const pos = (i / (MILESTONES.length - 1)) * 100;
               const reached = activeIdx >= i;
               return (
-                <div
+                <button
                   key={i}
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+                  onClick={() => setActiveIdx(i)}
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group"
                   style={{ left: `${pos}%` }}
+                  aria-label={he ? m.labelHe : m.labelEn}
                 >
                   {/* dot */}
-                  <div className={`w-5 h-5 rounded-full border-2 transition-all duration-300 flex items-center justify-center
+                  <div className={`w-6 h-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center
                     ${reached
-                      ? 'bg-stripe-purple border-stripe-purple shadow-md shadow-stripe-purple/30'
-                      : 'bg-white border-slate-300'}`}
+                      ? 'bg-stripe-purple border-stripe-purple shadow-lg shadow-stripe-purple/40 scale-110'
+                      : 'bg-white border-slate-300 group-hover:border-stripe-purple/50'}`}
                   >
-                    {reached && <div className="w-2 h-2 rounded-full bg-white" />}
+                    {reached && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                   </div>
-                  {/* label above */}
-                  <div className="absolute bottom-7 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-                    <div className={`text-lg font-black transition-colors duration-300 ${reached ? 'text-stripe-purple' : 'text-slate-300'}`}>
+                  {/* % label above */}
+                  <div className="absolute bottom-9 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
+                    <span className={`text-base font-black transition-colors duration-300 ${reached ? 'text-stripe-purple' : 'text-slate-300'}`}>
                       {m.pct}
-                    </div>
+                    </span>
                   </div>
                   {/* volume label below */}
-                  <div className="absolute top-7 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-                    <div className={`text-xs font-medium transition-colors duration-300 ${reached ? 'text-slate-600' : 'text-slate-400'}`}>
-                      {m.label}
-                    </div>
+                  <div className="absolute top-8 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
+                    <span className={`text-xs font-semibold transition-colors duration-300 ${reached ? 'text-slate-600' : 'text-slate-400'}`}>
+                      {he ? m.labelHe : m.labelEn}
+                    </span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
 
-          {/* Slider input */}
+          {/* Invisible range input for drag behaviour */}
           <input
             type="range"
-            min={0} max={100} step={0.2}
-            value={sliderPct}
-            onChange={(e) => setVolume(fromPercent(Number(e.target.value)))}
-            className="absolute inset-x-6 top-0 h-2 w-[calc(100%-3rem)] opacity-0 cursor-pointer"
+            min={0} max={MILESTONES.length - 1} step={1}
+            value={activeIdx}
+            onChange={(e) => setActiveIdx(Number(e.target.value))}
+            className="absolute inset-x-4 top-0 h-2 w-[calc(100%-2rem)] opacity-0 cursor-pointer"
             style={{ margin: 0 }}
           />
         </div>
@@ -195,7 +174,6 @@ export default function PaymentsPage() {
 
       {/* Override payment-stage: no background, no frame, no hover effects — phone only */}
       <style>{`
-        /* Kill hover entirely — RTL hero autoplays, no need for hover triggers */
         .payments-hero-anim { pointer-events: none; }
         .payments-hero-anim .payment-stage {
           overflow: visible !important; background: none !important; border: none !important;
@@ -204,30 +182,21 @@ export default function PaymentsPage() {
         .payments-hero-anim .payment-stage::before {
           display: none !important; content: none !important;
         }
-        .payments-hero-anim .payment-phone { left: 80px !important; }
-        [dir="rtl"] .payments-hero-anim .payment-phone { left: 60px !important; right: auto !important; top: 40px !important; }
-        [dir="rtl"] .payments-hero-anim .payment-stage { height: 100%; }
+        .payments-hero-anim .payment-phone { left: 60px !important; top: 40px !important; }
+        [dir="rtl"] .payments-hero-anim .payment-phone { left: auto !important; right: 60px !important; top: 40px !important; }
       `}</style>
 
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
-      {/* Wrapper for hero + diagonal so phone animation can overlap both */}
       <div className="relative">
-        {/* RTL: Phone floats above hero + diagonal strip */}
-        {isRtl && (
-          <div className="payments-hero-anim payment-card-expandable absolute left-16 top-32 w-[280px] hidden lg:block z-20" style={{ bottom: '-2rem' }}>
-            <PaymentAnimation show="phone" />
-          </div>
-        )}
-
-        <section className={`relative pt-32 bg-slate-50 overflow-x-hidden ${isRtl ? 'pb-12' : 'pb-20'}`}>
+        <section className="relative pt-32 pb-20 bg-slate-50 overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
 
-            <div className={`grid grid-cols-1 gap-12 items-center ${isRtl ? '' : 'lg:grid-cols-2'}`}>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
               {/* ── Text column (DOM first → right in RTL, left in LTR) ── */}
-              <div className={`text-right ${isRtl ? 'lg:pl-[300px]' : ''}`}>
+              <div className="text-right">
 
                 {/* Label chip */}
                 <div className={`inline-flex items-center gap-2 bg-stripe-purple/10 border border-stripe-purple/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 text-stripe-purple ${isRtl ? '' : 'flex-row-reverse'}`}>
@@ -280,12 +249,10 @@ export default function PaymentsPage() {
                 </div>
               </div>
 
-              {/* ── LTR: Animation column — phone only, hover activates animations ── */}
-              {!isRtl && (
-                <div className="payments-hero-anim payment-card-expandable relative h-[520px]">
-                  <PaymentAnimation show="phone" />
-                </div>
-              )}
+              {/* ── Animation column — phone only ── */}
+              <div className="payments-hero-anim payment-card-expandable relative h-[520px] hidden lg:block">
+                <PaymentAnimation show="phone" />
+              </div>
 
             </div>
           </div>
