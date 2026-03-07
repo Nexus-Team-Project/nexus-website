@@ -172,20 +172,22 @@ export default function PaymentsPage() {
     <div dir={direction} className="min-h-screen bg-white">
       <Navbar variant="dark" />
 
-      {/* Override payment-stage: no background, no frame, no hover effects — phone only */}
+      {/* Override payment-stage: no background, no frame — phone only */}
       <style>{`
         .payments-hero-anim { pointer-events: none; }
         .payments-hero-anim .payment-stage {
           overflow: visible !important; background: none !important; border: none !important;
           box-shadow: none !important; outline: none !important;
           display: flex !important; align-items: center !important; justify-content: center !important;
+          padding: 0 !important;
         }
         .payments-hero-anim .payment-stage::before {
           display: none !important; content: none !important;
         }
-        .payments-hero-anim .payment-phone {
+        .payments-hero-anim .payment-phone,
+        [dir="rtl"] .payments-hero-anim .payment-phone {
           position: relative !important; left: auto !important; right: auto !important;
-          top: auto !important; transform: none !important;
+          top: auto !important; margin: 0 auto !important;
         }
       `}</style>
 
@@ -253,7 +255,7 @@ export default function PaymentsPage() {
               </div>
 
               {/* ── Animation column — phone only ── */}
-              <div className="payments-hero-anim payment-card-expandable relative h-[520px] hidden lg:block">
+              <div className="payments-hero-anim relative h-[520px] hidden lg:block">
                 <PaymentAnimation show="phone" />
               </div>
 
