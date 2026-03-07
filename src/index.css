@@ -48,6 +48,15 @@ body {
   font-family: 'Rubik', system-ui, -apple-system, sans-serif !important;
 }
 
+/* Remove video border/outline on logo hover */
+video:focus,
+video:active,
+video:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* Partner logos mobile slider */
 @keyframes partnerSlide {
   0% {
