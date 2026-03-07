@@ -209,7 +209,7 @@ export default function ArticleContent() {
 
       {/* ─── Content + TOC ─── */}
       <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className={`flex gap-12 ${isRTL ? 'flex-row-reverse' : ''}`}>
+        <div className={`flex items-start gap-12 ${isRTL ? 'flex-row-reverse' : ''}`}>
           {/* TOC Sidebar — desktop only */}
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <nav className="sticky top-24">
