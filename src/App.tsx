@@ -4,6 +4,7 @@ import { LanguageProvider } from './i18n/LanguageContext';
 import { useAnalytics } from './hooks/useAnalytics';
 import { useAuth } from './contexts/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import AccessibilityWidget from './components/AccessibilityWidget';
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
@@ -204,6 +205,7 @@ function App() {
         </Routes>
       </Suspense>
       <ChatWidget />
+      <AccessibilityWidget />
     </>
   );
 }

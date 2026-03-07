@@ -1,0 +1,132 @@
+/* =============================================================================
+   Nexus Accessibility CSS — תקן נגישות SI 5568 / WCAG 2.1 AA
+   Applied as classes on the <html> element by AccessibilityWidget.tsx
+   ============================================================================= */
+
+/* ── Font size ─────────────────────────────────────────────────────────────── */
+
+html.a11y-font-md {
+  font-size: 120% !important;
+}
+
+html.a11y-font-lg {
+  font-size: 140% !important;
+}
+
+/* ── High contrast ─────────────────────────────────────────────────────────── */
+
+html.a11y-high-contrast body,
+html.a11y-high-contrast section,
+html.a11y-high-contrast main,
+html.a11y-high-contrast header,
+html.a11y-high-contrast nav,
+html.a11y-high-contrast footer,
+html.a11y-high-contrast article,
+html.a11y-high-contrast aside,
+html.a11y-high-contrast div:not([data-a11y-widget] *):not([data-a11y-widget]),
+html.a11y-high-contrast p,
+html.a11y-high-contrast span:not([data-a11y-widget] *),
+html.a11y-high-contrast li,
+html.a11y-high-contrast h1,
+html.a11y-high-contrast h2,
+html.a11y-high-contrast h3,
+html.a11y-high-contrast h4,
+html.a11y-high-contrast h5,
+html.a11y-high-contrast h6 {
+  background-color: #000 !important;
+  color: #fff !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+html.a11y-high-contrast a:not([data-a11y-widget] *) {
+  color: #ffff00 !important;
+  text-decoration: underline !important;
+}
+
+html.a11y-high-contrast button:not([data-a11y-widget] *),
+html.a11y-high-contrast [role="button"]:not([data-a11y-widget] *) {
+  background-color: #000 !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+}
+
+html.a11y-high-contrast input:not([data-a11y-widget] *),
+html.a11y-high-contrast textarea:not([data-a11y-widget] *),
+html.a11y-high-contrast select:not([data-a11y-widget] *) {
+  background-color: #000 !important;
+  color: #fff !important;
+  border: 2px solid #fff !important;
+}
+
+html.a11y-high-contrast img,
+html.a11y-high-contrast svg:not([data-a11y-widget] *) {
+  filter: contrast(1.4) !important;
+}
+
+/* ── Grayscale ─────────────────────────────────────────────────────────────── */
+
+html.a11y-grayscale {
+  filter: grayscale(100%) !important;
+}
+
+/* ── Highlight links ───────────────────────────────────────────────────────── */
+
+html.a11y-highlight-links a:not([data-a11y-widget] *) {
+  text-decoration: underline !important;
+  text-underline-offset: 3px !important;
+  text-decoration-thickness: 2px !important;
+  outline: 2px solid currentColor !important;
+  outline-offset: 2px !important;
+  border-radius: 2px !important;
+}
+
+/* ── Readable font (dyslexia-friendly) ────────────────────────────────────── */
+
+html.a11y-readable-font *:not([data-a11y-widget] *) {
+  font-family: Arial, Helvetica, sans-serif !important;
+  letter-spacing: 0.02em !important;
+}
+
+/* ── No animations ─────────────────────────────────────────────────────────── */
+
+html.a11y-no-animations *:not([data-a11y-widget] *),
+html.a11y-no-animations *:not([data-a11y-widget] *)::before,
+html.a11y-no-animations *:not([data-a11y-widget] *)::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ── Text spacing ──────────────────────────────────────────────────────────── */
+
+html.a11y-text-spacing *:not([data-a11y-widget] *) {
+  line-height: 1.75 !important;
+  letter-spacing: 0.12em !important;
+  word-spacing: 0.16em !important;
+  paragraph-spacing: 2em !important;
+}
+
+/* ── Big cursor ────────────────────────────────────────────────────────────── */
+
+html.a11y-big-cursor,
+html.a11y-big-cursor * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='36' viewBox='0 0 36 36'%3E%3Cpath d='M5 3l0 26 8-8 6 12 5-2.5-6-12 9 0z' fill='%23000' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E")
+    5 3,
+    auto !important;
+}
+
+/* ── Focus highlight ───────────────────────────────────────────────────────── */
+
+html.a11y-focus-highlight *:focus,
+html.a11y-focus-highlight *:focus-visible {
+  outline: 3px solid #635bff !important;
+  outline-offset: 3px !important;
+  border-radius: 4px !important;
+}
+
+/* Always-on sensible focus for the widget itself */
+[data-a11y-widget="true"] *:focus-visible {
+  outline: 2px solid #00d4ff !important;
+  outline-offset: 2px !important;
+}
