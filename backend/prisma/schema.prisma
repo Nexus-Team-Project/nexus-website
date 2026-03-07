@@ -121,8 +121,26 @@ model Organization {
   updatedAt    DateTime @updatedAt
 
   members OrganizationMember[]
+  invites OrgInvite[]
 
   @@index([slug])
+}
+
+model OrgInvite {
+  id        String    @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  role      OrgRole   @default(MEMBER)
+  token     String    @unique @default(cuid())
+  createdBy String
+  label     String?
+  maxUses   Int?
+  useCount  Int       @default(0)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([token])
+  @@index([orgId])
 }
 
 model OrganizationMember {

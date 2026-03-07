@@ -313,4 +313,60 @@ router.delete(
   },
 );
 
+// ─── POST /api/orgs/:slug/invites — Create invite link [org ADMIN/OWNER] ──
+router.post(
+  '/:slug/invites',
+  authenticate,
+  requireOrgRole('ADMIN'),
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { role, label, maxUses, expiresInDays } = req.body;
+      const invite = await orgService.createInvite({
+        orgSlug: req.params.slug,
+        createdBy: req.user!.sub,
+        role: role ?? 'MEMBER',
+        label,
+        maxUses: maxUses ? Number(maxUses) : undefined,
+        expiresInDays: expiresInDays ? Number(expiresInDays) : undefined,
+      });
+      res.status(201).json(invite);
+    } catch (err) {
+      sendServiceError(err, res, next);
+    }
+  },
+);
+
+// ─── GET /api/orgs/:slug/invites — List invites [org ADMIN/OWNER] ──
+router.get(
+  '/:slug/invites',
+  authenticate,
+  requireOrgRole('ADMIN'),
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const invites = await orgService.listInvites(req.params.slug);
+      res.json(invites);
+    } catch (err) {
+      sendServiceError(err, res, next);
+    }
+  },
+);
+
+// ─── DELETE /api/orgs/:slug/invites/:id — Delete invite [org ADMIN/OWNER] ──
+router.delete(
+  '/:slug/invites/:id',
+  authenticate,
+  requireOrgRole('ADMIN'),
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await orgService.deleteInvite(req.params.slug, req.params.id);
+      res.status(204).send();
+    } catch (err) {
+      sendServiceError(err, res, next);
+    }
+  },
+);
+
 export default router;

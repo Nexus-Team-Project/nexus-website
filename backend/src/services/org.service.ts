@@ -198,3 +198,99 @@ export async function getUserOrgs(userId: string) {
     },
   });
 }
+
+// ─── Invites ──────────────────────────────────────────────────────
+
+export interface CreateInviteInput {
+  orgSlug: string;
+  createdBy: string;
+  role?: OrgRole;
+  label?: string;
+  maxUses?: number;
+  expiresInDays?: number;
+}
+
+export async function createInvite(input: CreateInviteInput) {
+  const org = await prisma.organization.findUnique({ where: { slug: input.orgSlug } });
+  if (!org) throw Object.assign(new Error('Organization not found'), { status: 404 });
+
+  const expiresAt = input.expiresInDays
+    ? new Date(Date.now() + input.expiresInDays * 24 * 60 * 60 * 1000)
+    : null;
+
+  return prisma.orgInvite.create({
+    data: {
+      orgId: org.id,
+      createdBy: input.createdBy,
+      role: input.role ?? 'MEMBER',
+      label: input.label,
+      maxUses: input.maxUses ?? null,
+      expiresAt,
+    },
+    include: { org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } } },
+  });
+}
+
+export async function listInvites(orgSlug: string) {
+  const org = await prisma.organization.findUnique({ where: { slug: orgSlug } });
+  if (!org) throw Object.assign(new Error('Organization not found'), { status: 404 });
+
+  return prisma.orgInvite.findMany({
+    where: { orgId: org.id },
+    orderBy: { createdAt: 'desc' },
+    include: { org: { select: { id: true, slug: true, name: true } } },
+  });
+}
+
+export async function deleteInvite(orgSlug: string, inviteId: string) {
+  const org = await prisma.organization.findUnique({ where: { slug: orgSlug } });
+  if (!org) throw Object.assign(new Error('Organization not found'), { status: 404 });
+
+  const invite = await prisma.orgInvite.findFirst({ where: { id: inviteId, orgId: org.id } });
+  if (!invite) throw Object.assign(new Error('Invite not found'), { status: 404 });
+
+  return prisma.orgInvite.delete({ where: { id: inviteId } });
+}
+
+/** Public: validate token and return invite + org info */
+export async function getInviteByToken(token: string) {
+  const invite = await prisma.orgInvite.findUnique({
+    where: { token },
+    include: { org: { select: { id: true, slug: true, name: true, nameHe: true, logoUrl: true, primaryColor: true, _count: { select: { members: true } } } } },
+  });
+  if (!invite) throw Object.assign(new Error('Invalid invite link'), { status: 404 });
+  if (invite.expiresAt && invite.expiresAt < new Date()) {
+    throw Object.assign(new Error('This invite link has expired'), { status: 410 });
+  }
+  if (invite.maxUses !== null && invite.useCount >= invite.maxUses) {
+    throw Object.assign(new Error('This invite link has reached its maximum uses'), { status: 410 });
+  }
+  return invite;
+}
+
+/** Authenticated: accept an invite — add user to org, bump useCount */
+export async function acceptInvite(token: string, userId: string) {
+  const invite = await getInviteByToken(token); // validates expiry/maxUses
+
+  // Upsert membership (idempotent — if already a member, role stays as-is)
+  const existing = await prisma.organizationMember.findUnique({
+    where: { userId_orgId: { userId, orgId: invite.orgId } },
+  });
+
+  let membership;
+  if (existing) {
+    // Already a member — just return current membership
+    membership = existing;
+  } else {
+    membership = await prisma.organizationMember.create({
+      data: { userId, orgId: invite.orgId, role: invite.role },
+    });
+    // Increment use count
+    await prisma.orgInvite.update({
+      where: { id: invite.id },
+      data: { useCount: { increment: 1 } },
+    });
+  }
+
+  return { membership, org: invite.org, alreadyMember: !!existing };
+}

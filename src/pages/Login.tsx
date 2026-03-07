@@ -3,7 +3,7 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import AnimatedGradient from '../components/AnimatedGradient';
 import GoogleSignIn from '../components/GoogleSignIn';
 import NexusLogo from '../components/NexusLogo';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -24,6 +24,7 @@ export default function Login() {
   const { t, language, direction } = useLanguage();
   const { login } = useAuth();
   const navigate = useNavigate();
+  const { search } = useLocation();
   const { identify } = useAnalytics();
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
@@ -32,7 +33,11 @@ export default function Login() {
   const dashboardPath = isHe ? '/he/dashboard' : '/dashboard';
   const adminPath = isHe ? '/he/admin' : '/admin';
 
+  // Support ?next= redirect (e.g. from /join/:token)
+  const nextPath = new URLSearchParams(search).get('next');
+
   const getPostLoginPath = (user: { role: string; onboardingDone: boolean }) => {
+    if (nextPath) return nextPath;
     if (user.role === 'ADMIN') return adminPath;
     if (user.onboardingDone) return dashboardPath;
     return workspacePath;

@@ -20,6 +20,7 @@ import paymentsRoutes from './routes/payments.routes';
 import partnersRoutes from './routes/partners.route';
 import userRoutes from './routes/user.routes';
 import orgsRoutes from './routes/orgs.routes';
+import invitesRoutes from './routes/invites.routes';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -78,6 +79,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/partners', partnersRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/orgs', orgsRoutes);
+app.use('/api/invites', invitesRoutes);
 
 // ─── Serve frontend (SPA) ─────────────────────────────────
 const frontendDist = path.resolve(__dirname, '../public');
