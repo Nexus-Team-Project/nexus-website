@@ -182,8 +182,8 @@ export default function PaymentsPage() {
         .payments-hero-anim .payment-stage::before {
           display: none !important; content: none !important;
         }
-        .payments-hero-anim .payment-phone { left: 50% !important; right: auto !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
-        [dir="rtl"] .payments-hero-anim .payment-phone { left: 50% !important; right: auto !important; top: 50% !important; transform: translate(-50%, -50%) !important; }
+        .payments-hero-anim .payment-phone { right: 0 !important; left: auto !important; top: 50% !important; transform: translateY(-50%) !important; }
+        [dir="rtl"] .payments-hero-anim .payment-phone { left: 0 !important; right: auto !important; top: 50% !important; transform: translateY(-50%) !important; }
       `}</style>
 
       {/* ══════════════════════════════════════════════════════════
