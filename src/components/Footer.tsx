@@ -1,7 +1,9 @@
 import NexusLogo from './NexusLogo';
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
+
+const LANG_PREF_KEY = 'nexus-lang-preference';
 
 const languages = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -30,10 +32,12 @@ const FlagIcon = ({ code }: { code: string }) => {
 };
 
 export default function Footer({ light = false }: { light?: boolean }) {
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const { t, direction, language } = useLanguage();
+  const [selectedLanguage, setSelectedLanguage] = useState(language);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const { t, direction } = useLanguage();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -137,6 +141,13 @@ export default function Footer({ light = false }: { light?: boolean }) {
                       onClick={() => {
                         setSelectedLanguage(lang.code);
                         setIsOpen(false);
+                        localStorage.setItem(LANG_PREF_KEY, lang.code);
+                        // Navigate to the equivalent page in the selected language
+                        if (lang.code === 'he' && !pathname.startsWith('/he')) {
+                          navigate(pathname === '/' ? '/he' : `/he${pathname}`);
+                        } else if (lang.code === 'en' && pathname.startsWith('/he')) {
+                          navigate(pathname.slice(3) || '/');
+                        }
                       }}
                       className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm transition-colors ${
                         selectedLanguage === lang.code
