@@ -195,17 +195,18 @@ export default function Footer({ light = false }: { light?: boolean }) {
                       </li>
                     );
                   }
-                  // Documentation & API Reference link to API docs page
+                  // Documentation & API Reference link to external docs site
                   if (link === t.footer.documentation || link === t.footer.apiReference) {
-                    const docsPath = direction === 'rtl' ? '/he/docs' : '/docs';
                     return (
                       <li key={link}>
-                        <Link
-                          to={docsPath}
+                        <a
+                          href="https://docs.nexus-payment.com/"
+                          target="_blank"
+                          rel="noopener noreferrer"
                           className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
                         >
                           {link}
-                        </Link>
+                        </a>
                       </li>
                     );
                   }
