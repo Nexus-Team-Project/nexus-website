@@ -27,7 +27,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           items: [
             { name: t.navbar.loyaltyPartnerships, desc: t.navbar.loyaltyPartnershipsDesc, icon: Gift, href: lang === 'he' ? '/he/partners' : '/partners' },
             { name: t.navbar.loyaltyClub, desc: t.navbar.loyaltyClubDesc, icon: Users, href: lang === 'he' ? '/he/benefits' : '/benefits' },
-            { name: t.navbar.giftsWelfare, desc: t.navbar.giftsWelfareDesc, icon: Heart },
+            { name: t.navbar.giftsWelfare, desc: t.navbar.giftsWelfareDesc, icon: Heart, href: lang === 'he' ? '/he/welfare' : '/he/welfare' },
           ],
         },
         {
