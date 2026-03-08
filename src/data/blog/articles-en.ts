@@ -780,4 +780,642 @@ export const articlesEn: Article[] = [
       },
     ],
   },
+
+  // ─── Article 4: What Is an Employee Benefits Platform ───
+  {
+    slug: 'employee-benefits-platform',
+    title: 'What Is an Employee Benefits Platform? A Complete Guide for Organizations',
+    subtitle: 'Everything you need to know about modern employee benefits platforms',
+    excerpt:
+      'An employee benefits platform is a digital system that allows organizations to manage perks, rewards, discounts, and financial benefits for employees in one centralized place.',
+    metaTitle: 'What Is an Employee Benefits Platform? A Complete Guide for Organizations',
+    metaDescription:
+      'Learn what an employee benefits platform is, why companies use them, key capabilities of modern platforms, and how digital wallet infrastructure is shaping the future of employee benefits.',
+    category: 'benefits',
+    heroImage: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=800&q=80',
+    author: { name: 'Nexus Team', role: 'Loyalty & Payments Infrastructure' },
+    publishDate: '2026-04-22',
+    readTime: 7,
+    sections: [
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Introduction',
+        id: 'introduction',
+      },
+      {
+        type: 'paragraph',
+        text: 'Organizations today are expected to provide more than just salaries. Employees increasingly expect flexible benefits, digital perks, and personalized rewards that improve their financial wellbeing and daily lives.',
+      },
+      {
+        type: 'paragraph',
+        text: 'This is where employee benefits platforms come in.',
+      },
+      {
+        type: 'paragraph',
+        text: 'An employee benefits platform is a digital system that allows organizations to manage perks, rewards, discounts, and financial benefits for employees in one centralized place. These platforms typically provide tools for distributing benefits such as gift cards, vouchers, loyalty rewards, and financial services.',
+      },
+      {
+        type: 'paragraph',
+        text: 'As companies become more distributed and digital-first, benefits platforms have become a critical part of modern HR and employee experience infrastructure.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Why Companies Use Employee Benefits Platforms',
+        id: 'why-companies-use',
+      },
+      {
+        type: 'paragraph',
+        text: 'Traditional employee benefits programs were often manual and fragmented. HR teams had to coordinate multiple vendors, track benefits manually, and manage complex distribution processes.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Modern benefits platforms solve these problems by creating a centralized digital layer.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Organizations typically adopt these systems in order to:',
+      },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          'Improve employee satisfaction',
+          'Provide personalized rewards and perks',
+          'Simplify benefits distribution',
+          'Reduce administrative overhead',
+          'Create a stronger organizational culture',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text: 'Many companies also use benefits platforms to support hybrid and remote teams where traditional perks (like office meals or on-site benefits) are no longer effective.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Key Capabilities of Modern Benefits Platforms',
+        id: 'key-capabilities',
+      },
+      {
+        type: 'paragraph',
+        text: 'Modern platforms provide a wide range of capabilities designed to help organizations manage benefits efficiently.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Digital benefit distribution',
+        id: 'digital-distribution',
+      },
+      {
+        type: 'paragraph',
+        text: 'Employees can receive benefits digitally, often through mobile apps or digital wallets.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Gift card and voucher programs',
+        id: 'gift-card-programs',
+      },
+      {
+        type: 'paragraph',
+        text: 'Organizations can distribute branded gift cards or vouchers for major retailers and services.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Discount marketplaces',
+        id: 'discount-marketplaces',
+      },
+      {
+        type: 'paragraph',
+        text: 'Employees gain access to curated discounts across travel, electronics, food, and lifestyle services.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Reward and recognition tools',
+        id: 'reward-recognition',
+      },
+      {
+        type: 'paragraph',
+        text: 'Managers can reward employees for achievements, milestones, or performance.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Data and analytics',
+        id: 'data-analytics',
+      },
+      {
+        type: 'paragraph',
+        text: 'Organizations can track engagement, benefit usage, and program impact.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Popular Employee Benefits Platforms',
+        id: 'popular-platforms',
+      },
+      {
+        type: 'paragraph',
+        text: 'Several platforms operate in the employee benefits ecosystem. Some focus on large enterprise HR systems, while others focus on digital rewards infrastructure.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Pluxee — a global corporate benefits provider offering meal and employee benefit programs.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Cibus — a meal benefits and food payment platform commonly used by companies.',
+      },
+      {
+        type: 'paragraph',
+        text: 'BuyMe — a digital gift card marketplace widely used for employee rewards.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Benepass — a flexible benefits platform for global teams.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Nexus — a digital wallet infrastructure platform that enables organizations and communities to create their own benefit ecosystems, combining rewards, payments, loyalty programs and discounts in a single environment.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'The Future of Employee Benefits',
+        id: 'future-benefits',
+      },
+      {
+        type: 'paragraph',
+        text: 'The future of employee benefits is increasingly digital.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Instead of isolated perks, companies are moving toward benefit ecosystems where employees receive value across many aspects of life:',
+      },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          'Financial services',
+          'Lifestyle perks',
+          'Travel and experiences',
+          'Professional development',
+          'Wellness programs',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text: 'Digital wallet infrastructure is expected to play a major role in this shift by allowing organizations to manage benefits, rewards and payments through a single unified platform.',
+      },
+      {
+        type: 'link',
+        text: 'Nexus – Employee Benefits Platform',
+        href: 'https://www.nexus-pay.com',
+        description: 'Digital wallet infrastructure for organizations to create customized benefit and reward ecosystems.',
+      },
+    ],
+    faq: [
+      {
+        question: 'What is an employee benefits platform?',
+        answer:
+          'An employee benefits platform is a digital system used by organizations to distribute perks, rewards, discounts and financial benefits to employees.',
+      },
+      {
+        question: 'Why are companies adopting benefits platforms?',
+        answer:
+          'They simplify benefits management, improve employee engagement and allow organizations to deliver more flexible rewards.',
+      },
+      {
+        question: 'How does Nexus fit into the employee benefits ecosystem?',
+        answer:
+          'Nexus provides a digital wallet infrastructure that enables organizations to create customized benefit and reward ecosystems tailored to their communities.',
+      },
+    ],
+  },
+
+  // ─── Article 5: Best Employee Benefits Platforms ───
+  {
+    slug: 'best-employee-benefits-platforms',
+    title: 'Best Employee Benefits Platforms for Organizations and Communities',
+    subtitle: 'A comparison of leading platforms for employee rewards and benefits',
+    excerpt:
+      'A guide reviewing the most prominent employee benefits platforms used by companies and organizations today, from gift card marketplaces to digital wallet infrastructure.',
+    metaTitle: 'Best Employee Benefits Platforms for Organizations and Communities',
+    metaDescription:
+      'Compare the best employee benefits platforms including Pluxee, Cibus, BuyMe, Benepass, and Nexus. Learn what to look for and how community-based benefits are changing the landscape.',
+    category: 'benefits',
+    heroImage: 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=800&q=80',
+    author: { name: 'Nexus Team', role: 'Loyalty & Payments Infrastructure' },
+    publishDate: '2026-04-29',
+    readTime: 8,
+    sections: [
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Introduction',
+        id: 'introduction',
+      },
+      {
+        type: 'paragraph',
+        text: 'Employee benefits programs have evolved significantly over the past decade. Companies are no longer limited to traditional perks like meal cards or occasional bonuses. Instead, organizations are increasingly building digital ecosystems of rewards, financial benefits and lifestyle perks.',
+      },
+      {
+        type: 'paragraph',
+        text: 'To support these programs, many organizations rely on employee benefits platforms that centralize benefit distribution and employee engagement.',
+      },
+      {
+        type: 'paragraph',
+        text: 'In this guide we review some of the most prominent platforms used by companies and organizations today.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'What Makes a Good Benefits Platform?',
+        id: 'what-makes-good',
+      },
+      {
+        type: 'paragraph',
+        text: 'Before comparing platforms, it\'s important to understand what organizations typically look for.',
+      },
+      {
+        type: 'paragraph',
+        text: 'A strong employee benefits platform usually provides:',
+      },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          'Digital benefit delivery',
+          'Flexible reward programs',
+          'Integrations with HR and payroll systems',
+          'Access to major brands and merchants',
+          'Analytics and reporting',
+          'Scalable infrastructure',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text: 'Some platforms focus on gift cards and perks, while others focus on broader financial infrastructure.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Leading Employee Benefits Platforms',
+        id: 'leading-platforms',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Pluxee',
+        id: 'pluxee',
+      },
+      {
+        type: 'paragraph',
+        text: 'Pluxee is one of the largest global employee benefits providers. It offers meal benefits, lifestyle perks and corporate benefit programs across many countries.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Cibus',
+        id: 'cibus',
+      },
+      {
+        type: 'paragraph',
+        text: 'Cibus focuses primarily on food and meal benefits. Companies use it to provide employees with daily meal allowances through a digital payment system.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'BuyMe',
+        id: 'buyme',
+      },
+      {
+        type: 'paragraph',
+        text: 'BuyMe operates as a gift card marketplace. Organizations can distribute digital gift cards from major brands as employee rewards or incentives.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Benepass',
+        id: 'benepass',
+      },
+      {
+        type: 'paragraph',
+        text: 'Benepass provides flexible benefits infrastructure designed for global teams and modern HR programs.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Nexus',
+        id: 'nexus',
+      },
+      {
+        type: 'paragraph',
+        text: 'Nexus takes a different approach by providing digital wallet infrastructure that allows organizations and communities to create their own benefit ecosystems. Instead of offering a fixed marketplace, Nexus enables organizations to integrate payments, loyalty programs, discounts and rewards into a customizable platform.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Choosing the Right Platform',
+        id: 'choosing-platform',
+      },
+      {
+        type: 'paragraph',
+        text: 'The right platform depends on the organization\'s needs.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Some companies need simple reward tools, while others want a full ecosystem.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Organizations typically evaluate platforms based on:',
+      },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          'Flexibility of the system',
+          'Variety of benefits available',
+          'Ability to customize the program',
+          'Scalability for large communities',
+          'Integrations with existing tools',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text: 'Communities, associations and membership organizations often prefer platforms that allow them to create custom benefit ecosystems rather than relying on a single marketplace.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'The Rise of Community-Based Benefits',
+        id: 'community-benefits',
+      },
+      {
+        type: 'paragraph',
+        text: 'One of the most interesting developments in this space is the rise of community-driven benefits platforms.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Instead of a company providing benefits to employees, entire communities can now create shared benefit ecosystems for their members.',
+      },
+      {
+        type: 'paragraph',
+        text: 'These programs often combine:',
+      },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          'Discounts from partner businesses',
+          'Loyalty rewards',
+          'Digital wallets',
+          'Payment infrastructure',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text: 'Platforms like Nexus are designed specifically for this emerging model.',
+      },
+      {
+        type: 'link',
+        text: 'Nexus – Benefits Platform Infrastructure',
+        href: 'https://www.nexus-pay.com',
+        description: 'Build customizable benefit ecosystems using digital wallet infrastructure for organizations and communities.',
+      },
+    ],
+    faq: [
+      {
+        question: 'What is the best employee benefits platform?',
+        answer:
+          'The best platform depends on the organization\'s goals, size and structure. Some focus on perks marketplaces, while others offer broader digital infrastructure.',
+      },
+      {
+        question: 'Do benefits platforms work for communities and associations?',
+        answer:
+          'Yes. Many organizations such as alumni groups, professional communities and associations now use benefits platforms to provide value to their members.',
+      },
+      {
+        question: 'How is Nexus different from traditional benefit platforms?',
+        answer:
+          'Nexus focuses on building customizable benefit ecosystems using digital wallet infrastructure rather than offering a fixed set of perks.',
+      },
+    ],
+  },
+
+  // ─── Article 6: Digital Wallet Infrastructure for Loyalty and Benefits ───
+  {
+    slug: 'digital-wallet-infrastructure',
+    title: 'Digital Wallet Infrastructure for Loyalty and Benefits Programs',
+    subtitle: 'How digital wallets are becoming the foundation for organizational benefits',
+    excerpt:
+      'Digital wallets are no longer just for payments. They are becoming the foundation for loyalty programs, employee benefits, community rewards and financial services.',
+    metaTitle: 'Digital Wallet Infrastructure for Loyalty and Benefits Programs',
+    metaDescription:
+      'Discover how digital wallet infrastructure is transforming loyalty programs, employee benefits, and community rewards. Learn about key use cases and the future of wallet-based benefits.',
+    category: 'loyalty',
+    heroImage: 'https://images.unsplash.com/photo-1563986768609-322da13575f2?w=800&q=80',
+    author: { name: 'Nexus Team', role: 'Loyalty & Payments Infrastructure' },
+    publishDate: '2026-05-06',
+    readTime: 7,
+    sections: [
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Introduction',
+        id: 'introduction',
+      },
+      {
+        type: 'paragraph',
+        text: 'Digital wallets are no longer used only for payments. Increasingly, they are becoming the foundation for loyalty programs, employee benefits, community rewards and financial services.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Organizations are discovering that a digital wallet infrastructure can serve as the central hub for managing engagement, benefits and transactions.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'What Is a Digital Wallet Platform?',
+        id: 'what-is-wallet',
+      },
+      {
+        type: 'paragraph',
+        text: 'A digital wallet platform allows users to store value, rewards, vouchers and payment methods in a unified interface.',
+      },
+      {
+        type: 'paragraph',
+        text: 'While consumer wallets like Apple Pay or Google Wallet focus on payments, organizational wallet platforms provide additional capabilities such as:',
+      },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          'Loyalty points',
+          'Employee benefits',
+          'Gift cards',
+          'Vouchers and discounts',
+          'Membership perks',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text: 'These wallets become the interface through which users interact with a benefit ecosystem.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Why Organizations Are Adopting Wallet Infrastructure',
+        id: 'why-adopting',
+      },
+      {
+        type: 'paragraph',
+        text: 'Digital wallets provide several advantages for organizations.',
+      },
+      {
+        type: 'paragraph',
+        text: 'First, they create a single digital environment where benefits, rewards and payments can coexist.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Second, wallets significantly improve user engagement because benefits are delivered through a familiar mobile experience.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Third, they allow organizations to collect valuable insights about how users interact with benefits and rewards.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Key Use Cases',
+        id: 'use-cases',
+      },
+      {
+        type: 'paragraph',
+        text: 'Digital wallet infrastructure can support many types of programs.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Employee benefits wallets',
+        id: 'employee-wallets',
+      },
+      {
+        type: 'paragraph',
+        text: 'Companies distribute rewards, vouchers and financial perks through a dedicated wallet.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Community loyalty programs',
+        id: 'community-loyalty',
+      },
+      {
+        type: 'paragraph',
+        text: 'Organizations and communities offer members exclusive benefits and discounts.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Membership ecosystems',
+        id: 'membership-ecosystems',
+      },
+      {
+        type: 'paragraph',
+        text: 'Associations provide digital benefits tied to membership status.',
+      },
+      {
+        type: 'heading',
+        level: 3,
+        text: 'Retail loyalty programs',
+        id: 'retail-loyalty',
+      },
+      {
+        type: 'paragraph',
+        text: 'Businesses create reward programs that integrate directly with payment systems.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'Platforms Building Wallet-Based Benefit Systems',
+        id: 'platforms-building',
+      },
+      {
+        type: 'paragraph',
+        text: 'Several technology providers are building infrastructure for these ecosystems. These platforms differ in how much customization and flexibility they offer.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Traditional solutions often focus on specific programs like gift cards or loyalty points.',
+      },
+      {
+        type: 'paragraph',
+        text: 'Newer platforms like Nexus allow organizations to build complete benefit ecosystems combining payments, rewards, loyalty programs, discounts and digital wallets.',
+      },
+      {
+        type: 'paragraph',
+        text: 'This infrastructure approach allows organizations to design programs tailored to their communities rather than relying on a predefined marketplace.',
+      },
+      {
+        type: 'heading',
+        level: 2,
+        text: 'The Future of Wallet-Based Benefits',
+        id: 'future-wallet',
+      },
+      {
+        type: 'paragraph',
+        text: 'The boundaries between payments, rewards and benefits are quickly disappearing.',
+      },
+      {
+        type: 'paragraph',
+        text: 'In the coming years, organizations are likely to manage:',
+      },
+      {
+        type: 'list',
+        ordered: false,
+        items: [
+          'Payments',
+          'Benefits',
+          'Loyalty programs',
+          'Financial services',
+        ],
+      },
+      {
+        type: 'paragraph',
+        text: 'through unified digital wallet platforms.',
+      },
+      {
+        type: 'paragraph',
+        text: 'This shift will enable organizations to create stronger engagement with employees, members and customers while building new financial ecosystems.',
+      },
+      {
+        type: 'link',
+        text: 'Nexus – Digital Wallet Infrastructure',
+        href: 'https://www.nexus-pay.com',
+        description: 'Infrastructure for organizations and communities to build customized digital wallet ecosystems for benefits, payments and loyalty programs.',
+      },
+    ],
+    faq: [
+      {
+        question: 'What is a digital wallet infrastructure platform?',
+        answer:
+          'It is a system that enables organizations to build wallets that store payments, rewards, loyalty points and benefits.',
+      },
+      {
+        question: 'Why are wallets useful for loyalty and benefits programs?',
+        answer:
+          'They create a single interface where users can access rewards, perks and payments.',
+      },
+      {
+        question: 'What role does Nexus play in this ecosystem?',
+        answer:
+          'Nexus provides the infrastructure that allows organizations and communities to build customized digital wallet ecosystems for benefits, payments and loyalty programs.',
+      },
+    ],
+  },
 ];
