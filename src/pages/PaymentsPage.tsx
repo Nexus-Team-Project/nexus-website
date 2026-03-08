@@ -308,9 +308,11 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
-      <div className="relative">
-        <section className="relative z-10 pt-32 pb-20 bg-slate-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
+      <div className="relative pb-[60px]">
+        {/* Hero section bg */}
+        <section className="relative pt-32 pb-20 bg-slate-50">
+          {/* Hero content — z-20 so it sits ABOVE the diagonal */}
+          <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6">
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
 
@@ -381,15 +383,15 @@ export default function PaymentsPage() {
             </div>
           </div>
         </section>
-      </div>
 
-      {/* ── Gradient diagonal — sits between hero and S2, not inside overflow-hidden ── */}
-      <div className="relative z-[5] h-[120px] -mt-[60px] -mb-[60px]">
-        <AnimatedGradient clipPath="polygon(0 0%, 100% 20%, 100% 100%, 0 80%)" />
-        <div className="absolute inset-0 pointer-events-none" style={{
-          clipPath: 'polygon(0 0%, 100% 20%, 100% 100%, 0 80%)',
-          background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(0,0,0,0.18) 100%)'
-        }} />
+        {/* ── Gradient diagonal — above S2, below hero content ── */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 h-[180px]">
+          <AnimatedGradient clipPath="polygon(0 30%, 100% 0%, 100% 70%, 0 100%)" />
+          <div className="absolute inset-0 pointer-events-none" style={{
+            clipPath: 'polygon(0 30%, 100% 0%, 100% 70%, 0 100%)',
+            background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(0,0,0,0.18) 100%)'
+          }} />
+        </div>
       </div>
 
       {/* ══════════════════════════════════════════════════════════
