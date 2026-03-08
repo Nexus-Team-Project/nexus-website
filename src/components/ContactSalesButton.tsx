@@ -17,7 +17,9 @@ export default function ContactSalesButton({ onClick }: ContactSalesButtonProps)
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+        transform: hovered ? 'translate3d(0, -2px, 0)' : 'translate3d(0, 0, 0)',
+        willChange: 'transform',
+        backfaceVisibility: 'hidden' as const,
       }}
     >
       <div className="relative">
