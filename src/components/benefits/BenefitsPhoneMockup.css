@@ -1,0 +1,161 @@
+/* ═══════════════════════════════════════════════════════════════
+   Benefits Phone Mockup — CSS Animations
+   Adapted from PaymentAnimation.css + nexus-wallet story slides
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Phone float — gentle vertical bob */
+@keyframes benefitsPhoneFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-8px); }
+}
+
+.benefits-phone {
+  animation: benefitsPhoneFloat 4.5s ease-in-out infinite;
+}
+
+/* ── Benefit card staggered entrance ── */
+@keyframes benefitCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.benefit-card { opacity: 0; animation: benefitCardEnter 0.5s ease-out forwards; }
+.benefit-card:nth-child(1) { animation-delay: 0.3s; }
+.benefit-card:nth-child(2) { animation-delay: 0.45s; }
+.benefit-card:nth-child(3) { animation-delay: 0.6s; }
+.benefit-card:nth-child(4) { animation-delay: 0.75s; }
+.benefit-card:nth-child(5) { animation-delay: 0.9s; }
+.benefit-card:nth-child(6) { animation-delay: 1.05s; }
+
+/* ── Discount badge pulse ── */
+@keyframes discountPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 6px rgba(34, 197, 94, 0.25);
+  }
+  50% {
+    transform: scale(1.08);
+    box-shadow: 0 3px 10px rgba(34, 197, 94, 0.45);
+  }
+}
+
+.discount-badge {
+  animation: discountPulse 2.5s ease-in-out infinite;
+}
+
+/* ── Shimmer sweep on phone screen ── */
+@keyframes benefitsShimmer {
+  0%, 70%  { left: -100%; }
+  90%      { left: 120%; }
+  100%     { left: 120%; }
+}
+
+.benefits-phone-screen::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+  animation: benefitsShimmer 5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* ── Org logo + name bar slide-in ── */
+@keyframes orgBarEnter {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.org-bar {
+  opacity: 0;
+  animation: orgBarEnter 0.4s ease-out 0.15s forwards;
+}
+
+/* ── Bottom CTA bounce ── */
+@keyframes ctaBounce {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2px); }
+}
+
+.phone-cta-benefits {
+  animation: ctaBounce 2s ease-in-out infinite;
+  animation-delay: 1.5s;
+}
+
+/* ── Background blobs ── */
+@keyframes benefitsBlobDrift1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.12; }
+  50%      { transform: translate(15px, 10px) scale(1.15); opacity: 0.2; }
+}
+
+@keyframes benefitsBlobDrift2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.10; }
+  50%      { transform: translate(-12px, -8px) scale(1.1); opacity: 0.18; }
+}
+
+.benefits-blob-1 { animation: benefitsBlobDrift1 8s ease-in-out infinite; }
+.benefits-blob-2 { animation: benefitsBlobDrift2 10s ease-in-out infinite; }
+
+/* ── Carousel auto-slide for second phone variant ── */
+@keyframes benefitsCarousel {
+  0%, 18%   { transform: translateX(0); }
+  25%, 43%  { transform: translateX(-100%); }
+  50%, 68%  { transform: translateX(-200%); }
+  75%, 93%  { transform: translateX(-100%); }
+  100%      { transform: translateX(0); }
+}
+
+.benefits-carousel-strip {
+  animation: benefitsCarousel 12s ease-in-out infinite;
+}
+
+/* ── Provider grid staggered entrance (triggered by scroll-reveal) ── */
+@keyframes providerLogoEnter {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.provider-logo {
+  opacity: 0;
+  transition: none;
+}
+
+.revealed .provider-logo {
+  animation: providerLogoEnter 0.4s ease-out forwards;
+}
+
+.revealed .provider-logo:nth-child(1)  { animation-delay: 0.05s; }
+.revealed .provider-logo:nth-child(2)  { animation-delay: 0.10s; }
+.revealed .provider-logo:nth-child(3)  { animation-delay: 0.15s; }
+.revealed .provider-logo:nth-child(4)  { animation-delay: 0.20s; }
+.revealed .provider-logo:nth-child(5)  { animation-delay: 0.25s; }
+.revealed .provider-logo:nth-child(6)  { animation-delay: 0.30s; }
+.revealed .provider-logo:nth-child(7)  { animation-delay: 0.35s; }
+.revealed .provider-logo:nth-child(8)  { animation-delay: 0.40s; }
+.revealed .provider-logo:nth-child(9)  { animation-delay: 0.45s; }
+.revealed .provider-logo:nth-child(10) { animation-delay: 0.50s; }
+.revealed .provider-logo:nth-child(11) { animation-delay: 0.55s; }
+.revealed .provider-logo:nth-child(12) { animation-delay: 0.60s; }
+
+/* ── How-it-works step entrance ── */
+.revealed .step-card:nth-child(1) { transition-delay: 0.1s; }
+.revealed .step-card:nth-child(2) { transition-delay: 0.25s; }
+.revealed .step-card:nth-child(3) { transition-delay: 0.4s; }
+
+/* ── Feature card hover lift ── */
+.benefit-feature-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.benefit-feature-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(99, 91, 255, 0.12);
+}

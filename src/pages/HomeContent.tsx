@@ -5,7 +5,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
 import PartnerBubbles from '../components/PartnerBubbles';
-import LanguageSwitcher from '../components/LanguageSwitcher';
+
 import { useSectionVisible } from '../hooks/useSectionVisible';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
@@ -472,9 +472,6 @@ export default function HomeContent() {
           <FooterSkeleton />
         )}
       </div>
-
-      {/* Language Switcher */}
-      <LanguageSwitcher />
     </div>
   );
 }
