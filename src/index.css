@@ -28,14 +28,15 @@ body {
 /* Scroll-reveal animations */
 .scroll-reveal {
   opacity: 0;
-  transform: translateY(28px);
+  transform: translateY(28px) translateZ(0);
   transition: opacity 0.65s ease-out, transform 0.65s ease-out;
   will-change: opacity, transform;
+  backface-visibility: hidden;
 }
 
 .scroll-reveal.revealed {
   opacity: 1;
-  transform: translateY(0);
+  transform: translateY(0) translateZ(0);
 }
 
 .scroll-reveal.delay-1 { transition-delay: 0.1s; }
@@ -60,28 +61,32 @@ video:focus-visible {
 /* Partner logos mobile slider */
 @keyframes partnerSlide {
   0% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   100% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
 }
 
 @keyframes partnerSlideReverse {
   0% {
-    transform: translateX(-50%);
+    transform: translate3d(-50%, 0, 0);
   }
   100% {
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 .partner-slider {
   animation: partnerSlide 12s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .partner-slider-reverse {
   animation: partnerSlideReverse 12s linear infinite;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* Mega Menu Slide Animations — opacity only, no X/Y movement to prevent layout jumps */
@@ -115,22 +120,22 @@ video:focus-visible {
 @keyframes slideOutLeft {
   from {
     opacity: 1;
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   to {
     opacity: 0;
-    transform: translateX(-60px);
+    transform: translate3d(-60px, 0, 0);
   }
 }
 
 @keyframes slideOutRight {
   from {
     opacity: 1;
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   to {
     opacity: 0;
-    transform: translateX(60px);
+    transform: translate3d(60px, 0, 0);
   }
 }
 
@@ -152,16 +157,16 @@ video:focus-visible {
 /* Float animation for global money movement */
 @keyframes float {
   0%, 100% {
-    transform: translateY(0) translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   25% {
-    transform: translateY(-8px) translateX(4px);
+    transform: translate3d(4px, -8px, 0);
   }
   50% {
-    transform: translateY(-4px) translateX(-4px);
+    transform: translate3d(-4px, -4px, 0);
   }
   75% {
-    transform: translateY(-10px) translateX(2px);
+    transform: translate3d(2px, -10px, 0);
   }
 }
 
@@ -518,16 +523,18 @@ video:focus-visible {
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(32px);
+    transform: translateY(32px) translateZ(0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) translateZ(0);
   }
 }
 
 .animate-fade-in-up {
   animation: fadeInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 /* Gift Card Pulse Animation */
@@ -545,6 +552,8 @@ video:focus-visible {
 
 .gift-card-pulse {
   animation: giftCardPulse 1.5s ease-in-out;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* Dynamic grid margin - adjusts when embed payments card expands */
@@ -562,17 +571,19 @@ video:focus-visible {
 @keyframes typingLine {
   from {
     opacity: 0;
-    transform: translateX(-10px);
+    transform: translateX(-10px) translateZ(0);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translateX(0) translateZ(0);
   }
 }
 
 .code-line {
   opacity: 0;
   animation: typingLine 0.3s ease-out forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .code-line:nth-child(1) { animation-delay: 0.1s; }
@@ -608,22 +619,22 @@ video:focus-visible {
 @keyframes slideInLeftRTL {
   from {
     opacity: 0;
-    transform: translateX(60px);
+    transform: translate3d(60px, 0, 0);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 @keyframes slideInRightRTL {
   from {
     opacity: 0;
-    transform: translateX(-60px);
+    transform: translate3d(-60px, 0, 0);
   }
   to {
     opacity: 1;
-    transform: translateX(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -638,15 +649,15 @@ video:focus-visible {
 /* RTL Float animation adjustments */
 [dir="rtl"] @keyframes float {
   0%, 100% {
-    transform: translateY(0) translateX(0);
+    transform: translate3d(0, 0, 0);
   }
   25% {
-    transform: translateY(-8px) translateX(-4px);
+    transform: translate3d(-4px, -8px, 0);
   }
   50% {
-    transform: translateY(-4px) translateX(4px);
+    transform: translate3d(4px, -4px, 0);
   }
   75% {
-    transform: translateY(-10px) translateX(-2px);
+    transform: translate3d(-2px, -10px, 0);
   }
 }

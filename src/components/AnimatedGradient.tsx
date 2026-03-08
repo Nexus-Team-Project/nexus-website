@@ -14,7 +14,7 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
       {/* Animated blobs — bigger, faster, more travel distance */}
       <div
         className="absolute w-[150%] h-[150%] -top-[25%] -left-[25%]"
-        style={{ filter: 'blur(70px)' }}
+        style={{ filter: 'blur(70px)', transform: 'translateZ(0)' }}
       >
         {/* Soft purple/magenta */}
         <div
@@ -24,6 +24,8 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             top: '0%',
             left: '50%',
             animation: 'blob1 10s ease-in-out infinite alternate',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden' as const,
           }}
         />
         {/* Light cyan/turquoise */}
@@ -34,6 +36,8 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             top: '20%',
             left: '20%',
             animation: 'blob2 13s ease-in-out infinite alternate',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden' as const,
           }}
         />
         {/* Golden yellow — soft and warm */}
@@ -44,6 +48,8 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             top: '12%',
             left: '-5%',
             animation: 'blob3 12s ease-in-out infinite alternate',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden' as const,
           }}
         />
         {/* Soft pink accent */}
@@ -54,6 +60,8 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             top: '30%',
             left: '40%',
             animation: 'blob4 11s ease-in-out infinite alternate',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden' as const,
           }}
         />
         {/* Light lavender */}
@@ -64,45 +72,47 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             top: '5%',
             left: '30%',
             animation: 'blob5 14s ease-in-out infinite alternate',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden' as const,
           }}
         />
       </div>
 
       <style>{`
         @keyframes blob1 {
-          0% { transform: translate(0, 0) scale(1); }
-          25% { transform: translate(-25%, 20%) scale(1.25); }
-          50% { transform: translate(15%, -20%) scale(0.85); }
-          75% { transform: translate(-20%, -10%) scale(1.15); }
-          100% { transform: translate(20%, 15%) scale(0.9); }
+          0% { transform: translate3d(0, 0, 0) scale(1); }
+          25% { transform: translate3d(-25%, 20%, 0) scale(1.25); }
+          50% { transform: translate3d(15%, -20%, 0) scale(0.85); }
+          75% { transform: translate3d(-20%, -10%, 0) scale(1.15); }
+          100% { transform: translate3d(20%, 15%, 0) scale(0.9); }
         }
         @keyframes blob2 {
-          0% { transform: translate(0, 0) scale(1); }
-          25% { transform: translate(25%, -20%) scale(1.3); }
-          50% { transform: translate(-20%, 25%) scale(0.8); }
-          75% { transform: translate(15%, 15%) scale(1.2); }
-          100% { transform: translate(-25%, -15%) scale(1.1); }
+          0% { transform: translate3d(0, 0, 0) scale(1); }
+          25% { transform: translate3d(25%, -20%, 0) scale(1.3); }
+          50% { transform: translate3d(-20%, 25%, 0) scale(0.8); }
+          75% { transform: translate3d(15%, 15%, 0) scale(1.2); }
+          100% { transform: translate3d(-25%, -15%, 0) scale(1.1); }
         }
         @keyframes blob3 {
-          0% { transform: translate(0, 0) scale(1); }
-          25% { transform: translate(-20%, -25%) scale(1.2); }
-          50% { transform: translate(25%, 20%) scale(1.3); }
-          75% { transform: translate(20%, -15%) scale(0.85); }
-          100% { transform: translate(-15%, 25%) scale(1.15); }
+          0% { transform: translate3d(0, 0, 0) scale(1); }
+          25% { transform: translate3d(-20%, -25%, 0) scale(1.2); }
+          50% { transform: translate3d(25%, 20%, 0) scale(1.3); }
+          75% { transform: translate3d(20%, -15%, 0) scale(0.85); }
+          100% { transform: translate3d(-15%, 25%, 0) scale(1.15); }
         }
         @keyframes blob4 {
-          0% { transform: translate(0, 0) scale(1); }
-          25% { transform: translate(20%, 20%) scale(0.85); }
-          50% { transform: translate(-25%, -15%) scale(1.25); }
-          75% { transform: translate(-10%, 25%) scale(1.1); }
-          100% { transform: translate(25%, -20%) scale(0.9); }
+          0% { transform: translate3d(0, 0, 0) scale(1); }
+          25% { transform: translate3d(20%, 20%, 0) scale(0.85); }
+          50% { transform: translate3d(-25%, -15%, 0) scale(1.25); }
+          75% { transform: translate3d(-10%, 25%, 0) scale(1.1); }
+          100% { transform: translate3d(25%, -20%, 0) scale(0.9); }
         }
         @keyframes blob5 {
-          0% { transform: translate(0, 0) scale(1); }
-          25% { transform: translate(25%, 10%) scale(1.2); }
-          50% { transform: translate(-15%, -25%) scale(1.15); }
-          75% { transform: translate(20%, 20%) scale(0.85); }
-          100% { transform: translate(-20%, 15%) scale(1.3); }
+          0% { transform: translate3d(0, 0, 0) scale(1); }
+          25% { transform: translate3d(25%, 10%, 0) scale(1.2); }
+          50% { transform: translate3d(-15%, -25%, 0) scale(1.15); }
+          75% { transform: translate3d(20%, 20%, 0) scale(0.85); }
+          100% { transform: translate3d(-20%, 15%, 0) scale(1.3); }
         }
       `}</style>
     </div>
