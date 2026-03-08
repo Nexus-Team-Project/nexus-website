@@ -97,9 +97,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           title: t.navbar.learn,
           items: [
             { name: t.navbar.blog, desc: t.navbar.newsInsights, icon: Newspaper, href: lang === 'he' ? '/he/blog' : '/blog' },
-            { name: t.navbar.guides, desc: t.navbar.bestPractices, icon: Book },
-            { name: t.navbar.webinars, desc: t.navbar.liveTraining, icon: Youtube },
-            { name: t.navbar.videoTutorials, desc: t.navbar.watchAndLearn, icon: Youtube },
           ],
         },
         {
@@ -107,23 +104,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           items: [
             { name: t.navbar.helpCenter, desc: t.navbar.findAnswers, icon: HelpCircle },
             { name: t.navbar.contactSupport, desc: t.navbar.getHelp, icon: MessageSquare },
-            { name: t.navbar.apiStatus, desc: t.navbar.systemStatus, icon: BarChart3 },
-          ],
-        },
-        {
-          title: t.navbar.company,
-          items: [
-            { name: t.navbar.aboutUs, desc: t.navbar.ourStory, icon: Building2 },
-            { name: t.navbar.careers, desc: t.navbar.joinOurTeam, icon: Users },
-            { name: t.navbar.pressKit, desc: t.navbar.mediaResources, icon: FileText },
-          ],
-        },
-        {
-          title: t.navbar.customerStories,
-          items: [
-            { name: t.navbar.caseStudies, desc: t.navbar.successStories, icon: TrendingUp },
-            { name: t.testimonials.title, desc: t.navbar.whatCustomersSay, icon: MessageSquare },
-            { name: t.footer.partners, desc: t.navbar.ourEcosystem, icon: Network },
           ],
         },
       ],
