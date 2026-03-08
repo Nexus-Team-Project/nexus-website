@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Lightbulb, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
+import { AlertTriangle, Lightbulb, Sparkles, ChevronLeft, ChevronRight, BarChart3, CheckCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import AnimatedGradient from '../components/AnimatedGradient';
 import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 import BenefitsHowItWorks from '../components/benefits/BenefitsHowItWorks';
-import DashboardMock from '../components/workspace/DashboardMock';
 import PartnerBubbles from '../components/PartnerBubbles';
 import StoryWalletCards from '../components/benefits/StoryWalletCards';
 import StoryInsightsCarousel from '../components/benefits/StoryInsightsCarousel';
@@ -385,9 +384,71 @@ export default function BenefitsPage() {
           </div>
           <BenefitsFeatureGrid />
 
-          {/* Dashboard preview */}
-          <div className="mt-16 relative rounded-2xl overflow-hidden border border-slate-200 shadow-xl" style={{ height: 520 }}>
-            <DashboardMock />
+          {/* Dashboard preview — compact panel from NexusLandingPage hero */}
+          <div className="mt-16 relative bg-white/60 backdrop-blur-xl border border-slate-200 rounded-2xl shadow-2xl p-4 max-w-2xl mx-auto">
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+              {/* Browser chrome */}
+              <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-red-300" />
+                <div className="w-3 h-3 rounded-full bg-yellow-300" />
+                <div className="w-3 h-3 rounded-full bg-green-300" />
+                <span className={`${isRtl ? 'mr-4' : 'ml-4'} text-[10px] text-slate-400 font-mono`}>nexus.co.il/dashboard</span>
+              </div>
+              <div className="p-6" dir={direction}>
+                {/* Header */}
+                <div className="flex justify-between items-center mb-6">
+                  <div>
+                    <div className="text-xs text-slate-400 mb-1">{he ? 'סה״כ הטבות פעילות' : 'Total Active Benefits'}</div>
+                    <div className="text-2xl font-bold text-slate-900">{he ? '₪ 2,450,000' : '$2,450,000'}</div>
+                  </div>
+                  <div className="h-10 w-10 bg-stripe-purple/10 rounded-full flex items-center justify-center">
+                    <BarChart3 size={20} className="text-stripe-purple" />
+                  </div>
+                </div>
+                {/* Stats row */}
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-emerald-700">{he ? '₪1.8M' : '$1.8M'}</div>
+                    <div className="text-[10px] text-emerald-600">{he ? 'נוצל' : 'Redeemed'}</div>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-blue-700">{he ? '₪650K' : '$650K'}</div>
+                    <div className="text-[10px] text-blue-600">{he ? 'זמין' : 'Available'}</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-3 text-center">
+                    <div className="text-lg font-bold text-purple-700">1,240</div>
+                    <div className="text-[10px] text-purple-600">{he ? 'חברים' : 'Members'}</div>
+                  </div>
+                </div>
+                {/* Progress bars */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">{he ? 'קאשבק' : 'Cashback'}</span>
+                    <span className="text-slate-700 font-semibold">78%</span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-stripe-purple to-purple-400 rounded-full`} style={{ width: '78%' }} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">{he ? 'גיפט קארדס' : 'Gift Cards'}</span>
+                    <span className="text-slate-700 font-semibold">92%</span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-emerald-500 to-emerald-300 rounded-full`} style={{ width: '92%' }} />
+                  </div>
+                </div>
+                {/* Notification */}
+                <div className="mt-5 bg-green-50 rounded-lg p-3 border border-green-100 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <CheckCircle size={16} className="text-green-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">{he ? 'הקמפיין הושלם!' : 'Campaign Complete!'}</div>
+                    <div className="text-[10px] text-slate-500">{he ? '350 חברים קיבלו הטבה חדשה' : '350 members received a new benefit'}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
