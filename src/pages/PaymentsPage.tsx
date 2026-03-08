@@ -1,6 +1,6 @@
-import { useEffect, lazy, Suspense, useState } from 'react';
+import { useEffect, lazy, Suspense, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, CreditCard, Link2, RefreshCw, Users } from 'lucide-react';
+import { Check, CreditCard, Link2, RefreshCw, Users, Zap } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import PaymentAnimation, { PaymentPricingPanel, PaymentCheckoutPanel } from '../components/PaymentAnimation';
 import AnimatedGradient from '../components/AnimatedGradient';
@@ -22,6 +22,72 @@ function useScrollReveal() {
     document.querySelectorAll('.scroll-reveal').forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
+}
+
+// ─── Transaction Overlay — floating notifications on phone ───
+const CLEARING_TRANSACTIONS = [
+  { merchantHe: 'חנות אונליין', merchantEn: 'Online Store', amount: '₪1,250', timeHe: 'עכשיו', timeEn: 'Now' },
+  { merchantHe: 'מסעדת שף', merchantEn: 'Chef Restaurant', amount: '₪480', timeHe: 'לפני 2 דק׳', timeEn: '2 min ago' },
+  { merchantHe: 'סטודיו כושר', merchantEn: 'Fitness Studio', amount: '₪320', timeHe: 'לפני 5 דק׳', timeEn: '5 min ago' },
+  { merchantHe: 'חנות אלקטרוניקה', merchantEn: 'Electronics Shop', amount: '₪2,100', timeHe: 'לפני 8 דק׳', timeEn: '8 min ago' },
+];
+
+function TransactionOverlay({ he }: { he: boolean }) {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let step = 0;
+    timerRef.current = setInterval(() => {
+      step++;
+      if (step <= CLEARING_TRANSACTIONS.length) {
+        setVisibleCount(step);
+      } else if (step === CLEARING_TRANSACTIONS.length + 3) {
+        // Reset and restart cycle
+        setVisibleCount(0);
+        step = 0;
+      }
+    }, 1100);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, []);
+
+  return (
+    <div className="absolute bottom-8 right-[-180px] z-30 flex flex-col gap-2 pointer-events-none"
+         style={{ width: '210px' }}>
+      {CLEARING_TRANSACTIONS.slice(0, visibleCount).map((tx, i) => (
+        <div
+          key={i}
+          className="bg-white rounded-xl shadow-lg border border-slate-200/80 px-3 py-2.5 flex items-center gap-2.5 transition-all duration-500 ease-out"
+          style={{
+            opacity: 1,
+            transform: 'translateY(0)',
+            animation: `txSlideIn 0.45s ease-out`,
+          }}
+        >
+          <div className="w-8 h-8 rounded-lg bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0">
+            <span className="text-green-500 text-xs font-bold">₪</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-900 truncate">
+                {he ? tx.merchantHe : tx.merchantEn}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-0.5">
+              <span className="text-[10px] text-slate-400">{he ? tx.timeHe : tx.timeEn}</span>
+              <span className="text-[11px] font-black text-green-600">{tx.amount}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+      <style>{`
+        @keyframes txSlideIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 // ─── Reusable bullet (icon on right in RTL, left in LTR) ───
@@ -51,11 +117,12 @@ function CheckRow({ text }: { text: string }) {
 }
 
 // ─── Pricing Calculator Section ───────────────────────────
+// Reversed order: start from 0.7% (best rate visible first), user can slide to see higher rates
 const MILESTONES = [
-  { pct: '1.2%', labelHe: 'התחלה',              labelEn: 'Starting rate' },
-  { pct: '0.9%', labelHe: 'מעל ₪1M בחודש',     labelEn: 'Above ₪1M/mo'  },
-  { pct: '0.8%', labelHe: 'מעל ₪5M בחודש',     labelEn: 'Above ₪5M/mo'  },
   { pct: '0.7%', labelHe: 'מעל ₪10M בחודש',    labelEn: 'Above ₪10M/mo' },
+  { pct: '0.8%', labelHe: 'מעל ₪5M בחודש',     labelEn: 'Above ₪5M/mo'  },
+  { pct: '0.9%', labelHe: 'מעל ₪1M בחודש',     labelEn: 'Above ₪1M/mo'  },
+  { pct: '1.2%', labelHe: 'התחלה',              labelEn: 'Starting rate' },
 ];
 
 function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: boolean; signupLink: string }) {
@@ -72,10 +139,10 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
             {he ? 'תמחור' : 'Pricing'}
           </span>
           <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
-            {he ? 'עמלת סליקה לעסקים בישראל' : 'Processing Fees for Israeli Businesses'}
+            {he ? 'עמלת סליקה גמישה בהתאם לגודל שלך' : 'Flexible Processing Fees That Scale With You'}
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto text-sm leading-relaxed">
-            {he ? 'ככל שנפח הסליקה שלכם גדל — העמלה יורדת.' : 'The more you process, the lower your rate.'}
+            {he ? 'ככל שנפח הסליקה שלכם גדל — העמלה יורדת. גררו את המחוון כדי לראות את העמלה שלכם.' : 'The more you process, the lower your rate. Drag the slider to see your rate.'}
           </p>
         </div>
 
@@ -84,15 +151,15 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-2">
             {he ? 'העמלה שלך' : 'Your rate'}
           </span>
-          <span className="text-8xl font-black text-stripe-purple transition-all duration-300">
+          <span className="text-8xl font-black text-stripe-purple transition-all duration-300 tabular-nums">
             {MILESTONES[activeIdx].pct}
           </span>
         </div>
 
         {/* Progress bar — always LTR so slider behaves correctly */}
-        <div className="relative mb-16" dir="ltr">
+        <div className="relative mb-20" dir="ltr">
           {/* Track background */}
-          <div className="relative h-2 bg-slate-200 rounded-full mx-4">
+          <div className="relative h-2 bg-slate-200 rounded-full mx-8">
             {/* Fill */}
             <div
               className="absolute inset-y-0 left-0 bg-stripe-purple rounded-full transition-all duration-300"
@@ -121,13 +188,13 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
                   </div>
                   {/* % label above */}
                   <div className="absolute bottom-9 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-                    <span className={`text-base font-black transition-colors duration-300 ${reached ? 'text-stripe-purple' : 'text-slate-300'}`}>
+                    <span className={`text-base font-black tabular-nums transition-colors duration-300 ${reached ? 'text-stripe-purple' : 'text-slate-300'}`}>
                       {m.pct}
                     </span>
                   </div>
                   {/* volume label below */}
-                  <div className="absolute top-8 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-                    <span className={`text-xs font-semibold transition-colors duration-300 ${reached ? 'text-slate-600' : 'text-slate-400'}`}>
+                  <div className="absolute top-9 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
+                    <span className={`text-[11px] font-semibold transition-colors duration-300 ${reached ? 'text-slate-600' : 'text-slate-400'}`}>
                       {he ? m.labelHe : m.labelEn}
                     </span>
                   </div>
@@ -142,16 +209,29 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
             min={0} max={MILESTONES.length - 1} step={1}
             value={activeIdx}
             onChange={(e) => setActiveIdx(Number(e.target.value))}
-            className="absolute inset-x-4 top-0 h-2 w-[calc(100%-2rem)] opacity-0 cursor-pointer"
+            className="absolute inset-x-8 top-0 h-2 w-[calc(100%-4rem)] opacity-0 cursor-pointer"
             style={{ margin: 0 }}
           />
         </div>
 
-        {/* CTA */}
-        <div className="text-center mt-4">
-          <Link to={signupLink} className="inline-block bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors">
-            {he ? 'פתחו חשבון סליקה' : 'Open a payments account'}
-          </Link>
+        {/* CTAs */}
+        <div className="flex flex-col items-center gap-4 mt-4">
+          <div className="flex flex-wrap justify-center gap-4">
+            <Link to={signupLink} className="inline-flex items-center gap-2 bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors">
+              {he ? 'התחילו עכשיו' : 'Get Started'}
+            </Link>
+            <Link to={signupLink} className="inline-flex items-center gap-2 border-2 border-stripe-purple text-stripe-purple font-semibold px-10 py-3 rounded-xl hover:bg-stripe-purple/5 transition-colors">
+              {he ? 'הצעה מותאמת' : 'Custom Quote'}
+            </Link>
+          </div>
+
+          {/* Instant account opening emphasis */}
+          <div className="flex items-center gap-2 mt-3">
+            <Zap size={14} className="text-amber-500" />
+            <span className="text-sm text-slate-500">
+              {he ? 'פתחו חשבון סליקה מיד בדאשבורד — ללא נציג, ללא המתנה.' : 'Open a payments account instantly in the dashboard — no agent, no waiting.'}
+            </span>
+          </div>
         </div>
 
       </div>
@@ -195,7 +275,7 @@ export default function PaymentsPage() {
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
       <div className="relative">
-        <section className="relative pt-32 pb-20 bg-slate-50 overflow-x-hidden">
+        <section className="relative z-10 pt-32 pb-20 bg-slate-50 overflow-x-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -254,17 +334,22 @@ export default function PaymentsPage() {
                 </div>
               </div>
 
-              {/* ── Animation column — phone only ── */}
+              {/* ── Animation column — phone + transaction overlay ── */}
               <div className="payments-hero-anim relative h-[520px] hidden lg:block">
-                <PaymentAnimation show="phone" />
+                <div className="relative w-full h-full flex items-center justify-center">
+                  <div className="relative">
+                    <PaymentAnimation show="phone" />
+                    <TransactionOverlay he={he} />
+                  </div>
+                </div>
               </div>
 
             </div>
           </div>
         </section>
 
-        {/* ── Gradient diagonal — visible parallelogram strip (wider, tube illusion) ── */}
-        <div className="relative z-10 h-80 -mt-16">
+        {/* ── Gradient diagonal — moved up to sit behind bottom of phone animation ── */}
+        <div className="relative z-0 h-80 -mt-48">
           <AnimatedGradient clipPath={isRtl ? "polygon(0 0, 100% 25%, 100% 100%, 0 75%)" : "polygon(0 0, 100% 25%, 100% 100%, 0 75%)"} />
           {/* Tube/cylinder highlight overlay — same clip to create 3D pipe illusion */}
           <div className="absolute inset-0 pointer-events-none" style={{
@@ -277,7 +362,7 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           S2 — קבלו תשלומים מכל מקום  +  דף מסלולי תשלום
       ══════════════════════════════════════════════════════════ */}
-      <section className="scroll-reveal relative z-0 mt-0 py-20 md:py-32 bg-white overflow-x-hidden">
+      <section className="scroll-reveal relative z-0 mt-8 py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
