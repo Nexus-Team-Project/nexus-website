@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
-import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, ShoppingCart, Layers, Receipt, BarChart3, Scale, TrendingUp, Building2, Globe, Wallet, Bitcoin, Network, FileText, HelpCircle, AppWindow, Users, Store, Briefcase, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
+import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, AppWindow, Users, Store, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -14,37 +14,25 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
     megaMenu: {
       sections: [
         {
-          title: t.navbar.payments,
-          items: [
-            { name: t.navbar.payments, desc: t.navbar.paymentsOnline, icon: CreditCard, href: lang === 'he' ? '/he/payments' : '/payments' },
-            { name: t.navbar.paymentLinks, desc: t.navbar.paymentLinksDesc, icon: LinkIcon },
-            { name: t.navbar.checkout, desc: t.navbar.checkoutDesc, icon: ShoppingCart },
-            { name: t.navbar.elements, desc: t.navbar.elementsDesc, icon: Layers },
-          ],
-        },
-        {
           title: t.navbar.revenue,
           items: [
-            { name: t.navbar.loyaltyPartnerships, desc: t.navbar.loyaltyPartnershipsDesc, icon: Gift, href: lang === 'he' ? '/he/partners' : '/partners' },
             { name: t.navbar.loyaltyClub, desc: t.navbar.loyaltyClubDesc, icon: Users, href: lang === 'he' ? '/he/benefits' : '/benefits' },
+            { name: t.navbar.loyaltyPartnerships, desc: t.navbar.loyaltyPartnershipsDesc, icon: Gift, href: lang === 'he' ? '/he/partners' : '/partners' },
             { name: t.navbar.giftsWelfare, desc: t.navbar.giftsWelfareDesc, icon: Heart, href: lang === 'he' ? '/he/welfare' : '/he/welfare' },
           ],
         },
         {
-          title: t.navbar.moneyManagement,
+          title: t.navbar.payments,
           items: [
-            { name: t.navbar.financialAccounts, desc: t.navbar.businessFinances, icon: Building2 },
-            { name: t.navbar.globalPayouts, desc: t.navbar.payoutsThirdParties, icon: Globe },
-            { name: t.navbar.capital, desc: t.navbar.businessFinancing, icon: Wallet },
-            { name: t.navbar.cryptocurrency, desc: t.navbar.walletCardInfra, icon: Bitcoin },
+            { name: t.navbar.payments, desc: t.navbar.paymentsOnline, icon: CreditCard, href: lang === 'he' ? '/he/payments' : '/payments' },
+            { name: t.navbar.paymentLinks, desc: t.navbar.paymentLinksDesc, icon: LinkIcon, href: lang === 'he' ? '/he/payments' : '/payments' },
           ],
         },
         {
-          title: t.navbar.platformsSection,
+          title: t.navbar.developers,
           items: [
-            { name: t.navbar.connectTitle, desc: t.navbar.multiPartyPayments, icon: Network },
-            { name: t.navbar.issuing, desc: t.navbar.physicalVirtualCards, icon: CreditCard },
-            { name: t.navbar.forPlatforms, desc: t.navbar.embeddedFinancialServices, icon: Building2 },
+            { name: t.navbar.documentation, desc: t.navbar.integrationGuides, icon: FileText, href: 'https://docs.nexus-payment.com/' },
+            { name: t.navbar.changelog, desc: t.navbar.latestUpdates, icon: FileText, href: lang === 'he' ? '/he/changelog' : '/changelog' },
           ],
         },
       ],
@@ -111,56 +99,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
     },
   },
   {
-    label: t.navbar.developers,
-    megaMenu: {
-      sections: [
-        {
-          title: t.navbar.getStartedSection,
-          items: [
-            { name: t.navbar.documentation, desc: t.navbar.integrationGuides, icon: FileText, href: 'https://docs.nexus-payment.com/' },
-            { name: t.navbar.apiReference, desc: t.navbar.completeAPIDocs, icon: Code, href: 'https://docs.nexus-payment.com/' },
-            { name: t.navbar.quickStart, desc: t.navbar.startInMinutes, icon: ArrowRight },
-            { name: t.navbar.tutorials, desc: t.navbar.stepByStepGuides, icon: GraduationCap },
-          ],
-        },
-        {
-          title: t.navbar.toolsSDKs,
-          items: [
-            { name: t.navbar.javascriptSDK, desc: t.navbar.forWebApps, icon: Terminal },
-            { name: t.navbar.mobileSDKs, desc: t.navbar.iosAndroid, icon: AppWindow },
-            { name: t.navbar.serverLibraries, desc: t.navbar.nodePythonRuby, icon: Code },
-            { name: t.navbar.cliTools, desc: t.navbar.commandLine, icon: Terminal },
-          ],
-        },
-        {
-          title: t.navbar.resources,
-          items: [
-            { name: t.navbar.apiStatus, desc: t.navbar.systemPerformance, icon: BarChart3 },
-            { name: t.navbar.changelog, desc: t.navbar.latestUpdates, icon: FileText },
-            { name: t.navbar.codeSamples, desc: t.navbar.exampleProjects, icon: Code },
-          ],
-        },
-        {
-          title: t.navbar.community,
-          items: [
-            { name: t.navbar.developerForum, desc: t.navbar.askQuestions, icon: MessageSquare },
-            { name: t.navbar.github, desc: t.navbar.openSource, icon: Network },
-            { name: t.footer.support, desc: t.navbar.getHelp, icon: HelpCircle },
-          ],
-        },
-      ],
-      sidebar: {
-        title: t.navbar.developerTools,
-        content: t.navbar.developerToolsContent,
-        cta: t.navbar.exploreTools,
-      },
-      bottomLinks: [
-        { label: t.navbar.apiDocumentation, icon: FileText, href: 'https://docs.nexus-payment.com/' },
-        { label: t.navbar.developerCommunity, icon: Users },
-      ],
-    },
-  },
-  {
     label: t.navbar.resources,
     megaMenu: {
       sections: [
@@ -209,7 +147,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
       ],
     },
   },
-  { label: t.navbar.pricing, href: '#pricing' },
 ];
 
 // MegaMenuPanel: portal into document.body (eliminates nav stacking-context interference).
@@ -504,7 +441,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                   <div className="max-w-7xl mx-auto space-y-4">
                     <div className="bg-white shadow-2xl rounded-2xl overflow-hidden border border-gray-200 flex">
                       {/* Main Grid */}
-                      <div className="flex-1 p-8 grid grid-cols-4 gap-x-8 gap-y-10">
+                      <div className={`flex-1 p-8 grid gap-x-8 gap-y-10 ${item.megaMenu.sections.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
                         {item.megaMenu.sections.map((section, index) => (
                           <div
                             key={section.title}
