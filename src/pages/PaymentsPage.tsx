@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense, useState, useRef } from 'react';
+import { useEffect, lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, CreditCard, Link2, RefreshCw, Users, Zap } from 'lucide-react';
 import Navbar from '../components/Navbar';
@@ -32,83 +32,83 @@ const CLEARING_TRANSACTIONS = [
   { merchant: 'Electronics Shop', amount: '₪2,100', time: '8 min ago' },
 ];
 
-// Each tx has: 'entering' → 'visible' → 'exiting' → removed
-type TxState = { idx: number; phase: 'entering' | 'visible' | 'exiting' };
-
+// Simple cycle: show transactions → vibrate phone → fade all out → repeat
 function TransactionOverlay() {
-  const [txStack, setTxStack] = useState<TxState[]>([]);
-  const [shakePhone, setShakePhone] = useState(false);
-  const stepRef = useRef(0);
+  const [visible, setVisible] = useState(false);
+  const [shaking, setShaking] = useState(false);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const idx = stepRef.current % CLEARING_TRANSACTIONS.length;
+    let mounted = true;
+    const SHOW_ITEMS = [0, 1, 2]; // show first 3 transactions
 
-      // Add new tx as 'entering'
-      setTxStack(prev => [...prev, { idx, phase: 'entering' }]);
-      setShakePhone(true);
-      setTimeout(() => setShakePhone(false), 350);
+    function cycle() {
+      if (!mounted) return;
+      // 1. Show all transactions (fade in)
+      setVisible(true);
 
-      // After 300ms, mark it 'visible'
+      // 2. After 800ms, vibrate the phone
       setTimeout(() => {
-        setTxStack(prev => prev.map(t => t.idx === idx && t.phase === 'entering' ? { ...t, phase: 'visible' } : t));
-      }, 300);
+        if (!mounted) return;
+        setShaking(true);
+        setTimeout(() => setShaking(false), 400);
+      }, 800);
 
-      // After 3.5s, mark it 'exiting' (slide out to side)
+      // 3. After 3.5s, fade out all transactions
       setTimeout(() => {
-        setTxStack(prev => prev.map(t => t.idx === idx && t.phase === 'visible' ? { ...t, phase: 'exiting' } : t));
+        if (!mounted) return;
+        setVisible(false);
       }, 3500);
 
-      // After 4.2s, remove it completely
+      // 4. After 4.5s (1s pause), restart cycle
       setTimeout(() => {
-        setTxStack(prev => prev.filter(t => !(t.idx === idx && t.phase === 'exiting')));
-      }, 4200);
+        if (!mounted) return;
+        cycle();
+      }, 4500);
+    }
 
-      stepRef.current++;
-    }, 1400);
-
-    return () => clearInterval(interval);
+    // Start first cycle after a small delay
+    const t = setTimeout(cycle, 500);
+    return () => { mounted = false; clearTimeout(t); };
   }, []);
+
+  const txItems = CLEARING_TRANSACTIONS.slice(0, 3);
 
   return (
     <>
-      {/* Shake class injector for phone */}
-      {shakePhone && (
+      {shaking && (
         <style>{`
           .payments-hero-anim .payment-phone {
-            animation: phoneVibrate 0.35s ease-out !important;
+            animation: phoneVibrate 0.4s ease-out !important;
           }
         `}</style>
       )}
       <div className="absolute bottom-12 right-[-190px] z-30 flex flex-col-reverse gap-2 pointer-events-none"
            style={{ width: '210px' }}>
-        {txStack.map((t, i) => {
-          const tx = CLEARING_TRANSACTIONS[t.idx];
-          const animClass =
-            t.phase === 'entering' ? 'tx-enter' :
-            t.phase === 'exiting' ? 'tx-exit' : 'tx-visible';
-          return (
-            <div
-              key={`${t.idx}-${i}`}
-              className={`bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/80 px-3 py-2.5 flex items-center gap-2.5 ${animClass}`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0">
-                <span className="text-green-500 text-xs font-bold">₪</span>
+        {txItems.map((tx, i) => (
+          <div
+            key={i}
+            className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/80 px-3 py-2.5 flex items-center gap-2.5"
+            style={{
+              opacity: visible ? 1 : 0,
+              transform: visible ? 'translateY(0) scale(1)' : 'translateY(12px) scale(0.95)',
+              transition: `opacity ${visible ? '0.4s' : '0.5s'} ease, transform ${visible ? '0.4s' : '0.5s'} ease`,
+              transitionDelay: visible ? `${i * 120}ms` : `${(2 - i) * 80}ms`,
+            }}
+          >
+            <div className="w-8 h-8 rounded-lg bg-green-50 border border-green-200 flex items-center justify-center flex-shrink-0">
+              <span className="text-green-500 text-xs font-bold">₪</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-900 truncate">{tx.merchant}</span>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-900 truncate">
-                    {tx.merchant}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mt-0.5">
-                  <span className="text-[10px] text-slate-400">{tx.time}</span>
-                  <span className="text-[11px] font-black text-green-600">{tx.amount}</span>
-                </div>
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[10px] text-slate-400">{tx.time}</span>
+                <span className="text-[11px] font-black text-green-600">{tx.amount}</span>
               </div>
             </div>
-          );
-        })}
+          </div>
+        ))}
       </div>
       <style>{`
         @keyframes phoneVibrate {
@@ -118,24 +118,6 @@ function TransactionOverlay() {
           45% { transform: translateX(-1.5px) rotate(-0.3deg); }
           60% { transform: translateX(1.5px) rotate(0.3deg); }
           75% { transform: translateX(-0.5px); }
-        }
-        .tx-enter {
-          animation: txSlideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-        }
-        .tx-visible {
-          opacity: 1;
-          transform: translateX(0) translateY(0) scale(1);
-        }
-        .tx-exit {
-          animation: txSlideOut 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-        }
-        @keyframes txSlideIn {
-          from { opacity: 0; transform: translateY(16px) translateX(-10px) scale(0.92); }
-          to { opacity: 1; transform: translateY(0) translateX(0) scale(1); }
-        }
-        @keyframes txSlideOut {
-          from { opacity: 1; transform: translateX(0) scale(1); }
-          to { opacity: 0; transform: translateX(80px) scale(0.9); }
         }
       `}</style>
     </>
@@ -245,7 +227,7 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
                     </span>
                   </div>
                   {/* volume label below */}
-                  <div className="absolute top-9 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
+                  <div className="absolute top-9 left-1/2 -translate-x-1/2 text-center whitespace-nowrap" dir={he ? 'rtl' : 'ltr'}>
                     <span className={`text-[11px] font-semibold transition-colors duration-300 ${reached ? 'text-slate-600' : 'text-slate-400'}`}>
                       {he ? m.labelHe : m.labelEn}
                     </span>
@@ -326,7 +308,7 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
-      <div className="relative overflow-hidden">
+      <div className="relative">
         <section className="relative z-10 pt-32 pb-20 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
 
@@ -399,22 +381,21 @@ export default function PaymentsPage() {
             </div>
           </div>
         </section>
+      </div>
 
-        {/* ── Gradient diagonal — overlaps behind bottom of phone, phone sits on top ── */}
-        <div className="absolute bottom-[-60px] left-0 right-0 z-[5] h-[280px]">
-          <AnimatedGradient clipPath="polygon(0 40%, 100% 0%, 100% 60%, 0 100%)" />
-          {/* Tube/cylinder highlight overlay — same diagonal clip for 3D pipe illusion */}
-          <div className="absolute inset-0 pointer-events-none" style={{
-            clipPath: 'polygon(0 40%, 100% 0%, 100% 60%, 0 100%)',
-            background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(0,0,0,0.18) 100%)'
-          }} />
-        </div>
+      {/* ── Gradient diagonal — sits between hero and S2, not inside overflow-hidden ── */}
+      <div className="relative z-[5] h-[120px] -mt-[60px] -mb-[60px]">
+        <AnimatedGradient clipPath="polygon(0 0%, 100% 20%, 100% 100%, 0 80%)" />
+        <div className="absolute inset-0 pointer-events-none" style={{
+          clipPath: 'polygon(0 0%, 100% 20%, 100% 100%, 0 80%)',
+          background: 'linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(0,0,0,0.18) 100%)'
+        }} />
       </div>
 
       {/* ══════════════════════════════════════════════════════════
           S2 — קבלו תשלומים מכל מקום  +  דף מסלולי תשלום
       ══════════════════════════════════════════════════════════ */}
-      <section className="scroll-reveal relative z-0 mt-8 py-20 md:py-32 bg-white overflow-x-hidden">
+      <section className="scroll-reveal relative z-0 py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
