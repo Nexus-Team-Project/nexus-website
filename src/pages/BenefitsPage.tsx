@@ -1,6 +1,6 @@
-import { useEffect, lazy, Suspense } from 'react';
+import { useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { Users, TrendingUp, Zap, ChevronLeft, ChevronRight } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import AnimatedGradient from '../components/AnimatedGradient';
 import BenefitsProviderGrid from '../components/benefits/BenefitsProviderGrid';
@@ -29,19 +29,55 @@ function useScrollReveal() {
   }, []);
 }
 
-// ─── Reusable bullet ──────────────────────────────────────
-function Bullet({ text, icon: Icon = Check }: { text: string; icon?: React.ElementType }) {
-  const { direction } = useLanguage();
-  const isRtl = direction === 'rtl';
-  return (
-    <li className={`flex items-start gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
-      <span className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-stripe-purple/10 flex items-center justify-center">
-        <Icon size={12} className="text-stripe-purple" />
-      </span>
-      <span className="text-slate-600">{text}</span>
-    </li>
-  );
-}
+// ─── Gallery card data ────────────────────────────────────
+const STORY_CARDS = [
+  {
+    id: 'wallet',
+    labelHe: 'הטבות', labelEn: 'Benefits',
+    titleHe: 'כל ההטבות במקום אחד', titleEn: 'All Benefits in One Place',
+    Component: StoryWalletCards,
+  },
+  {
+    id: 'cashback',
+    labelHe: 'קאשבק', labelEn: 'Cashback',
+    titleHe: 'עד 60% החזר על כל רכישה', titleEn: 'Up to 60% Back on Every Purchase',
+    Component: StoryInsightsCarousel,
+  },
+  {
+    id: 'giftcards',
+    labelHe: 'גיפט קארדס', labelEn: 'Gift Cards',
+    titleHe: 'מהמותגים האהובים עליך', titleEn: 'From Your Favorite Brands',
+    Component: StoryGiftCards,
+  },
+  {
+    id: 'nearby',
+    labelHe: 'מפת הטבות', labelEn: 'Nearby',
+    titleHe: 'הטבות קרובות אליך', titleEn: 'Deals Near You',
+    Component: StoryNearbyMap,
+  },
+];
+
+// ─── "Why" reasons data ──────────────────────────────────
+const WHY_REASONS = [
+  {
+    icon: Users,
+    titleHe: 'שימור קהילה', titleEn: 'Community Retention',
+    descHe: 'חברי קהילה שמקבלים ערך כלכלי יומיומי נשארים מחוברים לארגון לאורך זמן. מועדון הטבות הוא הכלי הכי אפקטיבי ליצירת נאמנות.',
+    descEn: 'Members who receive daily economic value stay connected long-term. A benefits club is the most effective loyalty tool.',
+  },
+  {
+    icon: TrendingUp,
+    titleHe: 'יתרון תחרותי', titleEn: 'Competitive Edge',
+    descHe: 'ארגונים שמציעים הטבות ממשיות בולטים מול המתחרים. מועדון הטבות הופך את הארגון למקום שאנשים רוצים להיות חלק ממנו.',
+    descEn: 'Organizations offering real perks stand out. A benefits club turns your org into a place people want to belong to.',
+  },
+  {
+    icon: Zap,
+    titleHe: 'ללא תקורה תפעולית', titleEn: 'Zero Overhead',
+    descHe: 'אנחנו מנהלים הכל — ספקים, מימוש, תמיכה ואנליטיקות. אתם מקבלים פלטפורמה ממותגת מוכנה בלי להשקיע משאב אחד.',
+    descEn: 'We handle everything — providers, redemption, support, and analytics. You get a branded platform ready to go without investing a single resource.',
+  },
+];
 
 export default function BenefitsPage() {
   const { language, direction } = useLanguage();
@@ -51,16 +87,43 @@ export default function BenefitsPage() {
 
   useScrollReveal();
 
+  // ─── Gallery scroll state ─────────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    const cardWidth = el.firstElementChild?.clientWidth ?? 380;
+    const gap = 24; // gap-6
+    const index = Math.round(Math.abs(el.scrollLeft) / (cardWidth + gap));
+    setActiveIndex(Math.min(index, STORY_CARDS.length - 1));
+  };
+
+  const scrollToIndex = (i: number) => {
+    if (!scrollRef.current) return;
+    const cardWidth = scrollRef.current.firstElementChild?.clientWidth ?? 380;
+    const gap = 24;
+    const target = i * (cardWidth + gap);
+    scrollRef.current.scrollTo({
+      left: isRtl ? -target : target,
+      behavior: 'smooth',
+    });
+  };
+
   return (
     <div dir={direction} className="min-h-screen bg-white overflow-x-hidden">
       <Navbar variant="dark" />
 
-      {/* ═══════════════════════ S1: HERO — Wallet Cards Story ═══════════════════════ */}
+      {/* hide scrollbar globally for gallery */}
+      <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}`}</style>
+
+      {/* ═══════════════════════ S1: HERO — Dual Animation ═══════════════════════ */}
       <section className="relative pt-32 pb-12 md:pt-40 md:pb-20 bg-slate-50 overflow-hidden">
         <AnimatedGradient />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 items-center">
             {/* Text column */}
             <div className={isRtl ? 'text-right' : 'text-left'}>
               <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
@@ -68,144 +131,201 @@ export default function BenefitsPage() {
               </p>
               <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold text-slate-900 mb-6 leading-tight">
                 {he
-                  ? 'נרכז לך את כל ההטבות במקום אחד'
-                  : 'All Your Benefits In One Place'}
+                  ? 'המועדון שמחבר את הקהילה שלכם דרך ערך אמיתי'
+                  : 'The Club That Connects Your Community Through Real Value'}
               </h1>
               <p className="text-lg text-slate-600 mb-8 leading-relaxed max-w-lg">
                 {he
-                  ? 'הנכס הארגוני החשוב ביותר הוא הקהילה. מועדון הטבות חכם יוצר חיבור שמחזיק לאורך זמן — דרך ערך כלכלי צרכני שפותר את הכאב היומיומי של חברי הקהילה.'
-                  : 'Your organization\'s greatest asset is its community. A smart benefits club creates lasting connection — through consumer savings that solve your members\' everyday financial pain.'}
+                  ? 'פלטפורמה ממותגת שמרכזת מאות הנחות, קאשבק וגיפט קארדס לחברי הקהילה שלכם. ערך כלכלי יומיומי שמחזיק את הקהילה מחוברת.'
+                  : 'A branded platform that bundles hundreds of discounts, cashback and gift cards for your community members. Daily economic value that keeps your community engaged.'}
               </p>
-              <ul className={`space-y-3 mb-8 ${isRtl ? 'text-right' : 'text-left'}`}>
-                <Bullet text={he ? 'מאות ספקים ארציים עם הסכמים מסחריים' : 'Hundreds of national providers with negotiated deals'} />
-                <Bullet text={he ? 'התאמה מלאה למיתוג הארגון' : 'Fully branded to your organization'} />
-                <Bullet text={he ? 'ניהול, תמיכה ואנליטיקות מובנים' : 'Built-in management, support & analytics'} />
-              </ul>
               <div className={`flex flex-wrap gap-4 ${isRtl ? '' : 'flex-row-reverse'}`}>
                 <Link
                   to={signupLink}
-                  className="inline-flex items-center gap-2 bg-stripe-purple text-white px-7 py-3.5 rounded-full font-semibold text-sm hover:bg-[#5649d8] transition-all shadow-lg shadow-stripe-purple/25 hover:shadow-xl hover:shadow-stripe-purple/30"
+                  className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
                 >
                   {he ? 'התחילו עכשיו' : 'Get Started'}
                 </Link>
                 <a
-                  href="#how-it-works"
-                  className="inline-flex items-center gap-2 bg-white text-slate-700 px-7 py-3.5 rounded-full font-semibold text-sm border border-slate-200 hover:bg-slate-50 transition-all"
+                  href="#why-benefits"
+                  className="inline-block border border-slate-300 bg-white text-slate-700 font-semibold px-8 py-3 rounded-xl hover:bg-slate-50 transition-colors"
                 >
-                  {he ? 'איך זה עובד?' : 'How It Works'}
+                  {he ? 'למה מועדון הטבות?' : 'Why a Benefits Club?'}
                 </a>
               </div>
             </div>
 
-            {/* Story animation — Wallet Cards (phone mockup) */}
-            <div className="flex justify-center lg:justify-end">
-              <StoryWalletCards />
+            {/* Dual animation column */}
+            <div className="relative flex justify-center lg:justify-end" style={{ minHeight: 560 }}>
+              {/* Primary: WalletCards (front) */}
+              <div className="relative z-10">
+                <StoryWalletCards />
+              </div>
+              {/* Secondary: InsightsCarousel (behind, offset, scaled) */}
+              <div
+                className="hidden md:block absolute z-0"
+                style={{
+                  [isRtl ? 'right' : 'left']: '-60px',
+                  top: '40px',
+                  transform: 'scale(0.82)',
+                  transformOrigin: 'top center',
+                  opacity: 0.8,
+                  filter: 'blur(0.5px)',
+                }}
+              >
+                <StoryInsightsCarousel />
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════ S2: CASHBACK — Insights Story ═══════════════════════ */}
-      <section className="scroll-reveal relative py-16 md:py-24 bg-white overflow-hidden">
+      {/* ═══════════════════════ S2: WHY A BENEFITS CLUB ═══════════════════════ */}
+      <section
+        id="why-benefits"
+        className="scroll-reveal relative py-20 md:py-32 overflow-hidden"
+        style={{ background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)' }}
+      >
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none" style={{ background: 'rgba(99,91,255,0.08)', filter: 'blur(80px)' }} />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-16">
+            <span className="inline-block bg-white/10 text-violet-300 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+              {he ? 'למה מועדון הטבות?' : 'Why a Benefits Club?'}
+            </span>
+            <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
+              {he ? 'למה הארגון שלכם צריך מועדון הטבות' : 'Why Your Organization Needs a Benefits Club'}
+            </h2>
+            <p className="text-white/60 max-w-xl mx-auto text-base">
+              {he
+                ? 'הטבות זה לא בונוס — זה תשתית ליצירת קהילה חזקה ונאמנה.'
+                : "Benefits aren't a bonus — they're the infrastructure for building a strong, loyal community."}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {WHY_REASONS.map((r) => {
+              const Icon = r.icon;
+              return (
+                <div key={r.titleEn} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-8">
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
+                    style={{ background: 'rgba(99,91,255,0.15)' }}
+                  >
+                    <Icon size={24} className="text-violet-400" />
+                  </div>
+                  <h3 className={`text-xl font-bold text-white mb-3 ${isRtl ? 'text-right' : 'text-left'}`}>
+                    {he ? r.titleHe : r.titleEn}
+                  </h3>
+                  <p className={`text-white/60 text-sm leading-relaxed ${isRtl ? 'text-right' : 'text-left'}`}>
+                    {he ? r.descHe : r.descEn}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="text-center mt-12">
+            <Link
+              to={signupLink}
+              className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+            >
+              {he ? 'בואו נדבר' : "Let's Talk"}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════ S3: STORIES GALLERY ═══════════════════════ */}
+      <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Story animation — Insights Carousel */}
-            <div className={`flex justify-center ${isRtl ? 'lg:order-2' : 'lg:order-1'}`}>
-              <StoryInsightsCarousel />
-            </div>
+          {/* Header */}
+          <div className="text-center mb-12">
+            <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+              {he ? 'הקהילה שלכם' : 'Your Community'}
+            </span>
+            <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
+              {he ? 'מה תתנו לקהילה שלכם?' : 'What Will You Give Your Community?'}
+            </h2>
+            <p className="text-slate-500 max-w-2xl mx-auto text-base leading-relaxed">
+              {he
+                ? 'ארבע דרכים ליצור ערך אמיתי לחברי הארגון — הטבות, קאשבק, גיפט קארדס ומפת הטבות חכמה.'
+                : 'Four ways to create real value for your members — benefits, cashback, gift cards and a smart deals map.'}
+            </p>
+          </div>
 
-            {/* Text */}
-            <div className={`${isRtl ? 'lg:order-1 text-right' : 'lg:order-2 text-left'}`}>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
-                {he ? 'קאשבק חכם' : 'Smart Cashback'}
-              </p>
-              <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">
-                {he ? 'עד 60% קאשבק על הוצאות יומיומיות' : 'Up to 60% Cashback on Daily Expenses'}
-              </h2>
-              <p className="text-lg text-slate-600 leading-relaxed mb-6">
-                {he
-                  ? 'כל רכישה דרך הפלטפורמה מחזירה כסף אמיתי. הקאשבק נצבר אוטומטית ואפשר להשתמש בו בכל רגע — בלי הגבלה, בלי תנאים מסובכים.'
-                  : 'Every purchase through the platform returns real money. Cashback accumulates automatically and can be used anytime — no limits, no complicated terms.'}
-              </p>
-              <ul className={`space-y-3 ${isRtl ? 'text-right' : 'text-left'}`}>
-                <Bullet text={he ? 'קאשבק אוטומטי על כל רכישה' : 'Automatic cashback on every purchase'} />
-                <Bullet text={he ? 'צבירה ללא הגבלה' : 'Unlimited accumulation'} />
-                <Bullet text={he ? 'מימוש מיידי בכל עת' : 'Instant redemption anytime'} />
-              </ul>
+          {/* Gallery container with arrows */}
+          <div className="relative">
+            {/* Left arrow */}
+            <button
+              onClick={() => scrollToIndex(Math.max(0, activeIndex - 1))}
+              className={`hidden md:flex absolute top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white border border-slate-200 shadow-lg items-center justify-center hover:bg-slate-50 transition-colors ${isRtl ? '-right-4 lg:-right-6' : '-left-4 lg:-left-6'}`}
+              aria-label="Previous"
+            >
+              {isRtl ? <ChevronRight size={20} className="text-slate-600" /> : <ChevronLeft size={20} className="text-slate-600" />}
+            </button>
+
+            {/* Right arrow */}
+            <button
+              onClick={() => scrollToIndex(Math.min(STORY_CARDS.length - 1, activeIndex + 1))}
+              className={`hidden md:flex absolute top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white border border-slate-200 shadow-lg items-center justify-center hover:bg-slate-50 transition-colors ${isRtl ? '-left-4 lg:-left-6' : '-right-4 lg:-right-6'}`}
+              aria-label="Next"
+            >
+              {isRtl ? <ChevronLeft size={20} className="text-slate-600" /> : <ChevronRight size={20} className="text-slate-600" />}
+            </button>
+
+            {/* Scroll track */}
+            <div
+              ref={scrollRef}
+              onScroll={handleScroll}
+              className="flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4 px-1"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              {STORY_CARDS.map((card) => (
+                <div
+                  key={card.id}
+                  className="flex-shrink-0 w-[320px] sm:w-[380px] snap-center rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                >
+                  {/* Card header */}
+                  <div className={`px-5 pt-5 pb-3 ${isRtl ? 'text-right' : 'text-left'}`}>
+                    <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full mb-2">
+                      {he ? card.labelHe : card.labelEn}
+                    </span>
+                    <h3 className="text-lg font-bold text-slate-900">
+                      {he ? card.titleHe : card.titleEn}
+                    </h3>
+                  </div>
+
+                  {/* Animation container */}
+                  <div className="relative overflow-hidden" style={{ height: 480 }}>
+                    <div style={{ transform: 'scale(0.85)', transformOrigin: 'top center' }}>
+                      <card.Component />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
+          </div>
+
+          {/* Dots */}
+          <div className="flex justify-center gap-2.5 mt-6">
+            {STORY_CARDS.map((card, i) => (
+              <button
+                key={card.id}
+                onClick={() => scrollToIndex(i)}
+                className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                  i === activeIndex
+                    ? 'bg-stripe-purple w-7'
+                    : 'bg-slate-300 hover:bg-slate-400'
+                }`}
+                aria-label={`Go to story ${i + 1}`}
+              />
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ═══════════════════════ S3: GIFT CARDS — Gift Cards Story ═══════════════════════ */}
-      <section className="scroll-reveal relative py-16 md:py-24 bg-slate-50 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Text */}
-            <div className={isRtl ? 'text-right' : 'text-left'}>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
-                {he ? 'גיפט קארדס' : 'Gift Cards'}
-              </p>
-              <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">
-                {he
-                  ? 'גיפט קארד מהמותגים האהובים עליך'
-                  : 'Gift Cards From Your Favorite Brands'}
-              </h2>
-              <p className="text-lg text-slate-600 leading-relaxed mb-6">
-                {he
-                  ? 'משלו את הקאשבק שצברתם בגיפט קארדס ממותגים בינלאומיים ומקומיים. Airbnb, Nike, Garmin ועוד עשרות מותגים נוספים — הכל במרחק נגיעה.'
-                  : 'Redeem your cashback with gift cards from international and local brands. Airbnb, Nike, Garmin and dozens more — all at your fingertips.'}
-              </p>
-              <ul className={`space-y-3 ${isRtl ? 'text-right' : 'text-left'}`}>
-                <Bullet text={he ? 'מגוון מותגים בינלאומיים ומקומיים' : 'International and local brand variety'} />
-                <Bullet text={he ? 'מימוש קאשבק מיידי' : 'Instant cashback redemption'} />
-                <Bullet text={he ? 'שליחת מתנה לחברים ולמשפחה' : 'Send gifts to friends and family'} />
-              </ul>
-            </div>
-
-            {/* Story animation — Gift Cards 3D Carousel */}
-            <div className="flex justify-center">
-              <StoryGiftCards />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════ S4: NEARBY — Map Story ═══════════════════════ */}
-      <section className="scroll-reveal relative py-16 md:py-24 bg-white overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            {/* Story animation — Nearby Map */}
-            <div className={`flex justify-center ${isRtl ? 'lg:order-2' : 'lg:order-1'}`}>
-              <StoryNearbyMap />
-            </div>
-
-            {/* Text */}
-            <div className={`${isRtl ? 'lg:order-1 text-right' : 'lg:order-2 text-left'}`}>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
-                {he ? 'הטבות מסביבך' : 'Nearby Benefits'}
-              </p>
-              <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">
-                {he
-                  ? 'נציג לך איפה ההטבות הכי שוות'
-                  : "We'll Show You Where the Best Deals Are"}
-              </h2>
-              <p className="text-lg text-slate-600 leading-relaxed mb-6">
-                {he
-                  ? 'מפה חכמה שמראה לך בזמן אמת את ההטבות הקרובות אליך. בכל מקום שתהיו — תמיד תדעו איפה יש הנחות, קאשבק והצעות מיוחדות.'
-                  : 'A smart map that shows you real-time deals near you. Wherever you are — you\'ll always know where to find discounts, cashback and special offers.'}
-              </p>
-              <ul className={`space-y-3 ${isRtl ? 'text-right' : 'text-left'}`}>
-                <Bullet text={he ? 'מפה אינטראקטיבית בזמן אמת' : 'Real-time interactive map'} />
-                <Bullet text={he ? 'הטבות ממוקמות על המסלול שלך' : 'Benefits located along your route'} />
-                <Bullet text={he ? 'התראות על הנחות בסביבה' : 'Alerts for nearby discounts'} />
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═══════════════════════ S5: PROVIDERS ═══════════════════════ */}
+      {/* ═══════════════════════ S4: PROVIDERS ═══════════════════════ */}
       <section className="scroll-reveal relative py-20 md:py-32 bg-slate-50 overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
@@ -225,7 +345,7 @@ export default function BenefitsPage() {
         </div>
       </section>
 
-      {/* ═══════════════════════ S6: PLATFORM FEATURES ═══════════════════════ */}
+      {/* ═══════════════════════ S5: PLATFORM FEATURES ═══════════════════════ */}
       <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
@@ -245,7 +365,7 @@ export default function BenefitsPage() {
         </div>
       </section>
 
-      {/* ═══════════════════════ S7: HOW IT WORKS (dark) ═══════════════════════ */}
+      {/* ═══════════════════════ S6: HOW IT WORKS (dark) ═══════════════════════ */}
       <section
         id="how-it-works"
         className="scroll-reveal relative py-20 md:py-32 overflow-x-hidden"
@@ -271,7 +391,7 @@ export default function BenefitsPage() {
         </div>
       </section>
 
-      {/* ═══════════════════════ S8: STATS ═══════════════════════ */}
+      {/* ═══════════════════════ S7: STATS ═══════════════════════ */}
       <section className="scroll-reveal relative py-20 md:py-28 bg-stripe-light overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
@@ -283,7 +403,7 @@ export default function BenefitsPage() {
         </div>
       </section>
 
-      {/* ═══════════════════════ S9: FINAL CTA ═══════════════════════ */}
+      {/* ═══════════════════════ S8: FINAL CTA ═══════════════════════ */}
       <section
         className="scroll-reveal relative py-20 md:py-32 overflow-x-hidden"
         style={{ background: 'linear-gradient(135deg, #0A2540 0%, #2d1b69 50%, #0A2540 100%)' }}
@@ -305,13 +425,13 @@ export default function BenefitsPage() {
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
               to={signupLink}
-              className="inline-flex items-center gap-2 bg-stripe-purple text-white px-8 py-4 rounded-full font-semibold text-base hover:bg-[#5649d8] transition-all shadow-lg shadow-stripe-purple/30 hover:shadow-xl hover:shadow-stripe-purple/40"
+              className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
             >
               {he ? 'התחילו עכשיו' : 'Get Started'}
             </Link>
             <Link
               to={he ? '/he/partners' : '/partners'}
-              className="inline-flex items-center gap-2 bg-white/10 text-white px-8 py-4 rounded-full font-semibold text-base border border-white/20 hover:bg-white/20 transition-all"
+              className="inline-block border border-white/30 bg-white/10 text-white font-semibold px-10 py-3 rounded-xl hover:bg-white/20 transition-colors"
             >
               {he ? 'הכירו את השותפים שלנו' : 'Meet Our Partners'}
             </Link>
