@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ArrowLeft, CheckCircle, Users, BarChart3, Zap, Gift, Shield, Calendar, Building2, Smartphone, Mail, Link as LinkIcon, TrendingUp, Star, Clock, Settings, Heart, Briefcase, Globe, ChevronDown } from 'lucide-react';
-import NexusLogo from '../components/NexusLogo';
+import { ArrowLeft, CheckCircle, Users, BarChart3, Zap, Gift, Shield, Calendar, Building2, TrendingUp, Star, Clock, Settings, Heart, Briefcase, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { lazy, Suspense } from 'react';
 import AnimatedGradient from '../components/AnimatedGradient';
 import { LanguageProvider } from '../i18n/LanguageContext';
+
+const Navbar = lazy(() => import('../components/Navbar'));
+const Footer = lazy(() => import('../components/Footer'));
 
 // ─── Intersection Observer Hook ──────────────────────────────────────────────
 function useInView(threshold = 0.15) {
@@ -36,62 +39,6 @@ function FadeInSection({ children, className = '' }: { children: React.ReactNode
     >
       {children}
     </div>
-  );
-}
-
-// ─── Navbar ──────────────────────────────────────────────────────────────────
-function LandingNavbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  return (
-    <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-md shadow-sm border-b border-slate-100' : 'bg-transparent'}`}>
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-10">
-          <Link to="/he" className="flex items-center">
-            <NexusLogo height={28} variant={scrolled ? 'black' : 'white'} page="navbar" />
-          </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className={`text-sm font-semibold transition-colors ${scrolled ? 'text-slate-600 hover:text-slate-900' : 'text-white/80 hover:text-white'}`}>תכונות</a>
-            <a href="#benefits" className={`text-sm font-semibold transition-colors ${scrolled ? 'text-slate-600 hover:text-slate-900' : 'text-white/80 hover:text-white'}`}>יתרונות</a>
-            <a href="#use-cases" className={`text-sm font-semibold transition-colors ${scrolled ? 'text-slate-600 hover:text-slate-900' : 'text-white/80 hover:text-white'}`}>שימושים</a>
-            <a href="#comparison" className={`text-sm font-semibold transition-colors ${scrolled ? 'text-slate-600 hover:text-slate-900' : 'text-white/80 hover:text-white'}`}>השוואה</a>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <a
-            href="#cta-final"
-            className="bg-stripe-purple hover:bg-stripe-purple/85 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow-lg hover:shadow-stripe-purple/25"
-          >
-            קבעו פגישת הדגמה
-          </a>
-          <button
-            className="md:hidden p-2"
-            onClick={() => setMobileOpen(!mobileOpen)}
-          >
-            <div className={`w-5 h-0.5 ${scrolled ? 'bg-slate-900' : 'bg-white'} transition-all ${mobileOpen ? 'rotate-45 translate-y-1.5' : ''}`} />
-            <div className={`w-5 h-0.5 ${scrolled ? 'bg-slate-900' : 'bg-white'} mt-1 transition-all ${mobileOpen ? 'opacity-0' : ''}`} />
-            <div className={`w-5 h-0.5 ${scrolled ? 'bg-slate-900' : 'bg-white'} mt-1 transition-all ${mobileOpen ? '-rotate-45 -translate-y-1.5' : ''}`} />
-          </button>
-        </div>
-      </div>
-      {mobileOpen && (
-        <div className="md:hidden bg-white border-t border-slate-100 shadow-lg">
-          <div className="px-6 py-4 space-y-3">
-            <a href="#features" className="block text-sm font-semibold text-slate-700 py-2" onClick={() => setMobileOpen(false)}>תכונות</a>
-            <a href="#benefits" className="block text-sm font-semibold text-slate-700 py-2" onClick={() => setMobileOpen(false)}>יתרונות</a>
-            <a href="#use-cases" className="block text-sm font-semibold text-slate-700 py-2" onClick={() => setMobileOpen(false)}>שימושים</a>
-            <a href="#comparison" className="block text-sm font-semibold text-slate-700 py-2" onClick={() => setMobileOpen(false)}>השוואה</a>
-          </div>
-        </div>
-      )}
-    </nav>
   );
 }
 
@@ -145,7 +92,7 @@ function HeroSection() {
 
             {/* Dashboard mockup */}
             <div className="lg:order-2 hidden lg:block">
-              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-4 transform -rotate-1 hover:rotate-0 transition-transform duration-700">
+              <div className="relative bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-4 transform -rotate-1 hover:rotate-0 transition-transform duration-700">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-1.5">
                     <div className="w-3 h-3 rounded-full bg-red-300" />
@@ -195,19 +142,22 @@ function HeroSection() {
                         <div className="h-full bg-gradient-to-l from-emerald-500 to-emerald-300 rounded-full" style={{ width: '92%' }} />
                       </div>
                     </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Floating notification */}
-              <div className="absolute -bottom-4 right-8 bg-white rounded-xl shadow-xl p-4 border border-slate-100 w-64 transform rotate-2 animate-fade-in">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                    <CheckCircle size={20} className="text-green-600" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-slate-900">המתנות נשלחו!</div>
-                    <div className="text-[10px] text-slate-500">350 עובדים קיבלו מתנה לחג</div>
+                    {/* Notification badge - on the panel */}
+                    <div className="mt-5 bg-green-50 rounded-lg p-3 border border-green-100 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                        <CheckCircle size={16} className="text-green-600" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">המתנות נשלחו!</div>
+                        <div className="text-[10px] text-slate-500">350 עובדים קיבלו מתנה לחג</div>
+                      </div>
+                      <div className="mr-auto">
+                        <div className="h-1.5 w-16 bg-green-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-green-500 w-full rounded-full" />
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -513,69 +463,138 @@ function DifferentiationSection() {
   );
 }
 
-// ─── Section 6: Use Cases ────────────────────────────────────────────────────
+// ─── Section 6: Use Cases (Horizontal Scrolling Gallery) ─────────────────────
 function UseCasesSection() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  const scroll = (direction: 'left' | 'right') => {
+    if (!scrollRef.current) return;
+    const amount = 420;
+    scrollRef.current.scrollBy({
+      left: direction === 'left' ? -amount : amount,
+      behavior: 'smooth',
+    });
+  };
+
   const useCases = [
     {
-      icon: <Calendar size={28} className="text-red-500" />,
+      icon: <Calendar size={32} className="text-white" />,
       title: 'מתנות לחג לעובדים',
       desc: 'שלחו מתנות לחג לכל העובדים באופן אוטומטי – ראש השנה, פסח, חנוכה ועוד.',
-      color: 'from-red-50 to-orange-50',
-      border: 'border-red-100',
+      gradient: 'from-red-500 to-orange-500',
+      illustration: (
+        <div className="flex items-end gap-2 justify-center">
+          <div className="w-10 h-16 bg-white/20 rounded-lg" />
+          <div className="w-10 h-24 bg-white/30 rounded-lg" />
+          <div className="w-10 h-20 bg-white/20 rounded-lg" />
+          <div className="w-10 h-12 bg-white/15 rounded-lg" />
+        </div>
+      ),
     },
     {
-      icon: <Gift size={28} className="text-pink-500" />,
+      icon: <Gift size={32} className="text-white" />,
       title: 'מתנות ליום הולדת',
       desc: 'הגדירו תקציב ליום הולדת וזה קורה אוטומטית. העובד בוחר, אתם רק מאשרים.',
-      color: 'from-pink-50 to-rose-50',
-      border: 'border-pink-100',
+      gradient: 'from-pink-500 to-rose-500',
+      illustration: (
+        <div className="flex items-center justify-center gap-3">
+          <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+            <Gift size={24} className="text-white/60" />
+          </div>
+          <div className="w-10 h-10 bg-white/15 rounded-full" />
+          <div className="w-8 h-8 bg-white/10 rounded-full" />
+        </div>
+      ),
     },
     {
-      icon: <TrendingUp size={28} className="text-emerald-500" />,
+      icon: <TrendingUp size={32} className="text-white" />,
       title: 'בונוסים ותמריצים',
       desc: 'תגמלו עובדים מצטיינים עם מתנות מיידיות – ללא צורך בתהליכי רכש מסורבלים.',
-      color: 'from-emerald-50 to-teal-50',
-      border: 'border-emerald-100',
+      gradient: 'from-emerald-500 to-teal-500',
+      illustration: (
+        <div className="flex items-center justify-center">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-xl bg-white/20 flex items-center justify-center">
+              <TrendingUp size={32} className="text-white/60" />
+            </div>
+            <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-white/80 text-xs font-bold">+</div>
+          </div>
+        </div>
+      ),
     },
     {
-      icon: <Briefcase size={28} className="text-blue-500" />,
+      icon: <Briefcase size={32} className="text-white" />,
       title: 'תקציב רווחה שנתי',
       desc: 'הקצו תקציב רווחה שנתי לכל עובד ותנו לו לבחור איך להשתמש בו לאורך השנה.',
-      color: 'from-blue-50 to-indigo-50',
-      border: 'border-blue-100',
+      gradient: 'from-blue-500 to-indigo-500',
+      illustration: (
+        <div className="flex items-center justify-center gap-1">
+          {[70, 45, 85, 60, 40, 75].map((h, i) => (
+            <div key={i} className="w-4 bg-white/20 rounded-sm" style={{ height: `${h}%`, minHeight: h * 0.6 }} />
+          ))}
+        </div>
+      ),
     },
   ];
 
   return (
-    <section id="use-cases" className="py-24 bg-white">
+    <section id="use-cases" className="py-24 bg-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
         <FadeInSection>
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="text-stripe-purple font-bold text-sm tracking-wide mb-3 block">שימושים</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              איך ארגונים משתמשים במערכת
-            </h2>
-            <p className="text-lg text-slate-600 leading-relaxed">
-              Nexus מתאימה לכל תרחיש של מתנות לעובדים, הטבות ותקציבי רווחה.
-            </p>
+          <div className="flex items-end justify-between mb-12">
+            <div>
+              <span className="text-stripe-purple font-bold text-sm tracking-wide mb-3 block">שימושים</span>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+                איך ארגונים משתמשים במערכת
+              </h2>
+              <p className="text-lg text-slate-600 leading-relaxed max-w-2xl">
+                Nexus מתאימה לכל תרחיש של מתנות לעובדים, הטבות ותקציבי רווחה.
+              </p>
+            </div>
+            <div className="hidden md:flex items-center gap-2">
+              <button
+                onClick={() => scroll('right')}
+                className="w-10 h-10 rounded-full border border-slate-200 hover:border-stripe-purple hover:text-stripe-purple flex items-center justify-center text-slate-400 transition-colors"
+                aria-label="גלול ימינה"
+              >
+                <ChevronRight size={20} />
+              </button>
+              <button
+                onClick={() => scroll('left')}
+                className="w-10 h-10 rounded-full border border-slate-200 hover:border-stripe-purple hover:text-stripe-purple flex items-center justify-center text-slate-400 transition-colors"
+                aria-label="גלול שמאלה"
+              >
+                <ChevronLeft size={20} />
+              </button>
+            </div>
           </div>
         </FadeInSection>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div
+          ref={scrollRef}
+          className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide snap-x snap-mandatory"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {useCases.map((useCase, i) => (
-            <FadeInSection key={i}>
-              <div className={`bg-gradient-to-br ${useCase.color} rounded-2xl p-8 border ${useCase.border} hover:shadow-lg transition-shadow duration-300`}>
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-white shadow-sm flex items-center justify-center shrink-0">
-                    {useCase.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-2">{useCase.title}</h3>
-                    <p className="text-slate-600 leading-relaxed">{useCase.desc}</p>
-                  </div>
+            <div
+              key={i}
+              className="snap-start shrink-0 w-[340px] md:w-[400px] rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 group"
+            >
+              {/* Visual area */}
+              <div className={`bg-gradient-to-br ${useCase.gradient} h-48 p-6 flex flex-col justify-between`}>
+                <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  {useCase.icon}
+                </div>
+                <div className="h-16 flex items-end">
+                  {useCase.illustration}
                 </div>
               </div>
-            </FadeInSection>
+              {/* Content area */}
+              <div className="bg-white p-6 border border-t-0 border-slate-100 rounded-b-2xl">
+                <h3 className="text-xl font-bold text-slate-900 mb-3">{useCase.title}</h3>
+                <p className="text-slate-600 leading-relaxed">{useCase.desc}</p>
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -646,107 +665,7 @@ function AudienceSection() {
   );
 }
 
-// ─── Section 8: Comparison Table ─────────────────────────────────────────────
-function ComparisonSection() {
-  const rows = [
-    { feature: 'ניהול תקציבי רווחה', traditional: false, nexus: true },
-    { feature: 'הקצאה לפי עובד / צוות / אירוע', traditional: false, nexus: true },
-    { feature: 'קטלוג מתנות ושוברים', traditional: true, nexus: true },
-    { feature: 'הוספת ספקים פרטיים', traditional: false, nexus: true },
-    { feature: 'אוטומציה (ימי הולדת, חגים)', traditional: false, nexus: true },
-    { feature: 'דאשבורד ודוחות בזמן אמת', traditional: false, nexus: true },
-    { feature: 'מועדון הטבות לעובדים', traditional: false, nexus: true },
-    { feature: 'תוכניות נאמנות', traditional: false, nexus: true },
-    { feature: 'גמישות מלאה בהתאמה אישית', traditional: false, nexus: true },
-    { feature: 'API ואינטגרציות', traditional: false, nexus: true },
-  ];
-
-  return (
-    <section id="comparison" className="py-24 bg-white">
-      <div className="max-w-4xl mx-auto px-6">
-        <FadeInSection>
-          <div className="text-center max-w-3xl mx-auto mb-16">
-            <span className="text-stripe-purple font-bold text-sm tracking-wide mb-3 block">השוואה</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              Nexus מול פלטפורמות מתנות מסורתיות
-            </h2>
-          </div>
-        </FadeInSection>
-
-        <FadeInSection>
-          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            <div className="grid grid-cols-3 bg-slate-50 border-b border-slate-200">
-              <div className="p-4 font-bold text-slate-900">תכונה</div>
-              <div className="p-4 text-center font-bold text-slate-400">פלטפורמות מסורתיות</div>
-              <div className="p-4 text-center font-bold text-stripe-purple">Nexus</div>
-            </div>
-            {rows.map((row, i) => (
-              <div key={i} className={`grid grid-cols-3 border-b border-slate-100 last:border-0 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
-                <div className="p-4 text-sm text-slate-700 font-medium">{row.feature}</div>
-                <div className="p-4 text-center">
-                  {row.traditional ? (
-                    <CheckCircle size={18} className="text-slate-300 mx-auto" />
-                  ) : (
-                    <div className="w-5 h-0.5 bg-slate-200 mx-auto mt-2" />
-                  )}
-                </div>
-                <div className="p-4 text-center">
-                  <CheckCircle size={18} className="text-stripe-purple mx-auto" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </FadeInSection>
-      </div>
-    </section>
-  );
-}
-
-// ─── Section 9: SEO Content ──────────────────────────────────────────────────
-function SEOSection() {
-  return (
-    <section className="py-24 bg-slate-50">
-      <div className="max-w-4xl mx-auto px-6">
-        <FadeInSection>
-          <div className="bg-white rounded-2xl p-10 md:p-14 border border-slate-200 shadow-sm">
-            <span className="text-stripe-purple font-bold text-sm tracking-wide mb-3 block">מדריך</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-8">
-              מדריך לניהול תקציב רווחה לעובדים
-            </h2>
-
-            <div className="prose prose-slate max-w-none text-slate-600 leading-relaxed space-y-6">
-              <h3 className="text-xl font-bold text-slate-800 mt-0">איך ארגונים מנהלים תקציב רווחה לעובדים?</h3>
-              <p>
-                ניהול תקציב רווחה לעובדים הוא אחד התהליכים החשובים ביותר בכל ארגון. תקציב הרווחה כולל מתנות לעובדים,
-                שוברים לעובדים, הטבות לעובדים ומתנות לחג לעובדים. ארגונים רבים מקצים בין 1,000 ל-5,000 שקלים
-                לעובד בשנה עבור תקציב רווחה, כולל מתנות לחג, ימי הולדת, בונוסים והטבות שוטפות.
-              </p>
-
-              <h3 className="text-xl font-bold text-slate-800">מה כולל תקציב רווחה טיפוסי?</h3>
-              <p>
-                תקציב רווחה לעובדים כולל בדרך כלל מספר רכיבים: מתנות לחגים (ראש השנה, פסח, חנוכה),
-                מתנות ליום הולדת, בונוסים ותמריצים, ותק, והטבות שוטפות כמו מועדון הטבות לעובדים.
-                ארגונים מתקדמים מספקים לעובדים גמישות בבחירת המתנות וההטבות, מה שמעלה משמעותית
-                את שביעות הרצון.
-              </p>
-
-              <h3 className="text-xl font-bold text-slate-800">איך לבחור פתרון לניהול מתנות לעובדים?</h3>
-              <p>
-                בבחירת פתרון לניהול מתנות לעובדים ותקציב רווחה, חשוב להתייחס למספר קריטריונים:
-                ניהול תקציבי מרכזי, שקיפות ודיווח, מגוון הטבות ומתנות, אוטומציה של תהליכים,
-                יכולת התאמה אישית, ואינטגרציה עם מערכות HR קיימות. Nexus מציעה את כל היכולות הללו
-                בפלטפורמה אחת – תשתית הטבות לעובדים שמשלבת ניהול תקציבי, קטלוג מתנות ושוברים,
-                ואוטומציה מלאה.
-              </p>
-            </div>
-          </div>
-        </FadeInSection>
-      </div>
-    </section>
-  );
-}
-
-// ─── Section 10: Final CTA ───────────────────────────────────────────────────
+// ─── Final CTA ───────────────────────────────────────────────────────────────
 function FinalCTASection() {
   return (
     <section id="cta-final" className="relative py-32 overflow-hidden">
@@ -787,57 +706,10 @@ function FinalCTASection() {
   );
 }
 
-// ─── Footer ──────────────────────────────────────────────────────────────────
-function LandingFooter() {
-  return (
-    <footer className="bg-slate-900 py-12 border-t border-slate-800">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid md:grid-cols-4 gap-12 mb-12">
-          <div className="md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <NexusLogo height={24} variant="white" />
-            </div>
-            <p className="text-slate-400 text-sm leading-relaxed max-w-sm">
-              תשתית הטבות העובדים המתקדמת ביותר בישראל. ניהול תקציב רווחה, מתנות לעובדים ושוברים לעובדים – הכל בפלטפורמה אחת.
-            </p>
-          </div>
-          <div>
-            <h5 className="font-bold text-white mb-4">פתרונות</h5>
-            <ul className="space-y-2 text-sm text-slate-400">
-              <li><a href="#features" className="hover:text-white transition-colors">ניהול תקציבי רווחה</a></li>
-              <li><a href="#features" className="hover:text-white transition-colors">מתנות לעובדים</a></li>
-              <li><a href="#features" className="hover:text-white transition-colors">הטבות לעובדים</a></li>
-              <li><a href="#features" className="hover:text-white transition-colors">שוברים לעובדים</a></li>
-            </ul>
-          </div>
-          <div>
-            <h5 className="font-bold text-white mb-4">חברה</h5>
-            <ul className="space-y-2 text-sm text-slate-400">
-              <li><Link to="/he" className="hover:text-white transition-colors">אודות</Link></li>
-              <li><Link to="/he/blog" className="hover:text-white transition-colors">בלוג</Link></li>
-              <li><Link to="/he/privacy" className="hover:text-white transition-colors">פרטיות</Link></li>
-              <li><Link to="/he/terms" className="hover:text-white transition-colors">תנאי שימוש</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4 text-xs text-slate-500">
-          <div>© {new Date().getFullYear()} Nexus. כל הזכויות שמורות.</div>
-          <div className="flex gap-6">
-            <Link to="/he/privacy" className="hover:text-slate-300">פרטיות</Link>
-            <Link to="/he/terms" className="hover:text-slate-300">תנאי שימוש</Link>
-            <Link to="/he/accessibility" className="hover:text-slate-300">נגישות</Link>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
 // ─── Main Landing Page ───────────────────────────────────────────────────────
 export default function NexusLandingPage() {
   useEffect(() => {
     document.title = 'Nexus | ניהול תקציב רווחה ומתנות לעובדים';
-    // Set meta description for SEO
     let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement;
     if (!meta) {
       meta = document.createElement('meta');
@@ -846,7 +718,6 @@ export default function NexusLandingPage() {
     }
     meta.content = 'Nexus - פלטפורמה לניהול תקציב רווחה, מתנות לעובדים, שוברים והטבות לעובדים. הקצו תקציבים, שלחו מתנות ונהלו הטבות בצורה פשוטה ושקופה.';
 
-    // Inject Rubik font for Hebrew
     const linkId = 'rubik-font-landing';
     if (!document.getElementById(linkId)) {
       const link = document.createElement('link');
@@ -860,7 +731,9 @@ export default function NexusLandingPage() {
   return (
     <LanguageProvider language="he">
       <div className="min-h-screen bg-white" style={{ fontFamily: "'Rubik', 'Inter', sans-serif" }}>
-        <LandingNavbar />
+        <Suspense fallback={null}>
+          <Navbar variant="dark" />
+        </Suspense>
         <HeroSection />
         <ProblemSection />
         <SolutionSection />
@@ -868,10 +741,10 @@ export default function NexusLandingPage() {
         <DifferentiationSection />
         <UseCasesSection />
         <AudienceSection />
-        <ComparisonSection />
-        <SEOSection />
         <FinalCTASection />
-        <LandingFooter />
+        <Suspense fallback={null}>
+          <Footer />
+        </Suspense>
       </div>
     </LanguageProvider>
   );
