@@ -202,15 +202,6 @@ export default function ArticleContent() {
         </div>
       </section>
 
-      {/* ─── Hero Image ─── */}
-      <div className="max-w-4xl mx-auto px-6 -mt-8 mb-8">
-        <img
-          src={article.heroImage}
-          alt={article.title}
-          className="w-full max-h-[400px] object-cover rounded-2xl shadow-sm"
-        />
-      </div>
-
       {/* ─── Content + TOC ─── */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="flex gap-12">
