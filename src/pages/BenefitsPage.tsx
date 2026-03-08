@@ -6,6 +6,7 @@ import AnimatedGradient from '../components/AnimatedGradient';
 import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 import BenefitsHowItWorks from '../components/benefits/BenefitsHowItWorks';
 import BenefitsStats from '../components/benefits/BenefitsStats';
+import PartnerBubbles from '../components/PartnerBubbles';
 import StoryWalletCards from '../components/benefits/StoryWalletCards';
 import StoryInsightsCarousel from '../components/benefits/StoryInsightsCarousel';
 import StoryGiftCards from '../components/benefits/StoryGiftCards';
@@ -331,75 +332,79 @@ export default function BenefitsPage() {
         </div>
       </section>
 
-      {/* ═══════════════════════ S4: PROVIDERS (Home Page Partner Layout) ═══════════════════════ */}
-      <section className="scroll-reveal relative py-20 md:py-32 bg-slate-50 overflow-hidden">
-        {/* Vertical Grid Lines Background */}
-        <div className="absolute inset-0 z-0 flex justify-center pointer-events-none opacity-30 overflow-hidden">
-          <div className="flex space-x-24 h-full max-w-full">
-            {[...Array(8)].map((_, i) => (
-              <div
-                key={i}
-                className="w-px h-full bg-gradient-to-b from-transparent via-stripe-purple/20 to-transparent"
-              />
-            ))}
-          </div>
-        </div>
+      {/* ═══════════════════════ S4: PARTNER ECOSYSTEM (Home Page Layout) ═══════════════════════ */}
+      <section className="scroll-reveal relative pt-0 pb-8 overflow-hidden">
+        {/* Diagonal background */}
+        <div
+          className="absolute inset-0 bg-slate-100"
+          style={{
+            clipPath: isRtl
+              ? 'polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 100px))'
+              : 'polygon(0 0, 100% 0, 100% calc(100% - 100px), 0 100%)',
+          }}
+        />
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
-          <div className="text-center mb-14">
-            <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
-              {he ? 'כוח מיקוח' : 'Bargaining Power'}
-            </span>
-            <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
-              {he ? 'מאות ספקי הטבות ארציים' : 'Hundreds of National Benefit Providers'}
-            </h2>
-            <p className="text-slate-500 max-w-2xl mx-auto text-base leading-relaxed">
-              {he
-                ? 'העבודה עם עשרות ארגונים במקביל יוצרת כוח מיקוח שמתורגם להסכמים מסחריים חזקים — ולהנחות שלא תמצאו במקום אחר.'
-                : 'Working with dozens of organizations simultaneously creates bargaining power that translates to strong commercial agreements — and discounts you won\'t find elsewhere.'}
-            </p>
-          </div>
+        <div className="max-w-7xl mx-auto px-6 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-16 items-center">
+            {/* Left: Content */}
+            <div>
+              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+                {he ? 'אקוסיסטם של שותפים' : 'Partner Ecosystem'}
+              </p>
+              <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
+                {he ? 'בנוי עם השותפים החזקים ביותר' : "Built with the world's leading platforms"}
+              </h2>
+              <p className="text-lg text-slate-600 leading-relaxed mb-8">
+                {he
+                  ? 'אנחנו עובדים עם שותפים טכנולוגיים מובילים למימוש אינטגרציות מורכבות, הנפקה, סליקה וניהול תשתיות פיננסיות – לצד שותפי הטבות מסחריים שמספקים הנחות, שוברים ותנאים בלעדיים לחברי הקהילה. החיבור בין עומק טכנולוגי לכוח צרכני יוצר מערכת יציבה, סקיילבילית ומייצרת ערך מתמשך לכל הצדדים.'
+                  : 'Our platform integrates seamlessly with the payment providers and financial services you already use. From global payment networks to modern fintech solutions, we connect you with the tools that power the world\'s commerce.'}
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-1">
+                      {he ? 'אינטגרציה אוניברסלית' : 'Universal Integration'}
+                    </h3>
+                    <p className="text-sm text-slate-600">
+                      {he ? 'התחברו לכל ספק תשלומים או שירות פיננסי מרכזי' : 'Connect with any major payment provider or financial service'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-1">
+                      {he ? 'שותפים מהימנים' : 'Trusted Partners'}
+                    </h3>
+                    <p className="text-sm text-slate-600">
+                      {he ? 'עבדו עם מובילי מערכות אקולוגיות מאומתות ומאובטחות' : 'Work with verified and secure payment ecosystem leaders'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-900 mb-1">
+                      {he ? 'טווח הגעה גלובלי' : 'Global Reach'}
+                    </h3>
+                    <p className="text-sm text-slate-600">
+                      {he ? 'עבדו תשלומים ב-135+ מטבעות עם שיטות תשלום מקומיות' : 'Process payments in 135+ currencies with local payment methods'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-          {/* Desktop - static row */}
-          <div className="hidden md:flex items-center justify-center gap-10 lg:gap-12">
-            <img
-              src="/partner-1.png"
-              alt="Partner 1"
-              className="h-48 lg:h-56 w-auto object-contain opacity-100 hover:opacity-70 transition-all hover:grayscale"
-              loading="lazy"
-            />
-            <img
-              src="/partner-2.png"
-              alt="Partner 2"
-              className="h-10 lg:h-12 w-auto object-contain opacity-100 hover:opacity-70 transition-all hover:grayscale"
-              loading="lazy"
-            />
-            <img
-              src="/partner-3.png"
-              alt="Partner 3"
-              className="h-14 w-auto object-contain opacity-100 hover:opacity-70 transition-all hover:grayscale"
-              loading="lazy"
-            />
-            <img
-              src="/partner-4.png"
-              alt="Partner 4"
-              className="h-20 lg:h-24 w-auto object-contain opacity-100 hover:opacity-70 transition-all hover:grayscale"
-              loading="lazy"
-            />
-          </div>
-
-          {/* Mobile - auto-scrolling slider */}
-          <div className="md:hidden overflow-hidden">
-            <div className={`${isRtl ? 'partner-slider' : 'partner-slider-reverse'} flex items-center gap-12 w-max`}>
-              {[1, 2, 3, 4, 1, 2, 3, 4].map((num, i) => (
-                <img
-                  key={i}
-                  src={`/partner-${num}.png`}
-                  alt={`Partner ${num}`}
-                  className={`${num === 1 ? 'h-32' : num === 4 ? 'h-14' : 'h-8'} w-auto object-contain flex-shrink-0`}
-                  loading="lazy"
-                />
-              ))}
+            {/* Right: Rising Bubbles */}
+            <div className="relative h-[400px] md:h-[800px] -mx-6 md:mx-0 overflow-hidden">
+              <PartnerBubbles />
             </div>
           </div>
         </div>
