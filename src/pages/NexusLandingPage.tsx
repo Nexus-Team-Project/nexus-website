@@ -353,29 +353,40 @@ function ValuesStoriesSection() {
       title: 'מותגים שהעובדים אוהבים',
       subtitle: 'תנו מתנה שהעובד באמת בוחר בה',
       content: (
-        <div className="relative h-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-orange-500 p-8">
-          {/* Brand bubbles */}
-          <div className="flex flex-wrap justify-center gap-3 mb-8 max-w-sm">
-            {brandLogos.slice(0, 8).map((brand, i) => (
-              <div
-                key={i}
-                className="bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden"
-                style={{
-                  width: i % 3 === 0 ? 64 : i % 3 === 1 ? 56 : 48,
-                  height: i % 3 === 0 ? 64 : i % 3 === 1 ? 56 : 48,
-                  animationDelay: `${i * 0.1}s`,
-                }}
-              >
-                <img
-                  src={brand.src}
-                  alt={brand.name}
-                  className="w-3/4 h-3/4 object-contain"
-                />
-              </div>
-            ))}
+        <div className="relative h-full flex flex-col items-center justify-end overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-orange-500 p-8 pb-6">
+          {/* Rising brand columns */}
+          <div className="absolute inset-0 flex justify-center gap-4 overflow-hidden opacity-80 px-6">
+            {[0, 1, 2].map((col) => {
+              const colLogos = brandLogos.filter((_, i) => i % 3 === col);
+              const tripled = [...colLogos, ...colLogos, ...colLogos];
+              const duration = 12 + col * 4;
+              const size = col === 1 ? 64 : 52;
+              return (
+                <div
+                  key={col}
+                  className="flex flex-col items-center gap-4 rise-brands-col"
+                  style={{
+                    animation: `riseBrands ${duration}s linear infinite`,
+                    animationDelay: `${col * -3}s`,
+                  }}
+                >
+                  {tripled.map((brand, i) => (
+                    <div
+                      key={i}
+                      className="bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden shrink-0"
+                      style={{ width: size, height: size }}
+                    >
+                      <img src={brand.src} alt={brand.name} className="w-3/4 h-3/4 object-contain" />
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
           </div>
-          <h3 className="text-2xl font-bold text-white text-center z-10">תנו מתנה שהעובד באמת בוחר בה</h3>
-          <p className="text-white/70 text-center mt-2 text-sm z-10">מאות מותגים מובילים בקטלוג אחד</p>
+          {/* Bottom fade for text readability */}
+          <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-rose-500 via-rose-500/90 to-transparent z-[5]" />
+          <h3 className="text-2xl font-bold text-white text-center z-10 relative">תנו מתנה שהעובד באמת בוחר בה</h3>
+          <p className="text-white/70 text-center mt-2 text-sm z-10 relative">מאות מותגים מובילים בקטלוג אחד</p>
         </div>
       ),
     },
@@ -485,6 +496,13 @@ function ValuesStoriesSection() {
           ))}
         </div>
       </div>
+
+      <style>{`
+        @keyframes riseBrands {
+          0% { transform: translateY(0); }
+          100% { transform: translateY(-33.33%); }
+        }
+      `}</style>
     </section>
   );
 }
@@ -735,7 +753,7 @@ function UseCasesSection() {
                 <img
                   src={useCase.image}
                   alt={useCase.title}
-                  className="w-40 h-40 object-contain drop-shadow-xl group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-cover drop-shadow-xl group-hover:scale-110 transition-transform duration-500"
                 />
               </div>
               {/* Content area */}
