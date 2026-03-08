@@ -1,4 +1,4 @@
-import { CreditCard, Wallet, Package } from 'lucide-react';
+import { CreditCard, Wallet, Package, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 
 export default function CheckoutPanel() {
@@ -161,8 +161,11 @@ export default function CheckoutPanel() {
           </div>
 
           {/* Checkout Button */}
-          <button className="w-full mt-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white py-2.5 rounded-lg text-[11px] font-bold shadow-lg hover:shadow-xl transition-all hover:scale-[1.02]">
+          <button className="group w-full mt-4 inline-flex items-center justify-center gap-2 bg-stripe-purple hover:bg-stripe-purple/85 text-white font-semibold py-2.5 rounded-lg text-[11px] transition-all duration-300 hover:shadow-xl hover:shadow-stripe-purple/30">
             {he ? 'השלמת רכישה' : 'Complete Purchase'}
+            <span className="inline-block w-0 overflow-hidden group-hover:w-4 transition-all duration-300 ease-out">
+              <ArrowRight size={14} className={`inline ${he ? 'scale-x-[-1]' : ''}`} />
+            </span>
           </button>
 
           {/* Security Badge */}

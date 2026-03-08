@@ -831,21 +831,24 @@
   gap: 4px;
   padding: 8px;
   border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(255, 255, 255, 0.5);
-  transition: all 0.2s;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(255, 255, 255, 0.6);
+  transition: all 0.3s;
   cursor: default;
+  color: #4b5563;
 }
 
 .payment-method-btn:hover {
-  background: rgba(255, 255, 255, 0.8);
-  border-color: rgba(139, 92, 246, 0.3);
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(99, 91, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(99, 91, 255, 0.1);
 }
 
 .payment-method-btn.active {
-  background: rgba(139, 92, 246, 0.1);
-  border-color: rgba(139, 92, 246, 0.5);
-  color: #7c3aed;
+  background: #635bff;
+  border-color: #635bff;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(99, 91, 255, 0.35);
 }
 
 /* Blob Animation */
@@ -1086,8 +1089,8 @@
 }
 
 @keyframes checkoutBtnGlow {
-  0%, 100% { box-shadow: 0 4px 16px rgba(139, 92, 246, 0.25); }
-  50%      { box-shadow: 0 8px 28px rgba(139, 92, 246, 0.5); }
+  0%, 100% { box-shadow: 0 4px 16px rgba(99, 91, 255, 0.25); }
+  50%      { box-shadow: 0 8px 28px rgba(99, 91, 255, 0.5); }
 }
 
 /* Shimmer sweep across glass cards */
