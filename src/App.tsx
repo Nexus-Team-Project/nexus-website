@@ -36,6 +36,7 @@ const PrivacyPolicyPage  = lazy(() => import('./pages/PrivacyPolicyPage'));
 const AccessibilityPage  = lazy(() => import('./pages/AccessibilityPage'));
 const TermsOfUsePage     = lazy(() => import('./pages/TermsOfUsePage'));
 const NexusLandingPage   = lazy(() => import('./pages/NexusLandingPage'));
+const ApiDocsPage        = lazy(() => import('./pages/ApiDocsPage'));
 
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
@@ -253,6 +254,8 @@ function App() {
           <Route path="/terms"           element={<LanguageProvider language="en"><TermsOfUsePage /></LanguageProvider>} />
           <Route path="/he/terms"        element={<LanguageProvider language="he"><TermsOfUsePage /></LanguageProvider>} />
           <Route path="/he/welfare"     element={<NexusLandingPage />} />
+          <Route path="/docs"          element={<LanguageProvider language="en"><ApiDocsPage /></LanguageProvider>} />
+          <Route path="/he/docs"       element={<LanguageProvider language="he"><ApiDocsPage /></LanguageProvider>} />
           <Route path="/dashboard" element={
             <ProtectedRoute redirectTo="/login">
               <UserDashboard />
