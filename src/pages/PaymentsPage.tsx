@@ -25,21 +25,29 @@ function useScrollReveal() {
 }
 
 // ─── Transaction Overlay — floating notifications on phone ───
-const CLEARING_TRANSACTIONS = [
+const CLEARING_TRANSACTIONS_EN = [
   { merchant: 'Online Store', amount: '₪1,250', time: 'Now' },
   { merchant: 'Chef Restaurant', amount: '₪480', time: '2 min ago' },
   { merchant: 'Fitness Studio', amount: '₪320', time: '5 min ago' },
   { merchant: 'Electronics Shop', amount: '₪2,100', time: '8 min ago' },
 ];
 
+const CLEARING_TRANSACTIONS_HE = [
+  { merchant: 'חנות אונליין', amount: '₪1,250', time: 'עכשיו' },
+  { merchant: 'מסעדת השף', amount: '₪480', time: 'לפני 2 דק׳' },
+  { merchant: 'סטודיו כושר', amount: '₪320', time: 'לפני 5 דק׳' },
+  { merchant: 'חנות אלקטרוניקה', amount: '₪2,100', time: 'לפני 8 דק׳' },
+];
+
 // Simple cycle: show transactions → vibrate phone → fade all out → repeat
 function TransactionOverlay() {
   const [visible, setVisible] = useState(false);
   const [shaking, setShaking] = useState(false);
+  const { language } = useLanguage();
+  const he = language === 'he';
 
   useEffect(() => {
     let mounted = true;
-    const SHOW_ITEMS = [0, 1, 2]; // show first 3 transactions
 
     function cycle() {
       if (!mounted) return;
@@ -71,7 +79,8 @@ function TransactionOverlay() {
     return () => { mounted = false; clearTimeout(t); };
   }, []);
 
-  const txItems = CLEARING_TRANSACTIONS.slice(0, 3);
+  const transactions = he ? CLEARING_TRANSACTIONS_HE : CLEARING_TRANSACTIONS_EN;
+  const txItems = transactions.slice(0, 3);
 
   return (
     <>
