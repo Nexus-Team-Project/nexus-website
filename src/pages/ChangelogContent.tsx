@@ -5,19 +5,20 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 /* ─── Types ─── */
-interface GitHubRelease {
-  id: number;
-  tag_name: string;
-  name: string;
-  body: string;
-  published_at: string;
+interface GitHubCommit {
+  sha: string;
+  commit: {
+    message: string;
+    author: {
+      name: string;
+      date: string;
+    };
+  };
   html_url: string;
-  prerelease: boolean;
-  draft: boolean;
 }
 
 interface ChangelogEntry {
-  id: number;
+  id: string;
   version: string;
   title: string;
   description: string;
@@ -79,25 +80,34 @@ export default function ChangelogContent() {
   }, [language]);
 
   useEffect(() => {
-    async function fetchReleases() {
+    async function fetchCommits() {
       try {
         const res = await fetch(
-          `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=50`,
+          `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits?per_page=50&sha=main`,
         );
         if (!res.ok) throw new Error(`GitHub API responded ${res.status}`);
-        const data: GitHubRelease[] = await res.json();
+        const data: GitHubCommit[] = await res.json();
 
         const parsed: ChangelogEntry[] = data
-          .filter((r) => !r.draft)
-          .map((r) => ({
-            id: r.id,
-            version: r.tag_name,
-            title: r.name || r.tag_name,
-            description: r.body || '',
-            date: r.published_at,
-            url: r.html_url,
-            categories: detectCategories(`${r.name ?? ''} ${r.body ?? ''}`),
-          }));
+          .filter((c) => {
+            const msg = c.commit.message.toLowerCase();
+            // Filter out merge commits and bot commits
+            return !msg.startsWith('merge pull request') && !msg.startsWith('merge branch');
+          })
+          .map((c) => {
+            const lines = c.commit.message.split('\n');
+            const title = lines[0];
+            const description = lines.slice(1).join('\n').trim();
+            return {
+              id: c.sha,
+              version: c.sha.substring(0, 7),
+              title,
+              description,
+              date: c.commit.author.date,
+              url: c.html_url,
+              categories: detectCategories(c.commit.message),
+            };
+          });
 
         setEntries(parsed);
       } catch (err) {
@@ -106,12 +116,12 @@ export default function ChangelogContent() {
             ? 'לא ניתן לטעון את השינויים כרגע. נסו שוב מאוחר יותר.'
             : 'Unable to load changelog. Please try again later.',
         );
-        console.error('Failed to fetch releases:', err);
+        console.error('Failed to fetch commits:', err);
       } finally {
         setLoading(false);
       }
     }
-    fetchReleases();
+    fetchCommits();
   }, [language]);
 
   /* Group entries by month */
