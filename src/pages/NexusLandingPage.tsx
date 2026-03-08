@@ -91,8 +91,8 @@ function HeroSection() {
             </div>
 
             {/* Dashboard mockup */}
-            <div className="lg:order-2 hidden lg:block">
-              <div className="relative bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-4 transform -rotate-1 hover:rotate-0 transition-transform duration-700">
+            <div className="lg:order-2 hidden lg:block relative">
+              <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl p-4 transform -rotate-1 hover:rotate-0 transition-transform duration-700">
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
                   <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-1.5">
                     <div className="w-3 h-3 rounded-full bg-red-300" />
@@ -142,23 +142,23 @@ function HeroSection() {
                         <div className="h-full bg-gradient-to-l from-emerald-500 to-emerald-300 rounded-full" style={{ width: '92%' }} />
                       </div>
                     </div>
-
-                    {/* Notification badge - on the panel */}
-                    <div className="mt-5 bg-green-50 rounded-lg p-3 border border-green-100 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                        <CheckCircle size={16} className="text-green-600" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-slate-900">המתנות נשלחו!</div>
-                        <div className="text-[10px] text-slate-500">350 עובדים קיבלו מתנה לחג</div>
-                      </div>
-                      <div className="mr-auto">
-                        <div className="h-1.5 w-16 bg-green-100 rounded-full overflow-hidden">
-                          <div className="h-full bg-green-500 w-full rounded-full" />
-                        </div>
-                      </div>
-                    </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Floating notification - positioned on the panel */}
+              <div className="absolute -bottom-6 left-4 bg-white rounded-xl shadow-xl p-4 border border-slate-100 w-64 transform -rotate-3">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <CheckCircle size={20} className="text-green-600" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900">המתנות נשלחו!</div>
+                    <div className="text-[10px] text-slate-500">350 עובדים קיבלו מתנה לחג</div>
+                  </div>
+                </div>
+                <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-green-500 w-full rounded-full" />
                 </div>
               </div>
             </div>
@@ -298,6 +298,190 @@ function SolutionSection() {
                 </ul>
               </div>
             </FadeInSection>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Section: Values Stories Slider ──────────────────────────────────────────
+function ValuesStoriesSection() {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const brandLogos = [
+    { src: '/brands/samsung.png', name: 'Samsung' },
+    { src: '/brands/mango.png', name: 'Mango' },
+    { src: '/brands/foot-locker.png', name: 'Foot Locker' },
+    { src: '/brands/golf.png', name: 'Golf' },
+    { src: '/brands/american-eagle.png', name: 'American Eagle' },
+    { src: '/brands/sacks.png', name: 'Sacks' },
+    { src: '/brands/castro-home.png', name: 'Castro' },
+    { src: '/brands/rami-levy.png', name: 'Rami Levy' },
+    { src: '/brands/intima.png', name: 'Intima' },
+    { src: '/brands/yves-rocher.png', name: 'Yves Rocher' },
+  ];
+
+  const stories = [
+    {
+      id: 'global',
+      title: 'גיפטקארדס מכל העולם',
+      subtitle: 'תנו מתנות בארץ וגם בחו״ל',
+      content: (
+        <div className="relative h-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8">
+          {/* Globe image */}
+          <img
+            src="/global-money-movement.png"
+            alt="Global gift cards"
+            className="w-48 h-48 object-contain mb-6 opacity-90"
+          />
+          {/* Floating card images */}
+          <div className="absolute top-6 right-6 transform rotate-6">
+            <img src="/card-frame-1.png" alt="" className="w-24 opacity-80 drop-shadow-xl" />
+          </div>
+          <div className="absolute bottom-12 left-6 transform -rotate-6">
+            <img src="/card-frame-2.png" alt="" className="w-28 opacity-80 drop-shadow-xl" />
+          </div>
+          <h3 className="text-2xl font-bold text-white text-center z-10">תנו מתנות בארץ וגם בחו״ל</h3>
+          <p className="text-white/70 text-center mt-2 text-sm z-10">גיפטקארדס ממאות מותגים בינלאומיים</p>
+        </div>
+      ),
+    },
+    {
+      id: 'brands',
+      title: 'מותגים שהעובדים אוהבים',
+      subtitle: 'תנו מתנה שהעובד באמת בוחר בה',
+      content: (
+        <div className="relative h-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-orange-500 p-8">
+          {/* Brand bubbles */}
+          <div className="flex flex-wrap justify-center gap-3 mb-8 max-w-sm">
+            {brandLogos.slice(0, 8).map((brand, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden"
+                style={{
+                  width: i % 3 === 0 ? 64 : i % 3 === 1 ? 56 : 48,
+                  height: i % 3 === 0 ? 64 : i % 3 === 1 ? 56 : 48,
+                  animationDelay: `${i * 0.1}s`,
+                }}
+              >
+                <img
+                  src={brand.src}
+                  alt={brand.name}
+                  className="w-3/4 h-3/4 object-contain"
+                />
+              </div>
+            ))}
+          </div>
+          <h3 className="text-2xl font-bold text-white text-center z-10">תנו מתנה שהעובד באמת בוחר בה</h3>
+          <p className="text-white/70 text-center mt-2 text-sm z-10">מאות מותגים מובילים בקטלוג אחד</p>
+        </div>
+      ),
+    },
+    {
+      id: 'dashboard',
+      title: 'שקיפות מלאה',
+      subtitle: 'עקבו אחר ניצול התקציב',
+      content: (
+        <div className="relative h-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
+          {/* Dashboard mockup image */}
+          <img
+            src="/dashboard/chart.png"
+            alt="Dashboard analytics"
+            className="w-64 rounded-lg shadow-2xl border border-slate-700 mb-6 opacity-95"
+          />
+          {/* Animated stats overlay */}
+          <div className="flex gap-4 mb-6">
+            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-center">
+              <div className="text-lg font-bold text-emerald-400">92%</div>
+              <div className="text-[10px] text-slate-400">ניצול תקציב</div>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-center">
+              <div className="text-lg font-bold text-blue-400">₪2.4M</div>
+              <div className="text-[10px] text-slate-400">תקציב שנתי</div>
+            </div>
+            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-center">
+              <div className="text-lg font-bold text-purple-400">1,240</div>
+              <div className="text-[10px] text-slate-400">עובדים</div>
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-white text-center z-10">שקיפות מלאה</h3>
+          <p className="text-white/50 text-center mt-2 text-sm z-10">עקבו אחר ניצול התקציב בזמן אמת</p>
+        </div>
+      ),
+    },
+  ];
+
+  const scrollToStory = (index: number) => {
+    if (!scrollRef.current) return;
+    const child = scrollRef.current.children[index] as HTMLElement;
+    if (child) {
+      scrollRef.current.scrollTo({
+        left: child.offsetLeft - scrollRef.current.offsetLeft,
+        behavior: 'smooth',
+      });
+    }
+    setActiveIndex(index);
+  };
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const scrollLeft = el.scrollLeft;
+      const childWidth = (el.children[0] as HTMLElement)?.offsetWidth || 1;
+      setActiveIndex(Math.round(scrollLeft / childWidth));
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <section className="py-24 bg-white overflow-hidden">
+      <div className="max-w-7xl mx-auto px-6">
+        <FadeInSection>
+          <div className="text-center max-w-3xl mx-auto mb-12">
+            <span className="text-stripe-purple font-bold text-sm tracking-wide mb-3 block">הערכים שלנו</span>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
+              הכל מתחיל בחוויה
+            </h2>
+            <p className="text-lg text-slate-600 leading-relaxed">
+              Nexus מאפשרת לעובדים ליהנות ממתנות והטבות בדיוק כמו שהם רוצים.
+            </p>
+          </div>
+        </FadeInSection>
+
+        {/* Story indicator dots */}
+        <div className="flex justify-center gap-3 mb-8">
+          {stories.map((story, i) => (
+            <button
+              key={story.id}
+              onClick={() => scrollToStory(i)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
+                activeIndex === i
+                  ? 'bg-stripe-purple text-white shadow-lg shadow-stripe-purple/25'
+                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}
+            >
+              {story.title}
+            </button>
+          ))}
+        </div>
+
+        {/* Stories carousel */}
+        <div
+          ref={scrollRef}
+          className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {stories.map((story) => (
+            <div
+              key={story.id}
+              className="snap-center shrink-0 w-[85vw] md:w-[700px] h-[450px] rounded-2xl overflow-hidden shadow-xl"
+            >
+              {story.content}
+            </div>
           ))}
         </div>
       </div>
@@ -478,67 +662,33 @@ function UseCasesSection() {
 
   const useCases = [
     {
-      icon: <Calendar size={32} className="text-white" />,
       title: 'מתנות לחג לעובדים',
       desc: 'שלחו מתנות לחג לכל העובדים באופן אוטומטי – ראש השנה, פסח, חנוכה ועוד.',
+      image: '/avocado.png',
       gradient: 'from-red-500 to-orange-500',
-      illustration: (
-        <div className="flex items-end gap-2 justify-center">
-          <div className="w-10 h-16 bg-white/20 rounded-lg" />
-          <div className="w-10 h-24 bg-white/30 rounded-lg" />
-          <div className="w-10 h-20 bg-white/20 rounded-lg" />
-          <div className="w-10 h-12 bg-white/15 rounded-lg" />
-        </div>
-      ),
     },
     {
-      icon: <Gift size={32} className="text-white" />,
       title: 'מתנות ליום הולדת',
       desc: 'הגדירו תקציב ליום הולדת וזה קורה אוטומטית. העובד בוחר, אתם רק מאשרים.',
+      image: '/coffee.png',
       gradient: 'from-pink-500 to-rose-500',
-      illustration: (
-        <div className="flex items-center justify-center gap-3">
-          <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
-            <Gift size={24} className="text-white/60" />
-          </div>
-          <div className="w-10 h-10 bg-white/15 rounded-full" />
-          <div className="w-8 h-8 bg-white/10 rounded-full" />
-        </div>
-      ),
     },
     {
-      icon: <TrendingUp size={32} className="text-white" />,
       title: 'בונוסים ותמריצים',
       desc: 'תגמלו עובדים מצטיינים עם מתנות מיידיות – ללא צורך בתהליכי רכש מסורבלים.',
+      image: '/shoe.png',
       gradient: 'from-emerald-500 to-teal-500',
-      illustration: (
-        <div className="flex items-center justify-center">
-          <div className="relative">
-            <div className="w-20 h-20 rounded-xl bg-white/20 flex items-center justify-center">
-              <TrendingUp size={32} className="text-white/60" />
-            </div>
-            <div className="absolute -top-2 -left-2 w-8 h-8 rounded-full bg-white/30 flex items-center justify-center text-white/80 text-xs font-bold">+</div>
-          </div>
-        </div>
-      ),
     },
     {
-      icon: <Briefcase size={32} className="text-white" />,
       title: 'תקציב רווחה שנתי',
       desc: 'הקצו תקציב רווחה שנתי לכל עובד ותנו לו לבחור איך להשתמש בו לאורך השנה.',
+      image: '/calculator.png',
       gradient: 'from-blue-500 to-indigo-500',
-      illustration: (
-        <div className="flex items-center justify-center gap-1">
-          {[70, 45, 85, 60, 40, 75].map((h, i) => (
-            <div key={i} className="w-4 bg-white/20 rounded-sm" style={{ height: `${h}%`, minHeight: h * 0.6 }} />
-          ))}
-        </div>
-      ),
     },
   ];
 
   return (
-    <section id="use-cases" className="py-24 bg-white overflow-hidden">
+    <section id="use-cases" className="py-24 bg-slate-50 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
         <FadeInSection>
           <div className="flex items-end justify-between mb-12">
@@ -572,7 +722,7 @@ function UseCasesSection() {
 
         <div
           ref={scrollRef}
-          className="flex gap-6 overflow-x-auto pb-6 scrollbar-hide snap-x snap-mandatory"
+          className="flex gap-6 overflow-x-auto pb-6 snap-x snap-mandatory"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {useCases.map((useCase, i) => (
@@ -580,14 +730,13 @@ function UseCasesSection() {
               key={i}
               className="snap-start shrink-0 w-[340px] md:w-[400px] rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 group"
             >
-              {/* Visual area */}
-              <div className={`bg-gradient-to-br ${useCase.gradient} h-48 p-6 flex flex-col justify-between`}>
-                <div className="w-14 h-14 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  {useCase.icon}
-                </div>
-                <div className="h-16 flex items-end">
-                  {useCase.illustration}
-                </div>
+              {/* Image area */}
+              <div className={`bg-gradient-to-br ${useCase.gradient} h-56 p-6 flex items-center justify-center relative overflow-hidden`}>
+                <img
+                  src={useCase.image}
+                  alt={useCase.title}
+                  className="w-40 h-40 object-contain drop-shadow-xl group-hover:scale-110 transition-transform duration-500"
+                />
               </div>
               {/* Content area */}
               <div className="bg-white p-6 border border-t-0 border-slate-100 rounded-b-2xl">
@@ -629,7 +778,7 @@ function AudienceSection() {
   ];
 
   return (
-    <section className="py-24 bg-slate-50">
+    <section className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-6">
         <FadeInSection>
           <div className="text-center max-w-3xl mx-auto mb-16">
@@ -646,8 +795,8 @@ function AudienceSection() {
         <div className="grid md:grid-cols-3 gap-8">
           {audiences.map((audience, i) => (
             <FadeInSection key={i}>
-              <div className="bg-white rounded-2xl p-8 border border-slate-100 hover:shadow-xl transition-shadow duration-300 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-6">
+              <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100 hover:shadow-xl transition-shadow duration-300 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mx-auto mb-6 shadow-sm">
                   {audience.icon}
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-3">{audience.title}</h3>
@@ -732,11 +881,12 @@ export default function NexusLandingPage() {
     <LanguageProvider language="he">
       <div className="min-h-screen bg-white" style={{ fontFamily: "'Rubik', 'Inter', sans-serif" }}>
         <Suspense fallback={null}>
-          <Navbar variant="dark" />
+          <Navbar />
         </Suspense>
         <HeroSection />
         <ProblemSection />
         <SolutionSection />
+        <ValuesStoriesSection />
         <BenefitsSection />
         <DifferentiationSection />
         <UseCasesSection />
