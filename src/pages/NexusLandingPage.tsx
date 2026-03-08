@@ -4,6 +4,9 @@ import { ArrowLeft, CheckCircle, Users, BarChart3, Zap, Gift, Shield, Calendar, 
 import { lazy, Suspense } from 'react';
 import AnimatedGradient from '../components/AnimatedGradient';
 import { LanguageProvider } from '../i18n/LanguageContext';
+import StoryGiftCards from '../components/benefits/StoryGiftCards';
+import PartnerBubbles from '../components/PartnerBubbles';
+import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 
 const Navbar = lazy(() => import('../components/Navbar'));
 const Footer = lazy(() => import('../components/Footer'));
@@ -305,183 +308,140 @@ function SolutionSection() {
   );
 }
 
+// ─── Story cards data for values section ─────────────────────────────────────
+const WELFARE_STORY_CARDS = [
+  {
+    id: 'giftcards',
+    title: 'תנו מתנות בארץ וגם בחו״ל',
+    Component: StoryGiftCards,
+  },
+  {
+    id: 'brands',
+    title: 'תנו מתנה שהעובד באמת בוחר בה',
+    Component: () => (
+      <div className="relative w-full overflow-hidden" style={{ minHeight: 520 }}>
+        <PartnerBubbles />
+      </div>
+    ),
+  },
+  {
+    id: 'dashboard',
+    title: 'שקיפות מלאה — עקבו אחר ניצול התקציב',
+    Component: () => (
+      <div className="w-full px-4 py-8" style={{ minHeight: 520 }}>
+        <BenefitsFeatureGrid />
+      </div>
+    ),
+  },
+];
+
 // ─── Section: Values Stories Slider ──────────────────────────────────────────
 function ValuesStoriesSection() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const brandLogos = [
-    { src: '/brands/samsung.png', name: 'Samsung' },
-    { src: '/brands/mango.png', name: 'Mango' },
-    { src: '/brands/foot-locker.png', name: 'Foot Locker' },
-    { src: '/brands/golf.png', name: 'Golf' },
-    { src: '/brands/american-eagle.png', name: 'American Eagle' },
-    { src: '/brands/sacks.png', name: 'Sacks' },
-    { src: '/brands/castro-home.png', name: 'Castro' },
-    { src: '/brands/rami-levy.png', name: 'Rami Levy' },
-    { src: '/brands/intima.png', name: 'Intima' },
-    { src: '/brands/yves-rocher.png', name: 'Yves Rocher' },
-  ];
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    const cardWidth = el.firstElementChild?.clientWidth ?? 380;
+    const gap = 24;
+    const index = Math.round(Math.abs(el.scrollLeft) / (cardWidth + gap));
+    setActiveIndex(Math.min(index, WELFARE_STORY_CARDS.length - 1));
+  };
 
-  const stories = [
-    {
-      id: 'global',
-      title: 'גיפטקארדס מכל העולם',
-      subtitle: 'תנו מתנות בארץ וגם בחו״ל',
-      content: (
-        <div className="relative h-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-8">
-          {/* Globe image */}
-          <img
-            src="/global-money-movement.png"
-            alt="Global gift cards"
-            className="w-48 h-48 object-contain mb-6 opacity-90"
-          />
-          {/* Floating card images */}
-          <div className="absolute top-6 right-6 transform rotate-6">
-            <img src="/card-frame-1.png" alt="" className="w-24 opacity-80 drop-shadow-xl" />
-          </div>
-          <div className="absolute bottom-12 left-6 transform -rotate-6">
-            <img src="/card-frame-2.png" alt="" className="w-28 opacity-80 drop-shadow-xl" />
-          </div>
-          <h3 className="text-2xl font-bold text-white text-center z-10">תנו מתנות בארץ וגם בחו״ל</h3>
-          <p className="text-white/70 text-center mt-2 text-sm z-10">גיפטקארדס ממאות מותגים בינלאומיים</p>
+  const scrollToIndex = (i: number) => {
+    if (!scrollRef.current) return;
+    const cardWidth = scrollRef.current.firstElementChild?.clientWidth ?? 380;
+    const gap = 24;
+    const target = i * (cardWidth + gap);
+    scrollRef.current.scrollTo({
+      left: -target,
+      behavior: 'smooth',
+    });
+  };
+
+  return (
+    <section className="relative py-20 md:py-32 bg-white overflow-hidden">
+      {/* hide scrollbar + hide internal story text */}
+      <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.story-no-text>div>div:first-child{display:none!important}`}</style>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            הערכים שלנו
+          </span>
+          <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
+            הכל מתחיל בחוויה
+          </h2>
+          <p className="text-slate-500 max-w-2xl mx-auto text-base leading-relaxed">
+            Nexus מאפשרת לעובדים ליהנות ממתנות והטבות בדיוק כמו שהם רוצים.
+          </p>
         </div>
-      ),
-    },
-    {
-      id: 'brands',
-      title: 'מותגים שהעובדים אוהבים',
-      subtitle: 'תנו מתנה שהעובד באמת בוחר בה',
-      content: (
-        <div className="relative h-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-orange-500 p-8">
-          {/* Brand bubbles */}
-          <div className="flex flex-wrap justify-center gap-3 mb-8 max-w-sm">
-            {brandLogos.slice(0, 8).map((brand, i) => (
+
+        {/* Gallery container with arrows */}
+        <div className="relative">
+          {/* Right arrow (RTL previous) */}
+          <button
+            onClick={() => scrollToIndex(Math.max(0, activeIndex - 1))}
+            className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white border border-slate-200 shadow-lg items-center justify-center hover:bg-slate-50 transition-colors -right-4 lg:-right-6"
+            aria-label="Previous"
+          >
+            <ChevronRight size={20} className="text-slate-600" />
+          </button>
+
+          {/* Left arrow (RTL next) */}
+          <button
+            onClick={() => scrollToIndex(Math.min(WELFARE_STORY_CARDS.length - 1, activeIndex + 1))}
+            className="hidden md:flex absolute top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-white border border-slate-200 shadow-lg items-center justify-center hover:bg-slate-50 transition-colors -left-4 lg:-left-6"
+            aria-label="Next"
+          >
+            <ChevronLeft size={20} className="text-slate-600" />
+          </button>
+
+          {/* Scroll track */}
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            className="flex gap-6 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-4 px-1"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
+            {WELFARE_STORY_CARDS.map((card) => (
               <div
-                key={i}
-                className="bg-white rounded-full shadow-lg flex items-center justify-center overflow-hidden"
-                style={{
-                  width: i % 3 === 0 ? 64 : i % 3 === 1 ? 56 : 48,
-                  height: i % 3 === 0 ? 64 : i % 3 === 1 ? 56 : 48,
-                  animationDelay: `${i * 0.1}s`,
-                }}
+                key={card.id}
+                className="flex-shrink-0 w-[320px] sm:w-[380px] snap-center rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
-                <img
-                  src={brand.src}
-                  alt={brand.name}
-                  className="w-3/4 h-3/4 object-contain"
-                />
+                {/* Card header */}
+                <div className="px-5 pt-5 pb-3 text-right">
+                  <h3 className="text-lg font-bold" style={{ color: '#635BFF' }}>
+                    {card.title}
+                  </h3>
+                </div>
+
+                {/* Animation container */}
+                <div className="relative overflow-hidden" style={{ height: 480 }}>
+                  <div className="story-no-text" style={{ transform: 'scale(0.85)', transformOrigin: 'top center' }}>
+                    <card.Component />
+                  </div>
+                </div>
               </div>
             ))}
           </div>
-          <h3 className="text-2xl font-bold text-white text-center z-10">תנו מתנה שהעובד באמת בוחר בה</h3>
-          <p className="text-white/70 text-center mt-2 text-sm z-10">מאות מותגים מובילים בקטלוג אחד</p>
         </div>
-      ),
-    },
-    {
-      id: 'dashboard',
-      title: 'שקיפות מלאה',
-      subtitle: 'עקבו אחר ניצול התקציב',
-      content: (
-        <div className="relative h-full flex flex-col items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 p-8">
-          {/* Dashboard mockup image */}
-          <img
-            src="/dashboard/chart.png"
-            alt="Dashboard analytics"
-            className="w-64 rounded-lg shadow-2xl border border-slate-700 mb-6 opacity-95"
-          />
-          {/* Animated stats overlay */}
-          <div className="flex gap-4 mb-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-center">
-              <div className="text-lg font-bold text-emerald-400">92%</div>
-              <div className="text-[10px] text-slate-400">ניצול תקציב</div>
-            </div>
-            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-center">
-              <div className="text-lg font-bold text-blue-400">₪2.4M</div>
-              <div className="text-[10px] text-slate-400">תקציב שנתי</div>
-            </div>
-            <div className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-center">
-              <div className="text-lg font-bold text-purple-400">1,240</div>
-              <div className="text-[10px] text-slate-400">עובדים</div>
-            </div>
-          </div>
-          <h3 className="text-2xl font-bold text-white text-center z-10">שקיפות מלאה</h3>
-          <p className="text-white/50 text-center mt-2 text-sm z-10">עקבו אחר ניצול התקציב בזמן אמת</p>
-        </div>
-      ),
-    },
-  ];
 
-  const scrollToStory = (index: number) => {
-    if (!scrollRef.current) return;
-    const child = scrollRef.current.children[index] as HTMLElement;
-    if (child) {
-      scrollRef.current.scrollTo({
-        left: child.offsetLeft - scrollRef.current.offsetLeft,
-        behavior: 'smooth',
-      });
-    }
-    setActiveIndex(index);
-  };
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const scrollLeft = el.scrollLeft;
-      const childWidth = (el.children[0] as HTMLElement)?.offsetWidth || 1;
-      setActiveIndex(Math.round(scrollLeft / childWidth));
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
-
-  return (
-    <section className="py-24 bg-white overflow-hidden">
-      <div className="max-w-7xl mx-auto px-6">
-        <FadeInSection>
-          <div className="text-center max-w-3xl mx-auto mb-12">
-            <span className="text-stripe-purple font-bold text-sm tracking-wide mb-3 block">הערכים שלנו</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
-              הכל מתחיל בחוויה
-            </h2>
-            <p className="text-lg text-slate-600 leading-relaxed">
-              Nexus מאפשרת לעובדים ליהנות ממתנות והטבות בדיוק כמו שהם רוצים.
-            </p>
-          </div>
-        </FadeInSection>
-
-        {/* Story indicator dots */}
-        <div className="flex justify-center gap-3 mb-8">
-          {stories.map((story, i) => (
+        {/* Dots */}
+        <div className="flex justify-center gap-2.5 mt-6">
+          {WELFARE_STORY_CARDS.map((card, i) => (
             <button
-              key={story.id}
-              onClick={() => scrollToStory(i)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-300 ${
-                activeIndex === i
-                  ? 'bg-stripe-purple text-white shadow-lg shadow-stripe-purple/25'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              key={card.id}
+              onClick={() => scrollToIndex(i)}
+              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                i === activeIndex
+                  ? 'bg-stripe-purple w-7'
+                  : 'bg-slate-300 hover:bg-slate-400'
               }`}
-            >
-              {story.title}
-            </button>
-          ))}
-        </div>
-
-        {/* Stories carousel */}
-        <div
-          ref={scrollRef}
-          className="flex gap-6 overflow-x-auto pb-4 snap-x snap-mandatory"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-        >
-          {stories.map((story) => (
-            <div
-              key={story.id}
-              className="snap-center shrink-0 w-[85vw] md:w-[700px] h-[450px] rounded-2xl overflow-hidden shadow-xl"
-            >
-              {story.content}
-            </div>
+              aria-label={`Go to story ${i + 1}`}
+            />
           ))}
         </div>
       </div>
@@ -664,25 +624,25 @@ function UseCasesSection() {
     {
       title: 'מתנות לחג לעובדים',
       desc: 'שלחו מתנות לחג לכל העובדים באופן אוטומטי – ראש השנה, פסח, חנוכה ועוד.',
-      image: '/avocado.png',
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&q=80',
       gradient: 'from-red-500 to-orange-500',
     },
     {
       title: 'מתנות ליום הולדת',
       desc: 'הגדירו תקציב ליום הולדת וזה קורה אוטומטית. העובד בוחר, אתם רק מאשרים.',
-      image: '/coffee.png',
+      image: 'https://images.unsplash.com/photo-1549465220-1a8b9238f862?w=800&q=80',
       gradient: 'from-pink-500 to-rose-500',
     },
     {
       title: 'בונוסים ותמריצים',
       desc: 'תגמלו עובדים מצטיינים עם מתנות מיידיות – ללא צורך בתהליכי רכש מסורבלים.',
-      image: '/shoe.png',
+      image: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80',
       gradient: 'from-emerald-500 to-teal-500',
     },
     {
       title: 'תקציב רווחה שנתי',
       desc: 'הקצו תקציב רווחה שנתי לכל עובד ותנו לו לבחור איך להשתמש בו לאורך השנה.',
-      image: '/calculator.png',
+      image: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80',
       gradient: 'from-blue-500 to-indigo-500',
     },
   ];
@@ -731,12 +691,14 @@ function UseCasesSection() {
               className="snap-start shrink-0 w-[340px] md:w-[400px] rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 group"
             >
               {/* Image area */}
-              <div className={`bg-gradient-to-br ${useCase.gradient} h-56 p-6 flex items-center justify-center relative overflow-hidden`}>
+              <div className="h-56 relative overflow-hidden">
                 <img
                   src={useCase.image}
                   alt={useCase.title}
-                  className="w-40 h-40 object-contain drop-shadow-xl group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  loading="lazy"
                 />
+                <div className={`absolute inset-0 bg-gradient-to-t ${useCase.gradient} opacity-20`} />
               </div>
               {/* Content area */}
               <div className="bg-white p-6 border border-t-0 border-slate-100 rounded-b-2xl">
