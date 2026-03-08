@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
-import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, AppWindow, Users, Store, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
+import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, AppWindow, Users, Store, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart, Layers, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -26,6 +26,8 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           items: [
             { name: t.navbar.payments, desc: t.navbar.paymentsOnline, icon: CreditCard, href: lang === 'he' ? '/he/payments' : '/payments' },
             { name: t.navbar.paymentLinks, desc: t.navbar.paymentLinksDesc, icon: LinkIcon, href: lang === 'he' ? '/he/payments' : '/payments' },
+            { name: t.navbar.cardIssuance, desc: t.navbar.cardIssuanceDesc, icon: Layers, href: lang === 'he' ? '/he/payments' : '/payments' },
+            { name: t.navbar.businessLogic, desc: t.navbar.businessLogicDesc, icon: Cpu, href: lang === 'he' ? '/he/payments' : '/payments' },
           ],
         },
         {
