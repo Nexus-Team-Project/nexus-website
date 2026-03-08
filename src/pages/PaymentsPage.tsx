@@ -171,10 +171,10 @@ function CheckRow({ text }: { text: string }) {
 // ─── Pricing Calculator Section ───────────────────────────
 // Reversed order: start from 0.7% (best rate visible first), user can slide to see higher rates
 const MILESTONES = [
-  { pct: '0.7%', labelHe: 'מעל ₪10M בחודש',    labelEn: 'Above ₪10M/mo' },
-  { pct: '0.8%', labelHe: 'מעל ₪5M בחודש',     labelEn: 'Above ₪5M/mo'  },
-  { pct: '0.9%', labelHe: 'מעל ₪1M בחודש',     labelEn: 'Above ₪1M/mo'  },
-  { pct: '1.2%', labelHe: 'התחלה',              labelEn: 'Starting rate' },
+  { pct: '0.7%', labelHe: 'מעל ₪10M',    labelEn: 'Above ₪10M/mo' },
+  { pct: '0.8%', labelHe: 'עד ₪10M',     labelEn: 'Up to ₪10M/mo' },
+  { pct: '0.9%', labelHe: 'עד ₪5M',      labelEn: 'Up to ₪5M/mo'  },
+  { pct: '1.2%', labelHe: 'עד ₪1M',      labelEn: 'Up to ₪1M/mo'  },
 ];
 
 function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: boolean; signupLink: string }) {
@@ -182,7 +182,7 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
   const fillPct = (activeIdx / (MILESTONES.length - 1)) * 100;
 
   return (
-    <section className="scroll-reveal relative py-20 md:py-32 bg-slate-50 overflow-x-hidden">
+    <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
 
         {/* Header */}
@@ -326,8 +326,8 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           HERO — light gray background matching home page
       ══════════════════════════════════════════════════════════ */}
-      <div className="relative">
-        <section className="relative z-10 pt-32 pb-20 bg-slate-50 overflow-visible">
+      <div className="relative overflow-hidden">
+        <section className="relative z-10 pt-32 pb-20 bg-slate-50">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 relative">
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
