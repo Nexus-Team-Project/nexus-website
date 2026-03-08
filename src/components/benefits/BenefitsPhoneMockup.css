@@ -5,27 +5,29 @@
 
 /* Phone float — gentle vertical bob */
 @keyframes benefitsPhoneFloat {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-8px); }
+  0%, 100% { transform: translateY(0) translateZ(0); }
+  50%      { transform: translateY(-8px) translateZ(0); }
 }
 
 .benefits-phone {
   animation: benefitsPhoneFloat 4.5s ease-in-out infinite;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* ── Benefit card staggered entrance ── */
 @keyframes benefitCardEnter {
   from {
     opacity: 0;
-    transform: translateY(14px) scale(0.96);
+    transform: translateY(14px) scale(0.96) translateZ(0);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scale(1) translateZ(0);
   }
 }
 
-.benefit-card { opacity: 0; animation: benefitCardEnter 0.5s ease-out forwards; }
+.benefit-card { opacity: 0; animation: benefitCardEnter 0.5s ease-out forwards; will-change: transform, opacity; backface-visibility: hidden; }
 .benefit-card:nth-child(1) { animation-delay: 0.3s; }
 .benefit-card:nth-child(2) { animation-delay: 0.45s; }
 .benefit-card:nth-child(3) { animation-delay: 0.6s; }
@@ -36,17 +38,19 @@
 /* ── Discount badge pulse ── */
 @keyframes discountPulse {
   0%, 100% {
-    transform: scale(1);
+    transform: scale(1) translateZ(0);
     box-shadow: 0 2px 6px rgba(34, 197, 94, 0.25);
   }
   50% {
-    transform: scale(1.08);
+    transform: scale(1.08) translateZ(0);
     box-shadow: 0 3px 10px rgba(34, 197, 94, 0.45);
   }
 }
 
 .discount-badge {
   animation: discountPulse 2.5s ease-in-out infinite;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* ── Shimmer sweep on phone screen ── */
@@ -78,17 +82,21 @@
 .org-bar {
   opacity: 0;
   animation: orgBarEnter 0.4s ease-out 0.15s forwards;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 /* ── Bottom CTA bounce ── */
 @keyframes ctaBounce {
-  0%, 100% { transform: translateY(0); }
-  50%      { transform: translateY(-2px); }
+  0%, 100% { transform: translateY(0) translateZ(0); }
+  50%      { transform: translateY(-2px) translateZ(0); }
 }
 
 .phone-cta-benefits {
   animation: ctaBounce 2s ease-in-out infinite;
   animation-delay: 1.5s;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* ── Background blobs ── */
@@ -102,8 +110,8 @@
   50%      { transform: translate(-12px, -8px) scale(1.1); opacity: 0.18; }
 }
 
-.benefits-blob-1 { animation: benefitsBlobDrift1 8s ease-in-out infinite; }
-.benefits-blob-2 { animation: benefitsBlobDrift2 10s ease-in-out infinite; }
+.benefits-blob-1 { animation: benefitsBlobDrift1 8s ease-in-out infinite; will-change: transform, opacity; backface-visibility: hidden; }
+.benefits-blob-2 { animation: benefitsBlobDrift2 10s ease-in-out infinite; will-change: transform, opacity; backface-visibility: hidden; }
 
 /* ── Carousel auto-slide for second phone variant ── */
 @keyframes benefitsCarousel {
@@ -116,6 +124,8 @@
 
 .benefits-carousel-strip {
   animation: benefitsCarousel 12s ease-in-out infinite;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* ── Provider grid staggered entrance (triggered by scroll-reveal) ── */
@@ -127,6 +137,8 @@
 .provider-logo {
   opacity: 0;
   transition: none;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .revealed .provider-logo {
@@ -154,8 +166,10 @@
 /* ── Feature card hover lift ── */
 .benefit-feature-card {
   transition: transform 0.25s ease, box-shadow 0.25s ease;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 .benefit-feature-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-4px) translateZ(0);
   box-shadow: 0 12px 32px rgba(99, 91, 255, 0.12);
 }

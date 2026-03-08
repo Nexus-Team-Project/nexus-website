@@ -158,6 +158,8 @@
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.10);
   cursor: pointer;
   transition: transform 0.2s ease;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .wed-swatch:hover {
@@ -385,6 +387,8 @@
 
 .wed-paycard.main.is-pay {
   animation: wedPay 0.9s ease both;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .wed-paycard.main.is-pay .wed-paid {
@@ -407,16 +411,16 @@
 
 @keyframes wedPay {
   0% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scale(1) translateZ(0);
   }
   20% {
-    transform: translateY(-6px) scale(1.02);
+    transform: translateY(-6px) scale(1.02) translateZ(0);
   }
   55% {
-    transform: translateY(-2px) scale(1.01);
+    transform: translateY(-2px) scale(1.01) translateZ(0);
   }
   100% {
-    transform: translateY(0) scale(1);
+    transform: translateY(0) scale(1) translateZ(0);
   }
 }
 
@@ -452,6 +456,8 @@
   box-shadow: 0 10px 18px rgba(0, 0, 0, 0.05);
   cursor: pointer;
   transition: transform 0.2s ease;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .wed-action:active {
@@ -623,17 +629,19 @@
 
 .wed-currency.pulse {
   animation: wedPulse 0.6s ease both;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 @keyframes wedPulse {
   0% {
-    transform: scale(1);
+    transform: scale(1) translateZ(0);
   }
   50% {
-    transform: scale(1.15);
+    transform: scale(1.15) translateZ(0);
   }
   100% {
-    transform: scale(1);
+    transform: scale(1) translateZ(0);
   }
 }
 
@@ -735,16 +743,18 @@
   z-index: 1000;
   overflow: hidden;
   animation: slideIn 0.3s ease;
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translate(-50%, -45%);
+    transform: translate3d(-50%, -45%, 0);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%);
+    transform: translate3d(-50%, -50%, 0);
   }
 }
 
@@ -811,20 +821,26 @@
 /* Hide panels initially */
 .wallet-panel-left {
   opacity: 0;
-  transform: translateX(-100%);
+  transform: translateX(-100%) translateZ(0);
   transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 .wallet-panel-right {
   opacity: 0;
-  transform: translateX(100%);
+  transform: translateX(100%) translateZ(0);
   transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
 }
 
 /* Phone starts on the left */
 .wallet-phone-center {
-  transform: translateX(-180px);
+  transform: translateX(-180px) translateZ(0);
   transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* On hover: show panels and center phone */
