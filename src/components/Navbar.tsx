@@ -55,7 +55,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         link: 'https://www.globes.co.il/news/article.aspx?did=1001533300',
       },
       bottomLinks: [
-        { label: t.navbar.documentation, icon: FileText },
+        { label: t.navbar.documentation, icon: FileText, href: lang === 'he' ? '/he/docs' : '/docs' },
         { label: t.navbar.helpCenter, icon: HelpCircle },
         { label: t.navbar.appMarketplace, icon: AppWindow },
       ],
