@@ -123,7 +123,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           title: t.navbar.resources,
           items: [
             { name: t.navbar.apiStatus, desc: t.navbar.systemPerformance, icon: BarChart3 },
-            { name: t.navbar.changelog, desc: t.navbar.latestUpdates, icon: FileText },
+            { name: t.navbar.changelog, desc: t.navbar.latestUpdates, icon: FileText, href: lang === 'he' ? '/he/changelog' : '/changelog' },
             { name: t.navbar.codeSamples, desc: t.navbar.exampleProjects, icon: Code },
           ],
         },

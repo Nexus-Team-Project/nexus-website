@@ -195,6 +195,20 @@ export default function Footer({ light = false }: { light?: boolean }) {
                       </li>
                     );
                   }
+                  // Changelog link should route via React Router
+                  if (link === t.footer.apiChangelog) {
+                    const changelogPath = direction === 'rtl' ? '/he/changelog' : '/changelog';
+                    return (
+                      <li key={link}>
+                        <Link
+                          to={changelogPath}
+                          className="text-sm text-slate-600 hover:text-slate-900 transition-colors"
+                        >
+                          {link}
+                        </Link>
+                      </li>
+                    );
+                  }
                   // Documentation & API Reference link to external docs site
                   if (link === t.footer.documentation || link === t.footer.apiReference) {
                     return (
