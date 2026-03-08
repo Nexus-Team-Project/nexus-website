@@ -32,6 +32,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           title: t.navbar.developers,
           items: [
             { name: t.navbar.documentation, desc: t.navbar.integrationGuides, icon: FileText, href: 'https://docs.nexus-payment.com/' },
+            { name: t.navbar.changelog, desc: t.navbar.latestUpdates, icon: FileText, href: lang === 'he' ? '/he/changelog' : '/changelog' },
           ],
         },
       ],
@@ -98,56 +99,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
     },
   },
   {
-    label: t.navbar.developers,
-    megaMenu: {
-      sections: [
-        {
-          title: t.navbar.getStartedSection,
-          items: [
-            { name: t.navbar.documentation, desc: t.navbar.integrationGuides, icon: FileText, href: 'https://docs.nexus-payment.com/' },
-            { name: t.navbar.apiReference, desc: t.navbar.completeAPIDocs, icon: Code, href: 'https://docs.nexus-payment.com/' },
-            { name: t.navbar.quickStart, desc: t.navbar.startInMinutes, icon: ArrowRight },
-            { name: t.navbar.tutorials, desc: t.navbar.stepByStepGuides, icon: GraduationCap },
-          ],
-        },
-        {
-          title: t.navbar.toolsSDKs,
-          items: [
-            { name: t.navbar.javascriptSDK, desc: t.navbar.forWebApps, icon: Terminal },
-            { name: t.navbar.mobileSDKs, desc: t.navbar.iosAndroid, icon: AppWindow },
-            { name: t.navbar.serverLibraries, desc: t.navbar.nodePythonRuby, icon: Code },
-            { name: t.navbar.cliTools, desc: t.navbar.commandLine, icon: Terminal },
-          ],
-        },
-        {
-          title: t.navbar.resources,
-          items: [
-            { name: t.navbar.apiStatus, desc: t.navbar.systemPerformance, icon: BarChart3 },
-            { name: t.navbar.changelog, desc: t.navbar.latestUpdates, icon: FileText, href: lang === 'he' ? '/he/changelog' : '/changelog' },
-            { name: t.navbar.codeSamples, desc: t.navbar.exampleProjects, icon: Code },
-          ],
-        },
-        {
-          title: t.navbar.community,
-          items: [
-            { name: t.navbar.developerForum, desc: t.navbar.askQuestions, icon: MessageSquare },
-            { name: t.navbar.github, desc: t.navbar.openSource, icon: Network },
-            { name: t.footer.support, desc: t.navbar.getHelp, icon: HelpCircle },
-          ],
-        },
-      ],
-      sidebar: {
-        title: t.navbar.developerTools,
-        content: t.navbar.developerToolsContent,
-        cta: t.navbar.exploreTools,
-      },
-      bottomLinks: [
-        { label: t.navbar.apiDocumentation, icon: FileText, href: 'https://docs.nexus-payment.com/' },
-        { label: t.navbar.developerCommunity, icon: Users },
-      ],
-    },
-  },
-  {
     label: t.navbar.resources,
     megaMenu: {
       sections: [
@@ -196,7 +147,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
       ],
     },
   },
-  { label: t.navbar.pricing, href: '#pricing' },
 ];
 
 // MegaMenuPanel: portal into document.body (eliminates nav stacking-context interference).
