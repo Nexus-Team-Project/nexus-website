@@ -54,29 +54,27 @@ export default function Footer({ light = false }: { light?: boolean }) {
     {
       title: t.footer.products,
       links: [
-        t.footer.payments, t.footer.billing, t.footer.connect,
-        t.footer.radar, t.footer.terminal, t.footer.atlas, t.footer.sigma,
-      ],
-    },
-    {
-      title: t.footer.useCases,
-      links: [
-        t.footer.saas, t.footer.ecommerce, t.footer.marketplaces,
-        t.footer.financeAutomation, t.footer.crypto, t.footer.creatorEconomy,
+        t.navbar.loyaltyClub, t.navbar.loyaltyPartnerships, t.navbar.giftsWelfare,
+        t.footer.payments, t.navbar.paymentLinks,
       ],
     },
     {
       title: t.footer.developers,
       links: [
-        t.footer.documentation, t.footer.apiReference, t.footer.apiStatus,
-        t.footer.apiChangelog, t.footer.openSource,
+        t.footer.documentation, t.footer.apiReference,
+        t.footer.apiChangelog,
+      ],
+    },
+    {
+      title: t.footer.resources,
+      links: [
+        t.footer.blog, t.footer.supportCenter, t.footer.contactSales,
       ],
     },
     {
       title: t.footer.company,
       links: [
-        t.footer.aboutNexus, t.footer.customers, t.footer.partners,
-        t.footer.jobs, t.footer.newsroom, t.footer.blog,
+        t.footer.aboutNexus, t.footer.jobs, t.footer.newsroom,
       ],
     },
   ];

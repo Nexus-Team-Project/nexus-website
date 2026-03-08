@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
-import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, AppWindow, Users, Store, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
+import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, AppWindow, Users, Store, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart, Layers, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -26,6 +26,8 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           items: [
             { name: t.navbar.payments, desc: t.navbar.paymentsOnline, icon: CreditCard, href: lang === 'he' ? '/he/payments' : '/payments' },
             { name: t.navbar.paymentLinks, desc: t.navbar.paymentLinksDesc, icon: LinkIcon, href: lang === 'he' ? '/he/payments' : '/payments' },
+            { name: t.navbar.cardIssuance, desc: t.navbar.cardIssuanceDesc, icon: Layers, href: lang === 'he' ? '/he/payments' : '/payments' },
+            { name: t.navbar.businessLogic, desc: t.navbar.businessLogicDesc, icon: Cpu, href: lang === 'he' ? '/he/payments' : '/payments' },
           ],
         },
         {
@@ -42,11 +44,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         cta: t.navbar.readArticle,
         link: 'https://www.globes.co.il/news/article.aspx?did=1001533300',
       },
-      bottomLinks: [
-        { label: t.navbar.documentation, icon: FileText, href: 'https://docs.nexus-payment.com/' },
-        { label: t.navbar.helpCenter, icon: HelpCircle },
-        { label: t.navbar.appMarketplace, icon: AppWindow },
-      ],
     },
   },
   {
@@ -56,34 +53,34 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         {
           title: t.navbar.byBusinessType,
           items: [
-            { name: t.navbar.saas, desc: t.navbar.saasCompanies, icon: Code },
-            { name: t.navbar.ecommerce, desc: t.navbar.ecommerceStores, icon: Store },
-            { name: t.navbar.marketplaces, desc: t.navbar.multiVendorPlatforms, icon: Network },
-            { name: t.navbar.creatorEconomy, desc: t.navbar.contentCreators, icon: Youtube },
+            { name: t.navbar.saas, desc: t.navbar.saasCompanies, icon: Code, comingSoon: true },
+            { name: t.navbar.ecommerce, desc: t.navbar.ecommerceStores, icon: Store, comingSoon: true },
+            { name: t.navbar.marketplaces, desc: t.navbar.multiVendorPlatforms, icon: Network, comingSoon: true },
+            { name: t.navbar.creatorEconomy, desc: t.navbar.contentCreators, icon: Youtube, comingSoon: true },
           ],
         },
         {
           title: t.navbar.byBusinessSize,
           items: [
-            { name: t.navbar.startups, desc: t.navbar.earlyStageCompanies, icon: TrendingUp },
-            { name: t.navbar.enterprises, desc: t.navbar.largeOrganizations, icon: Building2 },
-            { name: t.navbar.smallBusiness, desc: t.navbar.localBusinesses, icon: Store },
+            { name: t.navbar.startups, desc: t.navbar.earlyStageCompanies, icon: TrendingUp, comingSoon: true },
+            { name: t.navbar.enterprises, desc: t.navbar.largeOrganizations, icon: Building2, comingSoon: true },
+            { name: t.navbar.smallBusiness, desc: t.navbar.localBusinesses, icon: Store, comingSoon: true },
           ],
         },
         {
           title: t.navbar.byIndustry,
           items: [
-            { name: t.navbar.finance, desc: t.navbar.financialServices, icon: Wallet },
-            { name: t.navbar.healthcare, desc: t.navbar.medicalWellness, icon: HelpCircle },
-            { name: t.navbar.education, desc: t.navbar.schoolsCourses, icon: GraduationCap },
+            { name: t.navbar.finance, desc: t.navbar.financialServices, icon: Wallet, comingSoon: true },
+            { name: t.navbar.healthcare, desc: t.navbar.medicalWellness, icon: HelpCircle, comingSoon: true },
+            { name: t.navbar.education, desc: t.navbar.schoolsCourses, icon: GraduationCap, comingSoon: true },
           ],
         },
         {
           title: t.navbar.useCases,
           items: [
-            { name: t.navbar.subscriptions, desc: t.navbar.recurringRevenue, icon: Receipt },
-            { name: t.navbar.invoicingTitle, desc: t.navbar.b2bPayments, icon: FileText },
-            { name: t.navbar.globalSales, desc: t.navbar.internationalExpansion, icon: Globe },
+            { name: t.navbar.subscriptions, desc: t.navbar.recurringRevenue, icon: Receipt, comingSoon: true },
+            { name: t.navbar.invoicingTitle, desc: t.navbar.b2bPayments, icon: FileText, comingSoon: true },
+            { name: t.navbar.globalSales, desc: t.navbar.internationalExpansion, icon: Globe, comingSoon: true },
           ],
         },
       ],
@@ -92,10 +89,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         content: t.navbar.caseStudiesContent,
         cta: t.navbar.viewAllStories,
       },
-      bottomLinks: [
-        { label: t.navbar.customerStories, icon: Users },
-        { label: t.navbar.partnerProgram, icon: Network },
-      ],
     },
   },
   {
@@ -106,9 +99,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           title: t.navbar.learn,
           items: [
             { name: t.navbar.blog, desc: t.navbar.newsInsights, icon: Newspaper, href: lang === 'he' ? '/he/blog' : '/blog' },
-            { name: t.navbar.guides, desc: t.navbar.bestPractices, icon: Book },
-            { name: t.navbar.webinars, desc: t.navbar.liveTraining, icon: Youtube },
-            { name: t.navbar.videoTutorials, desc: t.navbar.watchAndLearn, icon: Youtube },
           ],
         },
         {
@@ -116,23 +106,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           items: [
             { name: t.navbar.helpCenter, desc: t.navbar.findAnswers, icon: HelpCircle },
             { name: t.navbar.contactSupport, desc: t.navbar.getHelp, icon: MessageSquare },
-            { name: t.navbar.apiStatus, desc: t.navbar.systemStatus, icon: BarChart3 },
-          ],
-        },
-        {
-          title: t.navbar.company,
-          items: [
-            { name: t.navbar.aboutUs, desc: t.navbar.ourStory, icon: Building2 },
-            { name: t.navbar.careers, desc: t.navbar.joinOurTeam, icon: Users },
-            { name: t.navbar.pressKit, desc: t.navbar.mediaResources, icon: FileText },
-          ],
-        },
-        {
-          title: t.navbar.customerStories,
-          items: [
-            { name: t.navbar.caseStudies, desc: t.navbar.successStories, icon: TrendingUp },
-            { name: t.testimonials.title, desc: t.navbar.whatCustomersSay, icon: MessageSquare },
-            { name: t.footer.partners, desc: t.navbar.ourEcosystem, icon: Network },
           ],
         },
       ],
@@ -141,10 +114,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         content: t.navbar.latestResourcesContent,
         cta: t.navbar.browseAllResources,
       },
-      bottomLinks: [
-        { label: t.navbar.supportCenter, icon: HelpCircle },
-        { label: t.navbar.communityForum, icon: MessageSquare },
-      ],
     },
   },
 ];
@@ -438,10 +407,15 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                   }}
                   onMouseLeave={handleMouseLeave}
                 >
-                  <div className="max-w-7xl mx-auto space-y-4">
+                  <div className="max-w-7xl mx-auto">
                     <div className="bg-white shadow-2xl rounded-2xl overflow-hidden border border-gray-200 flex">
                       {/* Main Grid */}
-                      <div className={`flex-1 p-8 grid gap-x-8 gap-y-10 ${item.megaMenu.sections.length === 5 ? 'grid-cols-5' : 'grid-cols-4'}`}>
+                      <div className={`flex-1 p-8 grid gap-x-8 gap-y-10 ${
+                        item.megaMenu.sections.length === 1 ? 'grid-cols-1' :
+                        item.megaMenu.sections.length === 2 ? 'grid-cols-2' :
+                        item.megaMenu.sections.length === 3 ? 'grid-cols-3' :
+                        item.megaMenu.sections.length === 5 ? 'grid-cols-5' : 'grid-cols-4'
+                      }`}>
                         {item.megaMenu.sections.map((section, index) => (
                           <div
                             key={section.title}
@@ -461,19 +435,26 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                             <div className="space-y-6">
                               {section.items.map((subItem) => {
                                 const Icon = subItem.icon;
+                                const isComingSoon = (subItem as any).comingSoon;
                                 return (
                                   <a
                                     key={subItem.name}
-                                    href={(subItem as any).href || '#'}
-                                    className="group flex items-start gap-3"
+                                    href={isComingSoon ? undefined : ((subItem as any).href || '#')}
+                                    className={`group flex items-start gap-3 relative ${isComingSoon ? 'cursor-default' : ''}`}
+                                    onClick={isComingSoon ? (e: React.MouseEvent) => e.preventDefault() : undefined}
                                   >
-                                    <Icon className="text-stripe-purple text-xl mt-0.5 group-hover:scale-110 transition-transform" size={20} />
+                                    <Icon className={`text-xl mt-0.5 group-hover:scale-110 transition-transform ${isComingSoon ? 'text-slate-400' : 'text-stripe-purple'}`} size={20} />
                                     <div>
-                                      <div className="font-semibold text-sm text-slate-900 group-hover:text-stripe-purple transition-colors">
+                                      <div className={`font-semibold text-sm transition-colors ${isComingSoon ? 'text-slate-400' : 'text-slate-900 group-hover:text-stripe-purple'}`}>
                                         {subItem.name}
                                       </div>
                                       <p className="text-[13px] text-slate-500">{subItem.desc}</p>
                                     </div>
+                                    {isComingSoon && (
+                                      <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-medium px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                                        {t.navbar.comingSoon}
+                                      </span>
+                                    )}
                                   </a>
                                 );
                               })}
@@ -533,28 +514,6 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                       </div>
                     </div>
 
-                    {/* Bottom Links */}
-                    <div className="bg-slate-50/50 backdrop-blur-sm mt-4 rounded-xl p-4 flex items-center justify-center gap-10 border border-white/20">
-                      {item.megaMenu.bottomLinks.map((link) => {
-                        const Icon = link.icon;
-                        return (
-                          <a
-                            key={link.label}
-                            href={(link as any).href || '#'}
-                            target={(link as any).href ? '_blank' : undefined}
-                            rel={(link as any).href ? 'noopener noreferrer' : undefined}
-                            className="group text-sm font-semibold text-slate-600 hover:text-stripe-purple flex items-center gap-2 transition-colors"
-                          >
-                            <Icon size={18} />
-                            {link.label}
-                            <ArrowRight
-                              size={14}
-                              className={`opacity-0 group-hover:opacity-100 transition-opacity ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`}
-                            />
-                          </a>
-                        );
-                      })}
-                    </div>
                   </div>
                 </MegaMenuPanel>
               )}
