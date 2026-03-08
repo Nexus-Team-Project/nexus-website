@@ -164,7 +164,7 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
   const fillPct = (activeIdx / (MILESTONES.length - 1)) * 100;
 
   return (
-    <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
+    <section className="scroll-reveal relative py-20 md:py-32 bg-slate-50 overflow-x-hidden">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
 
         {/* Header */}
@@ -455,27 +455,26 @@ export default function PaymentsPage() {
           S3 — קישורי תשלום ו-Checkout
       ══════════════════════════════════════════════════════════ */}
       <section className="scroll-reveal relative py-20 md:py-32 overflow-x-hidden">
-        {/* Diagonal bg */}
+        {/* Blue diagonal bg — clipped top and bottom */}
         <div
-          className="absolute inset-0 bg-slate-50"
+          className="absolute inset-0"
           style={{
-            clipPath: isRtl
-              ? 'polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - 80px))'
-              : 'polygon(0 0, 100% 0, 100% calc(100% - 80px), 0 100%)',
+            background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)',
+            clipPath: 'polygon(0 80px, 100% 0, 100% calc(100% - 80px), 0 100%)',
           }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
             <div className="text-right">
-              <p className={`text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? '' : 'flex-row-reverse'}`}>
+              <p className={`text-violet-300 font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? '' : 'flex-row-reverse'}`}>
                 <Link2 size={14} />
                 {he ? 'קישורי תשלום' : 'Payment Links'}
               </p>
-              <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
+              <h2 className="text-4xl lg:text-5xl font-bold text-white tracking-tight mb-6 leading-tight">
                 {he ? 'קישורי תשלום ו-Checkout' : 'Payment Links & Checkout'}
               </h2>
-              <p className="text-lg text-slate-600 leading-relaxed mb-8">
+              <p className="text-lg text-white/70 leading-relaxed mb-8">
                 {he
                   ? 'שלחו ללקוח קישור – וקבלו תשלום מיד.'
                   : 'Send a link to your customer – and get paid immediately.'}
@@ -484,11 +483,18 @@ export default function PaymentsPage() {
                 {(he
                   ? ['Payment Links', 'עמודי Checkout מוכנים', 'גבייה מהירה ללא פיתוח']
                   : ['Payment Links', 'Ready-made Checkout pages', 'Fast collection without development']
-                ).map((item) => <Bullet key={item} text={item} />)}
+                ).map((item) => (
+                  <li key={item} className={`flex items-start gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
+                    <span className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-violet-500/20 flex items-center justify-center">
+                      <Check size={12} className="text-violet-300" />
+                    </span>
+                    <span className="text-white/90">{item}</span>
+                  </li>
+                ))}
               </ul>
             </div>
 
-            {/* ── Checkout panel, staggered section entrance triggered by parent section.revealed ── */}
+            {/* ── Checkout panel ── */}
             <div className="checkout-autoplay flex justify-center lg:justify-end items-start overflow-hidden">
               <div style={{ transform: 'scale(0.85)', transformOrigin: 'top center', marginBottom: '-60px' }}>
                 <PaymentCheckoutPanel />
@@ -546,10 +552,15 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           S6 — הבידול שלנו (dark)
       ══════════════════════════════════════════════════════════ */}
-      <section
-        className="scroll-reveal relative py-20 md:py-32 overflow-x-hidden"
-        style={{ background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)' }}
-      >
+      <section className="scroll-reveal relative py-20 md:py-32 overflow-x-hidden">
+        {/* Diagonal dark bg — clipped top and bottom */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)',
+            clipPath: 'polygon(0 80px, 100% 0, 100% calc(100% - 80px), 0 100%)',
+          }}
+        />
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] rounded-full opacity-10 pointer-events-none"
           style={{ background: 'radial-gradient(circle, #635BFF 0%, transparent 70%)' }}
@@ -584,21 +595,17 @@ export default function PaymentsPage() {
       {/* ══════════════════════════════════════════════════════════
           FINAL CTA
       ══════════════════════════════════════════════════════════ */}
-      <section className="scroll-reveal relative py-24 overflow-hidden bg-gradient-to-br from-stripe-blue to-violet-900 text-white">
-        <div
-          className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full opacity-15 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #a78bfa 0%, transparent 70%)' }}
-        />
-        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-right">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
+      <section className="scroll-reveal relative py-24 overflow-hidden bg-white">
+        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">
             {he ? 'התחילו לסלוק עם Nexus' : 'Start accepting payments with Nexus'}
           </h2>
-          <p className="text-white/70 text-lg mb-10 leading-relaxed">
+          <p className="text-slate-600 text-lg mb-14 leading-relaxed max-w-2xl mx-auto">
             {he
               ? 'הצטרפו לעסקים שכבר משתמשים במערכת התשלומים של Nexus כדי לנהל את התשלומים שלהם ולהגדיל את הפעילות העסקית.'
               : 'Join businesses already using Nexus payments to manage their payments and grow their business.'}
           </p>
-          <div className="flex flex-wrap gap-4 justify-end">
+          <div className="flex flex-wrap gap-4 justify-center">
             <Link
               to={signupLink}
               className="inline-block bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors"
@@ -607,7 +614,7 @@ export default function PaymentsPage() {
             </Link>
             <Link
               to={signupLink}
-              className="inline-block border border-white/30 bg-white/10 text-white font-semibold px-10 py-3 rounded-xl hover:bg-white/20 transition-colors"
+              className="inline-block border-2 border-stripe-purple text-stripe-purple font-semibold px-10 py-3 rounded-xl hover:bg-stripe-purple/5 transition-colors"
             >
               {he ? 'קבעו שיחת היכרות' : 'Schedule a call'}
             </Link>
