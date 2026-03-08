@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react';
-import { GitCommit, Tag, ExternalLink, Filter } from 'lucide-react';
+import { GitCommit, GitPullRequest, ExternalLink, Filter } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 
 /* ─── Types ─── */
-interface GitHubRelease {
+interface GitHubPR {
   id: number;
-  tag_name: string;
-  name: string;
-  body: string;
-  published_at: string;
+  number: number;
+  title: string;
+  body: string | null;
+  merged_at: string | null;
   html_url: string;
-  prerelease: boolean;
-  draft: boolean;
+  user: { login: string; avatar_url: string } | null;
+  labels: { name: string }[];
 }
 
 interface ChangelogEntry {
@@ -79,24 +79,24 @@ export default function ChangelogContent() {
   }, [language]);
 
   useEffect(() => {
-    async function fetchReleases() {
+    async function fetchMergedPRs() {
       try {
         const res = await fetch(
-          `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases?per_page=50`,
+          `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/pulls?state=closed&sort=updated&direction=desc&per_page=100`,
         );
         if (!res.ok) throw new Error(`GitHub API responded ${res.status}`);
-        const data: GitHubRelease[] = await res.json();
+        const data: GitHubPR[] = await res.json();
 
         const parsed: ChangelogEntry[] = data
-          .filter((r) => !r.draft)
-          .map((r) => ({
-            id: r.id,
-            version: r.tag_name,
-            title: r.name || r.tag_name,
-            description: r.body || '',
-            date: r.published_at,
-            url: r.html_url,
-            categories: detectCategories(`${r.name ?? ''} ${r.body ?? ''}`),
+          .filter((pr) => pr.merged_at !== null)
+          .map((pr) => ({
+            id: pr.id,
+            version: `#${pr.number}`,
+            title: pr.title,
+            description: pr.body || '',
+            date: pr.merged_at!,
+            url: pr.html_url,
+            categories: detectCategories(`${pr.title} ${pr.body ?? ''}`),
           }));
 
         setEntries(parsed);
@@ -106,12 +106,12 @@ export default function ChangelogContent() {
             ? 'לא ניתן לטעון את השינויים כרגע. נסו שוב מאוחר יותר.'
             : 'Unable to load changelog. Please try again later.',
         );
-        console.error('Failed to fetch releases:', err);
+        console.error('Failed to fetch merged PRs:', err);
       } finally {
         setLoading(false);
       }
     }
-    fetchReleases();
+    fetchMergedPRs();
   }, [language]);
 
   /* Group entries by month */
@@ -216,7 +216,7 @@ export default function ChangelogContent() {
                               )}
                             </time>
                             <span className="inline-flex items-center gap-1 text-xs font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                              <Tag className="w-3 h-3" />
+                              <GitPullRequest className="w-3 h-3" />
                               {entry.version}
                             </span>
                           </div>
