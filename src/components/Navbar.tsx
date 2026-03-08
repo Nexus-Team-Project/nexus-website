@@ -117,8 +117,8 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         {
           title: t.navbar.getStartedSection,
           items: [
-            { name: t.navbar.documentation, desc: t.navbar.integrationGuides, icon: FileText },
-            { name: t.navbar.apiReference, desc: t.navbar.completeAPIDocs, icon: Code },
+            { name: t.navbar.documentation, desc: t.navbar.integrationGuides, icon: FileText, href: lang === 'he' ? '/he/docs' : '/docs' },
+            { name: t.navbar.apiReference, desc: t.navbar.completeAPIDocs, icon: Code, href: lang === 'he' ? '/he/docs' : '/docs' },
             { name: t.navbar.quickStart, desc: t.navbar.startInMinutes, icon: ArrowRight },
             { name: t.navbar.tutorials, desc: t.navbar.stepByStepGuides, icon: GraduationCap },
           ],
@@ -155,7 +155,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
         cta: t.navbar.exploreTools,
       },
       bottomLinks: [
-        { label: t.navbar.apiDocumentation, icon: FileText, href: 'https://nexus-api-docs-production.up.railway.app/' },
+        { label: t.navbar.apiDocumentation, icon: FileText, href: lang === 'he' ? '/he/docs' : '/docs' },
         { label: t.navbar.developerCommunity, icon: Users },
       ],
     },
