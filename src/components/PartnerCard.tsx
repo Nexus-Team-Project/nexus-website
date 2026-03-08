@@ -1,6 +1,7 @@
 import { Lock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
+import BorderHighlightCard from './BorderHighlightCard';
 
 export interface Partner {
   id: string;
@@ -23,7 +24,7 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
   const lockLabel = language === 'he' ? 'התחבר לצפייה' : 'Sign in to view';
 
   return (
-    <div className="group bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 overflow-hidden flex flex-col">
+    <BorderHighlightCard className="group bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 overflow-hidden flex flex-col">
       {/* Logo */}
       <div className="flex items-center justify-center h-48 bg-white p-4">
         <img
@@ -92,6 +93,6 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
           )}
         </div>
       </div>
-    </div>
+    </BorderHighlightCard>
   );
 }

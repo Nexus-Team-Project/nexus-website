@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings2, BarChart3, Headphones, LayoutDashboard, Puzzle, Palette, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import BorderHighlightCard from '../BorderHighlightCard';
 
 const FEATURES_HE = [
   { icon: Settings2,       title: 'התאמה עמוקה',     desc: 'כיבוי והדלקה של הטבות, צירוף הטבות ייחודיות של הארגון או שניתנו לו ספציפית.' },
@@ -196,9 +197,8 @@ export default function BenefitsFeatureGrid() {
                 transition: `opacity 0.5s ease ${i * 0.15}s, transform 0.5s ease ${i * 0.15}s`,
               }}
             >
-              <div
+              <BorderHighlightCard
                 className="benefit-feature-card rounded-2xl border border-slate-200 bg-white p-5 h-full cursor-default hover:shadow-lg hover:border-violet-200 transition-all duration-300"
-                style={{ boxShadow: '0 4px 16px rgba(10,20,40,0.04)' }}
               >
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
@@ -212,7 +212,7 @@ export default function BenefitsFeatureGrid() {
                 <p className={`text-sm text-slate-500 leading-relaxed ${he ? 'text-right' : 'text-left'}`}>
                   {f.desc}
                 </p>
-              </div>
+              </BorderHighlightCard>
             </div>
           );
         })}
@@ -400,9 +400,8 @@ export default function BenefitsFeatureGrid() {
                 transition: `opacity 0.5s ease ${0.5 + i * 0.15}s, transform 0.5s ease ${0.5 + i * 0.15}s`,
               }}
             >
-              <div
+              <BorderHighlightCard
                 className="benefit-feature-card rounded-2xl border border-slate-200 bg-white p-5 h-full cursor-default hover:shadow-lg hover:border-violet-200 transition-all duration-300"
-                style={{ boxShadow: '0 4px 16px rgba(10,20,40,0.04)' }}
               >
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center mb-3"
@@ -416,7 +415,7 @@ export default function BenefitsFeatureGrid() {
                 <p className={`text-sm text-slate-500 leading-relaxed ${he ? 'text-right' : 'text-left'}`}>
                   {f.desc}
                 </p>
-              </div>
+              </BorderHighlightCard>
             </div>
           );
         })}
