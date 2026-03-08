@@ -5,7 +5,6 @@ import Navbar from '../components/Navbar';
 import AnimatedGradient from '../components/AnimatedGradient';
 import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 import BenefitsHowItWorks from '../components/benefits/BenefitsHowItWorks';
-import BenefitsStats from '../components/benefits/BenefitsStats';
 import PartnerBubbles from '../components/PartnerBubbles';
 import StoryWalletCards from '../components/benefits/StoryWalletCards';
 import StoryInsightsCarousel from '../components/benefits/StoryInsightsCarousel';
@@ -116,7 +115,7 @@ export default function BenefitsPage() {
       <Navbar variant="dark" />
 
       {/* hide scrollbar + hide internal story text on this page */}
-      <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.story-no-text>div>div:first-child{display:none!important}`}</style>
+      <style>{`.scrollbar-hide::-webkit-scrollbar{display:none}.story-no-text>div{overflow:visible!important;background:transparent!important;padding:0!important}.story-no-text>div>div:first-child{max-height:0!important;overflow:hidden!important;opacity:0!important;margin:0!important;padding:0!important}`}</style>
 
       {/* ═══════════════════════ S1: HERO — Dual Animation ═══════════════════════ */}
       <div className="relative">
@@ -161,7 +160,7 @@ export default function BenefitsPage() {
                 <div
                   className="story-no-text hidden md:block absolute z-0"
                   style={{
-                    [isRtl ? 'right' : 'left']: '-20px',
+                    [isRtl ? 'right' : 'left']: '60px',
                     top: '20px',
                     transform: 'scale(0.82)',
                     transformOrigin: 'top center',
@@ -196,8 +195,8 @@ export default function BenefitsPage() {
           className="absolute inset-0"
           style={{
             clipPath: isRtl
-              ? 'polygon(0 100px, 100% 0, 100% 100%, 0 calc(100% - 100px))'
-              : 'polygon(0 0, 100% 100px, 100% calc(100% - 100px), 0 100%)',
+              ? 'polygon(0 0, 100% 100px, 100% calc(100% - 100px), 0 100%)'
+              : 'polygon(0 100px, 100% 0, 100% 100%, 0 calc(100% - 100px))',
             background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)',
           }}
         />
@@ -241,14 +240,6 @@ export default function BenefitsPage() {
             })}
           </div>
 
-          <div className="text-center mt-12">
-            <Link
-              to={signupLink}
-              className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
-            >
-              {he ? 'בואו נדבר' : "Let's Talk"}
-            </Link>
-          </div>
         </div>
       </section>
 
@@ -360,52 +351,11 @@ export default function BenefitsPage() {
               <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
                 {he ? 'בנוי עם השותפים החזקים ביותר' : "Built with the world's leading platforms"}
               </h2>
-              <p className="text-lg text-slate-600 leading-relaxed mb-8">
+              <p className="text-lg text-slate-600 leading-relaxed">
                 {he
-                  ? 'אנחנו עובדים עם שותפים טכנולוגיים מובילים למימוש אינטגרציות מורכבות, הנפקה, סליקה וניהול תשתיות פיננסיות – לצד שותפי הטבות מסחריים שמספקים הנחות, שוברים ותנאים בלעדיים לחברי הקהילה. החיבור בין עומק טכנולוגי לכוח צרכני יוצר מערכת יציבה, סקיילבילית ומייצרת ערך מתמשך לכל הצדדים.'
-                  : 'Our platform integrates seamlessly with the payment providers and financial services you already use. From global payment networks to modern fintech solutions, we connect you with the tools that power the world\'s commerce.'}
+                  ? 'אנחנו עובדים עם מאות שותפים מובילים בתחומי הקמעונאות, הפנאי, הקולינריה והאופנה. אנחנו ממנפים את הכוח הצרכני שלנו כדי לקבל את ההצעות הכי שוות עבור חברי הקהילה שלכם.'
+                  : 'We work with hundreds of leading partners across retail, leisure, dining and fashion. We leverage our consumer power to secure the best deals for your community members.'}
               </p>
-              <div className="space-y-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-slate-900 mb-1">
-                      {he ? 'אינטגרציה אוניברסלית' : 'Universal Integration'}
-                    </h3>
-                    <p className="text-sm text-slate-600">
-                      {he ? 'התחברו לכל ספק תשלומים או שירות פיננסי מרכזי' : 'Connect with any major payment provider or financial service'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-slate-900 mb-1">
-                      {he ? 'שותפים מהימנים' : 'Trusted Partners'}
-                    </h3>
-                    <p className="text-sm text-slate-600">
-                      {he ? 'עבדו עם מובילי מערכות אקולוגיות מאומתות ומאובטחות' : 'Work with verified and secure payment ecosystem leaders'}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-slate-900 mb-1">
-                      {he ? 'טווח הגעה גלובלי' : 'Global Reach'}
-                    </h3>
-                    <p className="text-sm text-slate-600">
-                      {he ? 'עבדו תשלומים ב-135+ מטבעות עם שיטות תשלום מקומיות' : 'Process payments in 135+ currencies with local payment methods'}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Right: Rising Bubbles */}
@@ -462,33 +412,15 @@ export default function BenefitsPage() {
         </div>
       </section>
 
-      {/* ═══════════════════════ S7: STATS ═══════════════════════ */}
-      <section className="scroll-reveal relative py-20 md:py-28 bg-stripe-light overflow-x-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
-              {he ? 'מספרים שמדברים' : 'Numbers That Speak'}
-            </h2>
-          </div>
-          <BenefitsStats />
-        </div>
-      </section>
-
-      {/* ═══════════════════════ S8: FINAL CTA ═══════════════════════ */}
-      <section
-        className="scroll-reveal relative py-20 md:py-32 overflow-x-hidden"
-        style={{ background: 'linear-gradient(135deg, #0A2540 0%, #2d1b69 50%, #0A2540 100%)' }}
-      >
-        <div className="absolute top-10 right-10 w-72 h-72 rounded-full pointer-events-none" style={{ background: 'rgba(99,91,255,0.06)', filter: 'blur(60px)' }} />
-        <div className="absolute bottom-10 left-10 w-56 h-56 rounded-full pointer-events-none" style={{ background: 'rgba(0,212,255,0.05)', filter: 'blur(50px)' }} />
-
+      {/* ═══════════════════════ S7: FINAL CTA ═══════════════════════ */}
+      <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="relative z-10 max-w-3xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl lg:text-5xl font-bold text-white mb-6">
+          <h2 className="text-3xl lg:text-5xl font-bold text-slate-900 mb-6">
             {he
               ? 'מוכנים לבנות מועדון הטבות לארגון שלכם?'
               : 'Ready to Build a Benefits Club for Your Organization?'}
           </h2>
-          <p className="text-white/70 text-lg mb-10 max-w-xl mx-auto">
+          <p className="text-slate-600 text-lg mb-10 max-w-xl mx-auto">
             {he
               ? 'הצטרפו לעשרות ארגונים שכבר משתמשים בפלטפורמה שלנו כדי ליצור ערך אמיתי לקהילה שלהם.'
               : 'Join dozens of organizations already using our platform to create real value for their communities.'}
@@ -502,7 +434,7 @@ export default function BenefitsPage() {
             </Link>
             <Link
               to={he ? '/he/partners' : '/partners'}
-              className="inline-block border border-white/30 bg-white/10 text-white font-semibold px-10 py-3 rounded-xl hover:bg-white/20 transition-colors"
+              className="inline-block border border-slate-300 text-slate-700 font-semibold px-10 py-3 rounded-xl hover:bg-slate-50 transition-colors"
             >
               {he ? 'הכירו את השותפים שלנו' : 'Meet Our Partners'}
             </Link>
