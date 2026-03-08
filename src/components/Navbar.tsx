@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
-import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, Scale, TrendingUp, Building2, Globe, Wallet, Bitcoin, Network, FileText, HelpCircle, AppWindow, Users, Store, Briefcase, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
+import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, AppWindow, Users, Store, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -26,23 +26,6 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           items: [
             { name: t.navbar.payments, desc: t.navbar.paymentsOnline, icon: CreditCard, href: lang === 'he' ? '/he/payments' : '/payments' },
             { name: t.navbar.paymentLinks, desc: t.navbar.paymentLinksDesc, icon: LinkIcon, href: lang === 'he' ? '/he/payments' : '/payments' },
-          ],
-        },
-        {
-          title: t.navbar.moneyManagement,
-          items: [
-            { name: t.navbar.financialAccounts, desc: t.navbar.businessFinances, icon: Building2 },
-            { name: t.navbar.globalPayouts, desc: t.navbar.payoutsThirdParties, icon: Globe },
-            { name: t.navbar.capital, desc: t.navbar.businessFinancing, icon: Wallet },
-            { name: t.navbar.cryptocurrency, desc: t.navbar.walletCardInfra, icon: Bitcoin },
-          ],
-        },
-        {
-          title: t.navbar.platformsSection,
-          items: [
-            { name: t.navbar.connectTitle, desc: t.navbar.multiPartyPayments, icon: Network },
-            { name: t.navbar.issuing, desc: t.navbar.physicalVirtualCards, icon: CreditCard },
-            { name: t.navbar.forPlatforms, desc: t.navbar.embeddedFinancialServices, icon: Building2 },
           ],
         },
         {
