@@ -25,6 +25,7 @@ const ResetPassword      = lazy(() => import('./pages/ResetPassword'));
 const PartnersPage       = lazy(() => import('./pages/PartnersPage'));
 const PaymentsPage       = lazy(() => import('./pages/PaymentsPage'));
 const BenefitsPage       = lazy(() => import('./pages/BenefitsPage'));
+const BenefitsPageV1     = lazy(() => import('./pages/BenefitsPageV1'));
 const AdminDashboard     = lazy(() => import('./pages/AdminDashboard'));
 const UserDashboard      = lazy(() => import('./pages/UserDashboard'));
 const BlogList           = lazy(() => import('./pages/BlogList'));
@@ -238,6 +239,8 @@ function App() {
           <Route path="/he/payments" element={<LanguageProvider language="he"><PaymentsPage /></LanguageProvider>} />
           <Route path="/benefits"    element={<LanguageProvider language="en"><BenefitsPage /></LanguageProvider>} />
           <Route path="/he/benefits" element={<LanguageProvider language="he"><BenefitsPage /></LanguageProvider>} />
+          <Route path="/benefits-type-2"    element={<LanguageProvider language="en"><BenefitsPageV1 /></LanguageProvider>} />
+          <Route path="/he/benefits-type-2" element={<LanguageProvider language="he"><BenefitsPageV1 /></LanguageProvider>} />
           <Route path="/blog"            element={<BlogList />} />
           <Route path="/he/blog"         element={<BlogListHe />} />
           <Route path="/blog/:slug"      element={<ArticlePage />} />
