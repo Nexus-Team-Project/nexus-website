@@ -4,6 +4,7 @@ import { Check, CreditCard, Link2, RefreshCw, Users, Zap } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import PaymentAnimation, { PaymentPricingPanel, PaymentCheckoutPanel } from '../components/PaymentAnimation';
 import AnimatedGradient from '../components/AnimatedGradient';
+import BorderHighlightCard from '../components/BorderHighlightCard';
 import { useLanguage } from '../i18n/LanguageContext';
 import visaLogo from '../assets/logos/visa-logo-white.svg';
 import mastercardLogo from '../assets/logos/mastercard-logo.png';
@@ -447,10 +448,10 @@ export default function PaymentsPage() {
                   { src: '/apple-pay.png', alt: 'Apple Pay', label: 'Apple Pay' },
                   { src: '/google-pay.png', alt: 'Google Pay', label: 'Google Pay' },
                 ].map((pm) => (
-                  <div key={pm.alt} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center gap-2 hover:shadow-md hover:border-stripe-purple/30 transition-all duration-300">
+                  <BorderHighlightCard key={pm.alt} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center gap-2 hover:shadow-md hover:border-stripe-purple/30 transition-all duration-300">
                     <img src={pm.src} alt={pm.alt} className="h-8 object-contain" />
                     <span className="text-xs text-slate-500 font-medium">{pm.label}</span>
-                  </div>
+                  </BorderHighlightCard>
                 ))}
               </div>
               <p className="text-sm text-slate-400">{he ? 'ועוד מגוון אמצעי תשלום נוספים' : 'And many more payment methods'}</p>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Users, BarChart3, Zap, Gift, Shield, Calendar, Building2, TrendingUp, Star, Clock, Settings, Heart, Briefcase, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import AnimatedGradient from '../components/AnimatedGradient';
+import BorderHighlightCard from '../components/BorderHighlightCard';
 import { LanguageProvider } from '../i18n/LanguageContext';
 import StoryGiftCards from '../components/benefits/StoryGiftCards';
 import PartnerBubbles from '../components/PartnerBubbles';
@@ -215,13 +216,13 @@ function ProblemSection() {
         <div className="grid md:grid-cols-2 gap-6">
           {problems.map((problem, i) => (
             <FadeInSection key={i}>
-              <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100 hover:shadow-lg transition-shadow duration-300">
+              <BorderHighlightCard className="bg-slate-50 rounded-2xl p-8 border border-slate-100 hover:shadow-lg transition-shadow duration-300">
                 <div className="w-12 h-12 rounded-xl bg-white shadow-sm flex items-center justify-center mb-5">
                   {problem.icon}
                 </div>
                 <h3 className="text-lg font-bold text-slate-900 mb-2">{problem.title}</h3>
                 <p className="text-slate-600 leading-relaxed">{problem.desc}</p>
-              </div>
+              </BorderHighlightCard>
             </FadeInSection>
           ))}
         </div>
@@ -285,7 +286,7 @@ function SolutionSection() {
         <div className="grid md:grid-cols-3 gap-8">
           {features.map((feature, i) => (
             <FadeInSection key={i}>
-              <div className={`bg-gradient-to-br ${feature.gradient} rounded-2xl p-8 border border-slate-100 hover:shadow-xl transition-all duration-300 h-full`}>
+              <BorderHighlightCard className={`bg-gradient-to-br ${feature.gradient} rounded-2xl p-8 border border-slate-100 hover:shadow-xl transition-all duration-300 h-full`}>
                 <div className={`w-14 h-14 rounded-xl ${feature.iconBg} flex items-center justify-center mb-6 shadow-sm`}>
                   {feature.icon}
                 </div>
@@ -299,7 +300,7 @@ function SolutionSection() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </BorderHighlightCard>
             </FadeInSection>
           ))}
         </div>
@@ -407,7 +408,7 @@ function ValuesStoriesSection() {
             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
           >
             {WELFARE_STORY_CARDS.map((card) => (
-              <div
+              <BorderHighlightCard
                 key={card.id}
                 className="flex-shrink-0 w-[320px] sm:w-[380px] snap-center rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
@@ -424,7 +425,7 @@ function ValuesStoriesSection() {
                     <card.Component />
                   </div>
                 </div>
-              </div>
+              </BorderHighlightCard>
             ))}
           </div>
         </div>
@@ -687,7 +688,7 @@ function UseCasesSection() {
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {useCases.map((useCase, i) => (
-            <div
+            <BorderHighlightCard
               key={i}
               className="snap-start shrink-0 w-[340px] md:w-[400px] rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300 group"
             >
@@ -706,7 +707,7 @@ function UseCasesSection() {
                 <h3 className="text-xl font-bold text-slate-900 mb-3">{useCase.title}</h3>
                 <p className="text-slate-600 leading-relaxed">{useCase.desc}</p>
               </div>
-            </div>
+            </BorderHighlightCard>
           ))}
         </div>
       </div>
@@ -758,7 +759,7 @@ function AudienceSection() {
         <div className="grid md:grid-cols-3 gap-8">
           {audiences.map((audience, i) => (
             <FadeInSection key={i}>
-              <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100 hover:shadow-xl transition-shadow duration-300 text-center">
+              <BorderHighlightCard className="bg-slate-50 rounded-2xl p-8 border border-slate-100 hover:shadow-xl transition-shadow duration-300 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-white flex items-center justify-center mx-auto mb-6 shadow-sm">
                   {audience.icon}
                 </div>
@@ -768,7 +769,7 @@ function AudienceSection() {
                   <div className="text-2xl font-bold text-stripe-purple">{audience.stat}</div>
                   <div className="text-xs text-slate-500">{audience.statLabel}</div>
                 </div>
-              </div>
+              </BorderHighlightCard>
             </FadeInSection>
           ))}
         </div>

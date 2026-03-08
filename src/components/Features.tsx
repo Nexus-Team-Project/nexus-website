@@ -3,69 +3,12 @@ import PaymentAnimation from './PaymentAnimation';
 import WalletEditorCard from './WalletEditorCard';
 import SpendingLimitsAnimation from './SpendingLimitsAnimation';
 import BorderlessGlobe from './BorderlessGlobe';
+import BorderHighlightCard from './BorderHighlightCard';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { MouseEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
-
-interface BorderHighlightCardProps {
-  children: React.ReactNode;
-  className?: string;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
-  onClick?: () => void;
-}
-
-function BorderHighlightCard({ children, className = '', onMouseEnter, onMouseLeave, onClick }: BorderHighlightCardProps) {
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
-
-  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    const card = e.currentTarget;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    setMousePos({ x, y });
-  };
-
-  const handleMouseEnter = () => {
-    onMouseEnter?.();
-  };
-
-  const handleMouseLeave = () => {
-    setMousePos(null);
-    onMouseLeave?.();
-  };
-
-  const getBorderStyle = () => {
-    if (!mousePos) return {};
-
-    const radius = 120; // Radius of the highlight around mouse
-    const { x, y } = mousePos;
-
-    return {
-      '--mouse-x': `${x}px`,
-      '--mouse-y': `${y}px`,
-      '--radius': `${radius}px`,
-    } as React.CSSProperties;
-  };
-
-  return (
-    <div
-      ref={cardRef}
-      className={`${className} relative border-highlight-card`}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onClick={onClick}
-      style={getBorderStyle()}
-    >
-      {children}
-    </div>
-  );
-}
 
 const giftCards = [
   { name: 'AIRBNB', value: '$25', gradient: 'from-[#FF5A5F] to-[#FF385C]', logo: '/airbnb-logo.png' },

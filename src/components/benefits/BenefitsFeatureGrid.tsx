@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings2, BarChart3, Headphones, LayoutDashboard, Puzzle, Palette, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import BorderHighlightCard from '../BorderHighlightCard';
 
 const FEATURES_HE = [
   { icon: Settings2,       title: 'התאמה עמוקה',     desc: 'כיבוי והדלקה של הטבות, צירוף הטבות ייחודיות של הארגון או שניתנו לו ספציפית.', accent: 'violet' },
@@ -64,9 +65,11 @@ export default function BenefitsFeatureGrid() {
         }
         .feature-card-new {
           transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 1px 3px rgba(10,20,40,0.04);
         }
         .feature-card-new:hover {
           transform: translateY(-4px);
+          box-shadow: 0 8px 30px var(--glow-color, rgba(0,0,0,0.08)), 0 2px 8px rgba(0,0,0,0.04);
         }
         .feature-card-new:hover .feature-icon-container {
           animation: floatUp 2s ease-in-out infinite;
@@ -103,17 +106,11 @@ export default function BenefitsFeatureGrid() {
                 opacity: isVisible ? 1 : 0,
                 transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
                 transition: `opacity 0.6s ease ${i * 0.12}s, transform 0.6s ease ${i * 0.12}s`,
-              }}
+                '--glow-color': accent.glowColor,
+              } as React.CSSProperties}
             >
-              <div
+              <BorderHighlightCard
                 className={`feature-card-new relative rounded-2xl border border-slate-200/80 bg-white p-6 h-full cursor-default ${accent.borderHover} group overflow-hidden`}
-                style={{ boxShadow: '0 1px 3px rgba(10,20,40,0.04)' }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 30px ${accent.glowColor}, 0 2px 8px rgba(0,0,0,0.04)`;
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(10,20,40,0.04)';
-                }}
               >
                 {/* Subtle gradient background */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${accent.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl`} />
@@ -139,7 +136,7 @@ export default function BenefitsFeatureGrid() {
                     {f.desc}
                   </p>
                 </div>
-              </div>
+              </BorderHighlightCard>
             </div>
           );
         })}
@@ -244,17 +241,11 @@ export default function BenefitsFeatureGrid() {
                 opacity: isVisible ? 1 : 0,
                 transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
                 transition: `opacity 0.6s ease ${0.55 + i * 0.12}s, transform 0.6s ease ${0.55 + i * 0.12}s`,
-              }}
+                '--glow-color': accent.glowColor,
+              } as React.CSSProperties}
             >
-              <div
+              <BorderHighlightCard
                 className={`feature-card-new relative rounded-2xl border border-slate-200/80 bg-white p-6 h-full cursor-default ${accent.borderHover} group overflow-hidden`}
-                style={{ boxShadow: '0 1px 3px rgba(10,20,40,0.04)' }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = `0 8px 30px ${accent.glowColor}, 0 2px 8px rgba(0,0,0,0.04)`;
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.boxShadow = '0 1px 3px rgba(10,20,40,0.04)';
-                }}
               >
                 {/* Subtle gradient background */}
                 <div className={`absolute inset-0 bg-gradient-to-br ${accent.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl`} />
@@ -280,7 +271,7 @@ export default function BenefitsFeatureGrid() {
                     {f.desc}
                   </p>
                 </div>
-              </div>
+              </BorderHighlightCard>
             </div>
           );
         })}

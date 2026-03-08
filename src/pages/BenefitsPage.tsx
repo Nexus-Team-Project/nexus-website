@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, Lightbulb, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import AnimatedGradient from '../components/AnimatedGradient';
+import BorderHighlightCard from '../components/BorderHighlightCard';
 import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 import BenefitsHowItWorks from '../components/benefits/BenefitsHowItWorks';
 import PartnerBubbles from '../components/PartnerBubbles';
@@ -222,7 +223,7 @@ export default function BenefitsPage() {
             {WHY_REASONS.map((r) => {
               const Icon = r.icon;
               return (
-                <div key={r.titleEn} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-8">
+                <BorderHighlightCard key={r.titleEn} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-8">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
                     style={{ background: 'rgba(99,91,255,0.15)' }}
@@ -235,7 +236,7 @@ export default function BenefitsPage() {
                   <p className={`text-white/60 text-sm leading-relaxed ${isRtl ? 'text-right' : 'text-left'}`}>
                     {he ? r.descHe : r.descEn}
                   </p>
-                </div>
+                </BorderHighlightCard>
               );
             })}
           </div>
@@ -289,7 +290,7 @@ export default function BenefitsPage() {
               style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
               {STORY_CARDS.map((card) => (
-                <div
+                <BorderHighlightCard
                   key={card.id}
                   className="flex-shrink-0 w-[320px] sm:w-[380px] snap-center rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
@@ -306,7 +307,7 @@ export default function BenefitsPage() {
                       <card.Component />
                     </div>
                   </div>
-                </div>
+                </BorderHighlightCard>
               ))}
             </div>
           </div>
