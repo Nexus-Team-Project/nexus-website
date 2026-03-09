@@ -14,7 +14,7 @@ if (!fs.existsSync(publicDir)) {
 
 const images = [
   { url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&q=80', name: 'holiday-gifts' },
-  { url: 'https://images.unsplash.com/photo-1549465220-1a8b9238f862?w=800&q=80', name: 'birthday-gifts' },
+  { url: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80', name: 'birthday-gifts' },
   { url: 'https://images.unsplash.com/photo-1552664730-d307ca884978?w=800&q=80', name: 'bonuses' },
   { url: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&q=80', name: 'annual-budget' },
 ];
