@@ -15,10 +15,10 @@ export default function DashboardEnvelopePreview() {
 
   return (
     <div className="relative w-full flex items-center justify-center" style={{ minHeight: 520 }}>
-      <div className="relative w-full max-w-sm mx-auto" style={{ height: 480 }}>
-        {/* Dashboard - positioned to peek out from the envelope */}
+      <div className="relative w-full max-w-sm mx-auto px-4">
+        {/* Dashboard */}
         <div
-          className="absolute inset-x-4 top-0 z-[1] transition-all duration-700 ease-out"
+          className="transition-all duration-700 ease-out"
           style={{
             opacity: animated ? 1 : 0,
             transform: animated ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.95)',
@@ -125,72 +125,6 @@ export default function DashboardEnvelopePreview() {
                   <div className="h-full bg-gradient-to-l from-rose-500 to-rose-300 rounded-full" style={{ width: '87%' }} />
                 </div>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Envelope wrapper - covers the bottom portion of the dashboard */}
-        <div
-          className="absolute inset-x-0 bottom-0 z-[2] transition-all duration-800 ease-out"
-          style={{
-            height: '60%',
-            opacity: animated ? 1 : 0,
-            transform: animated ? 'translateY(0)' : 'translateY(40px)',
-          }}
-        >
-          {/* Envelope flap (triangle) */}
-          <svg
-            className="absolute top-0 left-0 w-full"
-            viewBox="0 0 400 60"
-            preserveAspectRatio="none"
-            style={{ transform: 'translateY(-98%)' }}
-          >
-            <defs>
-              <linearGradient id="flapGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#e2e0f5" />
-                <stop offset="100%" stopColor="#ede9fe" />
-              </linearGradient>
-              <filter id="flapSh">
-                <feDropShadow dx="0" dy="-2" stdDeviation="3" floodColor="rgba(109,40,217,0.1)" />
-              </filter>
-            </defs>
-            <path d="M 0 60 L 200 8 L 400 60 Z" fill="url(#flapGrad)" filter="url(#flapSh)" />
-            <path d="M 0 60 L 200 8 L 400 60" fill="none" stroke="rgba(139,92,246,0.2)" strokeWidth="1" />
-          </svg>
-
-          {/* Envelope body */}
-          <div
-            className="absolute inset-0 rounded-b-2xl overflow-hidden"
-            style={{
-              background: 'linear-gradient(180deg, #ede9fe 0%, #f5f3ff 40%, #faf5ff 100%)',
-              boxShadow: '0 -4px 20px rgba(109,40,217,0.08), 0 8px 32px rgba(109,40,217,0.12)',
-              borderLeft: '1px solid rgba(139,92,246,0.15)',
-              borderRight: '1px solid rgba(139,92,246,0.15)',
-              borderBottom: '1px solid rgba(139,92,246,0.15)',
-            }}
-          >
-            {/* Inner envelope texture lines */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.06]" preserveAspectRatio="none">
-              <pattern id="envLines" width="100%" height="16" patternUnits="userSpaceOnUse">
-                <line x1="0" y1="8" x2="100%" y2="8" stroke="#7c3aed" strokeWidth="0.5" />
-              </pattern>
-              <rect width="100%" height="100%" fill="url(#envLines)" />
-            </svg>
-
-            {/* Nexus seal/badge in the center */}
-            <div className="absolute top-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-              <div
-                className="w-14 h-14 rounded-full flex items-center justify-center shadow-lg"
-                style={{
-                  background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-                  boxShadow: '0 4px 14px rgba(109,40,217,0.3)',
-                }}
-              >
-                <span className="text-white font-bold text-lg">N</span>
-              </div>
-              <span className="text-violet-600/60 text-[10px] font-medium tracking-wider uppercase">
-                {he ? 'דאשבורד מלא בפנים' : 'Full dashboard inside'}
-              </span>
             </div>
           </div>
         </div>
