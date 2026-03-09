@@ -214,35 +214,13 @@ export default function StoryInsightsCarousel() {
   const cardLift = safeIndex === 1 ? visibleTxCount * TX_CARD_HEIGHT : 0;
 
   return (
-    <div className="w-full max-w-sm relative mx-auto" style={{ minHeight: 600 }}>
-      {/* Title */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true }}
-        className={`relative z-10 mb-4 text-2xl font-semibold leading-relaxed ${he ? 'text-right' : 'text-left'}`}
-        style={{ color: '#635bff' }}
-      >
-        <div>{he ? 'נהפוך את ההוצאות שלך להכנסות עם עד 60% קאשבק.' : 'Turn expenses into income with up to 60% cashback.'}</div>
-        <div>
-          {he ? 'צבור בלי הגבלה לנקסוס שלך: ' : 'Accumulate unlimited to your Nexus: '}
-          <motion.span
-            key={balanceTarget.current}
-            animate={{ x: [0, -3, 3, -2, 2, 0] }}
-            transition={{ duration: 0.4, ease: 'easeInOut' }}
-            className="inline-block font-bold"
-          >
-            {formattedBalance}
-          </motion.span>
-        </div>
-      </motion.div>
-
+    <div className="w-full max-w-sm relative mx-auto" style={{ minHeight: 520 }}>
       {/* Background shape */}
       <motion.div
         animate={shapeControls}
         initial={initialOffscreen.current}
         className="absolute left-1/2 -translate-x-1/2 z-0"
-        style={{ top: 170 }}
+        style={{ top: 80 }}
       >
         <NexusSemicircleBaseShape color={slide.shapeColor} />
       </motion.div>
