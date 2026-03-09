@@ -101,22 +101,22 @@ const PartnerBubbles = () => {
             opacity: 1;
           }
           15% {
-            transform: translateY(-180px) scale(0.85);
+            transform: translateY(-100px) scale(0.85);
           }
           30% {
-            transform: translateY(-360px) scale(0.9);
+            transform: translateY(-200px) scale(0.9);
           }
           50% {
-            transform: translateY(-600px) scale(0.95);
+            transform: translateY(-350px) scale(0.95);
           }
           70% {
-            transform: translateY(-840px) scale(1);
+            transform: translateY(-500px) scale(1);
           }
           85% {
-            transform: translateY(-1020px) scale(1);
+            transform: translateY(-620px) scale(1);
           }
           100% {
-            transform: translateY(-1300px) scale(1);
+            transform: translateY(-750px) scale(1);
             opacity: 1;
           }
         }
@@ -131,7 +131,7 @@ const PartnerBubbles = () => {
           className="partner-bubble absolute pointer-events-auto cursor-pointer"
           style={{
             left: `${bubble.left}%`,
-            bottom: '-300px',
+            bottom: '-120px',
             width: `${bubble.size}px`,
             height: `${bubble.size}px`,
             animationDuration: `${bubble.duration}s`,
