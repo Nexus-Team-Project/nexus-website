@@ -320,7 +320,7 @@ const WELFARE_STORY_CARDS = [
     id: 'brands',
     title: 'תנו מתנה שהעובד באמת בוחר בה',
     Component: () => (
-      <div className="relative w-full overflow-hidden" style={{ minHeight: 520 }}>
+      <div className="relative w-full h-full">
         <PartnerBubbles />
       </div>
     ),
@@ -421,9 +421,13 @@ function ValuesStoriesSection() {
 
                 {/* Animation container */}
                 <div className="relative overflow-hidden" style={{ height: 480 }}>
-                  <div className="story-no-text" style={{ transform: 'scale(0.85)', transformOrigin: 'top center' }}>
+                  {card.id === 'brands' ? (
                     <card.Component />
-                  </div>
+                  ) : (
+                    <div className="story-no-text" style={{ transform: 'scale(0.85)', transformOrigin: 'top center' }}>
+                      <card.Component />
+                    </div>
+                  )}
                 </div>
               </BorderHighlightCard>
             ))}
