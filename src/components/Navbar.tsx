@@ -48,6 +48,8 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
   },
   {
     label: t.navbar.solutions,
+    disableMegaMenu: true,
+    tooltip: t.navbar.comingSoon,
     megaMenu: {
       sections: [
         {
@@ -362,12 +364,14 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
 
         {/* Desktop Nav */}
         <div className="hidden lg:flex items-center gap-1" style={{ marginTop: '2px' }}>
-          {navItems.map((item) => (
+          {navItems.map((item) => {
+            const megaMenuEnabled = item.megaMenu && !item.disableMegaMenu;
+            return (
             <div
               key={item.label}
-              className="relative"
-              onMouseEnter={() => item.megaMenu && handleMouseEnter(item.label)}
-              onMouseLeave={handleMouseLeave}
+              className="relative group"
+              onMouseEnter={() => megaMenuEnabled && handleMouseEnter(item.label)}
+              onMouseLeave={() => { if (megaMenuEnabled) handleMouseLeave(); }}
             >
               <a
                 href={item.href || '#'}
@@ -377,13 +381,13 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                     : variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'
                 }`}
                 onMouseDown={(e) => {
-                  if (item.megaMenu) {
+                  if (megaMenuEnabled) {
                     e.preventDefault();
                     handleMouseDown(item.label);
                   }
                 }}
                 onMouseUp={(e) => {
-                  if (item.megaMenu) {
+                  if (megaMenuEnabled) {
                     e.preventDefault();
                     handleMouseUp();
                   }
@@ -395,8 +399,16 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                 )}
               </a>
 
+              {/* Tooltip for disabled mega menu items */}
+              {item.disableMegaMenu && item.tooltip && (
+                <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-slate-800 text-white text-[11px] font-medium px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none z-[101] shadow-lg">
+                  {item.tooltip}
+                  <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-slate-800 rotate-45" />
+                </span>
+              )}
+
               {/* Mega Menu */}
-              {item.megaMenu && openDropdown === item.label && (
+              {megaMenuEnabled && openDropdown === item.label && (
                 <MegaMenuPanel
                   key={`${item.label}-${slideDirection || 'initial'}`}
                   direction={direction}
@@ -518,7 +530,8 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                 </MegaMenuPanel>
               )}
             </div>
-          ))}
+          );
+          })}
         </div>
 
         {/* Desktop CTA */}
