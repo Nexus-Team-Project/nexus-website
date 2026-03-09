@@ -46,7 +46,7 @@ const PartnerBubbles = () => {
     // Generate initial bubbles
     const initialBubbles: Bubble[] = [];
     brands.forEach((brand, index) => {
-      initialBubbles.push(createBubble(bubbleId++, index * 1.2, brand));
+      initialBubbles.push(createBubble(bubbleId++, index * 0.6, brand));
     });
     setBubbles(initialBubbles);
 
@@ -70,7 +70,7 @@ const PartnerBubbles = () => {
 
         return activeBubbles;
       });
-    }, 1800);
+    }, 1200);
 
     return () => clearInterval(interval);
   }, []);
@@ -82,7 +82,7 @@ const PartnerBubbles = () => {
       brand: selectedBrand,
       left: Math.random() * 75 + 5,
       size: Math.random() * 40 + 80,
-      duration: Math.random() * 30 + 70,
+      duration: Math.random() * 10 + 18,
       delay: initialDelay,
       drift: 0,
       createdAt: Date.now(),
