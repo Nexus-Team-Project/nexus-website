@@ -8,6 +8,7 @@ import { LanguageProvider } from '../i18n/LanguageContext';
 import StoryGiftCards from '../components/benefits/StoryGiftCards';
 import PartnerBubbles from '../components/PartnerBubbles';
 import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
+import DashboardEnvelopePreview from '../components/benefits/DashboardEnvelopePreview';
 
 const Navbar = lazy(() => import('../components/Navbar'));
 const Footer = lazy(() => import('../components/Footer'));
@@ -329,8 +330,8 @@ const WELFARE_STORY_CARDS = [
     id: 'dashboard',
     title: 'שקיפות מלאה — עקבו אחר ניצול התקציב',
     Component: () => (
-      <div className="w-full px-4 py-8" style={{ minHeight: 520 }}>
-        <BenefitsFeatureGrid />
+      <div className="w-full" style={{ minHeight: 520 }}>
+        <DashboardEnvelopePreview />
       </div>
     ),
   },
