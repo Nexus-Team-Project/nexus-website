@@ -30,6 +30,41 @@ const ACCENT_STYLES: Record<string, { iconBg: string; iconColor: string; borderH
   purple:  { iconBg: 'bg-purple-100',   iconColor: 'text-purple-600',  borderHover: 'hover:border-purple-300',  gradient: 'from-purple-500/5 to-transparent',   glowColor: 'rgba(168,85,247,0.15)' },
 };
 
+/* ── Dashed connector lines SVG (desktop only) ── */
+function ConnectorLines({ isVisible }: { isVisible: boolean }) {
+  return (
+    <svg
+      className="absolute inset-0 w-full h-full pointer-events-none hidden md:block"
+      style={{ zIndex: 1, opacity: isVisible ? 1 : 0, transition: 'opacity 0.8s ease 0.3s' }}
+      preserveAspectRatio="none"
+    >
+      <defs>
+        <linearGradient id="line-grad-left" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="rgba(139,92,246,0.3)" />
+          <stop offset="100%" stopColor="rgba(139,92,246,0.08)" />
+        </linearGradient>
+        <linearGradient id="line-grad-right" x1="100%" y1="0%" x2="0%" y2="0%">
+          <stop offset="0%" stopColor="rgba(139,92,246,0.3)" />
+          <stop offset="100%" stopColor="rgba(139,92,246,0.08)" />
+        </linearGradient>
+      </defs>
+      {/* Left side lines — top, middle, bottom */}
+      <path d="M 22% 18% Q 32% 18%, 38% 35%" fill="none" stroke="url(#line-grad-left)" strokeWidth="1.5" strokeDasharray="6 4" />
+      <path d="M 22% 50% Q 30% 50%, 38% 50%" fill="none" stroke="url(#line-grad-left)" strokeWidth="1.5" strokeDasharray="6 4" />
+      <path d="M 22% 82% Q 32% 82%, 38% 65%" fill="none" stroke="url(#line-grad-left)" strokeWidth="1.5" strokeDasharray="6 4" />
+      {/* Right side lines — top, middle, bottom */}
+      <path d="M 78% 18% Q 68% 18%, 62% 35%" fill="none" stroke="url(#line-grad-right)" strokeWidth="1.5" strokeDasharray="6 4" />
+      <path d="M 78% 50% Q 70% 50%, 62% 50%" fill="none" stroke="url(#line-grad-right)" strokeWidth="1.5" strokeDasharray="6 4" />
+      <path d="M 78% 82% Q 68% 82%, 62% 65%" fill="none" stroke="url(#line-grad-right)" strokeWidth="1.5" strokeDasharray="6 4" />
+      {/* Dots at card endpoints */}
+      {['22% 18%', '22% 50%', '22% 82%', '78% 18%', '78% 50%', '78% 82%'].map((pos, i) => {
+        const [cx, cy] = pos.split(' ');
+        return <circle key={i} cx={cx} cy={cy} r="3" fill="rgba(139,92,246,0.35)" />;
+      })}
+    </svg>
+  );
+}
+
 export default function BenefitsFeatureGrid() {
   const { language, direction } = useLanguage();
   const he = language === 'he';
@@ -52,6 +87,59 @@ export default function BenefitsFeatureGrid() {
     return () => observer.disconnect();
   }, []);
 
+  // Split features: left 3 (indices 0,1,2), right 3 (indices 3,4,5)
+  // For RTL: swap sides
+  const leftFeatures = isRtl ? features.slice(3, 6) : features.slice(0, 3);
+  const rightFeatures = isRtl ? features.slice(0, 3) : features.slice(3, 6);
+
+  const renderCard = (f: typeof features[0], i: number, side: 'left' | 'right') => {
+    const Icon = f.icon;
+    const accent = ACCENT_STYLES[f.accent];
+    const delay = side === 'left' ? i * 0.12 : 0.3 + i * 0.12;
+    return (
+      <div
+        key={f.title}
+        style={{
+          opacity: isVisible ? 1 : 0,
+          transform: isVisible ? 'translateX(0)' : `translateX(${side === 'left' ? '-30px' : '30px'})`,
+          transition: `opacity 0.6s ease ${delay}s, transform 0.6s ease ${delay}s`,
+          '--glow-color': accent.glowColor,
+        } as React.CSSProperties}
+      >
+        <BorderHighlightCard
+          className={`feature-card-new relative rounded-2xl border border-slate-200/80 bg-white p-5 h-full cursor-default ${accent.borderHover} group overflow-hidden`}
+        >
+          {/* Subtle gradient background */}
+          <div className={`absolute inset-0 bg-gradient-to-br ${accent.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl`} />
+
+          {/* Shimmer effect */}
+          <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+            <div className="card-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full" />
+          </div>
+
+          {/* Accent line at top */}
+          <div className="feature-accent-line absolute top-0 left-0 h-[2px] w-0 transition-all duration-500 rounded-t-2xl" style={{ background: `linear-gradient(90deg, transparent, ${accent.glowColor.replace('0.15', '0.6')}, transparent)` }} />
+
+          <div className="relative z-10 flex items-start gap-4">
+            <div
+              className={`feature-icon-container w-11 h-11 rounded-xl ${accent.iconBg} flex items-center justify-center shrink-0 transition-all duration-300 group-hover:scale-110`}
+            >
+              <Icon size={20} className={accent.iconColor} strokeWidth={1.8} />
+            </div>
+            <div className="min-w-0">
+              <h3 className={`text-sm font-bold text-slate-900 mb-1 ${he ? 'text-right' : 'text-left'}`}>
+                {f.title}
+              </h3>
+              <p className={`text-xs text-slate-500 leading-relaxed ${he ? 'text-right' : 'text-left'}`}>
+                {f.desc}
+              </p>
+            </div>
+          </div>
+        </BorderHighlightCard>
+      </div>
+    );
+  };
+
   return (
     <div ref={containerRef} className="relative">
       <style>{`
@@ -62,6 +150,10 @@ export default function BenefitsFeatureGrid() {
         @keyframes shimmer {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
+        }
+        @keyframes dashedPulse {
+          0%, 100% { stroke-dashoffset: 0; }
+          100% { stroke-dashoffset: -20; }
         }
         .feature-card-new {
           transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
@@ -80,116 +172,87 @@ export default function BenefitsFeatureGrid() {
         .feature-card-new:hover .feature-accent-line {
           width: 100%;
         }
-        .bento-features {
+        .mindmap-layout {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          grid-template-rows: auto 1fr auto;
-          gap: 20px;
+          grid-template-columns: 1fr;
+          gap: 16px;
         }
-        @media (max-width: 767px) {
-          .bento-features {
-            grid-template-columns: 1fr;
-            grid-template-rows: auto;
+        @media (min-width: 768px) {
+          .mindmap-layout {
+            display: grid;
+            grid-template-columns: 1fr 1.4fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 24px;
+            align-items: center;
+            min-height: 600px;
+          }
+          .mindmap-center {
+            grid-column: 2;
+            grid-row: 1 / 4;
           }
         }
       `}</style>
 
-      <div className="bento-features">
-        {/* ── Top Row: 3 Feature Cards ── */}
-        {features.slice(0, 3).map((f, i) => {
-          const Icon = f.icon;
-          const accent = ACCENT_STYLES[f.accent];
-          return (
-            <div
-              key={f.title}
-              style={{
-                opacity: isVisible ? 1 : 0,
-                transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-                transition: `opacity 0.6s ease ${i * 0.12}s, transform 0.6s ease ${i * 0.12}s`,
-                '--glow-color': accent.glowColor,
-              } as React.CSSProperties}
-            >
-              <BorderHighlightCard
-                className={`feature-card-new relative rounded-2xl border border-slate-200/80 bg-white p-6 h-full cursor-default ${accent.borderHover} group overflow-hidden`}
-              >
-                {/* Subtle gradient background */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${accent.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl`} />
+      <div className="mindmap-layout relative">
+        {/* Connector lines SVG overlay (desktop) */}
+        <ConnectorLines isVisible={isVisible} />
 
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
-                  <div className="card-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full" />
-                </div>
+        {/* Left column — 3 cards stacked */}
+        {leftFeatures.map((f, i) => (
+          <div key={f.title} className="md:col-start-1" style={{ gridRow: `${i + 1}` }}>
+            {renderCard(f, i, 'left')}
+          </div>
+        ))}
 
-                {/* Accent line at top */}
-                <div className="feature-accent-line absolute top-0 left-0 h-[2px] w-0 transition-all duration-500 rounded-t-2xl" style={{ background: `linear-gradient(90deg, transparent, ${accent.glowColor.replace('0.15', '0.6')}, transparent)` }} />
-
-                <div className="relative z-10">
-                  <div
-                    className={`feature-icon-container w-12 h-12 rounded-xl ${accent.iconBg} flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110`}
-                  >
-                    <Icon size={22} className={accent.iconColor} strokeWidth={1.8} />
-                  </div>
-                  <h3 className={`text-base font-bold text-slate-900 mb-2 ${he ? 'text-right' : 'text-left'}`}>
-                    {f.title}
-                  </h3>
-                  <p className={`text-sm text-slate-500 leading-relaxed ${he ? 'text-right' : 'text-left'}`}>
-                    {f.desc}
-                  </p>
-                </div>
-              </BorderHighlightCard>
-            </div>
-          );
-        })}
-
-        {/* ── Center: Dashboard ── */}
+        {/* Center — Dashboard */}
         <div
-          className="md:col-span-3"
+          className="mindmap-center relative z-[2]"
           style={{
             opacity: isVisible ? 1 : 0,
-            transform: isVisible ? 'scale(1)' : 'scale(0.96)',
-            transition: 'opacity 0.7s ease 0.35s, transform 0.7s ease 0.35s',
+            transform: isVisible ? 'scale(1)' : 'scale(0.92)',
+            transition: 'opacity 0.7s ease 0.2s, transform 0.7s ease 0.2s',
           }}
         >
-          <div className="relative bg-gradient-to-br from-violet-50/80 via-white to-purple-50/60 backdrop-blur-xl border-2 border-violet-200/60 rounded-2xl shadow-2xl shadow-violet-100/50 p-4 max-w-3xl mx-auto">
+          <div className="relative bg-gradient-to-br from-violet-50/80 via-white to-purple-50/60 backdrop-blur-xl border-2 border-violet-200/60 rounded-2xl shadow-2xl shadow-violet-100/50 p-3">
             {/* Glowing border effect */}
             <div className="absolute -inset-px rounded-2xl bg-gradient-to-r from-violet-400/20 via-purple-400/10 to-violet-400/20 blur-sm pointer-events-none" />
 
             <div className="relative bg-white rounded-xl shadow-sm overflow-hidden">
               {/* Browser chrome */}
-              <div className="h-10 bg-slate-50 border-b border-slate-100 flex items-center px-4 gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-300" />
-                <div className="w-3 h-3 rounded-full bg-yellow-300" />
-                <div className="w-3 h-3 rounded-full bg-green-300" />
-                <span className={`${isRtl ? 'mr-4' : 'ml-4'} text-[10px] text-slate-400 font-mono`}>nexus.co.il/dashboard</span>
+              <div className="h-9 bg-slate-50 border-b border-slate-100 flex items-center px-3 gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-red-300" />
+                <div className="w-2.5 h-2.5 rounded-full bg-yellow-300" />
+                <div className="w-2.5 h-2.5 rounded-full bg-green-300" />
+                <span className={`${isRtl ? 'mr-3' : 'ml-3'} text-[9px] text-slate-400 font-mono`}>nexus.co.il/dashboard</span>
                 <div className={`${isRtl ? 'mr-auto' : 'ml-auto'} flex items-center gap-1`}>
                   <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                   <span className="text-[9px] text-green-600 font-medium">{he ? 'מחובר' : 'Live'}</span>
                 </div>
               </div>
-              <div className="p-6" dir={direction}>
+              <div className="p-5" dir={direction}>
                 {/* Header */}
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-5">
                   <div>
                     <div className="text-xs text-slate-400 mb-1">{he ? 'סה״כ הטבות פעילות' : 'Total Active Benefits'}</div>
-                    <div className="text-2xl font-bold text-slate-900">{he ? '₪ 2,450,000' : '$2,450,000'}</div>
+                    <div className="text-xl font-bold text-slate-900">{he ? '₪ 2,450,000' : '$2,450,000'}</div>
                   </div>
-                  <div className="h-10 w-10 bg-stripe-purple/10 rounded-full flex items-center justify-center">
-                    <BarChart3 size={20} className="text-stripe-purple" />
+                  <div className="h-9 w-9 bg-stripe-purple/10 rounded-full flex items-center justify-center">
+                    <BarChart3 size={18} className="text-stripe-purple" />
                   </div>
                 </div>
                 {/* Stats row */}
-                <div className="grid grid-cols-3 gap-3 mb-6">
-                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-emerald-700">{he ? '₪1.8M' : '$1.8M'}</div>
-                    <div className="text-[10px] text-emerald-600">{he ? 'נוצל' : 'Redeemed'}</div>
+                <div className="grid grid-cols-3 gap-2 mb-5">
+                  <div className="bg-emerald-50 rounded-lg p-2.5 text-center">
+                    <div className="text-base font-bold text-emerald-700">{he ? '₪1.8M' : '$1.8M'}</div>
+                    <div className="text-[9px] text-emerald-600">{he ? 'נוצל' : 'Redeemed'}</div>
                   </div>
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-blue-700">{he ? '₪650K' : '$650K'}</div>
-                    <div className="text-[10px] text-blue-600">{he ? 'זמין' : 'Available'}</div>
+                  <div className="bg-blue-50 rounded-lg p-2.5 text-center">
+                    <div className="text-base font-bold text-blue-700">{he ? '₪650K' : '$650K'}</div>
+                    <div className="text-[9px] text-blue-600">{he ? 'זמין' : 'Available'}</div>
                   </div>
-                  <div className="bg-purple-50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-bold text-purple-700">1,240</div>
-                    <div className="text-[10px] text-purple-600">{he ? 'חברים' : 'Members'}</div>
+                  <div className="bg-purple-50 rounded-lg p-2.5 text-center">
+                    <div className="text-base font-bold text-purple-700">1,240</div>
+                    <div className="text-[9px] text-purple-600">{he ? 'חברים' : 'Members'}</div>
                   </div>
                 </div>
                 {/* Progress bars */}
@@ -198,7 +261,7 @@ export default function BenefitsFeatureGrid() {
                     <span className="text-slate-500">{he ? 'קאשבק' : 'Cashback'}</span>
                     <span className="text-slate-700 font-semibold">78%</span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-stripe-purple to-purple-400 rounded-full transition-all duration-1000 ease-out`}
                       style={{ width: isVisible ? '78%' : '0%' }}
@@ -208,7 +271,7 @@ export default function BenefitsFeatureGrid() {
                     <span className="text-slate-500">{he ? 'גיפט קארדס' : 'Gift Cards'}</span>
                     <span className="text-slate-700 font-semibold">92%</span>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-emerald-500 to-emerald-300 rounded-full transition-all duration-1000 ease-out`}
                       style={{ width: isVisible ? '92%' : '0%', transitionDelay: '0.3s' }}
@@ -216,13 +279,13 @@ export default function BenefitsFeatureGrid() {
                   </div>
                 </div>
                 {/* Notification */}
-                <div className="mt-5 bg-green-50 rounded-lg p-3 border border-green-100 flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
-                    <CheckCircle size={16} className="text-green-600" />
+                <div className="mt-4 bg-green-50 rounded-lg p-2.5 border border-green-100 flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                    <CheckCircle size={14} className="text-green-600" />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-900">{he ? 'הקמפיין הושלם!' : 'Campaign Complete!'}</div>
-                    <div className="text-[10px] text-slate-500">{he ? '350 חברים קיבלו הטבה חדשה' : '350 members received a new benefit'}</div>
+                    <div className="text-[11px] font-bold text-slate-900">{he ? 'הקמפיין הושלם!' : 'Campaign Complete!'}</div>
+                    <div className="text-[9px] text-slate-500">{he ? '350 חברים קיבלו הטבה חדשה' : '350 members received a new benefit'}</div>
                   </div>
                 </div>
               </div>
@@ -230,51 +293,12 @@ export default function BenefitsFeatureGrid() {
           </div>
         </div>
 
-        {/* ── Bottom Row: 3 Feature Cards ── */}
-        {features.slice(3, 6).map((f, i) => {
-          const Icon = f.icon;
-          const accent = ACCENT_STYLES[f.accent];
-          return (
-            <div
-              key={f.title}
-              style={{
-                opacity: isVisible ? 1 : 0,
-                transform: isVisible ? 'translateY(0)' : 'translateY(30px)',
-                transition: `opacity 0.6s ease ${0.55 + i * 0.12}s, transform 0.6s ease ${0.55 + i * 0.12}s`,
-                '--glow-color': accent.glowColor,
-              } as React.CSSProperties}
-            >
-              <BorderHighlightCard
-                className={`feature-card-new relative rounded-2xl border border-slate-200/80 bg-white p-6 h-full cursor-default ${accent.borderHover} group overflow-hidden`}
-              >
-                {/* Subtle gradient background */}
-                <div className={`absolute inset-0 bg-gradient-to-br ${accent.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-2xl`} />
-
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
-                  <div className="card-shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full" />
-                </div>
-
-                {/* Accent line at top */}
-                <div className="feature-accent-line absolute top-0 left-0 h-[2px] w-0 transition-all duration-500 rounded-t-2xl" style={{ background: `linear-gradient(90deg, transparent, ${accent.glowColor.replace('0.15', '0.6')}, transparent)` }} />
-
-                <div className="relative z-10">
-                  <div
-                    className={`feature-icon-container w-12 h-12 rounded-xl ${accent.iconBg} flex items-center justify-center mb-4 transition-all duration-300 group-hover:scale-110`}
-                  >
-                    <Icon size={22} className={accent.iconColor} strokeWidth={1.8} />
-                  </div>
-                  <h3 className={`text-base font-bold text-slate-900 mb-2 ${he ? 'text-right' : 'text-left'}`}>
-                    {f.title}
-                  </h3>
-                  <p className={`text-sm text-slate-500 leading-relaxed ${he ? 'text-right' : 'text-left'}`}>
-                    {f.desc}
-                  </p>
-                </div>
-              </BorderHighlightCard>
-            </div>
-          );
-        })}
+        {/* Right column — 3 cards stacked */}
+        {rightFeatures.map((f, i) => (
+          <div key={f.title} className="md:col-start-3" style={{ gridRow: `${i + 1}` }}>
+            {renderCard(f, i, 'right')}
+          </div>
+        ))}
       </div>
     </div>
   );
