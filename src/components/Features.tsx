@@ -179,6 +179,7 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
                       <img
                         src={card.logo}
                         alt={card.name}
+                        loading="lazy"
                         className="w-40 h-auto object-contain"
                         style={card.name === 'GARMIN' ? { transform: 'translateY(-15px)' } : {}}
                         onError={() => {

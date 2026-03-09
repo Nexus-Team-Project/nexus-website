@@ -147,7 +147,7 @@ export default function PaymentAnimation({ show = 'all' }: { show?: 'all' | 'pho
               <button className="pay-btn paybox-pay">
                 {!imageErrors.has('paybox') ? (
                   <img
-                    src="/paybox-transparent.png"
+                    src="/paybox-transparent.webp"
                     alt="PayBox"
                     className="pay-logo pay-logo-paybox"
                     onError={() => setImageErrors(prev => new Set(prev).add('paybox'))}

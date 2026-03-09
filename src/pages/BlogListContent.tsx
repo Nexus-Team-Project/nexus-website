@@ -83,7 +83,7 @@ export default function BlogListContent() {
               <div className="grid md:grid-cols-5 gap-0">
                 {/* Image / gradient placeholder */}
                 <div className="md:col-span-3 relative h-64 md:h-auto min-h-[220px] overflow-hidden">
-                  <img src={featured.heroImage} alt={featured.title} className="absolute inset-0 w-full h-full object-cover" />
+                  <img src={featured.heroImage} alt={featured.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                 </div>
 
                 {/* Content */}
@@ -192,7 +192,7 @@ function ArticleCard({
     >
       {/* Image placeholder */}
       <div className="h-48 relative overflow-hidden">
-        <img src={article.heroImage} alt={article.title} className="w-full h-full object-cover" />
+        <img src={article.heroImage} alt={article.title} loading="lazy" className="w-full h-full object-cover" />
       </div>
 
       <div className="p-6 flex flex-col flex-1">

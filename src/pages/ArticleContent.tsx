@@ -296,7 +296,7 @@ export default function ArticleContent() {
                   className="group flex flex-col rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-lg transition-all"
                 >
                   <div className="h-40 relative overflow-hidden">
-                    <img src={r.heroImage} alt={r.title} className="w-full h-full object-cover" />
+                    <img src={r.heroImage} alt={r.title} loading="lazy" className="w-full h-full object-cover" />
                   </div>
                   <div className="p-6">
                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-3 ${CATEGORY_COLORS[r.category]}`}>

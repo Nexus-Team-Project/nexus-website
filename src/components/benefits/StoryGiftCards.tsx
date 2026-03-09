@@ -128,6 +128,7 @@ export default function StoryGiftCards() {
                     <img
                       src={card.logo}
                       alt={card.name}
+                      loading="lazy"
                       className="w-28 h-auto object-contain"
                       onError={() => setImageErrors((prev) => new Set(prev).add(cardIndex))}
                     />

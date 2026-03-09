@@ -158,6 +158,9 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
       }
     }
 
+    // Pre-allocate buffer for dot sorting (avoids creating new arrays every frame)
+    const ptsBuffer = dots.map(d => ({ p: { x: d.x, y: d.y, z: d.z }, seed: d.seed, land: d.land }));
+
     // Grid
     const grid: any[] = [];
     function addLatitude(latDeg: number, step = 7) {
@@ -352,11 +355,14 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
         [255, 184, 77]
       ];
 
-      const pts = dots.map(d => {
+      for (let i = 0; i < ptsBuffer.length; i++) {
+        const d = dots[i];
         let p = rotY(d, rotYBase + d.seed * 0.35);
         p = rotX(p, rotXBase);
-        return { p, seed: d.seed, land: d.land };
-      }).sort((a, b) => a.p.z - b.p.z);
+        ptsBuffer[i].p = p; ptsBuffer[i].seed = d.seed; ptsBuffer[i].land = d.land;
+      }
+      ptsBuffer.sort((a, b) => a.p.z - b.p.z);
+      const pts = ptsBuffer;
 
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';

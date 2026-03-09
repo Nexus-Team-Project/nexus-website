@@ -500,7 +500,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                               className="block w-full h-32 rounded-lg mb-4 overflow-hidden relative group cursor-pointer"
                             >
                               <img
-                                src="/globes-article.png"
+                                src="/globes-article.webp"
                                 alt="Globes Article"
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                               />
