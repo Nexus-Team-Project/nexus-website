@@ -632,7 +632,7 @@ function UseCasesSection() {
     {
       title: 'מתנות ליום הולדת',
       desc: 'הגדירו תקציב ליום הולדת וזה קורה אוטומטית. העובד בוחר, אתם רק מאשרים.',
-      image: 'https://images.unsplash.com/photo-1549465220-1a8b9238f862?w=800&q=80',
+      image: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?w=800&q=80',
       gradient: 'from-pink-500 to-rose-500',
     },
     {
