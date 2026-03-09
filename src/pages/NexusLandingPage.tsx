@@ -331,6 +331,8 @@ const WELFARE_STORY_CARDS = [
     title: 'שקיפות מלאה — עקבו אחר ניצול התקציב',
     Component: () => (
       <div className="w-full" style={{ minHeight: 520 }}>
+        {/* Dummy div — absorbed by .story-no-text>div>div:first-child{display:none} */}
+        <div />
         <DashboardEnvelopePreview />
       </div>
     ),
