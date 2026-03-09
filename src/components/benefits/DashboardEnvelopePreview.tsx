@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BarChart3, CheckCircle } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -6,48 +6,24 @@ export default function DashboardEnvelopePreview() {
   const { language, direction } = useLanguage();
   const he = language === 'he';
   const isRtl = direction === 'rtl';
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const [animated, setAnimated] = useState(false);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.15 },
-    );
-    if (containerRef.current) observer.observe(containerRef.current);
-    return () => observer.disconnect();
+    const t = setTimeout(() => setAnimated(true), 100);
+    return () => clearTimeout(t);
   }, []);
 
   return (
-    <div ref={containerRef} className="relative w-full flex items-center justify-center" style={{ minHeight: 520 }}>
-      <style>{`
-        @keyframes envelopeSlideUp {
-          from { transform: translateY(40px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes dashboardReveal {
-          from { transform: translateY(-20px) scale(0.95); opacity: 0; }
-          to { transform: translateY(0) scale(1); opacity: 1; }
-        }
-        .envelope-container {
-          animation: envelopeSlideUp 0.8s ease-out forwards;
-        }
-        .dashboard-inner {
-          animation: dashboardReveal 0.7s ease-out 0.3s forwards;
-          opacity: 0;
-        }
-      `}</style>
-
+    <div className="relative w-full flex items-center justify-center" style={{ minHeight: 520 }}>
       <div className="relative w-full max-w-sm mx-auto" style={{ height: 480 }}>
         {/* Dashboard - positioned to peek out from the envelope */}
         <div
-          className={`absolute inset-x-4 top-0 z-[1] ${isVisible ? 'dashboard-inner' : ''}`}
-          style={{ opacity: isVisible ? undefined : 0 }}
+          className="absolute inset-x-4 top-0 z-[1] transition-all duration-700 ease-out"
+          style={{
+            opacity: animated ? 1 : 0,
+            transform: animated ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.95)',
+            transitionDelay: '0.3s',
+          }}
         >
           <div className="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
             {/* Browser chrome */}
@@ -98,8 +74,8 @@ export default function DashboardEnvelopePreview() {
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-stripe-purple to-purple-400 rounded-full transition-all duration-1000 ease-out`}
-                    style={{ width: isVisible ? '78%' : '0%' }}
+                    className="h-full bg-gradient-to-l from-stripe-purple to-purple-400 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: animated ? '78%' : '0%' }}
                   />
                 </div>
                 <div className="flex items-center justify-between text-xs">
@@ -108,8 +84,8 @@ export default function DashboardEnvelopePreview() {
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-emerald-500 to-emerald-300 rounded-full transition-all duration-1000 ease-out`}
-                    style={{ width: isVisible ? '92%' : '0%', transitionDelay: '0.3s' }}
+                    className="h-full bg-gradient-to-l from-emerald-500 to-emerald-300 rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: animated ? '92%' : '0%', transitionDelay: '0.3s' }}
                   />
                 </div>
               </div>
@@ -132,30 +108,21 @@ export default function DashboardEnvelopePreview() {
                   <span className="text-slate-700 font-semibold">64%</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-amber-500 to-amber-300 rounded-full`}
-                    style={{ width: '64%' }}
-                  />
+                  <div className="h-full bg-gradient-to-l from-amber-500 to-amber-300 rounded-full" style={{ width: '64%' }} />
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">{he ? 'חינוך' : 'Education'}</span>
                   <span className="text-slate-700 font-semibold">45%</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-blue-500 to-blue-300 rounded-full`}
-                    style={{ width: '45%' }}
-                  />
+                  <div className="h-full bg-gradient-to-l from-blue-500 to-blue-300 rounded-full" style={{ width: '45%' }} />
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500">{he ? 'בריאות' : 'Health'}</span>
                   <span className="text-slate-700 font-semibold">87%</span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-rose-500 to-rose-300 rounded-full`}
-                    style={{ width: '87%' }}
-                  />
+                  <div className="h-full bg-gradient-to-l from-rose-500 to-rose-300 rounded-full" style={{ width: '87%' }} />
                 </div>
               </div>
             </div>
@@ -164,8 +131,12 @@ export default function DashboardEnvelopePreview() {
 
         {/* Envelope wrapper - covers the bottom portion of the dashboard */}
         <div
-          className={`absolute inset-x-0 bottom-0 z-[2] ${isVisible ? 'envelope-container' : ''}`}
-          style={{ height: '60%', opacity: isVisible ? undefined : 0 }}
+          className="absolute inset-x-0 bottom-0 z-[2] transition-all duration-800 ease-out"
+          style={{
+            height: '60%',
+            opacity: animated ? 1 : 0,
+            transform: animated ? 'translateY(0)' : 'translateY(40px)',
+          }}
         >
           {/* Envelope flap (triangle) */}
           <svg
@@ -175,26 +146,16 @@ export default function DashboardEnvelopePreview() {
             style={{ transform: 'translateY(-98%)' }}
           >
             <defs>
-              <linearGradient id="flapGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <linearGradient id="flapGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%" stopColor="#e2e0f5" />
                 <stop offset="100%" stopColor="#ede9fe" />
               </linearGradient>
-              <filter id="flapShadow">
+              <filter id="flapSh">
                 <feDropShadow dx="0" dy="-2" stdDeviation="3" floodColor="rgba(109,40,217,0.1)" />
               </filter>
             </defs>
-            <path
-              d="M 0 60 L 200 8 L 400 60 Z"
-              fill="url(#flapGradient)"
-              filter="url(#flapShadow)"
-            />
-            {/* Fold line */}
-            <path
-              d="M 0 60 L 200 8 L 400 60"
-              fill="none"
-              stroke="rgba(139,92,246,0.2)"
-              strokeWidth="1"
-            />
+            <path d="M 0 60 L 200 8 L 400 60 Z" fill="url(#flapGrad)" filter="url(#flapSh)" />
+            <path d="M 0 60 L 200 8 L 400 60" fill="none" stroke="rgba(139,92,246,0.2)" strokeWidth="1" />
           </svg>
 
           {/* Envelope body */}
@@ -210,10 +171,10 @@ export default function DashboardEnvelopePreview() {
           >
             {/* Inner envelope texture lines */}
             <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-[0.06]" preserveAspectRatio="none">
-              <pattern id="envelopeLines" width="100%" height="16" patternUnits="userSpaceOnUse">
+              <pattern id="envLines" width="100%" height="16" patternUnits="userSpaceOnUse">
                 <line x1="0" y1="8" x2="100%" y2="8" stroke="#7c3aed" strokeWidth="0.5" />
               </pattern>
-              <rect width="100%" height="100%" fill="url(#envelopeLines)" />
+              <rect width="100%" height="100%" fill="url(#envLines)" />
             </svg>
 
             {/* Nexus seal/badge in the center */}
