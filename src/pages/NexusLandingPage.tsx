@@ -6,6 +6,7 @@ import AnimatedGradient from '../components/AnimatedGradient';
 import BorderHighlightCard from '../components/BorderHighlightCard';
 import { LanguageProvider } from '../i18n/LanguageContext';
 import StoryGiftCards from '../components/benefits/StoryGiftCards';
+import StoryInsightsCarousel from '../components/benefits/StoryInsightsCarousel';
 import PartnerBubbles from '../components/PartnerBubbles';
 import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 import DashboardEnvelopePreview from '../components/benefits/DashboardEnvelopePreview';
@@ -81,7 +82,7 @@ function HeroSection() {
                   href="#cta-final"
                   className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/85 text-white font-semibold px-8 py-4 rounded-lg transition-all duration-300 hover:shadow-xl hover:shadow-stripe-purple/30 text-base"
                 >
-                  קבעו פגישת הדגמה
+                  התחל עכשיו
                   <span className="inline-block w-0 overflow-hidden group-hover:w-5 transition-all duration-300 ease-out">
                     <ArrowLeft size={16} className="inline" />
                   </span>
@@ -90,7 +91,7 @@ function HeroSection() {
                   href="#features"
                   className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white font-semibold px-8 py-4 rounded-lg transition-all text-base"
                 >
-                  ראו איך זה עובד
+                  צור קשר עם המכירות
                 </a>
               </div>
             </div>
@@ -337,6 +338,17 @@ const WELFARE_STORY_CARDS = [
       </div>
     ),
   },
+  {
+    id: 'benefits-club',
+    title: 'שלבו עם מועדון הטבות ארגוני',
+    subtitle: 'מתנות בחג והנחות בכל השנה',
+    Component: () => (
+      <div className="relative w-full overflow-hidden" style={{ minHeight: 520 }}>
+        <div />
+        <StoryInsightsCarousel />
+      </div>
+    ),
+  },
 ];
 
 // ─── Section: Values Stories Slider ──────────────────────────────────────────
@@ -420,6 +432,9 @@ function ValuesStoriesSection() {
                   <h3 className="text-lg font-bold" style={{ color: '#635BFF' }}>
                     {card.title}
                   </h3>
+                  {'subtitle' in card && card.subtitle && (
+                    <p className="text-sm text-slate-500 mt-1">{card.subtitle}</p>
+                  )}
                 </div>
 
                 {/* Animation container */}
@@ -808,7 +823,7 @@ function FinalCTASection() {
               rel="noopener noreferrer"
               className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/85 text-white font-bold px-10 py-4 rounded-lg transition-all duration-300 hover:shadow-xl hover:shadow-stripe-purple/30 text-lg"
             >
-              קבעו פגישת הדגמה
+              התחל עכשיו
               <span className="inline-block w-0 overflow-hidden group-hover:w-5 transition-all duration-300 ease-out">
                 <ArrowLeft size={18} className="inline" />
               </span>
@@ -817,7 +832,7 @@ function FinalCTASection() {
               to="/he"
               className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-10 py-4 rounded-lg transition-all text-lg"
             >
-              חזרה לאתר הראשי
+              צור קשר עם המכירות
             </Link>
           </div>
         </FadeInSection>
