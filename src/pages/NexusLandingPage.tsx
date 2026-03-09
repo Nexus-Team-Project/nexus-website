@@ -82,7 +82,7 @@ function HeroSection() {
                   href="#cta-final"
                   className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/85 text-white font-semibold px-8 py-4 rounded-lg transition-all duration-300 hover:shadow-xl hover:shadow-stripe-purple/30 text-base"
                 >
-                  קבעו פגישת הדגמה
+                  התחל עכשיו
                   <span className="inline-block w-0 overflow-hidden group-hover:w-5 transition-all duration-300 ease-out">
                     <ArrowLeft size={16} className="inline" />
                   </span>
@@ -91,7 +91,7 @@ function HeroSection() {
                   href="#features"
                   className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white font-semibold px-8 py-4 rounded-lg transition-all text-base"
                 >
-                  ראו איך זה עובד
+                  צור קשר עם המכירות
                 </a>
               </div>
             </div>
@@ -819,7 +819,7 @@ function FinalCTASection() {
               rel="noopener noreferrer"
               className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/85 text-white font-bold px-10 py-4 rounded-lg transition-all duration-300 hover:shadow-xl hover:shadow-stripe-purple/30 text-lg"
             >
-              קבעו פגישת הדגמה
+              התחל עכשיו
               <span className="inline-block w-0 overflow-hidden group-hover:w-5 transition-all duration-300 ease-out">
                 <ArrowLeft size={18} className="inline" />
               </span>
@@ -828,7 +828,7 @@ function FinalCTASection() {
               to="/he"
               className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-10 py-4 rounded-lg transition-all text-lg"
             >
-              חזרה לאתר הראשי
+              צור קשר עם המכירות
             </Link>
           </div>
         </FadeInSection>
