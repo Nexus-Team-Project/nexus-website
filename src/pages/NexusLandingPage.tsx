@@ -10,6 +10,7 @@ import StoryInsightsCarousel from '../components/benefits/StoryInsightsCarousel'
 import PartnerBubbles from '../components/PartnerBubbles';
 import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 import DashboardEnvelopePreview from '../components/benefits/DashboardEnvelopePreview';
+import { useSEO } from '../hooks/useSEO';
 
 const Navbar = lazy(() => import('../components/Navbar'));
 const Footer = lazy(() => import('../components/Footer'));
@@ -843,16 +844,15 @@ function FinalCTASection() {
 
 // ─── Main Landing Page ───────────────────────────────────────────────────────
 export default function NexusLandingPage() {
-  useEffect(() => {
-    document.title = 'Nexus | ניהול תקציב רווחה ומתנות לעובדים';
-    let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement;
-    if (!meta) {
-      meta = document.createElement('meta');
-      meta.name = 'description';
-      document.head.appendChild(meta);
-    }
-    meta.content = 'Nexus - פלטפורמה לניהול תקציב רווחה, מתנות לעובדים, שוברים והטבות לעובדים. הקצו תקציבים, שלחו מתנות ונהלו הטבות בצורה פשוטה ושקופה.';
+  useSEO({
+    title: 'Nexus | ניהול תקציב רווחה ומתנות לעובדים',
+    description: 'Nexus - פלטפורמה לניהול תקציב רווחה, מתנות לעובדים, שוברים והטבות לעובדים. הקצו תקציבים, שלחו מתנות ונהלו הטבות בצורה פשוטה ושקופה.',
+    canonical: 'https://nexus-payment.com/he/welfare',
+    alternates: { he: 'https://nexus-payment.com/he/welfare' },
+  });
 
+  useEffect(() => {
+    // Font loading for this page (SEO title/description handled by useSEO above)
     const linkId = 'rubik-font-landing';
     if (!document.getElementById(linkId)) {
       const link = document.createElement('link');
