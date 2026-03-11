@@ -6,6 +6,7 @@ import PaymentAnimation, { PaymentPricingPanel, PaymentCheckoutPanel } from '../
 import AnimatedGradient from '../components/AnimatedGradient';
 import BorderHighlightCard from '../components/BorderHighlightCard';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useSEO } from '../hooks/useSEO';
 import visaLogo from '../assets/logos/visa-logo-white.svg';
 import mastercardLogo from '../assets/logos/mastercard-logo.png';
 
@@ -291,6 +292,14 @@ export default function PaymentsPage() {
   const he = language === 'he';
   const signupLink = he ? '/he/signup' : '/signup';
   const isRtl = direction === 'rtl';
+
+  useSEO({
+    title: he ? 'עיבוד תשלומים — Nexus' : 'Payment Processing — Nexus',
+    description: he
+      ? 'קבלו תשלומים בקלות עם Nexus. תמיכה ב-135+ מטבעות, זיהוי הונאות בזמן אמת וחוויית תשלום חלקה לכל עסק.'
+      : 'Accept online payments globally with Nexus. Support for 135+ currencies, real-time fraud detection, and seamless checkout for any business.',
+    canonical: he ? 'https://nexus-payment.com/he/payments' : 'https://nexus-payment.com/payments',
+  });
 
   return (
     <div dir={direction} className="min-h-screen bg-white">
