@@ -139,6 +139,10 @@ export default defineConfig({
           if (id.includes('node_modules/@react-oauth')) {
             return 'auth-vendor';
           }
+          // Framer Motion — used by Story components; isolate for independent caching
+          if (id.includes('node_modules/framer-motion')) {
+            return 'motion-vendor';
+          }
         },
         // Ensure asset filenames include content hash for long-term caching
         chunkFileNames: 'assets/[name]-[hash].js',

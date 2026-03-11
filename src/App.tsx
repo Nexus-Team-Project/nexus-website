@@ -43,52 +43,56 @@ const ChangelogPageHe    = lazy(() => import('./pages/ChangelogHe'));
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
 // ─── Geo-language detection for root route ────────────────
-// Checks stored preference first; falls back to IP geolocation.
-// Default (on failure) is Hebrew.
+// Synchronous check determines if we KNOW the user wants Hebrew.
+// If yes → show spinner + redirect immediately (fast, no flash).
+// If unknown → render Home immediately, detect IP in background.
+// This avoids a 1-3 second spinner (which killed mobile LCP).
 function GeoDetectHome() {
   const navigate = useNavigate();
-  const [ready, setReady] = useState(false);
+
+  // Synchronous: do we already know the user wants Hebrew?
+  const knownHe = (() => {
+    const s = localStorage.getItem(LANG_PREF_KEY);
+    if (s === 'he') return true;
+    if (!s && (navigator.language ?? '').toLowerCase().startsWith('he')) return true;
+    return false;
+  })();
 
   useEffect(() => {
     const stored = localStorage.getItem(LANG_PREF_KEY);
-    if (stored) {
-      if (stored === 'he') {
-        navigate('/he', { replace: true });
-      } else {
-        setReady(true); // show English home
-      }
+
+    if (stored === 'he') {
+      navigate('/he', { replace: true });
       return;
     }
 
-    // Fast path: browser language preference (instant, no network call)
     const browserLang = navigator.language ?? '';
-    if (browserLang.toLowerCase().startsWith('he')) {
+    if (!stored && browserLang.toLowerCase().startsWith('he')) {
       localStorage.setItem(LANG_PREF_KEY, 'he');
       navigate('/he', { replace: true });
       return;
     }
 
-    // Detect country via free IP geolocation API
+    if (stored === 'en') return; // already know → stay on English Home
+
+    // Unknown first-time visitor: Home is already rendered.
+    // Detect country in background — redirect only if Israel.
     fetch('https://ipapi.co/country/')
       .then((r) => r.text())
       .then((country) => {
         const lang = country.trim() === 'IL' ? 'he' : 'en';
         localStorage.setItem(LANG_PREF_KEY, lang);
-        if (lang === 'he') {
-          navigate('/he', { replace: true });
-        } else {
-          setReady(true);
-        }
+        if (lang === 'he') navigate('/he', { replace: true });
+        // if 'en', stay (Home is already visible)
       })
       .catch(() => {
-        // Default: Hebrew
         localStorage.setItem(LANG_PREF_KEY, 'he');
         navigate('/he', { replace: true });
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!ready) return <PageLoader />;
+  if (knownHe) return <PageLoader />;
   return <Home />;
 }
 
