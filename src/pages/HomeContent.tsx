@@ -8,6 +8,7 @@ import PartnerBubbles from '../components/PartnerBubbles';
 
 import { useSectionVisible } from '../hooks/useSectionVisible';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useSEO } from '../hooks/useSEO';
 import { MARKETING } from '../lib/analyticsEvents';
 
 // Lazy load heavy components below the fold
@@ -212,6 +213,16 @@ function FooterSkeleton() {
 export default function HomeContent() {
   const { t, direction, language } = useLanguage();
   const { track } = useAnalytics();
+
+  useSEO({
+    title: language === 'he'
+      ? 'Nexus — תשתית פיננסית לעסקים מודרניים'
+      : 'Nexus — Financial Infrastructure for Modern Business',
+    description: language === 'he'
+      ? 'Nexus מספקת תשלומים, הנפקת כרטיסים, תוכניות נאמנות והטבות ארגוניות ל-50M+ עסקים ב-135+ מטבעות.'
+      : 'Nexus provides payment processing, card issuance, loyalty programs, and corporate benefits for 50M+ businesses in 135+ currencies.',
+    canonical: language === 'he' ? 'https://nexus-payment.com/he' : 'https://nexus-payment.com/',
+  });
 
   // Differential loading: each section's JS chunk only loads when the user
   // is within rootMargin distance of that section. '400px 0px' means 400px

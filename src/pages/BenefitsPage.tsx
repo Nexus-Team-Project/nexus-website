@@ -12,6 +12,7 @@ import StoryInsightsCarousel from '../components/benefits/StoryInsightsCarousel'
 import StoryGiftCards from '../components/benefits/StoryGiftCards';
 import StoryNearbyMap from '../components/benefits/StoryNearbyMap';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useSEO } from '../hooks/useSEO';
 
 const Footer = lazy(() => import('../components/Footer'));
 
@@ -86,6 +87,14 @@ export default function BenefitsPage() {
   const signupLink = he ? '/he/signup' : '/signup';
 
   useScrollReveal();
+
+  useSEO({
+    title: he ? 'מועדון הטבות ארגוני — Nexus' : 'Corporate Benefits Club — Nexus',
+    description: he
+      ? 'הפעילו מועדון הטבות white-label לארגון שלכם. מאות הנחות בלעדיות, גיפט קארדס דיגיטליים, קאשבק ונאמנות לעובדים — הכל בפלטפורמה אחת.'
+      : 'Launch a white-label benefits club for your organization. Exclusive discounts, digital gift cards, cashback, and loyalty rewards for your employees — all in one platform.',
+    canonical: he ? 'https://nexus-payment.com/he/benefits' : 'https://nexus-payment.com/benefits',
+  });
 
   // ─── Gallery scroll state ─────────────────────────────
   const scrollRef = useRef<HTMLDivElement>(null);

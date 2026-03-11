@@ -7,6 +7,7 @@ import Footer from '../components/Footer';
 import BlogSubscribeSection from '../components/BlogSubscribeSection';
 import { getArticles } from '../data/blog';
 import type { Article, ArticleCategory } from '../data/blog';
+import { useSEO } from '../hooks/useSEO';
 
 const CATEGORY_COLORS: Record<ArticleCategory, string> = {
   gifts: 'bg-purple-100 text-purple-700',
@@ -31,13 +32,15 @@ export default function BlogListContent() {
   const featured = filtered[0];
   const rest = filtered.slice(1);
 
-  // Set document title
-  useEffect(() => {
-    document.title =
-      language === 'he'
-        ? 'בלוג | Nexus – תשתיות נאמנות ותשלומים'
-        : 'Blog | Nexus – Loyalty & Payments Infrastructure';
-  }, [language]);
+  useSEO({
+    title: language === 'he'
+      ? 'בלוג | Nexus – תשתיות נאמנות ותשלומים'
+      : 'Blog | Nexus – Loyalty & Payments Infrastructure',
+    description: language === 'he'
+      ? 'תובנות על פינטק, הטבות לעובדים, תוכניות נאמנות, תשתיות תשלומים ורווחת עובדים מצוות Nexus.'
+      : 'Insights on fintech, employee benefits, loyalty programs, payment infrastructure, and organizational welfare from the Nexus team.',
+    canonical: language === 'he' ? 'https://nexus-payment.com/he/blog' : 'https://nexus-payment.com/blog',
+  });
 
   const categoryLabel = (cat: ArticleCategory | 'all') => {
     const labels: Record<string, Record<string, string>> = {

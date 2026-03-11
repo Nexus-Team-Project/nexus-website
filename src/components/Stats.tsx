@@ -2,10 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const getStats = (t: any) => [
-  { value: 250, suffix: 'M+', label: t.stats.apiRequests },
   { value: 135, suffix: '+', label: t.stats.currenciesAndPayment },
   { value: 99.99, suffix: '%', label: t.stats.uptimeSLA, decimals: 2 },
-  { value: 35, suffix: '+', label: t.stats.countriesAcquiring },
+  { value: 160, suffix: '+', label: t.stats.benefitsPartners },
 ];
 
 export default function Stats() {
@@ -15,7 +14,7 @@ export default function Stats() {
   return (
     <section className="py-24 bg-stripe-light">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 lg:gap-12">
           {stats.map((stat, index) => (
             <StatCounter
               key={stat.label}

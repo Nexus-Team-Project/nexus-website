@@ -7,6 +7,7 @@ import PartnerRingsAnimation from '../components/PartnerRingsAnimation';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { useSEO } from '../hooks/useSEO';
 
 const Footer = lazy(() => import('../components/Footer'));
 
@@ -26,6 +27,15 @@ export default function PartnersPage() {
   const { t, language, direction } = useLanguage();
   const { user, isLoading: authLoading } = useAuth();
   const isLoggedIn = !!user;
+  const he = language === 'he';
+
+  useSEO({
+    title: he ? 'רשת שותפים — Nexus' : 'Partner Network — Nexus',
+    description: he
+      ? 'גלו את רשת השותפים של Nexus. 160+ מותגים מובילים — Airbnb, Nike, Garmin, קרפור ועוד — לתוכניות הטבות ונאמנות שמשתלמות באמת.'
+      : 'Explore the Nexus partner network. 160+ leading brands — Airbnb, Nike, Garmin, Carrefour and more — for benefits and loyalty programs with real value.',
+    canonical: he ? 'https://nexus-payment.com/he/partners' : 'https://nexus-payment.com/partners',
+  });
 
   const [partners, setPartners] = useState<Partner[]>([]);
   const [loading, setLoading] = useState(true);
