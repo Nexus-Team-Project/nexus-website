@@ -42,9 +42,6 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
-  // Agent Gateway — optional (agent endpoints disabled when absent)
-  SEO_AGENT_API_KEY: z.string().min(32).optional(),
-  AGENT_SERVICE_URL: z.string().url().optional(),
 });
 
 // Validate on startup — crash fast if core vars missing
@@ -66,7 +63,6 @@ const optional = {
   'WhatsApp Notifications': env.WHATSAPP_TOKEN,
   'Apollo Enrichment': env.APOLLO_API_KEY,
   'Email (SendPulse)': env.SENDPULSE_CLIENT_ID,
-  'Agent Gateway': env.SEO_AGENT_API_KEY,
 };
 for (const [feature, key] of Object.entries(optional)) {
   if (!key) console.warn(`⚠️  ${feature} disabled — env var not set`);

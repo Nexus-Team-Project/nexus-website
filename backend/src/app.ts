@@ -19,8 +19,6 @@ import webhookRoutes from './routes/webhook.routes';
 import paymentsRoutes from './routes/payments.routes';
 import partnersRoutes from './routes/partners.route';
 import userRoutes from './routes/user.routes';
-import agentRoutes from './routes/agent.routes';
-
 const app = express();
 app.set('trust proxy', 1);
 
@@ -47,7 +45,7 @@ app.use(
 // ─── CORS ────────────────────────────────────────────────
 app.use(
   cors({
-    origin: [env.FRONTEND_URL, ...(env.AGENT_SERVICE_URL ? [env.AGENT_SERVICE_URL] : [])],
+    origin: [env.FRONTEND_URL],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-anonymous-id', 'x-agent-key'],
@@ -83,7 +81,6 @@ app.use('/api/admin/ai', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/partners', partnersRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/agent', agentRoutes);
 
 // ─── Serve frontend (SPA) ─────────────────────────────────
 const frontendDist = path.resolve(__dirname, '../public');
