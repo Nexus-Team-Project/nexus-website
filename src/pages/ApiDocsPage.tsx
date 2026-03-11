@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react';
 import { Copy, Check, ChevronRight, Lock, Zap, Globe, Code, Terminal, Book } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import { useLanguage } from '../i18n/LanguageContext';
+import { useSEO } from '../hooks/useSEO';
 
 const Footer = lazy(() => import('../components/Footer'));
 
@@ -390,9 +391,13 @@ export default function ApiDocsPage() {
 
   useScrollReveal();
 
-  useEffect(() => {
-    document.title = `${tx.pageTitle} | Nexus`;
-  }, [tx.pageTitle]);
+  useSEO({
+    title: `${tx.pageTitle} | Nexus`,
+    description: isRTL
+      ? 'תיעוד API מלא של Nexus. שלבו תשלומים, הנפקת כרטיסים, תוכניות נאמנות והטבות ארגוניות לתוך הפלטפורמה שלכם.'
+      : 'Comprehensive API documentation for Nexus. Integrate payments, card issuance, loyalty programs, and corporate benefits into your platform.',
+    canonical: isRTL ? 'https://nexus-payment.com/he/docs' : 'https://nexus-payment.com/docs',
+  });
 
   const scrollTo = (id: string) => {
     setActiveSection(id);

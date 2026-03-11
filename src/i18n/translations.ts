@@ -342,10 +342,9 @@ export const translations = {
       label2: 'Businesses',
       metric3: '135+',
       label3: 'Currencies',
-      apiRequests: 'API requests per day',
       currenciesAndPayment: 'Currencies & payment methods',
       uptimeSLA: 'Uptime SLA',
-      countriesAcquiring: 'Countries with local acquiring',
+      benefitsPartners: 'Benefits partners',
     },
     globalSection: {
       title: 'Ready to get started?',
@@ -817,10 +816,9 @@ export const translations = {
       label2: 'עסקים',
       metric3: '+135',
       label3: 'מטבעות',
-      apiRequests: 'בקשות API ביום',
       currenciesAndPayment: 'מטבעות ושיטות תשלום',
       uptimeSLA: 'SLA זמן פעילות',
-      countriesAcquiring: 'מדינות עם רכישה מקומית',
+      benefitsPartners: 'שותפי הטבות',
     },
     globalSection: {
       title: 'מוכנים להתחיל?',
