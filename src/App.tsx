@@ -43,10 +43,15 @@ const ChangelogPageHe    = lazy(() => import('./pages/ChangelogHe'));
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
 // ─── Subdomain-aware root route ───────────────────────────
-// docs.nexus-payment.com → ApiDocsPage (EN)
+// docs.nexus-payment.com → ApiDocsPage (EN), rendered directly — no redirect,
+// so the URL stays at "/" and there is no "docs/docs" confusion.
 function RootRoute() {
   if (window.location.hostname === 'docs.nexus-payment.com') {
-    return <Navigate to="/docs" replace />;
+    return (
+      <LanguageProvider language="en">
+        <ApiDocsPage />
+      </LanguageProvider>
+    );
   }
   return <GeoDetectHome />;
 }
