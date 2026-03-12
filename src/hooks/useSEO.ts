@@ -23,21 +23,21 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
     document.title = title;
 
     // ── Favicon override ──────────────────────────────────────────────────
-    // Hide existing favicon links and inject a fresh one with the correct type,
-    // so the browser actually picks up the new icon (changing href on an svg link
-    // doesn't work because the MIME type stays image/svg+xml).
-    let injectedFavicon: HTMLLinkElement | null = null;
+    // To reliably change the favicon in Chrome/Firefox we must:
+    //   1. Physically remove all existing icon links (renaming rel is not enough —
+    //      the browser keeps the cached icon in memory).
+    //   2. Inject a fresh link with a cache-busting query so the browser fetches
+    //      the new file even if it previously cached the old one.
     const existingFaviconLinks = Array.from(
-      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'),
+      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"]'),
     );
+    let injectedFavicon: HTMLLinkElement | null = null;
     if (favicon) {
-      existingFaviconLinks.forEach((l) => l.setAttribute('data-favicon-hidden', 'true'));
-      existingFaviconLinks.forEach((l) => { l.rel = 'icon-disabled'; });
+      existingFaviconLinks.forEach((l) => l.remove());
       injectedFavicon = document.createElement('link');
       injectedFavicon.rel = 'icon';
       injectedFavicon.type = 'image/png';
-      injectedFavicon.href = favicon;
-      injectedFavicon.setAttribute('data-favicon-override', 'true');
+      injectedFavicon.href = `${favicon}?v=${Date.now()}`;
       document.head.appendChild(injectedFavicon);
     }
 
@@ -95,14 +95,11 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
       if (xDefault) addHreflang('x-default', xDefault);
     }
 
-    // Cleanup: restore original favicons and remove hreflang links on unmount
+    // Cleanup: remove injected favicon, restore originals, remove hreflang links
     return () => {
       if (favicon) {
         injectedFavicon?.remove();
-        existingFaviconLinks.forEach((l) => {
-          l.rel = 'icon';
-          l.removeAttribute('data-favicon-hidden');
-        });
+        existingFaviconLinks.forEach((l) => document.head.appendChild(l));
       }
       document.querySelectorAll('link[data-hreflang]').forEach((el) => el.remove());
     };
