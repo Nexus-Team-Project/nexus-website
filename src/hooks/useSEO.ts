@@ -4,6 +4,8 @@ interface SEOProps {
   title: string;
   description: string;
   canonical?: string;
+  /** Override the favicon for this page. Pass the public-folder path, e.g. "/nexus-api-favicon.png". */
+  favicon?: string;
   /** hreflang alternate URLs. Provide both to declare bilingual equivalents. */
   alternates?: {
     en?: string;
@@ -15,10 +17,19 @@ interface SEOProps {
  * Sets document title, meta description, canonical URL, og tags,
  * and hreflang alternate links for bilingual pages.
  */
-export function useSEO({ title, description, canonical, alternates }: SEOProps) {
+export function useSEO({ title, description, canonical, favicon, alternates }: SEOProps) {
   useEffect(() => {
     // ── Title ──────────────────────────────────────────────────────────────
     document.title = title;
+
+    // ── Favicon override ──────────────────────────────────────────────────
+    const faviconLinks = Array.from(
+      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'),
+    );
+    const originalHrefs = faviconLinks.map((l) => l.href);
+    if (favicon) {
+      faviconLinks.forEach((l) => { l.href = favicon; });
+    }
 
     // ── Meta description ───────────────────────────────────────────────────
     let metaDesc = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
@@ -74,11 +85,14 @@ export function useSEO({ title, description, canonical, alternates }: SEOProps) 
       if (xDefault) addHreflang('x-default', xDefault);
     }
 
-    // Cleanup: remove hreflang links when component unmounts
+    // Cleanup: restore original favicon and remove hreflang links on unmount
     return () => {
+      if (favicon) {
+        faviconLinks.forEach((l, i) => { l.href = originalHrefs[i]; });
+      }
       document.querySelectorAll('link[data-hreflang]').forEach((el) => el.remove());
     };
-  }, [title, description, canonical, alternates?.en, alternates?.he]);
+  }, [title, description, canonical, favicon, alternates?.en, alternates?.he]);
 }
 
 // Re-export so callers don't need a separate import

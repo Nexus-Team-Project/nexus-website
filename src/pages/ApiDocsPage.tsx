@@ -397,6 +397,7 @@ export default function ApiDocsPage() {
       ? 'תיעוד API מלא של Nexus. שלבו תשלומים, הנפקת כרטיסים, תוכניות נאמנות והטבות ארגוניות לתוך הפלטפורמה שלכם.'
       : 'Comprehensive API documentation for Nexus. Integrate payments, card issuance, loyalty programs, and corporate benefits into your platform.',
     canonical: isRTL ? 'https://nexus-payment.com/he/docs' : 'https://nexus-payment.com/docs',
+    favicon: '/nexus-api-favicon.png',
   });
 
   const scrollTo = (id: string) => {
