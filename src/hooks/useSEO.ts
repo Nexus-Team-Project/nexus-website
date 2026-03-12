@@ -37,6 +37,7 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
       injectedFavicon = document.createElement('link');
       injectedFavicon.rel = 'icon';
       injectedFavicon.type = 'image/png';
+      injectedFavicon.setAttribute('sizes', '64x64');
       injectedFavicon.href = `${favicon}?v=${Date.now()}`;
       document.head.appendChild(injectedFavicon);
     }
