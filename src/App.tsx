@@ -42,6 +42,15 @@ const ChangelogPageHe    = lazy(() => import('./pages/ChangelogHe'));
 
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
+// ─── Subdomain-aware root route ───────────────────────────
+// docs.nexus-payment.com → ApiDocsPage (EN)
+function RootRoute() {
+  if (window.location.hostname === 'docs.nexus-payment.com') {
+    return <Navigate to="/docs" replace />;
+  }
+  return <GeoDetectHome />;
+}
+
 // ─── Geo-language detection for root route ────────────────
 // Synchronous check determines if we KNOW the user wants Hebrew.
 // If yes → show spinner + redirect immediately (fast, no flash).
@@ -274,7 +283,7 @@ function App() {
       <RouteAnalytics />
       <Suspense fallback={<PageLoader />}>
         <Routes>
-          <Route path="/"         element={<GeoDetectHome />} />
+          <Route path="/"         element={<RootRoute />} />
           <Route path="/he"       element={<HomeHe />} />
           {/* ── Auth ─────────────────────────────────────────── */}
           <Route path="/signup"   element={<LanguageGate><LanguageProvider language="en"><Signup /></LanguageProvider></LanguageGate>} />
