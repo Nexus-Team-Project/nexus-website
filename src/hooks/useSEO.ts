@@ -23,12 +23,22 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
     document.title = title;
 
     // ── Favicon override ──────────────────────────────────────────────────
-    const faviconLinks = Array.from(
+    // Hide existing favicon links and inject a fresh one with the correct type,
+    // so the browser actually picks up the new icon (changing href on an svg link
+    // doesn't work because the MIME type stays image/svg+xml).
+    let injectedFavicon: HTMLLinkElement | null = null;
+    const existingFaviconLinks = Array.from(
       document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]'),
     );
-    const originalHrefs = faviconLinks.map((l) => l.href);
     if (favicon) {
-      faviconLinks.forEach((l) => { l.href = favicon; });
+      existingFaviconLinks.forEach((l) => l.setAttribute('data-favicon-hidden', 'true'));
+      existingFaviconLinks.forEach((l) => { l.rel = 'icon-disabled'; });
+      injectedFavicon = document.createElement('link');
+      injectedFavicon.rel = 'icon';
+      injectedFavicon.type = 'image/png';
+      injectedFavicon.href = favicon;
+      injectedFavicon.setAttribute('data-favicon-override', 'true');
+      document.head.appendChild(injectedFavicon);
     }
 
     // ── Meta description ───────────────────────────────────────────────────
@@ -85,10 +95,14 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
       if (xDefault) addHreflang('x-default', xDefault);
     }
 
-    // Cleanup: restore original favicon and remove hreflang links on unmount
+    // Cleanup: restore original favicons and remove hreflang links on unmount
     return () => {
       if (favicon) {
-        faviconLinks.forEach((l, i) => { l.href = originalHrefs[i]; });
+        injectedFavicon?.remove();
+        existingFaviconLinks.forEach((l) => {
+          l.rel = 'icon';
+          l.removeAttribute('data-favicon-hidden');
+        });
       }
       document.querySelectorAll('link[data-hreflang]').forEach((el) => el.remove());
     };
