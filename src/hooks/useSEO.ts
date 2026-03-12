@@ -32,14 +32,27 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
       document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"]'),
     );
     let injectedFavicon: HTMLLinkElement | null = null;
+    let injectedFaviconSvgSlot: HTMLLinkElement | null = null;
     if (favicon) {
+      const v = Date.now();
       existingFaviconLinks.forEach((l) => l.remove());
+
+      // PNG link — used by Firefox and most browsers
       injectedFavicon = document.createElement('link');
       injectedFavicon.rel = 'icon';
       injectedFavicon.type = 'image/png';
       injectedFavicon.setAttribute('sizes', '64x64');
-      injectedFavicon.href = `${favicon}?v=${Date.now()}`;
+      injectedFavicon.href = `${favicon}?v=${v}`;
       document.head.appendChild(injectedFavicon);
+
+      // SVG-type slot pointing to the same PNG — Chrome internally prefers
+      // image/svg+xml entries and will keep showing the old SVG from its
+      // favicon database unless we explicitly replace the SVG slot too.
+      injectedFaviconSvgSlot = document.createElement('link');
+      injectedFaviconSvgSlot.rel = 'icon';
+      injectedFaviconSvgSlot.type = 'image/svg+xml';
+      injectedFaviconSvgSlot.href = `${favicon}?v=${v}`;
+      document.head.appendChild(injectedFaviconSvgSlot);
     }
 
     // ── Meta description ───────────────────────────────────────────────────
@@ -100,6 +113,7 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
     return () => {
       if (favicon) {
         injectedFavicon?.remove();
+        injectedFaviconSvgSlot?.remove();
         existingFaviconLinks.forEach((l) => document.head.appendChild(l));
       }
       document.querySelectorAll('link[data-hreflang]').forEach((el) => el.remove());
