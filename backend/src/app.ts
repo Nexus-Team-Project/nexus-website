@@ -4,7 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import path from 'path';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -104,9 +104,23 @@ if (existsSync(frontendDist)) {
       },
     }),
   );
-  app.get(/^(?!\/api).*/, (_req, res) => {
+  app.get(/^(?!\/api).*/, (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile(path.join(frontendDist, 'index.html'));
+    const indexPath = path.join(frontendDist, 'index.html');
+    // Serve docs subdomain with the purple API favicon injected at the HTML level,
+    // so the browser sets the correct favicon before any JavaScript loads.
+    if (req.hostname === 'docs.nexus-payment.com') {
+      const html = readFileSync(indexPath, 'utf-8')
+        .replace(/<link rel="icon" type="image\/svg\+xml"[^>]*>/g, '')
+        .replace(
+          /<link rel="icon" type="image\/png"[^>]*>/g,
+          '<link rel="icon" type="image/png" sizes="64x64" href="/nexus-api-favicon.png" />',
+        );
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } else {
+      res.sendFile(indexPath);
+    }
   });
 }
 
