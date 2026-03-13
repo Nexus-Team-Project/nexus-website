@@ -93,22 +93,22 @@ if (existsSync(frontendDist)) {
       immutable: true,
     }),
   );
+  // index: false — prevents express.static from serving index.html for directory
+  // paths (e.g. "/"), so every HTML request reaches the catch-all below where we
+  // can inject the correct favicon per subdomain.
   app.use(
     express.static(frontendDist, {
       redirect: false,
+      index: false,
       maxAge: '1h',
-      setHeaders(res, filePath) {
-        if (filePath.endsWith('index.html')) {
-          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-        }
-      },
     }),
   );
   app.get(/^(?!\/api).*/, (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     const indexPath = path.join(frontendDist, 'index.html');
-    // Serve docs subdomain with the purple API favicon injected at the HTML level,
-    // so the browser sets the correct favicon before any JavaScript loads.
+    // Docs subdomain: inject the purple API favicon directly into the HTML so the
+    // browser shows the correct icon before any JavaScript loads (no race condition
+    // with Chrome's internal SVG fetch).
     if (req.hostname === 'docs.nexus-payment.com') {
       const html = readFileSync(indexPath, 'utf-8')
         .replace(/<link rel="icon" type="image\/svg\+xml"[^>]*>/g, '')
