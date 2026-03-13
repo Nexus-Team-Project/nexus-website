@@ -36,17 +36,8 @@ export function useSEO({ title, description, canonical, favicon, alternates }: S
     pngLink.href = `${favicon}?v=${v}`;
     document.head.appendChild(pngLink);
 
-    // SVG-type slot pointing to the same PNG — Chrome internally prefers
-    // image/svg+xml and keeps showing the old SVG unless we replace this slot too.
-    const svgSlot = document.createElement('link');
-    svgSlot.rel = 'icon';
-    svgSlot.type = 'image/svg+xml';
-    svgSlot.href = `${favicon}?v=${v}`;
-    document.head.appendChild(svgSlot);
-
     return () => {
       pngLink.remove();
-      svgSlot.remove();
       existingFaviconLinks.forEach((l) => document.head.appendChild(l));
     };
   }, [favicon]);
