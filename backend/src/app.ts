@@ -109,15 +109,31 @@ if (existsSync(frontendDist)) {
     // Docs subdomain: inject the purple API favicon directly into the HTML so the
     // browser shows the correct icon before any JavaScript loads (no race condition
     // with Chrome's internal SVG fetch).
-    if (req.hostname === 'docs.nexus-payment.com') {
-      const html = readFileSync(indexPath, 'utf-8')
-        .replace(/<link rel="icon" type="image\/svg\+xml"[^>]*>/g, '')
-        .replace(
-          /<link rel="icon" type="image\/png"[^>]*>/g,
-          '<link rel="icon" type="image/png" sizes="64x64" href="/nexus-api-favicon.png" />',
-        );
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.send(html);
+    // Defensive hostname check covers: Railway not forwarding X-Forwarded-Host,
+    // proxies that set Host directly, and req.hostname from Express trust-proxy.
+    const isDocsDomain =
+      req.hostname === 'docs.nexus-payment.com' ||
+      req.headers['x-forwarded-host'] === 'docs.nexus-payment.com' ||
+      req.get('host') === 'docs.nexus-payment.com';
+    if (isDocsDomain) {
+      try {
+        const raw = readFileSync(indexPath, 'utf-8');
+        // Strip ALL existing icon links regardless of attribute order, then
+        // inject a single authoritative entry for the purple PNG favicon.
+        const html = raw
+          .replace(/<link[^>]+rel=["']icon["'][^>]*\/?>/g, '')
+          .replace(/<link[^>]+rel=["']shortcut icon["'][^>]*\/?>/g, '')
+          .replace(
+            '</head>',
+            '<link rel="icon" type="image/png" sizes="64x64" href="/nexus-api-favicon.png" />\n  </head>',
+          );
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(html);
+      } catch {
+        // If readFileSync fails (e.g. file not yet written), fall back to
+        // sending the file directly so the server never crashes.
+        res.sendFile(indexPath);
+      }
     } else {
       res.sendFile(indexPath);
     }
