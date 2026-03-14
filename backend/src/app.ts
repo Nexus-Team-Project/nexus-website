@@ -84,6 +84,28 @@ app.use('/api/user', userRoutes);
 
 // ─── Serve frontend (SPA) ─────────────────────────────────
 const frontendDist = path.resolve(__dirname, '../public');
+
+// 1x1 transparent PNG — returned instead of the real favicon files when the
+// request comes from docs.nexus-payment.com.  This is the ONLY reliable way to
+// replace what Chrome has stored in its internal Favicons SQLite cache:
+// express.static would serve the file BEFORE the catch-all ever runs, so we
+// must intercept favicon requests here — before registering express.static.
+const TRANSPARENT_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+);
+const isDocsDomain = (req: express.Request) =>
+  req.hostname === 'docs.nexus-payment.com' ||
+  req.headers['x-forwarded-host'] === 'docs.nexus-payment.com' ||
+  req.get('host') === 'docs.nexus-payment.com';
+
+app.get(['/nexus-favicon.svg', '/nexus-favicon.png', '/favicon.ico'], (req, res, next) => {
+  if (!isDocsDomain(req)) return next();
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.send(TRANSPARENT_PNG);
+});
+
 if (existsSync(frontendDist)) {
   app.use(
     '/assets',
