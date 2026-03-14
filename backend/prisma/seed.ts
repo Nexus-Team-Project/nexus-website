@@ -6,24 +6,26 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // ─── Enable pgvector extension ────────────────────────────
-  await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector;');
-  console.log('✅ pgvector extension enabled');
+  // ─── Enable pgvector extension (optional — may not be available on all hosts) ──
+  try {
+    await prisma.$executeRawUnsafe('CREATE EXTENSION IF NOT EXISTS vector;');
+    console.log('✅ pgvector extension enabled');
 
-  // ─── Ensure embedding column exists on KnowledgeChunk ─────
-  // pgvector column isn't managed by Prisma — add it manually if missing
-  await prisma.$executeRawUnsafe(`
-    DO $$
-    BEGIN
-      IF NOT EXISTS (
-        SELECT 1 FROM information_schema.columns
-        WHERE table_name = 'KnowledgeChunk' AND column_name = 'embedding'
-      ) THEN
-        ALTER TABLE "KnowledgeChunk" ADD COLUMN embedding vector(1536);
-      END IF;
-    END $$;
-  `);
-  console.log('✅ embedding column ensured on KnowledgeChunk');
+    await prisma.$executeRawUnsafe(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'KnowledgeChunk' AND column_name = 'embedding'
+        ) THEN
+          ALTER TABLE "KnowledgeChunk" ADD COLUMN embedding vector(1536);
+        END IF;
+      END $$;
+    `);
+    console.log('✅ embedding column ensured on KnowledgeChunk');
+  } catch {
+    console.log('⚠️  pgvector not available — skipping vector extension setup');
+  }
 
   // ─── Default AI system prompt ─────────────────────────────
   await prisma.aiConfig.upsert({
@@ -436,7 +438,58 @@ async function main() {
     console.log(`⏭️  Partners already seeded (${existingPartners} rows) — skipping`);
   }
 
+  // ─── Blog Articles ────────────────────────────────────────
+  await seedBlogArticlesIfEmpty();
+
   console.log('🌱 Seed complete!');
+}
+
+async function seedBlogArticlesIfEmpty() {
+  const existing = await prisma.blogArticle.count();
+  if (existing > 0) {
+    console.log(`⏭️  Blog articles already seeded (${existing} rows) — skipping`);
+    return;
+  }
+
+  // Dynamic import to avoid rootDir restrictions
+  // @ts-ignore
+  const { articlesEn } = await import('../../src/data/blog/articles-en');
+  // @ts-ignore
+  const { articlesHe } = await import('../../src/data/blog/articles-he');
+
+  const allArticles = [
+    ...articlesEn.map((a: any) => ({ ...a, lang: 'en' })),
+    ...articlesHe.map((a: any) => ({ ...a, lang: 'he' })),
+  ];
+
+  for (const article of allArticles) {
+    await prisma.blogArticle.upsert({
+      where: { slug_lang: { slug: article.slug, lang: article.lang } },
+      create: {
+        slug: article.slug,
+        lang: article.lang,
+        status: 'PUBLISHED',
+        title: article.title,
+        subtitle: article.subtitle ?? null,
+        excerpt: article.excerpt ?? null,
+        heroImage: article.heroImage ?? null,
+        metaTitle: article.metaTitle ?? null,
+        metaDescription: article.metaDescription ?? null,
+        category: article.category ?? null,
+        authorName: article.author?.name ?? null,
+        authorRole: article.author?.role ?? null,
+        authorAvatar: article.author?.avatar ?? null,
+        publishDate: article.publishDate ? new Date(article.publishDate) : null,
+        readTime: article.readTime ?? null,
+        sectionsJson: article.sections ?? [],
+        faqJson: article.faq ?? null,
+        publishedAt: article.publishDate ? new Date(article.publishDate) : new Date(),
+      },
+      update: {},
+    });
+  }
+
+  console.log(`✅ ${allArticles.length} blog articles seeded`);
 }
 
 main()

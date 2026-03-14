@@ -19,6 +19,10 @@ import webhookRoutes from './routes/webhook.routes';
 import paymentsRoutes from './routes/payments.routes';
 import partnersRoutes from './routes/partners.route';
 import userRoutes from './routes/user.routes';
+import blogRoutes from './routes/blog.routes';
+import agentApprovalsRoutes from './routes/agent-approvals.routes';
+import seoRoutes from './routes/seo.routes';
+import { prisma } from './config/database';
 const app = express();
 app.set('trust proxy', 1);
 
@@ -81,6 +85,77 @@ app.use('/api/admin/ai', adminRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/partners', partnersRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/blog', blogRoutes);
+app.use('/api/admin/agent-requests', agentApprovalsRoutes);
+app.use('/api/seo', seoRoutes);
+
+// ─── Dynamic sitemap.xml (must be before static middleware) ──────────────────
+app.get('/sitemap.xml', async (_req, res, next) => {
+  try {
+    const publishedArticles = await prisma.blogArticle.findMany({
+      where: { status: 'PUBLISHED' },
+      select: { slug: true, lang: true, updatedAt: true },
+      orderBy: { publishedAt: 'desc' },
+    });
+
+    const today = new Date().toISOString().split('T')[0];
+
+    const staticPages = [
+      { loc: '', changefreq: 'weekly', priority: '1.0' },
+      { loc: '/he', changefreq: 'weekly', priority: '1.0' },
+      { loc: '/payments', changefreq: 'monthly', priority: '0.9' },
+      { loc: '/he/payments', changefreq: 'monthly', priority: '0.9' },
+      { loc: '/benefits', changefreq: 'monthly', priority: '0.9' },
+      { loc: '/he/benefits', changefreq: 'monthly', priority: '0.9' },
+      { loc: '/partners', changefreq: 'weekly', priority: '0.8' },
+      { loc: '/he/partners', changefreq: 'weekly', priority: '0.8' },
+      { loc: '/docs', changefreq: 'weekly', priority: '0.8' },
+      { loc: '/he/docs', changefreq: 'weekly', priority: '0.8' },
+      { loc: '/changelog', changefreq: 'weekly', priority: '0.6' },
+      { loc: '/he/changelog', changefreq: 'weekly', priority: '0.6' },
+      { loc: '/blog', changefreq: 'daily', priority: '0.8' },
+      { loc: '/he/blog', changefreq: 'daily', priority: '0.8' },
+      { loc: '/privacy', changefreq: 'yearly', priority: '0.3' },
+      { loc: '/he/privacy', changefreq: 'yearly', priority: '0.3' },
+      { loc: '/terms', changefreq: 'yearly', priority: '0.3' },
+      { loc: '/he/terms', changefreq: 'yearly', priority: '0.3' },
+      { loc: '/accessibility', changefreq: 'yearly', priority: '0.3' },
+      { loc: '/he/accessibility', changefreq: 'yearly', priority: '0.3' },
+      { loc: '/welfare', changefreq: 'monthly', priority: '0.9' },
+      { loc: '/he/welfare', changefreq: 'monthly', priority: '0.9' },
+    ];
+
+    const articleUrls = publishedArticles.map((a) => {
+      const prefix = a.lang === 'he' ? '/he' : '';
+      const lastmod = a.updatedAt.toISOString().split('T')[0];
+      return `  <url>
+    <loc>https://nexus-payment.com${prefix}/blog/${a.slug}</loc>
+    <lastmod>${lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>`;
+    });
+
+    const staticUrls = staticPages.map((p) => `  <url>
+    <loc>https://nexus-payment.com${p.loc}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority}</priority>
+  </url>`);
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${staticUrls.join('\n')}
+${articleUrls.join('\n')}
+</urlset>`;
+
+    res.set('Content-Type', 'application/xml');
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.send(xml);
+  } catch (err) {
+    next(err);
+  }
+});
 
 // ─── Serve frontend (SPA) ─────────────────────────────────
 const frontendDist = path.resolve(__dirname, '../public');

@@ -5,7 +5,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import BlogSubscribeSection from '../components/BlogSubscribeSection';
-import { getArticleBySlug, getArticles } from '../data/blog';
+import { useBlogArticle, useBlogArticles } from '../hooks/useBlogArticles';
 import type { Article, ArticleSection } from '../data/blog';
 
 /* ─── Category helpers ─── */
@@ -21,8 +21,8 @@ export default function ArticleContent() {
   const isRTL = direction === 'rtl';
   const prefix = language === 'he' ? '/he' : '';
 
-  const article = slug ? getArticleBySlug(slug, language) : undefined;
-  const allArticles = getArticles(language);
+  const { article, loading: articleLoading } = useBlogArticle(slug, language);
+  const { articles: allArticles } = useBlogArticles(language);
 
   /* Related articles = other articles in the same category (or just the rest) */
   const related = useMemo(() => {
@@ -182,6 +182,24 @@ export default function ArticleContent() {
       document.querySelectorAll('link[data-hreflang]').forEach((el) => el.remove());
     };
   }, [article, language]);
+
+  /* ─── Loading ─── */
+  if (articleLoading) {
+    return (
+      <div className="min-h-screen bg-white" dir={direction}>
+        <Navbar variant="dark" />
+        <div className="max-w-4xl mx-auto px-6 py-32 animate-pulse">
+          <div className="h-8 bg-slate-200 rounded w-3/4 mb-6" />
+          <div className="h-4 bg-slate-200 rounded w-1/2 mb-4" />
+          <div className="h-64 bg-slate-200 rounded mb-8" />
+          <div className="space-y-3">
+            {[1,2,3,4,5].map(i => <div key={i} className="h-4 bg-slate-200 rounded" />)}
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   /* ─── 404 ─── */
   if (!article) {

@@ -460,3 +460,94 @@ model Partner {
 
   @@index([isActive])
 }
+
+// ─── BLOG ──────────────────────────────────────────────────────────
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model BlogArticle {
+  id              String        @id @default(cuid())
+  slug            String
+  lang            String        // "en" | "he"
+  status          ArticleStatus @default(DRAFT)
+  title           String        @db.Text
+  subtitle        String?       @db.Text
+  excerpt         String?       @db.Text
+  heroImage       String?
+  metaTitle       String?
+  metaDescription String?       @db.Text
+  category        String?
+  authorName      String?
+  authorRole      String?
+  authorAvatar    String?
+  publishDate     DateTime?
+  readTime        Int?
+  sectionsJson    Json          // ArticleSection[]
+  faqJson         Json?         // ArticleFAQ[]
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  publishedAt     DateTime?
+
+  @@unique([slug, lang])
+  @@index([lang, status])
+  @@index([status])
+}
+
+// ─── PAGE META OVERRIDES ───────────────────────────────────────────
+//
+// SEO meta overrides for any page on the site.
+// The agent (Tier 1) writes here; the frontend useSEO hook reads these
+// and applies them over hardcoded defaults — without requiring a new deploy.
+//
+// slug = full URL pathname: "/", "/he", "/benefits", "/he/payments", etc.
+// lang = "en" | "he" (derived from slug prefix; kept for query convenience)
+
+model PageMeta {
+  id              String   @id @default(cuid())
+  slug            String
+  lang            String   @default("en")
+  metaTitle       String?
+  metaDescription String?  @db.Text
+  ogImage         String?
+  updatedBy       String?
+  updatedAt       DateTime @updatedAt
+  createdAt       DateTime @default(now())
+
+  @@unique([slug, lang])
+  @@index([slug])
+  @@index([lang])
+}
+
+// ─── AGENT REQUESTS ────────────────────────────────────────────────
+
+enum AgentAction {
+  BLOG_PUBLISH
+  BLOG_UPDATE_PUBLISHED
+  BLOG_UNPUBLISH
+}
+
+enum AgentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+}
+
+model AgentRequest {
+  id              String             @id @default(cuid())
+  action          AgentAction
+  payload         Json
+  status          AgentRequestStatus @default(PENDING)
+  result          Json?
+  rejectionReason String?            @db.Text
+  requestedAt     DateTime           @default(now())
+  resolvedAt      DateTime?
+  resolvedBy      String?
+
+  @@index([status])
+  @@index([requestedAt])
+}

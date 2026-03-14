@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 import {
   Users, MessageSquare, TrendingUp, Percent,
   Star, Brain, CreditCard, RefreshCw, LogOut, Bell,
+  CheckCircle, XCircle, Clock,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -76,6 +77,16 @@ interface Lead {
   company: string | null;
   status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'LOST';
   createdAt: string;
+}
+
+interface AgentRequest {
+  id: string;
+  action: 'BLOG_PUBLISH' | 'BLOG_UPDATE_PUBLISHED' | 'BLOG_UNPUBLISH';
+  payload: Record<string, any>;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED';
+  requestedAt: string;
+  resolvedAt: string | null;
+  rejectionReason: string | null;
 }
 
 // ─── Sparkline (SVG) ─────────────────────────────────────
@@ -320,6 +331,8 @@ export default function AdminDashboard() {
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [agentRequests, setAgentRequests] = useState<AgentRequest[]>([]);
+  const [agentLoading, setAgentLoading] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -367,6 +380,30 @@ export default function AdminDashboard() {
     await api.post('/api/dashboard/notifications/read', { ids: notifications.map(n => n.id) }).catch(() => {});
     setNotifications([]);
     setNotifOpen(false);
+  };
+
+  const fetchAgentRequests = useCallback(async () => {
+    setAgentLoading(true);
+    try {
+      const res = await api.get<{ requests: AgentRequest[] }>('/api/admin/agent-requests?limit=50');
+      setAgentRequests(res.requests);
+    } catch {
+      // non-fatal — don't block dashboard
+    } finally {
+      setAgentLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void fetchAgentRequests(); }, [fetchAgentRequests]);
+
+  const handleAgentApprove = async (id: string) => {
+    await api.post(`/api/admin/agent-requests/${id}/approve`, {});
+    setAgentRequests(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleAgentReject = async (id: string) => {
+    await api.post(`/api/admin/agent-requests/${id}/reject`, {});
+    setAgentRequests(prev => prev.filter(r => r.id !== id));
   };
 
   if (loading) {
@@ -592,6 +629,87 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
+
+        {/* Agent Requests */}
+        {(agentLoading || agentRequests.length > 0) && (
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 overflow-hidden">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock size={15} className="text-stripe-purple" />
+              <h2 className="text-sm font-semibold text-stripe-dark">Agent Requests</h2>
+              {agentRequests.filter(r => r.status === 'PENDING').length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold">
+                  {agentRequests.filter(r => r.status === 'PENDING').length} pending
+                </span>
+              )}
+            </div>
+            {agentLoading ? (
+              <div className="h-16 animate-pulse bg-gray-50 rounded-lg" />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-stripe-gray/60 border-b border-gray-100">
+                      <th className="text-left pb-2 font-medium">Requested</th>
+                      <th className="text-left pb-2 font-medium">Action</th>
+                      <th className="text-left pb-2 font-medium">Article</th>
+                      <th className="text-left pb-2 font-medium">Status</th>
+                      <th className="text-right pb-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {agentRequests.map(req => (
+                      <tr key={req.id} className="hover:bg-stripe-light transition-colors">
+                        <td className="py-2 pr-4 text-stripe-gray/60">
+                          {new Date(req.requestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                            req.action === 'BLOG_PUBLISH'          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            req.action === 'BLOG_UPDATE_PUBLISHED' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                                     'bg-red-50 text-red-700 border-red-200'
+                          }`}>
+                            {req.action === 'BLOG_PUBLISH' ? 'Publish' : req.action === 'BLOG_UPDATE_PUBLISHED' ? 'Update Live' : 'Unpublish'}
+                          </span>
+                        </td>
+                        <td className="py-2 pr-4 text-stripe-gray font-mono text-[10px] max-w-[200px] truncate">
+                          {req.payload?.articleId ?? JSON.stringify(req.payload).slice(0, 40)}
+                        </td>
+                        <td className="py-2 pr-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
+                            req.status === 'PENDING'  ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            req.status === 'EXECUTED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                            req.status === 'REJECTED' ? 'bg-red-50 text-red-700 border-red-200' :
+                                                        'bg-gray-50 text-gray-600 border-gray-200'
+                          }`}>{req.status}</span>
+                        </td>
+                        <td className="py-2 text-right">
+                          {req.status === 'PENDING' && (
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                onClick={() => handleAgentApprove(req.id)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-[10px] font-medium border border-emerald-200"
+                              >
+                                <CheckCircle size={11} />
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleAgentReject(req.id)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-50 text-red-700 hover:bg-red-100 transition-colors text-[10px] font-medium border border-red-200"
+                              >
+                                <XCircle size={11} />
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Leads */}
         {leads.length > 0 && (
