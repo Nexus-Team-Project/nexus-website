@@ -2,6 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- On docs.nexus-payment.com: inject data:, which is a zero-fetch signal Chrome
+         respects immediately, clearing its internal favicon cache for this origin.
+         On the main site: inject the normal SVG + PNG favicon links.
+         Must run synchronously here — before any <link rel="icon"> is seen — so
+         Chrome never queues a fetch for the old nexus-favicon.svg. -->
+    <script>if(window.location.hostname==='docs.nexus-payment.com'){document.write('<link rel="icon" href="data:,">');}else{document.write('<link rel="icon" type="image/svg+xml" href="/nexus-favicon.svg"><link rel="icon" type="image/png" href="/nexus-favicon.png">');};</script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Nexus - Financial Infrastructure</title>
 
