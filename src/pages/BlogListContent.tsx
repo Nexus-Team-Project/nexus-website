@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import BlogSubscribeSection from '../components/BlogSubscribeSection';
-import { getArticles } from '../data/blog';
+import { useBlogArticles } from '../hooks/useBlogArticles';
 import type { Article, ArticleCategory } from '../data/blog';
 import { useSEO } from '../hooks/useSEO';
 
@@ -21,7 +21,7 @@ export default function BlogListContent() {
   const isRTL = direction === 'rtl';
   const prefix = language === 'he' ? '/he' : '';
 
-  const articles = getArticles(language);
+  const { articles, loading } = useBlogArticles(language);
   const [activeCategory, setActiveCategory] = useState<ArticleCategory | 'all'>('all');
 
   const filtered =
@@ -77,14 +77,19 @@ export default function BlogListContent() {
               : 'Practical guides, real-world insights, and best practices in organizational benefits, loyalty, and payments.'}
           </p>
 
+          {/* Loading skeleton */}
+          {loading && (
+            <div className="rounded-2xl overflow-hidden border border-slate-200 bg-white animate-pulse h-64" />
+          )}
+
           {/* Featured Article inside diagonal */}
-          {featured && (
+          {!loading && featured && (
             <Link
               to={`${prefix}/blog/${featured.slug}`}
               className="group block rounded-2xl overflow-hidden shadow-sm border border-slate-200 bg-white hover:shadow-lg transition-shadow"
             >
               <div className="grid md:grid-cols-5 gap-0">
-                {/* Image / gradient placeholder */}
+                {/* Image */}
                 <div className="md:col-span-3 relative h-64 md:h-auto min-h-[220px] overflow-hidden">
                   <img src={featured.heroImage} alt={featured.title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
                 </div>
@@ -93,7 +98,7 @@ export default function BlogListContent() {
                 <div className="md:col-span-2 p-8 flex flex-col justify-center">
                   <span
                     className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-4 w-fit ${
-                      CATEGORY_COLORS[featured.category]
+                      CATEGORY_COLORS[featured.category] ?? 'bg-slate-100 text-slate-700'
                     }`}
                   >
                     {categoryLabel(featured.category)}
@@ -121,7 +126,7 @@ export default function BlogListContent() {
         </div>
       </section>
 
-      {/* ─── Category Tabs (below diagonal) ─── */}
+      {/* ─── Category Tabs ─── */}
       <div className="border-b border-slate-200 bg-white sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-6">
           <nav className="flex gap-1 -mb-px overflow-x-auto">
@@ -143,7 +148,17 @@ export default function BlogListContent() {
       </div>
 
       {/* ─── Article Grid ─── */}
-      {rest.length > 0 && (
+      {loading && (
+        <section className="max-w-7xl mx-auto px-6 py-12">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-2xl border border-slate-200 bg-white animate-pulse h-72" />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {!loading && rest.length > 0 && (
         <section className="max-w-7xl mx-auto px-6 py-12">
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {rest.map((article) => (
@@ -160,7 +175,7 @@ export default function BlogListContent() {
       )}
 
       {/* ─── Empty State ─── */}
-      {filtered.length === 0 && (
+      {!loading && filtered.length === 0 && (
         <div className="max-w-7xl mx-auto px-6 py-20 text-center">
           <p className="text-slate-500 text-lg">
             {language === 'he' ? 'אין מאמרים בקטגוריה זו עדיין.' : 'No articles in this category yet.'}
@@ -168,9 +183,7 @@ export default function BlogListContent() {
         </div>
       )}
 
-      {/* ─── Subscribe / CTA Section ─── */}
       <BlogSubscribeSection />
-
       <Footer />
     </div>
   );
@@ -193,7 +206,6 @@ function ArticleCard({
       to={`${prefix}/blog/${article.slug}`}
       className="group flex flex-col rounded-2xl overflow-hidden border border-slate-200 bg-white hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
     >
-      {/* Image placeholder */}
       <div className="h-48 relative overflow-hidden">
         <img src={article.heroImage} alt={article.title} loading="lazy" className="w-full h-full object-cover" />
       </div>
@@ -201,7 +213,7 @@ function ArticleCard({
       <div className="p-6 flex flex-col flex-1">
         <span
           className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-3 w-fit ${
-            CATEGORY_COLORS[article.category]
+            CATEGORY_COLORS[article.category] ?? 'bg-slate-100 text-slate-700'
           }`}
         >
           {categoryLabel}
