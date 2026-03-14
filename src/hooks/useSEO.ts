@@ -4,8 +4,6 @@ interface SEOProps {
   title: string;
   description: string;
   canonical?: string;
-  /** Override the favicon for this page. Pass the public-folder path, e.g. "/nexus-api-favicon.png". */
-  favicon?: string;
   /** hreflang alternate URLs. Provide both to declare bilingual equivalents. */
   alternates?: {
     en?: string;
@@ -17,32 +15,7 @@ interface SEOProps {
  * Sets document title, meta description, canonical URL, og tags,
  * and hreflang alternate links for bilingual pages.
  */
-export function useSEO({ title, description, canonical, favicon, alternates }: SEOProps) {
-  // ── Favicon — isolated effect so title/description changes don't cause flicker ──
-  useEffect(() => {
-    if (!favicon) return;
-
-    const existingFaviconLinks = Array.from(
-      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="shortcut icon"]'),
-    );
-    const v = Date.now();
-    existingFaviconLinks.forEach((l) => l.remove());
-
-    // PNG link — used by Firefox and most browsers
-    const pngLink = document.createElement('link');
-    pngLink.rel = 'icon';
-    pngLink.type = 'image/png';
-    pngLink.setAttribute('sizes', '64x64');
-    pngLink.href = `${favicon}?v=${v}`;
-    document.head.appendChild(pngLink);
-
-    return () => {
-      pngLink.remove();
-      existingFaviconLinks.forEach((l) => document.head.appendChild(l));
-    };
-  }, [favicon]);
-
-  // ── Title, meta, OG, canonical, hreflang ──────────────────────────────────
+export function useSEO({ title, description, canonical, alternates }: SEOProps) {
   useEffect(() => {
     document.title = title;
 
