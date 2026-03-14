@@ -416,6 +416,38 @@ export default function ArticleContent() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
+   Inline text renderer — parses [text](url) markdown links into React nodes
+   ═══════════════════════════════════════════════════════════════════════════════ */
+
+function InlineText({ text }: { text: string }) {
+  // Split on markdown link pattern [text](url)
+  const parts = text.split(/(\[[^\]]+\]\([^)]+\))/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        const match = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+        if (!match) return <span key={i}>{part}</span>;
+        const [, label, href] = match;
+        const isInternal = href.startsWith('/');
+        if (isInternal) {
+          return (
+            <Link key={i} to={href} className="text-[#635BFF] hover:underline font-medium">
+              {label}
+            </Link>
+          );
+        }
+        return (
+          <a key={i} href={href} target="_blank" rel="noopener noreferrer"
+            className="text-[#635BFF] hover:underline font-medium">
+            {label}
+          </a>
+        );
+      })}
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
    Section Renderer — renders one ArticleSection
    ═══════════════════════════════════════════════════════════════════════════════ */
 
@@ -444,7 +476,7 @@ function SectionRenderer({ section }: { section: ArticleSection }) {
     case 'paragraph':
       return (
         <p className="text-slate-600 leading-relaxed mb-4 text-base">
-          {section.text}
+          <InlineText text={section.text} />
         </p>
       );
 
@@ -454,7 +486,7 @@ function SectionRenderer({ section }: { section: ArticleSection }) {
           <ol className="list-decimal list-inside space-y-2 mb-6 text-slate-600 ps-4">
             {section.items.map((item, i) => (
               <li key={i} className="leading-relaxed">
-                {item}
+                <InlineText text={item} />
               </li>
             ))}
           </ol>
@@ -464,7 +496,7 @@ function SectionRenderer({ section }: { section: ArticleSection }) {
         <ul className="list-disc list-inside space-y-2 mb-6 text-slate-600 ps-4">
           {section.items.map((item, i) => (
             <li key={i} className="leading-relaxed">
-              {item}
+              <InlineText text={item} />
             </li>
           ))}
         </ul>
