@@ -6,7 +6,9 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import BlogSubscribeSection from '../components/BlogSubscribeSection';
 import { useBlogArticle, useBlogArticles } from '../hooks/useBlogArticles';
-import type { Article, ArticleSection } from '../data/blog';
+import type { ArticleSection } from '../data/blog';
+
+type H2Heading = Extract<ArticleSection, { type: 'heading' }> & { level: 2 };
 
 /* ─── Category helpers ─── */
 const CATEGORY_COLORS: Record<string, string> = {
@@ -34,8 +36,7 @@ export default function ArticleContent() {
   const headings = useMemo(() => {
     if (!article) return [];
     return article.sections.filter(
-      (s): s is Extract<ArticleSection, { type: 'heading'; level: 2 }> =>
-        s.type === 'heading' && s.level === 2,
+      (s): s is H2Heading => s.type === 'heading' && (s as { level: number }).level === 2,
     );
   }, [article]);
 
