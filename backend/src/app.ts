@@ -4,7 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import path from 'path';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -93,50 +93,15 @@ if (existsSync(frontendDist)) {
       immutable: true,
     }),
   );
-  // index: false — prevents express.static from serving index.html for directory
-  // paths (e.g. "/"), so every HTML request reaches the catch-all below where we
-  // can inject the correct favicon per subdomain.
   app.use(
     express.static(frontendDist, {
       redirect: false,
-      index: false,
       maxAge: '1h',
     }),
   );
   app.get(/^(?!\/api).*/, (req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    const indexPath = path.join(frontendDist, 'index.html');
-    // Docs subdomain: inject the purple API favicon directly into the HTML so the
-    // browser shows the correct icon before any JavaScript loads (no race condition
-    // with Chrome's internal SVG fetch).
-    // Defensive hostname check covers: Railway not forwarding X-Forwarded-Host,
-    // proxies that set Host directly, and req.hostname from Express trust-proxy.
-    const isDocsDomain =
-      req.hostname === 'docs.nexus-payment.com' ||
-      req.headers['x-forwarded-host'] === 'docs.nexus-payment.com' ||
-      req.get('host') === 'docs.nexus-payment.com';
-    if (isDocsDomain) {
-      try {
-        const raw = readFileSync(indexPath, 'utf-8');
-        // Strip ALL existing icon links regardless of attribute order, then
-        // inject a single authoritative entry for the purple PNG favicon.
-        const html = raw
-          .replace(/<link[^>]+rel=["']icon["'][^>]*\/?>/g, '')
-          .replace(/<link[^>]+rel=["']shortcut icon["'][^>]*\/?>/g, '')
-          .replace(
-            '</head>',
-            '<link rel="icon" type="image/png" sizes="64x64" href="/nexus-api-favicon.png" />\n  </head>',
-          );
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        res.send(html);
-      } catch {
-        // If readFileSync fails (e.g. file not yet written), fall back to
-        // sending the file directly so the server never crashes.
-        res.sendFile(indexPath);
-      }
-    } else {
-      res.sendFile(indexPath);
-    }
+    res.sendFile(path.join(frontendDist, 'index.html'));
   });
 }
 
