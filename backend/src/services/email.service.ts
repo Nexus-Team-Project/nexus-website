@@ -15,10 +15,14 @@ function getSmtpTransport(): nodemailer.Transporter | null {
     _smtpTransport = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
-      secure: env.SMTP_PORT === 465,
+      secure: env.SMTP_PORT === 465, // true for 465 (SSL), false for 587/2525 (STARTTLS)
       auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+      connectionTimeout: 10_000,  // 10s to connect
+      greetingTimeout: 10_000,    // 10s for SMTP greeting
+      socketTimeout: 30_000,      // 30s per socket operation
+      tls: { rejectUnauthorized: false }, // SendPulse cert flexibility
     });
-    console.log(`📬  SMTP transport created: ${env.SMTP_HOST}:${env.SMTP_PORT}`);
+    console.log(`📬  SMTP transport created: ${env.SMTP_HOST}:${env.SMTP_PORT} (secure=${env.SMTP_PORT === 465})`);
   }
   return _smtpTransport;
 }
