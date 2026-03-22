@@ -385,7 +385,7 @@ export async function sendEscalationAlert(data: {
     }
   }
 
-  const subject = `[Chat-${shortId}] ${data.topic}`;
+  const subject = `[Chat-${shortId}] שיחה באתר`;
 
   await sendMail({
     to: data.to,
@@ -452,16 +452,22 @@ export async function sendChatMessageEmail(data: {
   text: string;
   sender: 'CUSTOMER' | 'AI' | 'AGENT' | 'SYSTEM';
   emailMessageId?: string | null;
-}): Promise<void> {
-  if (data.sender === 'SYSTEM') return; // Don't send system messages as emails
+}): Promise<string | null> {
+  if (data.sender === 'SYSTEM') return null;
 
   const shortId = data.sessionId.slice(-8);
   const threadRef = threadReferenceId(shortId);
-  const subject = `Re: [Chat-${shortId}]`;
+  const messageId = generateMessageId(shortId);
+
+  // If we have a previous email in the thread → this is a reply
+  const isReply = !!data.emailMessageId;
+  const subject = isReply
+    ? `Re: [Chat-${shortId}] שיחה באתר`
+    : `[Chat-${shortId}] שיחה באתר`;
 
   // Threading headers
   const headers: Record<string, string> = {
-    'Message-ID': generateMessageId(shortId),
+    'Message-ID': messageId,
     'References': data.emailMessageId
       ? `${threadRef} ${data.emailMessageId}`
       : threadRef,
@@ -501,6 +507,8 @@ export async function sendChatMessageEmail(data: {
 </table>
 </body></html>`,
   });
+
+  return messageId;
 }
 
 // Keep backward compat alias
