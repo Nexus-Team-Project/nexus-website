@@ -33,7 +33,11 @@ const envSchema = z.object({
   MS_CLIENT_SECRET: z.string().min(1).optional(),
   MS_MAILBOX: z.string().email().optional(), // e.g. admin@nexus-payment.com
 
-  // Email (SendPulse HTTP API) — optional (email disabled when absent)
+  // Email — SMTP (preferred) or SendPulse HTTP API fallback
+  SMTP_HOST: z.string().min(1).optional(),          // e.g. smtp-pulse.com
+  SMTP_PORT: z.coerce.number().default(465),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
   SENDPULSE_CLIENT_ID: z.string().min(1).optional(),
   SENDPULSE_CLIENT_SECRET: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().optional(),
@@ -68,7 +72,8 @@ const optional = {
   'AI Chat (OpenAI)': env.OPENAI_API_KEY,
   'Apollo Enrichment': env.APOLLO_API_KEY,
   'Monday.com CRM': env.MONDAY_API_TOKEN,
-  'Email (SendPulse)': env.SENDPULSE_CLIENT_ID,
+  'Email (SMTP)': env.SMTP_HOST,
+  'Email (SendPulse API fallback)': env.SENDPULSE_CLIENT_ID,
 };
 for (const [feature, key] of Object.entries(optional)) {
   if (!key) console.warn(`⚠️  ${feature} disabled — env var not set`);

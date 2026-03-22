@@ -1,10 +1,29 @@
+import nodemailer from 'nodemailer';
 import { env } from '../config/env';
 
 const FROM_EMAIL = env.EMAIL_FROM ?? 'hello@nexus-payment.com';
 const FROM_NAME = 'Nexus';
 const FRONTEND = env.FRONTEND_URL;
 
-// ─── SendPulse HTTP API client ──────────────────────────────
+// ─── SMTP transport (Nodemailer) — preferred for threading ──
+
+let _smtpTransport: nodemailer.Transporter | null = null;
+
+function getSmtpTransport(): nodemailer.Transporter | null {
+  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return null;
+  if (!_smtpTransport) {
+    _smtpTransport = nodemailer.createTransport({
+      host: env.SMTP_HOST,
+      port: env.SMTP_PORT,
+      secure: env.SMTP_PORT === 465,
+      auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
+    });
+    console.log(`📬  SMTP transport created: ${env.SMTP_HOST}:${env.SMTP_PORT}`);
+  }
+  return _smtpTransport;
+}
+
+// ─── SendPulse HTTP API — fallback when SMTP not configured ──
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
@@ -33,6 +52,8 @@ async function getAccessToken(): Promise<string> {
   return cachedToken.value;
 }
 
+// ─── Unified send interface ──────────────────────────────────
+
 interface SendMailOptions {
   to: string;
   toName?: string;
@@ -47,12 +68,46 @@ interface SendMailOptions {
 }
 
 async function sendMail(options: SendMailOptions): Promise<string | null> {
+  const label = options._label ?? 'GENERIC';
+  const smtp = getSmtpTransport();
+
+  // ── Strategy 1: Nodemailer SMTP (supports threading headers) ──
+  if (smtp) {
+    console.log(`📧  [${label}] SMTP → ${options.to}, subject: "${options.subject}"`);
+    try {
+      const plainText = options.text ?? options.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+      // Build Nodemailer message with proper threading fields
+      const msgId = options.headers?.['Message-ID']?.replace(/^<|>$/g, '');
+      const inReplyTo = options.headers?.['In-Reply-To'];
+      const references = options.headers?.['References'];
+
+      const info = await smtp.sendMail({
+        from: `"${options.fromName ?? FROM_NAME}" <${FROM_EMAIL}>`,
+        to: `"${options.toName ?? options.to}" <${options.to}>`,
+        subject: options.subject,
+        html: options.html,
+        text: plainText,
+        ...(msgId && { messageId: msgId }),
+        ...(inReplyTo && { inReplyTo }),
+        ...(references && { references }),
+        ...(options.replyTo && { replyTo: options.replyTo }),
+      });
+
+      console.log(`✅  [${label}] SMTP sent — messageId: ${info.messageId ?? 'none'}`);
+      return info.messageId ?? null;
+    } catch (err: any) {
+      console.error(`❌  [${label}] SMTP FAILED to ${options.to}:`, err?.message ?? err);
+      throw err;
+    }
+  }
+
+  // ── Strategy 2: SendPulse REST API (no threading headers) ──
   if (!env.SENDPULSE_CLIENT_ID || !env.SENDPULSE_CLIENT_SECRET) {
-    console.warn('⚠️  Email not sent — SENDPULSE_CLIENT_ID/SECRET not configured');
+    console.warn(`⚠️  [${label}] Email not sent — no SMTP or SendPulse configured`);
     return null;
   }
-  const label = options._label ?? 'GENERIC';
-  console.log(`📧  [${label}] Sending email to ${options.to}, subject: "${options.subject}"`);
+  console.log(`📧  [${label}] SendPulse API → ${options.to}, subject: "${options.subject}"`);
   try {
     const token = await getAccessToken();
     const plainText = options.text ?? options.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -64,16 +119,7 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
       from: { name: options.fromName ?? FROM_NAME, email: FROM_EMAIL },
       to: [{ name: options.toName ?? options.to, email: options.to }],
     };
-
-    // Add Reply-To if specified
-    if (options.replyTo) {
-      emailPayload.reply_to = options.replyTo;
-    }
-
-    // Add custom headers (Message-ID, In-Reply-To, References for threading)
-    if (options.headers && Object.keys(options.headers).length > 0) {
-      emailPayload.headers = options.headers;
-    }
+    if (options.replyTo) emailPayload.reply_to = options.replyTo;
 
     const body = JSON.stringify({ email: emailPayload });
     const res = await fetch('https://api.sendpulse.com/smtp/emails', {
@@ -89,10 +135,10 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
     if (!res.ok || data.result === false) {
       throw new Error(data.message ?? `HTTP ${res.status}`);
     }
-    console.log(`✅  [${label}] Email sent to ${options.to} — id: ${data.id ?? 'none'}`);
+    console.log(`✅  [${label}] SendPulse sent to ${options.to} — id: ${data.id ?? 'none'}`);
     return data.id ?? null;
   } catch (err: any) {
-    console.error(`❌  [${label}] Email FAILED to ${options.to}:`, err?.message ?? err);
+    console.error(`❌  [${label}] SendPulse FAILED to ${options.to}:`, err?.message ?? err);
     throw err;
   }
 }
