@@ -1,5 +1,4 @@
 import { prisma } from '../config/database';
-import * as WhatsApp from './whatsapp-provider';
 import * as MondayService from './monday.service';
 import * as EmailService from './email.service';
 import { broadcastToAdmins } from '../socket';
@@ -49,15 +48,6 @@ export async function handleVisitorArrival(data: {
     apolloData,
     timestamp: notification.createdAt,
   });
-
-  // 3. Send WhatsApp notification to agent
-  const waMsg = WhatsApp.formatVisitorAlert({
-    page: data.page,
-    country: data.country,
-    visitorId: data.visitorId,
-    apolloData,
-  });
-  await WhatsApp.notifyAgent(waMsg);
 }
 
 // ─── Chat session opened ──────────────────────────────────
@@ -103,14 +93,6 @@ export async function handleChatOpened(data: {
     apolloData,
     timestamp: notification.createdAt,
   });
-
-  // WhatsApp
-  const waMsg = WhatsApp.formatChatOpenedAlert({
-    sessionId: data.sessionId,
-    page: data.page,
-    apolloData,
-  });
-  await WhatsApp.notifyAgent(waMsg);
 }
 
 // ─── Chat escalated to human ──────────────────────────────
@@ -155,28 +137,6 @@ export async function handleChatEscalated(data: {
     leadData: data.leadData,
     timestamp: notification.createdAt,
   });
-
-  // ─── WhatsApp notification ─────────────────────────────
-
-  let waMessage = `*העברה לנציג - ${topicLabel}*\n\n`;
-  if (data.leadData) {
-    const ld = data.leadData;
-    if (ld.name || ld.company) waMessage += `${ld.name ?? ''}${ld.company ? ` | ${ld.company}` : ''}\n`;
-    if (ld.email) waMessage += `${ld.email}\n`;
-    if (ld.phone) waMessage += `${ld.phone}\n`;
-  }
-  if (data.page) waMessage += `עמוד: ${data.page}\n`;
-  if (data.recentMessages && data.recentMessages.length > 0) {
-    waMessage += `\n*הודעות אחרונות:*\n`;
-    for (const msg of data.recentMessages) {
-      const label = msg.sender === 'CUSTOMER' || msg.sender === 'לקוח' ? 'לקוח' : 'AI';
-      waMessage += `${label}: ${msg.text}\n`;
-    }
-  }
-  waMessage += `\nסשן: ${shortId}`;
-  waMessage += `\n/take ${shortId}`;
-
-  await WhatsApp.notifyAgent(waMessage);
 
   // ─── Email notification (reply-enabled) ─────────────────
 
@@ -239,9 +199,6 @@ export async function handleLeadSubmitted(data: {
     company: data.company,
     timestamp: notification.createdAt,
   });
-
-  const waMsg = WhatsApp.formatLeadAlert(data);
-  await WhatsApp.notifyAgent(waMsg);
 }
 
 // ─── Get unread notifications ─────────────────────────────
