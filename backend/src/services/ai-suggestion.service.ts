@@ -37,11 +37,20 @@ export async function generateSuggestion(
     });
 
     // 5. Send ONLY to agent via WhatsApp (NOT to customer)
-    const shortId = session.id.slice(-8);
-    await WhatsAppProvider.sendText(
-      session.assignedAgentWa,
-      `[${shortId}] 💡 הצעת AI:\n${aiReply.text}`,
-    );
+    // Prefer group if available, otherwise direct message
+    const groupId = session.whatsappGroupId;
+    if (groupId) {
+      await WhatsAppProvider.sendToGroup(
+        groupId,
+        `*הצעת AI:*\n${aiReply.text}`,
+      );
+    } else {
+      const shortId = session.id.slice(-8);
+      await WhatsAppProvider.sendText(
+        session.assignedAgentWa,
+        `[${shortId}] הצעת AI:\n${aiReply.text}`,
+      );
+    }
 
     // 6. Mark as sent
     await prisma.aiSuggestion.update({

@@ -300,6 +300,94 @@ export async function sendPasswordResetEmail(
   await sendMail({ to: email, toName: fullName, subject, text, html });
 }
 
+// ─── Chat escalation alert ────────────────────────────────
+
+export async function sendEscalationAlert(data: {
+  to: string;
+  sessionId: string;
+  topic: string;
+  leadData?: Record<string, string>;
+  recentMessages?: Array<{ sender: string; text: string }>;
+  page?: string;
+}) {
+  const shortId = data.sessionId.slice(-8);
+  const dashboardUrl = `${FRONTEND}/dashboard`;
+
+  // Build messages HTML
+  let messagesHtml = '';
+  if (data.recentMessages && data.recentMessages.length > 0) {
+    messagesHtml = data.recentMessages
+      .map((m) => {
+        const isCustomer = m.sender === 'CUSTOMER' || m.sender === 'לקוח';
+        const label = isCustomer ? 'לקוח' : 'AI';
+        const bg = isCustomer ? '#e0e7ff' : '#f3f4f6';
+        const align = isCustomer ? 'right' : 'left';
+        return `<div style="background:${bg};padding:10px 14px;border-radius:10px;margin:6px 0;text-align:${align};max-width:85%;${isCustomer ? 'margin-right:0;margin-left:auto;' : 'margin-left:0;margin-right:auto;'}">
+          <span style="font-size:11px;color:#6b7280;font-weight:bold;">${label}</span><br>
+          <span style="font-size:14px;color:#111;">${m.text}</span>
+        </div>`;
+      })
+      .join('');
+  }
+
+  // Build lead info
+  let leadHtml = '';
+  if (data.leadData) {
+    const ld = data.leadData;
+    const fields: string[] = [];
+    if (ld.name) fields.push(`<strong>שם:</strong> ${ld.name}`);
+    if (ld.company) fields.push(`<strong>חברה:</strong> ${ld.company}`);
+    if (ld.email) fields.push(`<strong>אימייל:</strong> ${ld.email}`);
+    if (ld.phone) fields.push(`<strong>טלפון:</strong> ${ld.phone}`);
+    if (fields.length > 0) {
+      leadHtml = `<div style="background:#fef3c7;padding:12px 16px;border-radius:10px;margin:12px 0;">
+        ${fields.join('<br>')}
+      </div>`;
+    }
+  }
+
+  await sendMail({
+    to: data.to,
+    subject: `[צ'אט ${shortId}] נדרש נציג - ${data.topic}`,
+    html: `<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:30px 15px;">
+<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+  <tr><td>
+    <div style="background:#dc2626;color:white;padding:14px 20px;border-radius:10px;text-align:center;font-size:18px;font-weight:bold;">
+      צ'אט חדש דורש נציג
+    </div>
+  </td></tr>
+  <tr><td style="padding-top:16px;">
+    <table style="width:100%;font-size:14px;color:#555;">
+      <tr><td style="padding:4px 0;"><strong>סשן:</strong> ${shortId}</td></tr>
+      <tr><td style="padding:4px 0;"><strong>נושא:</strong> ${data.topic}</td></tr>
+      ${data.page ? `<tr><td style="padding:4px 0;"><strong>עמוד:</strong> ${data.page}</td></tr>` : ''}
+    </table>
+  </td></tr>
+  ${leadHtml ? `<tr><td style="padding-top:8px;">${leadHtml}</td></tr>` : ''}
+  ${messagesHtml ? `<tr><td style="padding-top:12px;">
+    <div style="font-weight:bold;color:#111;margin-bottom:8px;">שיחה אחרונה:</div>
+    ${messagesHtml}
+  </td></tr>` : ''}
+  <tr><td align="center" style="padding:24px 0 8px 0;">
+    <a href="${dashboardUrl}" style="background:#111;color:white;padding:14px 32px;border-radius:10px;font-size:15px;font-weight:bold;text-decoration:none;display:inline-block;">
+      פתח דשבורד
+    </a>
+  </td></tr>
+  <tr><td style="padding-top:12px;text-align:center;">
+    <span style="font-size:12px;color:#999;">ענה דרך WhatsApp: /take ${shortId}</span>
+  </td></tr>
+</table>
+</td></tr>
+</table>
+</body></html>`,
+  });
+}
+
 // ─── Daily digest ──────────────────────────────────────────
 
 export async function sendDailyDigest(

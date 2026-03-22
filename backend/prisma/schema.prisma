@@ -184,6 +184,7 @@ model ChatSession {
   assignedAgentName String?
   subject           String?
   waThreadId        String?
+  whatsappGroupId   String?    // Green API group chatId for this session
   modeLockUntil     DateTime?
   metadata          Json?
   createdAt         DateTime   @default(now())

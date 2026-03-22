@@ -14,6 +14,21 @@ export async function notifyAgent(message: string): Promise<void> {
   return provider().notifyAgent(message);
 }
 
+// ─── Group support (Green API only) ──────────────────────
+
+export async function createGroup(
+  groupName: string,
+  participantPhones: string[],
+): Promise<{ chatId: string; inviteLink: string } | null> {
+  if (env.WHATSAPP_PROVIDER !== 'green_api') return null;
+  return GreenApi.createGroup(groupName, participantPhones);
+}
+
+export async function sendToGroup(groupChatId: string, text: string): Promise<string | null> {
+  if (env.WHATSAPP_PROVIDER !== 'green_api') return null;
+  return GreenApi.sendToGroup(groupChatId, text);
+}
+
 // Format helpers are provider-agnostic — re-export from Meta service
 export {
   formatVisitorAlert,

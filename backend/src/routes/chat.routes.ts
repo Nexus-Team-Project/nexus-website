@@ -166,12 +166,18 @@ router.post(
         // HUMAN mode — forward to agent + generate AI suggestion in background
         res.status(201).json(customerMsg);
 
-        // Forward customer message to assigned rep via WhatsApp
-        if (session.assignedAgentWa) {
+        // Forward customer message to WhatsApp group (preferred) or direct
+        const groupId = (session as any).whatsappGroupId as string | undefined;
+        if (groupId) {
+          WhatsAppProvider.sendToGroup(
+            groupId,
+            `*לקוח:*\n${text}`,
+          ).catch(console.error);
+        } else if (session.assignedAgentWa) {
           const shortId = sessionId.slice(-8);
           WhatsAppProvider.sendText(
             session.assignedAgentWa,
-            `[${shortId}] 👤 לקוח:\n${text}`,
+            `[${shortId}] לקוח:\n${text}`,
           ).catch(console.error);
         }
 

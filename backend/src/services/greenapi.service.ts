@@ -39,6 +39,54 @@ export async function notifyAgent(message: string): Promise<void> {
   await sendText(env.AGENT_WHATSAPP_NUMBER, message);
 }
 
+// ─── Send message to a group ─────────────────────────────
+
+export async function sendToGroup(groupChatId: string, text: string): Promise<string | null> {
+  if (!env.GREEN_API_ID_INSTANCE || !env.GREEN_API_TOKEN) return null;
+
+  try {
+    const res = await axios.post(buildUrl('sendMessage'), {
+      chatId: groupChatId, // e.g. "120363425825596249@g.us"
+      message: text,
+    });
+    return res.data?.idMessage ?? null;
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error('[GreenAPI] sendToGroup error:', err.response?.data);
+    }
+    return null;
+  }
+}
+
+// ─── Create a WhatsApp group ─────────────────────────────
+
+export async function createGroup(
+  groupName: string,
+  participantPhones: string[],
+): Promise<{ chatId: string; inviteLink: string } | null> {
+  if (!env.GREEN_API_ID_INSTANCE || !env.GREEN_API_TOKEN) return null;
+
+  try {
+    const chatIds = participantPhones.map(toChatId);
+    const res = await axios.post(buildUrl('createGroup'), {
+      groupName,
+      chatIds,
+    });
+    if (res.data?.created) {
+      return {
+        chatId: res.data.chatId,
+        inviteLink: res.data.groupInviteLink ?? '',
+      };
+    }
+    return null;
+  } catch (err: unknown) {
+    if (axios.isAxiosError(err)) {
+      console.error('[GreenAPI] createGroup error:', err.response?.data);
+    }
+    return null;
+  }
+}
+
 // ─── Check instance state ─────────────────────────────────
 
 export async function getStateInstance(): Promise<string | null> {

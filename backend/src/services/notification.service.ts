@@ -1,8 +1,10 @@
 import { prisma } from '../config/database';
 import * as WhatsApp from './whatsapp-provider';
 import * as MondayService from './monday.service';
+import * as EmailService from './email.service';
 import { broadcastToAdmins } from '../socket';
 import * as AnalyticsService from './analytics.service';
+import { env } from '../config/env';
 
 // ─── Visitor arrived on site ──────────────────────────────
 
@@ -124,22 +126,23 @@ export async function handleChatEscalated(data: {
     sales: 'מכירות', technical: 'טכני', billing: 'חיוב', general: 'כללי',
   };
   const topicLabel = topicLabels[data.topic ?? 'general'] ?? 'כללי';
+  const shortId = data.sessionId.slice(-8);
 
   // Build enriched notification body
-  let body = `סשן: ${data.sessionId.slice(-8)}\nנושא: ${topicLabel}`;
+  let body = `סשן: ${shortId}\nנושא: ${topicLabel}`;
   if (data.page) body += `\nעמוד: ${data.page}`;
   if (data.leadData) {
     const ld = data.leadData;
-    if (ld.name) body += `\n👤 ${ld.name}`;
+    if (ld.name) body += `\n${ld.name}`;
     if (ld.company) body += ` | ${ld.company}`;
-    if (ld.email) body += `\n📧 ${ld.email}`;
-    if (ld.phone) body += `\n📱 ${ld.phone}`;
+    if (ld.email) body += `\n${ld.email}`;
+    if (ld.phone) body += `\n${ld.phone}`;
   }
 
   const notification = await prisma.notification.create({
     data: {
       type: 'chat_escalated',
-      title: `🚨 צ'אט דורש נציג — ${topicLabel}`,
+      title: `צ'אט דורש נציג - ${topicLabel}`,
       body,
       metadata: data,
     },
@@ -153,33 +156,43 @@ export async function handleChatEscalated(data: {
     timestamp: notification.createdAt,
   });
 
-  const shortId = data.sessionId.slice(-8);
+  // ─── WhatsApp notification ─────────────────────────────
 
-  // Build rich WhatsApp handoff message with takeover instructions
-  let waMessage = `🔴 *העברה לנציג — ${topicLabel}*\n\n`;
+  let waMessage = `*העברה לנציג - ${topicLabel}*\n\n`;
   if (data.leadData) {
     const ld = data.leadData;
-    if (ld.name || ld.company) waMessage += `👤 ${ld.name ?? ''}${ld.company ? ` | ${ld.company}` : ''}\n`;
-    if (ld.email) waMessage += `📧 ${ld.email}\n`;
-    if (ld.phone) waMessage += `📱 ${ld.phone}\n`;
+    if (ld.name || ld.company) waMessage += `${ld.name ?? ''}${ld.company ? ` | ${ld.company}` : ''}\n`;
+    if (ld.email) waMessage += `${ld.email}\n`;
+    if (ld.phone) waMessage += `${ld.phone}\n`;
   }
-  if (data.page) waMessage += `📄 עמוד: ${data.page}\n`;
-
-  // Include last messages for context
+  if (data.page) waMessage += `עמוד: ${data.page}\n`;
   if (data.recentMessages && data.recentMessages.length > 0) {
-    waMessage += `\n💬 *הודעות אחרונות:*\n`;
+    waMessage += `\n*הודעות אחרונות:*\n`;
     for (const msg of data.recentMessages) {
-      waMessage += `- ${msg.sender}: ${msg.text}\n`;
+      const label = msg.sender === 'CUSTOMER' || msg.sender === 'לקוח' ? 'לקוח' : 'AI';
+      waMessage += `${label}: ${msg.text}\n`;
     }
   }
-
   waMessage += `\nסשן: ${shortId}`;
-  waMessage += `\n🎯 לקיחת שליטה: /take ${shortId}`;
-  waMessage += `\nהלקוח מחכה לתגובה!`;
+  waMessage += `\n/take ${shortId}`;
 
   await WhatsApp.notifyAgent(waMessage);
 
-  // Create / update lead on Monday.com CRM
+  // ─── Email notification ────────────────────────────────
+
+  if (env.AGENT_EMAIL) {
+    EmailService.sendEscalationAlert({
+      to: env.AGENT_EMAIL,
+      sessionId: data.sessionId,
+      topic: topicLabel,
+      leadData: data.leadData,
+      recentMessages: data.recentMessages,
+      page: data.page,
+    }).catch((err) => console.error('[Notification] Email alert failed:', err));
+  }
+
+  // ─── Monday.com CRM ────────────────────────────────────
+
   MondayService.createLead({
     name: data.leadData?.name ?? 'Chat Lead',
     email: data.leadData?.email,
