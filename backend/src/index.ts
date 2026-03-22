@@ -7,6 +7,7 @@ import { prisma } from './config/database';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
 import { embedText } from './services/ai.service';
 import { scheduleBiRefresh } from './jobs/biRefresh';
+import { pollInbox } from './services/outlook-inbound.service';
 
 const PORT = env.PORT;
 
@@ -180,14 +181,25 @@ async function bootstrap() {
   // 5. Schedule cron jobs
   scheduleDailyDigest();
   scheduleBiRefresh();
+
+  // 6. Outlook inbox polling (every 30s)
+  if (env.MS_TENANT_ID && env.MS_CLIENT_ID && env.MS_CLIENT_SECRET && env.MS_MAILBOX) {
+    setInterval(() => pollInbox().catch(console.error), 30_000);
+    // Run immediately on startup
+    pollInbox().catch(console.error);
+    console.log(`✅ Outlook inbox polling active (${env.MS_MAILBOX})`);
+  } else {
+    console.warn('⚠️  Outlook inbox polling disabled — MS_TENANT_ID/CLIENT_ID/CLIENT_SECRET/MS_MAILBOX not set');
+  }
+
   console.log('✅ Cron jobs scheduled');
 
-  // 6. Start listening
+  // 7. Start listening
   httpServer.listen(PORT, () => {
     console.log(`🚀 Nexus backend running on port ${PORT} [${env.NODE_ENV}]`);
   });
 
-  // 7. Graceful shutdown
+  // 8. Graceful shutdown
   process.on('SIGTERM', async () => {
     console.log('SIGTERM received — shutting down gracefully');
     httpServer.close(async () => {

@@ -42,6 +42,12 @@ const envSchema = z.object({
   AGENT_EMAIL: z.string().email().optional(), // Email for chat escalation alerts
   INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Secret for inbound email webhook
 
+  // Microsoft Graph API — for reading Outlook inbox replies
+  MS_TENANT_ID: z.string().min(1).optional(),
+  MS_CLIENT_ID: z.string().min(1).optional(),
+  MS_CLIENT_SECRET: z.string().min(1).optional(),
+  MS_MAILBOX: z.string().email().optional(), // e.g. admin@nexus-payment.com
+
   // Email (SendPulse HTTP API) — optional (email disabled when absent)
   SENDPULSE_CLIENT_ID: z.string().min(1).optional(),
   SENDPULSE_CLIENT_SECRET: z.string().min(1).optional(),

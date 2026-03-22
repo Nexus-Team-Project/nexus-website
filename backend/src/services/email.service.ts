@@ -438,19 +438,28 @@ export async function sendEscalationAlert(data: {
   return messageId;
 }
 
-// ─── Follow-up email: customer sent a new message ─────────
+// ─── Mirror chat message to email thread ──────────────────
 
-export async function sendCustomerMessageEmail(data: {
+/**
+ * Send any chat message (customer, AI, or agent) as an email in the conversation thread.
+ * - Customer messages: labeled as incoming from visitor
+ * - AI messages: labeled as AI assistant response
+ * - Agent messages: labeled as agent response
+ */
+export async function sendChatMessageEmail(data: {
   to: string;
   sessionId: string;
-  customerText: string;
+  text: string;
+  sender: 'CUSTOMER' | 'AI' | 'AGENT' | 'SYSTEM';
   emailMessageId?: string | null;
 }): Promise<void> {
+  if (data.sender === 'SYSTEM') return; // Don't send system messages as emails
+
   const shortId = data.sessionId.slice(-8);
   const threadRef = threadReferenceId(shortId);
   const subject = `Re: [Chat-${shortId}]`;
 
-  // Threading headers — link to the original escalation email
+  // Threading headers
   const headers: Record<string, string> = {
     'Message-ID': generateMessageId(shortId),
     'References': data.emailMessageId
@@ -462,8 +471,16 @@ export async function sendCustomerMessageEmail(data: {
     headers['In-Reply-To'] = data.emailMessageId;
   }
 
+  // Different styling per sender
+  const config = {
+    CUSTOMER: { label: 'לקוח', bg: '#e0e7ff', border: '#818cf8', fromName: 'לקוח באתר — Nexus Chat' },
+    AI:       { label: 'AI', bg: '#f3f4f6', border: '#9ca3af', fromName: 'AI Nexus' },
+    AGENT:    { label: 'נציג', bg: '#ecfdf5', border: '#10b981', fromName: 'נציג — Nexus' },
+  }[data.sender] ?? { label: data.sender, bg: '#f3f4f6', border: '#9ca3af', fromName: 'Nexus Chat' };
+
   await sendMail({
     to: data.to,
+    toName: 'Sales',
     subject,
     headers,
     html: `<!doctype html>
@@ -471,17 +488,12 @@ export async function sendCustomerMessageEmail(data: {
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td align="center" style="padding:20px 15px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<tr><td align="center" style="padding:16px 15px;">
+<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:12px;padding:20px;box-shadow:0 4px 12px rgba(0,0,0,0.04);">
   <tr><td>
-    <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">צ'אט ${shortId} — הודעה חדשה מהלקוח:</div>
-    <div style="background:#e0e7ff;padding:14px 18px;border-radius:12px;font-size:15px;color:#111;line-height:1.6;">
-      ${data.customerText.replace(/\n/g, '<br>')}
-    </div>
-  </td></tr>
-  <tr><td style="padding-top:14px;">
-    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;text-align:center;font-size:13px;color:#166534;">
-      ענה למייל הזה כדי להגיב ללקוח
+    <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">צ'אט ${shortId} — ${config.label}:</div>
+    <div style="background:${config.bg};border-right:4px solid ${config.border};padding:12px 16px;border-radius:8px;font-size:15px;color:#111;line-height:1.6;">
+      ${data.text.replace(/\n/g, '<br>')}
     </div>
   </td></tr>
 </table>
@@ -490,6 +502,20 @@ export async function sendCustomerMessageEmail(data: {
 </body></html>`,
   });
 }
+
+// Keep backward compat alias
+export const sendCustomerMessageEmail = (data: {
+  to: string;
+  sessionId: string;
+  customerText: string;
+  emailMessageId?: string | null;
+}) => sendChatMessageEmail({
+  to: data.to,
+  sessionId: data.sessionId,
+  text: data.customerText,
+  sender: 'CUSTOMER',
+  emailMessageId: data.emailMessageId,
+});
 
 // ─── Daily digest ──────────────────────────────────────────
 

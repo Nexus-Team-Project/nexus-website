@@ -118,7 +118,19 @@ router.post(
         timestamp: customerMsg.createdAt,
       });
 
-      // 3. If in AI mode → generate AI reply (async, returns 200 right away)
+      // 3. Mirror customer message to email thread (all modes)
+      const emailMsgId = (session as any).emailMessageId as string | undefined;
+      if (env.AGENT_EMAIL) {
+        EmailService.sendChatMessageEmail({
+          to: env.AGENT_EMAIL,
+          sessionId,
+          text,
+          sender: 'CUSTOMER',
+          emailMessageId: emailMsgId,
+        }).catch((err) => console.error('[Chat] Email mirror failed:', err));
+      }
+
+      // 4. If in AI mode → generate AI reply (async, returns 200 right away)
       if (session.mode === 'AI') {
         // Return customer message confirmation first
         res.status(201).json(customerMsg);
@@ -151,6 +163,17 @@ router.post(
               actions: aiReply.actions,
             });
 
+            // Mirror AI reply to email thread
+            if (env.AGENT_EMAIL) {
+              EmailService.sendChatMessageEmail({
+                to: env.AGENT_EMAIL,
+                sessionId,
+                text: aiReply.text,
+                sender: 'AI',
+                emailMessageId: emailMsgId,
+              }).catch((err) => console.error('[Chat] AI email mirror failed:', err));
+            }
+
             // Save lead data if AI extracted any
             if (aiReply.leadData && Object.keys(aiReply.leadData).length > 0) {
               ChatService.upsertLeadFromChat(sessionId, aiReply.leadData).catch(console.error);
@@ -165,19 +188,10 @@ router.post(
           })
           .catch(console.error);
       } else {
-        // HUMAN mode — forward to agent via email + WhatsApp + generate AI suggestion
+        // HUMAN mode — forward to agent via WhatsApp + generate AI suggestion
         res.status(201).json(customerMsg);
 
-        // Forward customer message via email (reply-threaded)
-        if (env.AGENT_EMAIL) {
-          const emailMsgId = (session as any).emailMessageId as string | undefined;
-          EmailService.sendCustomerMessageEmail({
-            to: env.AGENT_EMAIL,
-            sessionId,
-            customerText: text,
-            emailMessageId: emailMsgId,
-          }).catch((err) => console.error('[Chat] Email follow-up failed:', err));
-        }
+        // (Email already sent above for all modes)
 
         // Forward via WhatsApp group (preferred) or direct
         const groupId = (session as any).whatsappGroupId as string | undefined;

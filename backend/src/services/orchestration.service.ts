@@ -1,6 +1,8 @@
 import { prisma } from '../config/database';
 import * as ChatService from './chat.service';
 import * as WhatsAppProvider from './whatsapp-provider';
+import * as EmailService from './email.service';
+import { env } from '../config/env';
 import { getIO, broadcastToAdmins } from '../socket';
 
 // ─── Command Parsing ──────────────────────────────────────
@@ -200,6 +202,17 @@ async function handleAgentMessage(
     channel: agentMsg.channel,
     timestamp: agentMsg.createdAt,
   });
+
+  // Mirror agent message to email thread
+  if (env.AGENT_EMAIL) {
+    EmailService.sendChatMessageEmail({
+      to: env.AGENT_EMAIL,
+      sessionId: session.id,
+      text: messageText,
+      sender: 'AGENT',
+      emailMessageId: session.emailMessageId,
+    }).catch((err) => console.error('[Orchestration] Agent email mirror failed:', err));
+  }
 }
 
 // ─── Unstructured message fallback ────────────────────────
