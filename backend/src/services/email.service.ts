@@ -82,6 +82,16 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
       const inReplyTo = options.headers?.['In-Reply-To'];
       const references = options.headers?.['References'];
 
+      // Collect extra headers (Thread-Topic, X-Chat-Session, etc.)
+      const extraHeaders: Record<string, string> = {};
+      if (options.headers) {
+        for (const [k, v] of Object.entries(options.headers)) {
+          if (!['Message-ID', 'In-Reply-To', 'References'].includes(k)) {
+            extraHeaders[k] = v;
+          }
+        }
+      }
+
       const info = await smtp.sendMail({
         from: `"${options.fromName ?? FROM_NAME}" <${FROM_EMAIL}>`,
         to: `"${options.toName ?? options.to}" <${options.to}>`,
@@ -92,6 +102,7 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
         ...(inReplyTo && { inReplyTo }),
         ...(references && { references }),
         ...(options.replyTo && { replyTo: options.replyTo }),
+        ...(Object.keys(extraHeaders).length > 0 && { headers: extraHeaders }),
       });
 
       console.log(`✅  [${label}] SMTP sent — messageId: ${info.messageId ?? 'none'}`);
@@ -445,6 +456,7 @@ export async function sendEscalationAlert(data: {
       'Message-ID': messageId,
       'References': threadRef,
       'X-Chat-Session': shortId,
+      'Thread-Topic': subject,
     },
     html: `<!doctype html>
 <html lang="he" dir="rtl">
@@ -492,10 +504,36 @@ export async function sendEscalationAlert(data: {
 // ─── Mirror chat message to email thread ──────────────────
 
 /**
+ * Render a list of messages as styled HTML for email conversation history.
+ */
+function renderConversationHtml(
+  messages: Array<{ sender: string; text: string }>,
+  currentIndex?: number,
+): string {
+  if (messages.length === 0) return '';
+
+  const senderConfig: Record<string, { label: string; bg: string; border: string }> = {
+    CUSTOMER: { label: '👤 לקוח', bg: '#e0e7ff', border: '#818cf8' },
+    AI:       { label: '🤖 AI',  bg: '#f3f4f6', border: '#9ca3af' },
+    AGENT:    { label: '👨‍💼 נציג', bg: '#ecfdf5', border: '#10b981' },
+    SYSTEM:   { label: '⚙️ מערכת', bg: '#fef3c7', border: '#f59e0b' },
+  };
+
+  return messages.map((m, i) => {
+    const cfg = senderConfig[m.sender] ?? senderConfig.CUSTOMER;
+    const isCurrent = currentIndex !== undefined && i === currentIndex;
+    const opacity = isCurrent ? '1' : '0.85';
+    const weight = isCurrent ? 'font-weight:bold;' : '';
+    return `<div style="background:${cfg.bg};border-right:3px solid ${cfg.border};padding:8px 12px;border-radius:6px;margin:4px 0;opacity:${opacity};${weight}">
+      <span style="font-size:10px;color:#6b7280;">${cfg.label}</span><br>
+      <span style="font-size:13px;color:#111;line-height:1.5;">${m.text.replace(/\n/g, '<br>').slice(0, 500)}</span>
+    </div>`;
+  }).join('');
+}
+
+/**
  * Send any chat message (customer, AI, or agent) as an email in the conversation thread.
- * - Customer messages: labeled as incoming from visitor
- * - AI messages: labeled as AI assistant response
- * - Agent messages: labeled as agent response
+ * Each email includes the FULL conversation history so the agent always sees context.
  */
 export async function sendChatMessageEmail(data: {
   to: string;
@@ -503,26 +541,28 @@ export async function sendChatMessageEmail(data: {
   text: string;
   sender: 'CUSTOMER' | 'AI' | 'AGENT' | 'SYSTEM';
   emailMessageId?: string | null;
+  /** Full conversation history up to (and including) this message */
+  recentMessages?: Array<{ sender: string; text: string }>;
 }): Promise<string | null> {
   if (data.sender === 'SYSTEM') return null;
 
   const shortId = data.sessionId.slice(-8);
   const threadRef = threadReferenceId(shortId);
   const messageId = generateMessageId(shortId);
+  const threadTopic = `[Chat-${shortId}] שיחה באתר`;
 
   // If we have a previous email in the thread → this is a reply
   const isReply = !!data.emailMessageId;
-  const subject = isReply
-    ? `Re: [Chat-${shortId}] שיחה באתר`
-    : `[Chat-${shortId}] שיחה באתר`;
+  const subject = isReply ? `Re: ${threadTopic}` : threadTopic;
 
-  // Threading headers
+  // Threading headers (Outlook-compatible)
   const headers: Record<string, string> = {
     'Message-ID': messageId,
     'References': data.emailMessageId
       ? `${threadRef} ${data.emailMessageId}`
       : threadRef,
     'X-Chat-Session': shortId,
+    'Thread-Topic': threadTopic,
   };
   if (data.emailMessageId) {
     headers['In-Reply-To'] = data.emailMessageId;
@@ -530,10 +570,33 @@ export async function sendChatMessageEmail(data: {
 
   // Different styling per sender
   const config = {
-    CUSTOMER: { label: 'לקוח', bg: '#e0e7ff', border: '#818cf8', fromName: 'לקוח באתר — Nexus Chat' },
-    AI:       { label: 'AI', bg: '#f3f4f6', border: '#9ca3af', fromName: 'AI Nexus' },
-    AGENT:    { label: 'נציג', bg: '#ecfdf5', border: '#10b981', fromName: 'נציג — Nexus' },
+    CUSTOMER: { label: 'לקוח', bg: '#e0e7ff', border: '#818cf8', fromName: 'Nexus Chat' },
+    AI:       { label: 'AI', bg: '#f3f4f6', border: '#9ca3af', fromName: 'Nexus Chat' },
+    AGENT:    { label: 'נציג', bg: '#ecfdf5', border: '#10b981', fromName: 'Nexus Chat' },
   }[data.sender] ?? { label: data.sender, bg: '#f3f4f6', border: '#9ca3af', fromName: 'Nexus Chat' };
+
+  // Build conversation history HTML
+  let historyHtml = '';
+  const msgs = data.recentMessages ?? [];
+  if (msgs.length > 1) {
+    // Show all messages except the very last one (which is the "new" message shown above)
+    const previousMsgs = msgs.slice(0, -1);
+    historyHtml = `
+  <tr><td style="padding-top:16px;">
+    <div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:8px;">
+      <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">📋 היסטוריית שיחה (${previousMsgs.length} הודעות קודמות):</div>
+      ${renderConversationHtml(previousMsgs)}
+    </div>
+  </td></tr>`;
+  }
+
+  // Footer with reply instructions
+  const replyInstructions = `
+  <tr><td style="padding:14px 0 4px 0;">
+    <div style="background:#ecfdf5;border:1px solid #10b981;border-radius:8px;padding:10px 14px;text-align:center;">
+      <div style="font-size:13px;color:#065f46;font-weight:bold;">↩️ ענה למייל הזה כדי להגיב ללקוח בצ'אט</div>
+    </div>
+  </td></tr>`;
 
   await sendMail({
     to: data.to,
@@ -550,11 +613,11 @@ export async function sendChatMessageEmail(data: {
 <tr><td align="center" style="padding:16px 15px;">
 <table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:12px;padding:20px;box-shadow:0 4px 12px rgba(0,0,0,0.04);">
   <tr><td>
-    <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">צ'אט ${shortId} — ${config.label}:</div>
+    <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">צ'אט ${shortId} — הודעה חדשה מ${config.label}:</div>
     <div style="background:${config.bg};border-right:4px solid ${config.border};padding:12px 16px;border-radius:8px;font-size:15px;color:#111;line-height:1.6;">
       ${data.text.replace(/\n/g, '<br>')}
     </div>
-  </td></tr>
+  </td></tr>${historyHtml}${replyInstructions}
 </table>
 </td></tr>
 </table>

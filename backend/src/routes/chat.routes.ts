@@ -120,7 +120,14 @@ router.post(
       let emailMsgId = (session as any).emailMessageId as string | undefined;
       let customerEmailDone: Promise<void> = Promise.resolve();
 
-      console.log(`[Chat] Email mirror: AGENT_EMAIL=${env.AGENT_EMAIL ? 'SET' : 'NOT SET'}, emailMsgId=${emailMsgId ?? 'none'}, session=${sessionId}`);
+      // Build conversation history for email (previous messages + current customer message)
+      const previousMessages = (session.messages ?? []).map((m) => ({
+        sender: m.sender,
+        text: m.text,
+      }));
+      const historyWithCustomer = [...previousMessages, { sender: 'CUSTOMER', text }];
+
+      console.log(`[Chat] Email mirror: AGENT_EMAIL=${env.AGENT_EMAIL ? 'SET' : 'NOT SET'}, emailMsgId=${emailMsgId ?? 'none'}, session=${sessionId}, historyLen=${historyWithCustomer.length}`);
       if (env.AGENT_EMAIL) {
         customerEmailDone = EmailService.sendChatMessageEmail({
           to: env.AGENT_EMAIL,
@@ -128,6 +135,7 @@ router.post(
           text,
           sender: 'CUSTOMER',
           emailMessageId: emailMsgId,
+          recentMessages: historyWithCustomer,
         }).then(async (sentMsgId) => {
           console.log(`[Chat] Customer email sent OK: msgId=${sentMsgId ?? 'null'}`);
           // Save first email's Message-ID on session for threading
@@ -182,13 +190,16 @@ router.post(
             if (env.AGENT_EMAIL) {
               // Wait for customer email to finish so thread anchor is saved
               await customerEmailDone;
-              console.log(`[Chat] AI email mirror: threadId=${emailMsgId ?? 'none'}, aiText="${aiReply.text.slice(0, 50)}"`);
+              // Build full history including AI response
+              const historyWithAi = [...historyWithCustomer, { sender: 'AI', text: aiReply.text }];
+              console.log(`[Chat] AI email mirror: threadId=${emailMsgId ?? 'none'}, historyLen=${historyWithAi.length}, aiText="${aiReply.text.slice(0, 50)}"`);
               EmailService.sendChatMessageEmail({
                 to: env.AGENT_EMAIL,
                 sessionId,
                 text: aiReply.text,
                 sender: 'AI',
                 emailMessageId: emailMsgId,
+                recentMessages: historyWithAi,
               }).catch((err) => console.error('[Chat] AI email FAILED:', err?.message ?? err));
             }
 
