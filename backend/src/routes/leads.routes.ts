@@ -6,6 +6,7 @@ import { apiLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
 import * as NotificationService from '../services/notification.service';
 import * as ApolloService from '../services/apollo.service';
+import * as MondayService from '../services/monday.service';
 import { ingest } from '../services/analytics.service';
 
 const router = Router();
@@ -58,6 +59,15 @@ router.post(
       NotificationService.handleLeadSubmitted({
         leadId: lead.id,
         ...req.body,
+      }).catch(console.error);
+
+      // Create lead on Monday.com CRM (fire-and-forget)
+      MondayService.createLead({
+        name: req.body.fullName ?? req.body.email ?? 'Unknown',
+        email: req.body.email,
+        company: req.body.company,
+        phone: req.body.phone,
+        source: req.body.source ?? 'contact_form',
       }).catch(console.error);
 
       // Analytics: fire-and-forget

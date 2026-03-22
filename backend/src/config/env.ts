@@ -23,6 +23,14 @@ const envSchema = z.object({
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
 
+  // WhatsApp provider selection: 'meta' or 'green_api'
+  WHATSAPP_PROVIDER: z.enum(['meta', 'green_api']).default('meta'),
+
+  // Green API — optional (feature disabled when absent)
+  GREEN_API_URL: z.string().url().default('https://api.green-api.com'),
+  GREEN_API_ID_INSTANCE: z.string().min(1).optional(),
+  GREEN_API_TOKEN: z.string().min(1).optional(),
+
   // OpenAI — optional (AI chat disabled when absent)
   OPENAI_API_KEY: z.string().min(1).optional(),
 
@@ -36,6 +44,11 @@ const envSchema = z.object({
   SENDPULSE_CLIENT_ID: z.string().min(1).optional(),
   SENDPULSE_CLIENT_SECRET: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().optional(),
+
+  // Monday.com CRM — optional (CRM disabled when absent)
+  MONDAY_API_TOKEN: z.string().min(1).optional(),
+  MONDAY_BOARD_ID: z.string().min(1).optional(),
+  MONDAY_COLUMN_MAP: z.string().optional(), // JSON: maps logical names to column IDs
 
   // Payments
   ACTIVE_PAYMENT_PROVIDER: z.enum(['stripe', 'payplus']).default('stripe'),
@@ -61,7 +74,9 @@ const optional = {
   'Google OAuth': env.GOOGLE_CLIENT_SECRET,
   'AI Chat (OpenAI)': env.OPENAI_API_KEY,
   'WhatsApp Notifications': env.WHATSAPP_TOKEN,
+  'Green API WhatsApp': env.GREEN_API_ID_INSTANCE,
   'Apollo Enrichment': env.APOLLO_API_KEY,
+  'Monday.com CRM': env.MONDAY_API_TOKEN,
   'Email (SendPulse)': env.SENDPULSE_CLIENT_ID,
 };
 for (const [feature, key] of Object.entries(optional)) {

@@ -205,6 +205,35 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
       socket.on('agent_typing', () => {
         if (mounted) setIsTyping(true);
       });
+
+      socket.on('mode_changed', (data: { mode: string }) => {
+        if (!mounted) return;
+        setIsTyping(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-${Date.now()}`,
+            text: data.mode === 'HUMAN'
+              ? (t.liveChat as any).agentJoined ?? 'An agent has joined the conversation.'
+              : (t.liveChat as any).aiResumed ?? 'AI assistant has resumed the conversation.',
+            sender: 'agent',
+            timestamp: new Date(),
+          },
+        ]);
+      });
+
+      socket.on('session_closed', () => {
+        if (!mounted) return;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `system-${Date.now()}`,
+            text: (t.liveChat as any).sessionClosed ?? 'This conversation has been closed.',
+            sender: 'agent',
+            timestamp: new Date(),
+          },
+        ]);
+      });
     };
 
     // Resume existing session if provided

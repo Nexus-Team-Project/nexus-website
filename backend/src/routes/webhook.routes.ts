@@ -1,11 +1,24 @@
 import { Router, Request, Response } from 'express';
 import { env } from '../config/env';
 import { hmacSha256 } from '../utils/crypto';
-import * as ChatService from '../services/chat.service';
+import { prisma } from '../config/database';
+import * as OrchestrationService from '../services/orchestration.service';
 import * as PaymentService from '../services/payment.service';
-import { getIO } from '../socket';
 
 const router = Router();
+
+// ─── Idempotency helpers ─────────────────────────────────
+
+async function isProcessed(externalId: string): Promise<boolean> {
+  const existing = await prisma.webhookLog.findUnique({ where: { externalId } });
+  return !!existing;
+}
+
+async function markProcessed(externalId: string, source: string): Promise<void> {
+  await prisma.webhookLog
+    .create({ data: { externalId, source } })
+    .catch(() => {}); // Ignore duplicate key race condition
+}
 
 // ─── GET /api/webhooks/whatsapp — Meta verification ────────
 
@@ -22,7 +35,7 @@ router.get('/whatsapp', (req: Request, res: Response) => {
   }
 });
 
-// ─── POST /api/webhooks/whatsapp — Inbound messages ────────
+// ─── POST /api/webhooks/whatsapp — Meta inbound messages ──
 
 router.post('/whatsapp', async (req: Request, res: Response) => {
   // HMAC verification (raw body preserved by express.raw middleware)
@@ -53,50 +66,61 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
     for (const change of entry.changes ?? []) {
       const value = change.value;
 
-      // Handle incoming messages (agent replies from WhatsApp)
+      // Handle incoming messages — route through orchestration
       for (const msg of value.messages ?? []) {
         if (msg.type !== 'text') continue;
 
-        const from = msg.from; // Agent's WhatsApp number
+        const externalId = msg.id;
+
+        // Idempotency check
+        if (await isProcessed(externalId)) continue;
+        await markProcessed(externalId, 'meta');
+
+        const from = msg.from;
         const text = msg.text?.body ?? '';
-        const waMessageId = msg.id;
-        const threadId = from; // Use sender number as thread identifier
 
-        // Find the open chat session linked to this WhatsApp thread
-        const session = await ChatService.findSessionByWaThread(threadId);
-        if (!session) {
-          console.warn(`[Webhook] No session for WA thread ${threadId}`);
-          continue;
-        }
-
-        // Save agent message to DB
-        const agentMsg = await ChatService.saveMessage({
-          sessionId: session.id,
-          text,
-          sender: 'AGENT',
-          channel: 'WHATSAPP',
-          waMessageId,
-        });
-
-        // Emit to customer browser via Socket.io
-        const io = getIO();
-        io.to(`session:${session.id}`).emit('new_message', {
-          id: agentMsg.id,
-          text: agentMsg.text,
-          sender: agentMsg.sender,
-          channel: agentMsg.channel,
-          timestamp: agentMsg.createdAt,
-        });
+        // Route through orchestration service
+        await OrchestrationService.handleIncomingWhatsAppMessage({ from, text, externalId });
       }
 
       // Handle message status updates (delivered, read, etc.)
       for (const status of value.statuses ?? []) {
-        // Emit status update to relevant session room
-        // We'd need to look up the session by waMessageId for full accuracy
         console.log(`[Webhook] Status update: ${status.id} → ${status.status}`);
       }
     }
   }
+});
+
+// ─── POST /api/webhooks/greenapi — Green API inbound ──────
+
+router.post('/greenapi', async (req: Request, res: Response) => {
+  // Always respond 200 immediately
+  res.status(200).send('OK');
+
+  let payload: GreenApiWebhookPayload;
+  try {
+    const rawBody = req.body as Buffer;
+    payload = JSON.parse(rawBody.toString()) as GreenApiWebhookPayload;
+  } catch {
+    return;
+  }
+
+  // Only process incoming text messages
+  if (payload.typeWebhook !== 'incomingMessageReceived') return;
+  if (payload.messageData?.typeMessage !== 'textMessage') return;
+
+  const externalId = payload.idMessage;
+  const from = payload.senderData?.sender?.replace('@c.us', '') ?? '';
+  const text = payload.messageData?.textMessageData?.textMessage ?? '';
+
+  if (!externalId || !from || !text) return;
+
+  // Idempotency check
+  if (await isProcessed(externalId)) return;
+  await markProcessed(externalId, 'green_api');
+
+  // Route through orchestration service
+  await OrchestrationService.handleIncomingWhatsAppMessage({ from, text, externalId });
 });
 
 // ─── POST /api/webhooks/payment — Stripe events ────────────
@@ -139,6 +163,23 @@ interface WhatsAppPayload {
       };
     }>;
   }>;
+}
+
+interface GreenApiWebhookPayload {
+  typeWebhook: string;
+  instanceData?: { idInstance: number; wid: string };
+  timestamp: number;
+  idMessage: string;
+  senderData?: {
+    chatId: string;
+    sender: string;
+    chatName: string;
+    senderName: string;
+  };
+  messageData?: {
+    typeMessage: string;
+    textMessageData?: { textMessage: string };
+  };
 }
 
 export default router;

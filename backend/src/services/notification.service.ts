@@ -1,5 +1,6 @@
 import { prisma } from '../config/database';
-import * as WhatsApp from './whatsapp.service';
+import * as WhatsApp from './whatsapp-provider';
+import * as MondayService from './monday.service';
 import { broadcastToAdmins } from '../socket';
 import * as AnalyticsService from './analytics.service';
 
@@ -152,7 +153,9 @@ export async function handleChatEscalated(data: {
     timestamp: notification.createdAt,
   });
 
-  // Build rich WhatsApp handoff message
+  const shortId = data.sessionId.slice(-8);
+
+  // Build rich WhatsApp handoff message with takeover instructions
   let waMessage = `🔴 *העברה לנציג — ${topicLabel}*\n\n`;
   if (data.leadData) {
     const ld = data.leadData;
@@ -170,9 +173,22 @@ export async function handleChatEscalated(data: {
     }
   }
 
-  waMessage += `\nסשן: ${data.sessionId.slice(-8)}\nהלקוח מחכה לתגובה!`;
+  waMessage += `\nסשן: ${shortId}`;
+  waMessage += `\n🎯 לקיחת שליטה: /take ${shortId}`;
+  waMessage += `\nהלקוח מחכה לתגובה!`;
 
   await WhatsApp.notifyAgent(waMessage);
+
+  // Create / update lead on Monday.com CRM
+  MondayService.createLead({
+    name: data.leadData?.name ?? 'Chat Lead',
+    email: data.leadData?.email,
+    company: data.leadData?.company,
+    phone: data.leadData?.phone,
+    source: 'chat_escalation',
+    sessionId: data.sessionId,
+    topic: data.topic,
+  }).catch(console.error);
 }
 
 // ─── Lead submitted ───────────────────────────────────────

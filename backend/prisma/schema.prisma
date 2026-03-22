@@ -174,18 +174,20 @@ model PendingRegistration {
 // ─── CHAT ─────────────────────────────────────────────────────────
 
 model ChatSession {
-  id              String     @id @default(cuid())
-  userId          String?
-  user            User?      @relation(fields: [userId], references: [id])
-  visitorId       String
-  status          ChatStatus @default(OPEN)
-  mode            ChatMode   @default(AI)
-  assignedAgentWa String?
-  subject         String?
-  waThreadId      String?
-  metadata        Json?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id                String     @id @default(cuid())
+  userId            String?
+  user              User?      @relation(fields: [userId], references: [id])
+  visitorId         String
+  status            ChatStatus @default(OPEN)
+  mode              ChatMode   @default(AI)
+  assignedAgentWa   String?
+  assignedAgentName String?
+  subject           String?
+  waThreadId        String?
+  modeLockUntil     DateTime?
+  metadata          Json?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
 
   messages ChatMessage[]
 
@@ -550,4 +552,37 @@ model AgentRequest {
 
   @@index([status])
   @@index([requestedAt])
+}
+
+// ─── ORCHESTRATION ──────────────────────────────────────────────────
+
+model WebhookLog {
+  id          String   @id @default(cuid())
+  externalId  String   @unique
+  source      String
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}
+
+model MondayItem {
+  id           String   @id @default(cuid())
+  mondayItemId String   @unique
+  boardId      String
+  sessionId    String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([sessionId])
+}
+
+model AiSuggestion {
+  id          String   @id @default(cuid())
+  sessionId   String
+  suggestion  String   @db.Text
+  sentToAgent Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([sessionId])
 }

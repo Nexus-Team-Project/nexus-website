@@ -6,6 +6,8 @@ import { chatLimiter, apiLimiter } from '../middleware/rateLimiter';
 import * as ChatService from '../services/chat.service';
 import * as AiService from '../services/ai.service';
 import * as NotificationService from '../services/notification.service';
+import * as WhatsAppProvider from '../services/whatsapp-provider';
+import * as AiSuggestionService from '../services/ai-suggestion.service';
 import { getIO } from '../socket';
 
 const router = Router();
@@ -80,10 +82,20 @@ router.post(
       const sessionId = req.params.id;
       const { text, visitorId } = req.body;
 
-      const session = await ChatService.getSession(sessionId);
+      let session = await ChatService.getSession(sessionId);
       if (!session) {
         res.status(404).json({ error: 'Session not found' });
         return;
+      }
+
+      // Mode lock: if a mode transition is in progress, wait briefly and re-fetch
+      if (session.modeLockUntil && new Date(session.modeLockUntil) > new Date()) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        session = (await ChatService.getSession(sessionId))!;
+        if (!session) {
+          res.status(404).json({ error: 'Session not found' });
+          return;
+        }
       }
 
       // 1. Save customer message
@@ -151,8 +163,21 @@ router.post(
           })
           .catch(console.error);
       } else {
-        // HUMAN mode — just save and return (agent replies via WhatsApp → webhook)
+        // HUMAN mode — forward to agent + generate AI suggestion in background
         res.status(201).json(customerMsg);
+
+        // Forward customer message to assigned rep via WhatsApp
+        if (session.assignedAgentWa) {
+          const shortId = sessionId.slice(-8);
+          WhatsAppProvider.sendText(
+            session.assignedAgentWa,
+            `[${shortId}] 👤 לקוח:\n${text}`,
+          ).catch(console.error);
+        }
+
+        // Generate AI suggestion in background (sent to agent only, never to customer)
+        const msgs = session.messages.map((m) => ({ sender: m.sender, text: m.text }));
+        AiSuggestionService.generateSuggestion(sessionId, text, msgs).catch(console.error);
       }
     } catch (err) {
       next(err);

@@ -454,6 +454,9 @@ export const translations = {
       defaultResponse: 'Thanks for your message! A sales representative will be with you shortly.',
       inputPlaceholder: 'Type your message here...',
       selectTopicPrompt: 'Select a topic so we can help you better',
+      agentJoined: 'An agent has joined the conversation.',
+      aiResumed: 'AI assistant has resumed the conversation.',
+      sessionClosed: 'This conversation has been closed.',
     },
     partnersPage: {
       heroTitle: 'Find a Nexus partner with the benefit or solution you need',
@@ -928,6 +931,9 @@ export const translations = {
       defaultResponse: 'תודה על ההודעה! נציג יחזור אליכם בהקדם.',
       inputPlaceholder: 'כתבו את ההודעה שלכם כאן...',
       selectTopicPrompt: 'בחר נושא כדי שנוכל לעזור לך טוב יותר',
+      agentJoined: 'נציג הצטרף לשיחה.',
+      aiResumed: 'העוזר החכם חזר לשיחה.',
+      sessionClosed: 'השיחה נסגרה.',
     },
     partnersPage: {
       heroTitle: 'מצא שותף של נקסוס עם ההטבה או הפתרון שאתה צריך',
