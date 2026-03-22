@@ -17,20 +17,6 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
 
-  // WhatsApp Meta Cloud API — optional (feature disabled when absent)
-  WHATSAPP_TOKEN: z.string().min(1).optional(),
-  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
-  WHATSAPP_APP_SECRET: z.string().min(1).optional(),
-  WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
-
-  // WhatsApp provider selection: 'meta' or 'green_api'
-  WHATSAPP_PROVIDER: z.enum(['meta', 'green_api']).default('meta'),
-
-  // Green API — optional (feature disabled when absent)
-  GREEN_API_URL: z.string().url().default('https://api.green-api.com'),
-  GREEN_API_ID_INSTANCE: z.string().min(1).optional(),
-  GREEN_API_TOKEN: z.string().min(1).optional(),
-
   // OpenAI — optional (AI chat disabled when absent)
   OPENAI_API_KEY: z.string().min(1).optional(),
 
@@ -38,7 +24,6 @@ const envSchema = z.object({
   APOLLO_API_KEY: z.string().min(1).optional(),
 
   // Notifications
-  AGENT_WHATSAPP_NUMBER: z.string().min(1).optional(),
   AGENT_EMAIL: z.string().email().optional(), // Email for chat escalation alerts
   INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Secret for inbound email webhook
 
@@ -81,8 +66,6 @@ export type Env = typeof env;
 const optional = {
   'Google OAuth': env.GOOGLE_CLIENT_SECRET,
   'AI Chat (OpenAI)': env.OPENAI_API_KEY,
-  'WhatsApp Notifications': env.WHATSAPP_TOKEN,
-  'Green API WhatsApp': env.GREEN_API_ID_INSTANCE,
   'Apollo Enrichment': env.APOLLO_API_KEY,
   'Monday.com CRM': env.MONDAY_API_TOKEN,
   'Email (SendPulse)': env.SENDPULSE_CLIENT_ID,

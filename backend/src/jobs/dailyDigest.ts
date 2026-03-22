@@ -35,8 +35,7 @@ export function scheduleDailyDigest(): void {
           year: 'numeric',
         });
 
-        // Send to the agent email (extracted from AGENT_WHATSAPP_NUMBER env owner)
-        // In production, configure AGENT_EMAIL separately
+        // Send daily digest to the agent email
         const agentEmail = process.env.AGENT_EMAIL;
         if (agentEmail) {
           await sendDailyDigest(agentEmail, {

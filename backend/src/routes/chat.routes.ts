@@ -6,8 +6,6 @@ import { chatLimiter, apiLimiter } from '../middleware/rateLimiter';
 import * as ChatService from '../services/chat.service';
 import * as AiService from '../services/ai.service';
 import * as NotificationService from '../services/notification.service';
-import * as WhatsAppProvider from '../services/whatsapp-provider';
-import * as AiSuggestionService from '../services/ai-suggestion.service';
 import * as EmailService from '../services/email.service';
 import { env } from '../config/env';
 import { getIO } from '../socket';
@@ -188,29 +186,8 @@ router.post(
           })
           .catch(console.error);
       } else {
-        // HUMAN mode — forward to agent via WhatsApp + generate AI suggestion
+        // HUMAN mode — email already mirrored above
         res.status(201).json(customerMsg);
-
-        // (Email already sent above for all modes)
-
-        // Forward via WhatsApp group (preferred) or direct
-        const groupId = (session as any).whatsappGroupId as string | undefined;
-        if (groupId) {
-          WhatsAppProvider.sendToGroup(
-            groupId,
-            `*לקוח:*\n${text}`,
-          ).catch(console.error);
-        } else if (session.assignedAgentWa) {
-          const shortId = sessionId.slice(-8);
-          WhatsAppProvider.sendText(
-            session.assignedAgentWa,
-            `[${shortId}] לקוח:\n${text}`,
-          ).catch(console.error);
-        }
-
-        // Generate AI suggestion in background (sent to agent only, never to customer)
-        const msgs = session.messages.map((m) => ({ sender: m.sender, text: m.text }));
-        AiSuggestionService.generateSuggestion(sessionId, text, msgs).catch(console.error);
       }
     } catch (err) {
       next(err);
@@ -235,7 +212,7 @@ router.post(
         const msgs = fullSession.messages.map((m) => ({ sender: m.sender, text: m.text }));
         const topic = AiService.detectEscalationTopic(msgs);
 
-        // Get last 5 messages for WhatsApp handoff context
+        // Get last 5 messages for escalation context
         const recentMsgs = msgs.slice(-5).map((m) => ({
           sender: m.sender === 'CUSTOMER' ? 'לקוח' : 'AI',
           text: m.text.slice(0, 200),
