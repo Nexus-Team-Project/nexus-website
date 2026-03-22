@@ -118,15 +118,18 @@ router.post(
 
       // 3. Mirror customer message to email thread (all modes)
       let emailMsgId = (session as any).emailMessageId as string | undefined;
+      let customerEmailDone: Promise<void> = Promise.resolve();
+
       console.log(`[Chat] Email mirror: AGENT_EMAIL=${env.AGENT_EMAIL ? 'SET' : 'NOT SET'}, emailMsgId=${emailMsgId ?? 'none'}, session=${sessionId}`);
       if (env.AGENT_EMAIL) {
-        EmailService.sendChatMessageEmail({
+        customerEmailDone = EmailService.sendChatMessageEmail({
           to: env.AGENT_EMAIL,
           sessionId,
           text,
           sender: 'CUSTOMER',
           emailMessageId: emailMsgId,
         }).then(async (sentMsgId) => {
+          console.log(`[Chat] Customer email sent OK: msgId=${sentMsgId ?? 'null'}`);
           // Save first email's Message-ID on session for threading
           if (sentMsgId && !emailMsgId) {
             emailMsgId = sentMsgId;
@@ -137,7 +140,9 @@ router.post(
             }).catch(() => {});
             console.log(`[Chat] Saved thread anchor: ${sentMsgId}`);
           }
-        }).catch((err) => console.error('[Chat] Email mirror failed:', err));
+        }).catch((err) => {
+          console.error('[Chat] Customer email FAILED:', err?.message ?? err);
+        });
       }
 
       // 4. If in AI mode → generate AI reply (async, returns 200 right away)
@@ -173,23 +178,18 @@ router.post(
               actions: aiReply.actions,
             });
 
-            // Mirror AI reply to email thread (re-fetch emailMessageId in case it was saved above)
+            // Mirror AI reply to email thread
             if (env.AGENT_EMAIL) {
-              // Get fresh emailMessageId from DB (might have been set by customer email above)
-              const { prisma } = await import('../config/database');
-              const freshSession = await prisma.chatSession.findUnique({
-                where: { id: sessionId },
-                select: { emailMessageId: true },
-              });
-              const threadId = freshSession?.emailMessageId ?? emailMsgId;
-              console.log(`[Chat] AI email mirror: threadId=${threadId ?? 'none'}, aiText="${aiReply.text.slice(0, 50)}"`);
+              // Wait for customer email to finish so thread anchor is saved
+              await customerEmailDone;
+              console.log(`[Chat] AI email mirror: threadId=${emailMsgId ?? 'none'}, aiText="${aiReply.text.slice(0, 50)}"`);
               EmailService.sendChatMessageEmail({
                 to: env.AGENT_EMAIL,
                 sessionId,
                 text: aiReply.text,
                 sender: 'AI',
-                emailMessageId: threadId,
-              }).catch((err) => console.error('[Chat] AI email mirror failed:', err));
+                emailMessageId: emailMsgId,
+              }).catch((err) => console.error('[Chat] AI email FAILED:', err?.message ?? err));
             }
 
             // Save lead data if AI extracted any

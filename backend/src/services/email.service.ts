@@ -36,11 +36,14 @@ async function getAccessToken(): Promise<string> {
 interface SendMailOptions {
   to: string;
   toName?: string;
+  fromName?: string;
   subject: string;
   html: string;
   text?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  /** Label for logging (e.g. 'CUSTOMER', 'AI') */
+  _label?: string;
 }
 
 async function sendMail(options: SendMailOptions): Promise<string | null> {
@@ -48,7 +51,8 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
     console.warn('⚠️  Email not sent — SENDPULSE_CLIENT_ID/SECRET not configured');
     return null;
   }
-  console.log(`📧  Sending email to ${options.to}, subject: "${options.subject}", html length: ${options.html?.length ?? 0}`);
+  const label = options._label ?? 'GENERIC';
+  console.log(`📧  [${label}] Sending email to ${options.to}, subject: "${options.subject}"`);
   try {
     const token = await getAccessToken();
     const plainText = options.text ?? options.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -57,7 +61,7 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
       html: Buffer.from(options.html, 'utf8').toString('base64'),
       text: plainText,
       subject: options.subject,
-      from: { name: FROM_NAME, email: FROM_EMAIL },
+      from: { name: options.fromName ?? FROM_NAME, email: FROM_EMAIL },
       to: [{ name: options.toName ?? options.to, email: options.to }],
     };
 
@@ -81,14 +85,14 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
       body,
     });
     const data = await res.json() as { result?: boolean; message?: string; id?: string };
-    console.log(`📬  SendPulse response:`, JSON.stringify(data));
+    console.log(`📬  [${label}] SendPulse response: ${JSON.stringify(data)}`);
     if (!res.ok || data.result === false) {
       throw new Error(data.message ?? `HTTP ${res.status}`);
     }
-    console.log(`✅  Email sent to ${options.to}`);
+    console.log(`✅  [${label}] Email sent to ${options.to} — id: ${data.id ?? 'none'}`);
     return data.id ?? null;
   } catch (err: any) {
-    console.error(`❌  Email send failed to ${options.to}:`, err?.message ?? err);
+    console.error(`❌  [${label}] Email FAILED to ${options.to}:`, err?.message ?? err);
     throw err;
   }
 }
@@ -390,6 +394,7 @@ export async function sendEscalationAlert(data: {
   await sendMail({
     to: data.to,
     subject,
+    _label: 'ESCALATION',
     headers: {
       'Message-ID': messageId,
       'References': threadRef,
@@ -487,8 +492,10 @@ export async function sendChatMessageEmail(data: {
   await sendMail({
     to: data.to,
     toName: 'Sales',
+    fromName: config.fromName,
     subject,
     headers,
+    _label: `CHAT-${data.sender}`,
     html: `<!doctype html>
 <html lang="he" dir="rtl">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
