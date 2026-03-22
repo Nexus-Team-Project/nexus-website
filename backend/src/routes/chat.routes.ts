@@ -118,6 +118,7 @@ router.post(
 
       // 3. Mirror customer message to email thread (all modes)
       const emailMsgId = (session as any).emailMessageId as string | undefined;
+      console.log(`[Chat] Email mirror check: AGENT_EMAIL=${env.AGENT_EMAIL ?? 'NOT SET'}, sessionId=${sessionId}`);
       if (env.AGENT_EMAIL) {
         EmailService.sendChatMessageEmail({
           to: env.AGENT_EMAIL,
