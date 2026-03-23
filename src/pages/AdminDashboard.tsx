@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import {
   Users, MessageSquare, TrendingUp, Percent,
   Star, Brain, CreditCard, RefreshCw, LogOut, Bell,
+  CheckCircle, AlertTriangle, Zap, BookOpen,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
@@ -48,11 +49,27 @@ interface Visitor {
   lastPage: string | null;
 }
 
+interface KnowledgeGap {
+  id: string;
+  question: string;
+  bestScore: number | null;
+  createdAt: string;
+}
+
 interface AiStats {
   totalRatings: number;
   avgRating: number;
+  ratingTrend: number | null;
   lowRatedCount: number;
   knowledgeChunks: number;
+  resolutionRate: number;
+  escalationRate: number;
+  totalSessions: number;
+  aiResolvedSessions: number;
+  escalatedSessions: number;
+  autoExamplesCount: number;
+  unresolvedGaps: number;
+  topKnowledgeGaps: KnowledgeGap[];
 }
 
 interface RevenueData {
@@ -324,6 +341,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resolvingGap, setResolvingGap] = useState<string | null>(null);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const fetchAll = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true);
@@ -360,7 +379,34 @@ export default function AdminDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Close notifications on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    };
+    if (notifOpen) document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [notifOpen]);
+
   const handleLogout = async () => { await logout(); navigate('/login'); };
+
+  const resolveGap = async (id: string) => {
+    setResolvingGap(id);
+    try {
+      await api.patch(`/api/dashboard/knowledge-gaps/${id}/resolve`, {});
+      setAiStats(prev => prev ? {
+        ...prev,
+        unresolvedGaps: prev.unresolvedGaps - 1,
+        topKnowledgeGaps: prev.topKnowledgeGaps.filter(g => g.id !== id),
+      } : prev);
+    } catch {
+      // ignore
+    } finally {
+      setResolvingGap(null);
+    }
+  };
 
   const markAllRead = async () => {
     if (!notifications.length) return;
@@ -415,7 +461,7 @@ export default function AdminDashboard() {
             </button>
 
             {/* Notifications */}
-            <div className="relative">
+            <div className="relative" ref={notifRef}>
               <button
                 onClick={() => setNotifOpen(o => !o)}
                 className="relative p-2 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all"
@@ -516,34 +562,92 @@ export default function AdminDashboard() {
 
         {/* AI Stats + Visitors */}
         <div className="grid lg:grid-cols-3 gap-4">
-          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6">
-            <div className="flex items-center gap-2 mb-5">
+          <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 flex flex-col gap-5">
+            <div className="flex items-center gap-2">
               <Brain size={15} className="text-stripe-purple" />
               <h2 className="text-sm font-semibold text-stripe-dark">AI Assistant</h2>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            {/* Rating row */}
+            <div className="flex items-end gap-3">
               <div>
-                <div className="text-2xl font-bold text-stripe-dark">{aiStats?.avgRating.toFixed(1) ?? '—'}</div>
-                <div className="text-xs text-stripe-gray mt-1">Avg Rating</div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold text-stripe-dark">{aiStats?.avgRating.toFixed(1) ?? '—'}</span>
+                  {aiStats?.ratingTrend !== null && aiStats?.ratingTrend !== undefined && (
+                    <span className={`text-xs font-medium ${aiStats.ratingTrend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                      {aiStats.ratingTrend >= 0 ? '+' : ''}{aiStats.ratingTrend}
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-0.5 mt-1">
                   {[1, 2, 3, 4, 5].map(i => (
-                    <Star key={i} size={10} fill={i <= Math.round(aiStats?.avgRating ?? 0) ? '#f59e0b' : 'none'} stroke="#f59e0b" />
+                    <Star key={i} size={11} fill={i <= Math.round(aiStats?.avgRating ?? 0) ? '#f59e0b' : 'none'} stroke="#f59e0b" />
+                  ))}
+                </div>
+                <div className="text-xs text-stripe-gray mt-1">{aiStats?.totalRatings ?? 0} ratings</div>
+              </div>
+            </div>
+
+            {/* 4-stat grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-emerald-50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <CheckCircle size={12} className="text-emerald-600" />
+                  <span className="text-xs text-emerald-700 font-medium">Resolution</span>
+                </div>
+                <div className="text-xl font-bold text-emerald-700">{aiStats?.resolutionRate ?? 0}%</div>
+                <div className="text-[10px] text-emerald-600 mt-0.5">{aiStats?.aiResolvedSessions ?? 0} / {aiStats?.totalSessions ?? 0} sessions</div>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Zap size={12} className="text-amber-600" />
+                  <span className="text-xs text-amber-700 font-medium">Escalation</span>
+                </div>
+                <div className="text-xl font-bold text-amber-700">{aiStats?.escalationRate ?? 0}%</div>
+                <div className="text-[10px] text-amber-600 mt-0.5">{aiStats?.escalatedSessions ?? 0} escalated</div>
+              </div>
+              <div className="bg-red-50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <AlertTriangle size={12} className="text-red-500" />
+                  <span className="text-xs text-red-600 font-medium">Low Rated ≤2</span>
+                </div>
+                <div className="text-xl font-bold text-red-600">{aiStats?.lowRatedCount ?? 0}</div>
+              </div>
+              <div className="bg-indigo-50 rounded-lg p-3">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <BookOpen size={12} className="text-indigo-600" />
+                  <span className="text-xs text-indigo-700 font-medium">Knowledge</span>
+                </div>
+                <div className="text-xl font-bold text-indigo-700">{aiStats?.knowledgeChunks ?? 0}</div>
+                <div className="text-[10px] text-indigo-600 mt-0.5">{aiStats?.autoExamplesCount ?? 0} auto-examples</div>
+              </div>
+            </div>
+
+            {/* Knowledge Gaps */}
+            {(aiStats?.unresolvedGaps ?? 0) > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-stripe-dark">Knowledge Gaps</span>
+                  <span className="text-[10px] font-medium text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">
+                    {aiStats!.unresolvedGaps} unresolved
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {aiStats!.topKnowledgeGaps.map(gap => (
+                    <div key={gap.id} className="flex items-start gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
+                      <span className="flex-1 text-stripe-dark leading-snug line-clamp-2">{gap.question}</span>
+                      <button
+                        onClick={() => void resolveGap(gap.id)}
+                        disabled={resolvingGap === gap.id}
+                        className="shrink-0 text-[10px] font-semibold text-stripe-purple hover:text-stripe-purple/80 disabled:opacity-40 transition-colors mt-0.5"
+                      >
+                        {resolvingGap === gap.id ? '…' : 'Resolve'}
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
-              <div>
-                <div className="text-2xl font-bold text-stripe-dark">{aiStats?.totalRatings ?? 0}</div>
-                <div className="text-xs text-stripe-gray mt-1">Total Ratings</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-red-500">{aiStats?.lowRatedCount ?? 0}</div>
-                <div className="text-xs text-stripe-gray mt-1">Low Rated ≤2</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-emerald-600">{aiStats?.knowledgeChunks ?? 0}</div>
-                <div className="text-xs text-stripe-gray mt-1">Knowledge Chunks</div>
-              </div>
-            </div>
+            )}
           </div>
 
           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6 overflow-hidden">
