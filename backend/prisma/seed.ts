@@ -337,22 +337,31 @@ async function main() {
     console.log(`⏭️  Knowledge chunks already seeded (${existingChunks} rows) — skipping`);
   }
 
-  // ─── Admin user ───────────────────────────────────────────
-  const adminEmail = process.env.ADMIN_EMAIL ?? 'admin@nexus.com';
-  const adminPassword = process.env.ADMIN_PASSWORD ?? 'Change-Me-Immediately-123!';
+  // ─── Admin / Agent users ──────────────────────────────────
+  const adminUsers = [
+    { email: process.env.ADMIN_EMAIL ?? 'admin@nexus.com', password: process.env.ADMIN_PASSWORD ?? 'Change-Me-Immediately-123!', fullName: 'Nexus Admin', role: 'ADMIN' as const },
+    { email: 'sales@nexus-payment.com', password: 'Nexus_123456', fullName: 'Nexus Sales', role: 'ADMIN' as const },
+    { email: 'benefitree1@gmail.com',   password: 'Nexus_123456', fullName: 'Benefitree',  role: 'ADMIN' as const },
+  ];
 
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    create: {
-      email: adminEmail,
-      fullName: 'Nexus Admin',
-      passwordHash: await bcrypt.hash(adminPassword, 12),
-      role: 'ADMIN',
-      emailVerified: true,
-    },
-    update: {},
-  });
-  console.log(`✅ Admin user: ${adminEmail}`);
+  for (const u of adminUsers) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      create: {
+        email: u.email,
+        fullName: u.fullName,
+        passwordHash: await bcrypt.hash(u.password, 12),
+        role: u.role,
+        emailVerified: true,
+      },
+      update: {
+        role: u.role,
+        emailVerified: true,
+        passwordHash: await bcrypt.hash(u.password, 12),
+      },
+    });
+    console.log(`✅ Admin user: ${u.email}`);
+  }
 
   // ─── Partner brands (from Wix CMS CSV, 71 entries) ───────
   const existingPartners = await prisma.partner.count();

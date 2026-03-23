@@ -28,7 +28,7 @@ interface ChatMessage {
 
 // ─── Access Control ──────────────────────────────────────────
 
-const ALLOWED_EMAIL = 'sales@nexus-payment.com';
+const ALLOWED_EMAILS = ['sales@nexus-payment.com', 'benefitree1@gmail.com'];
 
 // ─── Component ───────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ const LiveInbox = () => {
   const { user } = useAuth();
 
   // Access control
-  if (!user || user.email !== ALLOWED_EMAIL) {
+  if (!user || !ALLOWED_EMAILS.includes(user.email)) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-slate-950" dir="rtl">
         <div className="text-center p-8">
