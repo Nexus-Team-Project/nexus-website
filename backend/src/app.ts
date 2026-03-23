@@ -78,7 +78,7 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     env: env.NODE_ENV,
-    build: '2026-03-23b',
+    build: '2026-03-23c',
     emailConfigured: !!(env.SENDPULSE_CLIENT_ID && env.SENDPULSE_CLIENT_SECRET),
   });
 });
@@ -205,6 +205,7 @@ if (existsSync(frontendDist)) {
     express.static(frontendDist, {
       redirect: false,
       maxAge: '1h',
+      index: false, // Don't serve index.html from static — SPA handler below does it with no-cache
     }),
   );
   app.get(/^(?!\/api).*/, (req, res) => {
