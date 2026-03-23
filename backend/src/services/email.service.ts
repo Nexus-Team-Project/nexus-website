@@ -10,27 +10,10 @@ const FRONTEND = env.FRONTEND_URL;
 let _smtpTransport: nodemailer.Transporter | null = null;
 
 function getSmtpTransport(): nodemailer.Transporter | null {
-  if (!env.SMTP_HOST || !env.SMTP_USER || !env.SMTP_PASS) return null;
-  if (!_smtpTransport) {
-    _smtpTransport = nodemailer.createTransport({
-      host: env.SMTP_HOST,
-      port: env.SMTP_PORT,
-      secure: env.SMTP_PORT === 465, // true for 465 (SSL), false for 587/2525 (STARTTLS)
-      auth: { user: env.SMTP_USER, pass: env.SMTP_PASS },
-      connectionTimeout: 10_000,  // 10s to connect
-      greetingTimeout: 10_000,    // 10s for SMTP greeting
-      socketTimeout: 30_000,      // 30s per socket operation
-      tls: { rejectUnauthorized: false }, // SendPulse cert flexibility
-    });
-    console.log(`📬  SMTP transport created: ${env.SMTP_HOST}:${env.SMTP_PORT} (secure=${env.SMTP_PORT === 465})`);
-    // Verify SMTP connection in background (non-blocking)
-    _smtpTransport.verify().then(() => {
-      console.log('✅  SMTP connection verified OK');
-    }).catch((err: any) => {
-      console.error('❌  SMTP connection verify FAILED:', err?.message ?? err);
-    });
-  }
-  return _smtpTransport;
+  // SMTP disabled — causes connection hangs on Railway.
+  // Using SendPulse REST API only for now.
+  // To re-enable: remove this early return and set SMTP_HOST/USER/PASS env vars.
+  return null;
 }
 
 // ─── SendPulse HTTP API — fallback when SMTP not configured ──
