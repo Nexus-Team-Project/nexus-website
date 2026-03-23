@@ -168,24 +168,41 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
     });
-    const user = await prisma.user.findUnique({
-      where: { id: result.userId },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        avatarUrl: true,
-        emailVerified: true,
-        onboardingDone: true,
-        orgMemberships: {
-          select: {
-            role: true,
-            org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
+    let user: any = null;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: result.userId },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          avatarUrl: true,
+          emailVerified: true,
+          onboardingDone: true,
+          orgMemberships: {
+            select: {
+              role: true,
+              org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
+            },
           },
         },
-      },
-    });
+      });
+    } catch {
+      user = await prisma.user.findUnique({
+        where: { id: result.userId },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          avatarUrl: true,
+          emailVerified: true,
+          onboardingDone: true,
+        },
+      });
+      if (user) user.orgMemberships = [];
+    }
     const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
     res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
     res.json({ accessToken: result.accessToken, user });
@@ -320,29 +337,53 @@ router.post(
 
 router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.sub },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        country: true,
-        avatarUrl: true,
-        emailVerified: true,
-        emailUpdates: true,
-        provider: true,
-        lastLoginAt: true,
-        createdAt: true,
-        onboardingDone: true,
-        orgMemberships: {
-          select: {
-            role: true,
-            org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
+    // Try full query with orgMemberships first; fall back without if table missing
+    let user: any = null;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: req.user!.sub },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          country: true,
+          avatarUrl: true,
+          emailVerified: true,
+          emailUpdates: true,
+          provider: true,
+          lastLoginAt: true,
+          createdAt: true,
+          onboardingDone: true,
+          orgMemberships: {
+            select: {
+              role: true,
+              org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
+            },
           },
         },
-      },
-    });
+      });
+    } catch {
+      // orgMemberships table may not exist yet — query without it
+      user = await prisma.user.findUnique({
+        where: { id: req.user!.sub },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          country: true,
+          avatarUrl: true,
+          emailVerified: true,
+          emailUpdates: true,
+          provider: true,
+          lastLoginAt: true,
+          createdAt: true,
+          onboardingDone: true,
+        },
+      });
+      if (user) (user as any).orgMemberships = [];
+    }
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
