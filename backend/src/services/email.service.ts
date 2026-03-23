@@ -495,39 +495,14 @@ export async function sendEscalationAlert(data: {
   return messageId;
 }
 
-// ─── Mirror chat message to email thread ──────────────────
+// ─── Mirror chat message to email thread (SendPulse) ──────
 
 /**
- * Render a list of messages as styled HTML for email conversation history.
- */
-function renderConversationHtml(
-  messages: Array<{ sender: string; text: string }>,
-  currentIndex?: number,
-): string {
-  if (messages.length === 0) return '';
-
-  const senderConfig: Record<string, { label: string; bg: string; border: string }> = {
-    CUSTOMER: { label: '👤 לקוח', bg: '#e0e7ff', border: '#818cf8' },
-    AI:       { label: '🤖 AI',  bg: '#f3f4f6', border: '#9ca3af' },
-    AGENT:    { label: '👨‍💼 נציג', bg: '#ecfdf5', border: '#10b981' },
-    SYSTEM:   { label: '⚙️ מערכת', bg: '#fef3c7', border: '#f59e0b' },
-  };
-
-  return messages.map((m, i) => {
-    const cfg = senderConfig[m.sender] ?? senderConfig.CUSTOMER;
-    const isCurrent = currentIndex !== undefined && i === currentIndex;
-    const opacity = isCurrent ? '1' : '0.85';
-    const weight = isCurrent ? 'font-weight:bold;' : '';
-    return `<div style="background:${cfg.bg};border-right:3px solid ${cfg.border};padding:8px 12px;border-radius:6px;margin:4px 0;opacity:${opacity};${weight}">
-      <span style="font-size:10px;color:#6b7280;">${cfg.label}</span><br>
-      <span style="font-size:13px;color:#111;line-height:1.5;">${m.text.replace(/\n/g, '<br>').slice(0, 500)}</span>
-    </div>`;
-  }).join('');
-}
-
-/**
- * Send any chat message (customer, AI, or agent) as an email in the conversation thread.
- * Each email includes the FULL conversation history so the agent always sees context.
+ * Send a customer message as an email via SendPulse.
+ * This creates an INBOUND email in the agent's inbox (FROM Nexus Chat TO agent).
+ * The email is simple — no conversation history, since all messages thread together.
+ *
+ * For AI replies, use OutlookGraph.sendReplyFromMailbox() instead (Graph API).
  */
 export async function sendChatMessageEmail(data: {
   to: string;
@@ -535,8 +510,6 @@ export async function sendChatMessageEmail(data: {
   text: string;
   sender: 'CUSTOMER' | 'AI' | 'AGENT' | 'SYSTEM';
   emailMessageId?: string | null;
-  /** Full conversation history up to (and including) this message */
-  recentMessages?: Array<{ sender: string; text: string }>;
 }): Promise<string | null> {
   if (data.sender === 'SYSTEM') return null;
 
@@ -562,59 +535,33 @@ export async function sendChatMessageEmail(data: {
     headers['In-Reply-To'] = data.emailMessageId;
   }
 
-  // Different styling per sender
-  const config = {
-    CUSTOMER: { label: 'לקוח', bg: '#e0e7ff', border: '#818cf8', fromName: 'Nexus Chat' },
-    AI:       { label: 'AI', bg: '#f3f4f6', border: '#9ca3af', fromName: 'Nexus Chat' },
-    AGENT:    { label: 'נציג', bg: '#ecfdf5', border: '#10b981', fromName: 'Nexus Chat' },
-  }[data.sender] ?? { label: data.sender, bg: '#f3f4f6', border: '#9ca3af', fromName: 'Nexus Chat' };
-
-  // Build conversation history HTML
-  let historyHtml = '';
-  const msgs = data.recentMessages ?? [];
-  if (msgs.length > 1) {
-    // Show all messages except the very last one (which is the "new" message shown above)
-    const previousMsgs = msgs.slice(0, -1);
-    historyHtml = `
-  <tr><td style="padding-top:16px;">
-    <div style="border-top:1px solid #e5e7eb;padding-top:12px;margin-top:8px;">
-      <div style="font-size:11px;color:#6b7280;margin-bottom:8px;">📋 היסטוריית שיחה (${previousMsgs.length} הודעות קודמות):</div>
-      ${renderConversationHtml(previousMsgs)}
-    </div>
-  </td></tr>`;
-  }
-
-  // Footer with reply instructions
-  const replyInstructions = `
-  <tr><td style="padding:14px 0 4px 0;">
-    <div style="background:#ecfdf5;border:1px solid #10b981;border-radius:8px;padding:10px 14px;text-align:center;">
-      <div style="font-size:13px;color:#065f46;font-weight:bold;">↩️ ענה למייל הזה כדי להגיב ללקוח בצ'אט</div>
-    </div>
-  </td></tr>`;
+  // Sender label for display
+  const senderLabel = {
+    CUSTOMER: '👤 לקוח',
+    AI: '🤖 AI',
+    AGENT: '👨‍💼 נציג',
+  }[data.sender] ?? data.sender;
 
   await sendMail({
     to: data.to,
     toName: 'Sales',
-    fromName: config.fromName,
+    fromName: 'Nexus Chat',
     subject,
     headers,
     _label: `CHAT-${data.sender}`,
     html: `<!doctype html>
 <html lang="he" dir="rtl">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
-<table width="100%" cellpadding="0" cellspacing="0">
-<tr><td align="center" style="padding:16px 15px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:12px;padding:20px;box-shadow:0 4px 12px rgba(0,0,0,0.04);">
-  <tr><td>
-    <div style="font-size:11px;color:#6b7280;margin-bottom:6px;">צ'אט ${shortId} — הודעה חדשה מ${config.label}:</div>
-    <div style="background:${config.bg};border-right:4px solid ${config.border};padding:12px 16px;border-radius:8px;font-size:15px;color:#111;line-height:1.6;">
-      ${data.text.replace(/\n/g, '<br>')}
-    </div>
-  </td></tr>${historyHtml}${replyInstructions}
-</table>
-</td></tr>
-</table>
+<body style="margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
+<div style="max-width:560px;margin:0 auto;padding:12px;">
+  <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">${senderLabel} — צ'אט ${shortId}</div>
+  <div style="font-size:15px;color:#111;line-height:1.6;">
+    ${data.text.replace(/\n/g, '<br>')}
+  </div>
+  <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;">
+    <div style="font-size:12px;color:#065f46;text-align:center;">↩️ ענה למייל הזה כדי להגיב ללקוח בצ'אט</div>
+  </div>
+</div>
 </body></html>`,
   });
 
@@ -634,6 +581,21 @@ export const sendCustomerMessageEmail = (data: {
   sender: 'CUSTOMER',
   emailMessageId: data.emailMessageId,
 });
+
+// ─── Build AI reply HTML for Graph API outbound ──────────
+
+/**
+ * Build the HTML body for an AI reply sent via Graph API.
+ * Clearly labeled as AI-generated so the agent knows it's automated.
+ */
+export function buildAiReplyHtml(text: string, shortId: string): string {
+  return `<div dir="rtl" style="font-family:Arial,Helvetica,sans-serif;direction:rtl;">
+<div style="font-size:12px;color:#6b7280;margin-bottom:8px;">🤖 תגובת AI — צ'אט ${shortId}</div>
+<div style="font-size:15px;color:#111;line-height:1.6;">
+${text.replace(/\n/g, '<br>')}
+</div>
+</div>`;
+}
 
 // ─── Daily digest ──────────────────────────────────────────
 

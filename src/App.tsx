@@ -39,6 +39,7 @@ const NexusLandingPage   = lazy(() => import('./pages/NexusLandingPage'));
 const ApiDocsPage        = lazy(() => import('./pages/ApiDocsPage'));
 const ChangelogPage      = lazy(() => import('./pages/Changelog'));
 const ChangelogPageHe    = lazy(() => import('./pages/ChangelogHe'));
+const LiveInbox          = lazy(() => import('./pages/LiveInbox'));
 
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
@@ -164,6 +165,12 @@ function RouteAnalytics() {
         : 'MARKETING';
     page(channel, pathname);
     window.scrollTo(0, 0);
+
+    // Keep <html lang/dir> in sync with the active route so the browser
+    // renders the tab title with the correct language/direction hints.
+    const isHe = pathname.startsWith('/he');
+    document.documentElement.lang = isHe ? 'he' : 'en';
+    document.documentElement.dir  = isHe ? 'rtl' : 'ltr';
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
@@ -337,6 +344,11 @@ function App() {
           <Route path="/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
               <AdminDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/inbox" element={
+            <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
+              <LiveInbox />
             </ProtectedRoute>
           } />
         </Routes>

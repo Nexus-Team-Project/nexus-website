@@ -7,6 +7,7 @@ import * as ChatService from '../services/chat.service';
 import * as AiService from '../services/ai.service';
 import * as NotificationService from '../services/notification.service';
 import * as EmailService from '../services/email.service';
+import * as OutlookGraph from '../services/outlook-graph.service';
 import { env } from '../config/env';
 import { getIO } from '../socket';
 
@@ -117,25 +118,22 @@ router.post(
       });
 
       // 3. Mirror customer message to email thread (all modes)
+      const shortId = sessionId.slice(-8);
       let emailMsgId = (session as any).emailMessageId as string | undefined;
+      let outlookConvId = (session as any).outlookConversationId as string | undefined;
+      let outlookLastMsgId = (session as any).outlookLastMessageId as string | undefined;
       let customerEmailDone: Promise<void> = Promise.resolve();
 
-      // Build conversation history for email (previous messages + current customer message)
-      const previousMessages = (session.messages ?? []).map((m) => ({
-        sender: m.sender,
-        text: m.text,
-      }));
-      const historyWithCustomer = [...previousMessages, { sender: 'CUSTOMER', text }];
+      console.log(`[Chat] Email mirror: AGENT_EMAIL=${env.AGENT_EMAIL ? 'SET' : 'NOT SET'}, emailMsgId=${emailMsgId ?? 'none'}, outlookConvId=${outlookConvId ?? 'none'}, session=${sessionId}`);
 
-      console.log(`[Chat] Email mirror: AGENT_EMAIL=${env.AGENT_EMAIL ? 'SET' : 'NOT SET'}, emailMsgId=${emailMsgId ?? 'none'}, session=${sessionId}, historyLen=${historyWithCustomer.length}`);
       if (env.AGENT_EMAIL) {
+        // Send customer message via SendPulse (appears as received email in agent's inbox)
         customerEmailDone = EmailService.sendChatMessageEmail({
           to: env.AGENT_EMAIL,
           sessionId,
           text,
           sender: 'CUSTOMER',
           emailMessageId: emailMsgId,
-          recentMessages: historyWithCustomer,
         }).then(async (sentMsgId) => {
           console.log(`[Chat] Customer email sent OK: msgId=${sentMsgId ?? 'null'}`);
           // Save first email's Message-ID on session for threading
@@ -147,6 +145,28 @@ router.post(
               data: { emailMessageId: sentMsgId },
             }).catch(() => {});
             console.log(`[Chat] Saved thread anchor: ${sentMsgId}`);
+          }
+
+          // Search Outlook inbox for the delivered email to get conversationId
+          if (!outlookConvId && OutlookGraph.isConfigured()) {
+            try {
+              const found = await OutlookGraph.findEmailBySubject(shortId, new Date(Date.now() - 60_000));
+              if (found) {
+                outlookConvId = found.conversationId;
+                outlookLastMsgId = found.id;
+                const { prisma } = await import('../config/database');
+                await prisma.chatSession.update({
+                  where: { id: sessionId },
+                  data: {
+                    outlookConversationId: found.conversationId,
+                    outlookLastMessageId: found.id,
+                  },
+                }).catch(() => {});
+                console.log(`[Chat] Outlook thread anchor: convId=${found.conversationId}, msgId=${found.id}`);
+              }
+            } catch (err: any) {
+              console.error('[Chat] Outlook search FAILED:', err?.message ?? err);
+            }
           }
         }).catch((err) => {
           console.error('[Chat] Customer email FAILED:', err?.message ?? err);
@@ -190,17 +210,61 @@ router.post(
             if (env.AGENT_EMAIL) {
               // Wait for customer email to finish so thread anchor is saved
               await customerEmailDone;
-              // Build full history including AI response
-              const historyWithAi = [...historyWithCustomer, { sender: 'AI', text: aiReply.text }];
-              console.log(`[Chat] AI email mirror: threadId=${emailMsgId ?? 'none'}, historyLen=${historyWithAi.length}, aiText="${aiReply.text.slice(0, 50)}"`);
-              EmailService.sendChatMessageEmail({
-                to: env.AGENT_EMAIL,
-                sessionId,
-                text: aiReply.text,
-                sender: 'AI',
-                emailMessageId: emailMsgId,
-                recentMessages: historyWithAi,
-              }).catch((err) => console.error('[Chat] AI email FAILED:', err?.message ?? err));
+
+              // Try Graph API first — sends FROM agent's mailbox (appears as sent message)
+              if (OutlookGraph.isConfigured() && outlookConvId) {
+                try {
+                  // Find latest message in the conversation to reply to
+                  const latest = outlookLastMsgId
+                    ? { id: outlookLastMsgId }
+                    : await OutlookGraph.findLatestInConversation(outlookConvId);
+
+                  if (latest) {
+                    const aiHtml = EmailService.buildAiReplyHtml(aiReply.text, shortId);
+                    const draftId = await OutlookGraph.sendReplyFromMailbox(latest.id, aiHtml);
+                    console.log(`[Chat] AI reply sent via Graph API (FROM agent mailbox), draftId=${draftId}`);
+
+                    // Update last message ID for next reply chain
+                    if (draftId) {
+                      outlookLastMsgId = draftId;
+                      const { prisma } = await import('../config/database');
+                      await prisma.chatSession.update({
+                        where: { id: sessionId },
+                        data: { outlookLastMessageId: draftId },
+                      }).catch(() => {});
+                    }
+                  } else {
+                    // No message to reply to — fall back to SendPulse
+                    console.warn('[Chat] No Outlook message found for reply, falling back to SendPulse');
+                    await EmailService.sendChatMessageEmail({
+                      to: env.AGENT_EMAIL,
+                      sessionId,
+                      text: aiReply.text,
+                      sender: 'AI',
+                      emailMessageId: emailMsgId,
+                    });
+                  }
+                } catch (err: any) {
+                  console.error('[Chat] Graph API AI reply FAILED, falling back to SendPulse:', err?.message ?? err);
+                  await EmailService.sendChatMessageEmail({
+                    to: env.AGENT_EMAIL,
+                    sessionId,
+                    text: aiReply.text,
+                    sender: 'AI',
+                    emailMessageId: emailMsgId,
+                  }).catch((e) => console.error('[Chat] SendPulse fallback also FAILED:', e?.message ?? e));
+                }
+              } else {
+                // Graph API not configured — use SendPulse (separate email, no threading)
+                console.log(`[Chat] AI email via SendPulse (Graph not configured or no conversationId)`);
+                EmailService.sendChatMessageEmail({
+                  to: env.AGENT_EMAIL,
+                  sessionId,
+                  text: aiReply.text,
+                  sender: 'AI',
+                  emailMessageId: emailMsgId,
+                }).catch((err) => console.error('[Chat] AI email FAILED:', err?.message ?? err));
+              }
             }
 
             // Save lead data if AI extracted any
@@ -265,6 +329,151 @@ router.post(
       } else {
         NotificationService.handleChatEscalated({ sessionId: req.params.id }).catch(console.error);
       }
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/chat/sessions/:id/agent-reply ────────────────
+
+const agentReplySchema = z.object({
+  body: z.object({
+    text: z.string().min(1).max(2000),
+  }),
+  params: z.object({ id: z.string().min(1) }),
+});
+
+router.post(
+  '/sessions/:id/agent-reply',
+  authenticate,
+  requireAgent,
+  validate(agentReplySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.params.id;
+      const { text } = req.body;
+
+      const session = await ChatService.getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      // Auto-take session if not already in HUMAN mode
+      if (session.mode !== 'HUMAN') {
+        const { prisma } = await import('../config/database');
+        await prisma.chatSession.update({
+          where: { id: sessionId },
+          data: {
+            mode: 'HUMAN',
+            status: 'OPEN',
+            assignedAgentName: req.user?.email ?? 'Agent',
+            modeLockUntil: new Date(Date.now() + 5000),
+          },
+        });
+
+        const io = getIO();
+        io.to(`session:${sessionId}`).emit('mode_changed', { mode: 'HUMAN' });
+
+        await ChatService.saveMessage({
+          sessionId,
+          text: 'נציג הצטרף לשיחה.',
+          sender: 'SYSTEM',
+          channel: 'WEB',
+        });
+      }
+
+      // Save agent message
+      const agentMsg = await ChatService.saveMessage({
+        sessionId,
+        text,
+        sender: 'AGENT',
+        channel: 'WEB',
+      });
+
+      // Forward to customer via Socket.io
+      const io = getIO();
+      io.to(`session:${sessionId}`).emit('new_message', {
+        id: agentMsg.id,
+        text: agentMsg.text,
+        sender: agentMsg.sender,
+        channel: agentMsg.channel,
+        timestamp: agentMsg.createdAt,
+      });
+
+      res.status(201).json(agentMsg);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/chat/sessions/:id/take ───────────────────────
+
+router.post(
+  '/sessions/:id/take',
+  authenticate,
+  requireAgent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { prisma } = await import('../config/database');
+      const session = await prisma.chatSession.update({
+        where: { id: req.params.id },
+        data: {
+          mode: 'HUMAN',
+          status: 'OPEN',
+          assignedAgentName: req.user?.email ?? 'Agent',
+          modeLockUntil: new Date(Date.now() + 5000),
+        },
+      });
+
+      const io = getIO();
+      io.to(`session:${req.params.id}`).emit('mode_changed', { mode: 'HUMAN' });
+
+      await ChatService.saveMessage({
+        sessionId: req.params.id,
+        text: 'נציג הצטרף לשיחה.',
+        sender: 'SYSTEM',
+        channel: 'WEB',
+      });
+
+      res.json(session);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/chat/sessions/:id/release ────────────────────
+
+router.post(
+  '/sessions/:id/release',
+  authenticate,
+  requireAgent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { prisma } = await import('../config/database');
+      const session = await prisma.chatSession.update({
+        where: { id: req.params.id },
+        data: {
+          mode: 'AI',
+          assignedAgentName: null,
+          modeLockUntil: new Date(Date.now() + 5000),
+        },
+      });
+
+      const io = getIO();
+      io.to(`session:${req.params.id}`).emit('mode_changed', { mode: 'AI' });
+
+      await ChatService.saveMessage({
+        sessionId: req.params.id,
+        text: 'הצ\'אט הועבר חזרה ל-AI.',
+        sender: 'SYSTEM',
+        channel: 'WEB',
+      });
+
       res.json(session);
     } catch (err) {
       next(err);

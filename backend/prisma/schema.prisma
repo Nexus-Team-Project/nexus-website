@@ -187,6 +187,8 @@ model ChatSession {
   waThreadId        String?
   whatsappGroupId   String?    // Green API group chatId for this session
   emailMessageId    String?    // Message-ID of first escalation email (for threading)
+  outlookConversationId String? // Outlook conversationId for thread grouping
+  outlookLastMessageId  String? // Graph message ID of latest email in thread
   modeLockUntil     DateTime?
   metadata          Json?
   createdAt         DateTime   @default(now())

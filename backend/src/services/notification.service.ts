@@ -1,6 +1,7 @@
 import { prisma } from '../config/database';
 import * as MondayService from './monday.service';
 import * as EmailService from './email.service';
+import * as OutlookGraph from './outlook-graph.service';
 import { broadcastToAdmins } from '../socket';
 import * as AnalyticsService from './analytics.service';
 import { env } from '../config/env';
@@ -141,6 +142,7 @@ export async function handleChatEscalated(data: {
   // ─── Email notification (reply-enabled) ─────────────────
 
   if (env.AGENT_EMAIL) {
+    const escShortId = data.sessionId.slice(-8);
     EmailService.sendEscalationAlert({
       to: env.AGENT_EMAIL,
       sessionId: data.sessionId,
@@ -155,6 +157,25 @@ export async function handleChatEscalated(data: {
           where: { id: data.sessionId },
           data: { emailMessageId: messageId },
         }).catch(() => {});
+      }
+
+      // Search Outlook inbox for the delivered email to establish thread anchor
+      if (OutlookGraph.isConfigured()) {
+        try {
+          const found = await OutlookGraph.findEmailBySubject(escShortId, new Date(Date.now() - 60_000));
+          if (found) {
+            await prisma.chatSession.update({
+              where: { id: data.sessionId },
+              data: {
+                outlookConversationId: found.conversationId,
+                outlookLastMessageId: found.id,
+              },
+            }).catch(() => {});
+            console.log(`[Notification] Outlook thread anchor saved: convId=${found.conversationId}`);
+          }
+        } catch (err: any) {
+          console.error('[Notification] Outlook search failed:', err?.message ?? err);
+        }
       }
     }).catch((err) => console.error('[Notification] Email alert failed:', err));
   }

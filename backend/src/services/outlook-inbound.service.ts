@@ -1,7 +1,13 @@
-import { env } from '../config/env';
 import { prisma } from '../config/database';
 import * as ChatService from './chat.service';
 import { getIO } from '../socket';
+import {
+  isConfigured,
+  getMailbox,
+  graphGet,
+  graphPatch,
+  type GraphMessage,
+} from './outlook-graph.service';
 
 // ─── Microsoft Graph API — Outlook inbox polling ─────────
 //
@@ -9,91 +15,13 @@ import { getIO } from '../socket';
 // Replies are identified by [Chat-XXXXXXXX] in the subject line.
 // The reply text is stripped of quoted content and routed to the customer.
 
-const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
-const TOKEN_URL = (tenant: string) =>
-  `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`;
-
-let cachedToken: { value: string; expiresAt: number } | null = null;
-
-// ─── Auth ─────────────────────────────────────────────────
-
-async function getAccessToken(): Promise<string> {
-  if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
-    return cachedToken.value;
-  }
-
-  const res = await fetch(TOKEN_URL(env.MS_TENANT_ID!), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'client_credentials',
-      client_id: env.MS_CLIENT_ID!,
-      client_secret: env.MS_CLIENT_SECRET!,
-      scope: 'https://graph.microsoft.com/.default',
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`MS Graph auth failed: ${res.status} ${text}`);
-  }
-
-  const data = (await res.json()) as { access_token: string; expires_in: number };
-  cachedToken = {
-    value: data.access_token,
-    expiresAt: Date.now() + data.expires_in * 1000,
-  };
-  return cachedToken.value;
-}
-
-// ─── Graph API helpers ────────────────────────────────────
-
-interface GraphMessage {
-  id: string;
-  subject: string;
-  from: { emailAddress: { name: string; address: string } };
-  body: { contentType: string; content: string };
-  receivedDateTime: string;
-  conversationId: string;
-}
-
-async function graphGet<T>(path: string): Promise<T> {
-  const token = await getAccessToken();
-  const res = await fetch(`${GRAPH_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Graph GET ${path} failed: ${res.status} ${text}`);
-  }
-  return res.json() as Promise<T>;
-}
-
-async function graphPatch(path: string, body: object): Promise<void> {
-  const token = await getAccessToken();
-  const res = await fetch(`${GRAPH_BASE}${path}`, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Graph PATCH ${path} failed: ${res.status} ${text}`);
-  }
-}
-
 // ─── Poll inbox ───────────────────────────────────────────
 
 export async function pollInbox(): Promise<void> {
-  if (!env.MS_TENANT_ID || !env.MS_CLIENT_ID || !env.MS_CLIENT_SECRET || !env.MS_MAILBOX) {
-    return; // Not configured — skip silently
-  }
+  if (!isConfigured()) return;
 
   try {
-    const mailbox = encodeURIComponent(env.MS_MAILBOX);
+    const mailbox = getMailbox();
 
     // Fetch unread emails with [Chat- in the subject
     const filter = encodeURIComponent("isRead eq false and contains(subject,'[Chat-')");
