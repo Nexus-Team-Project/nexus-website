@@ -283,13 +283,28 @@ function App() {
               <UserDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/he/dashboard" element={
+            <ProtectedRoute redirectTo="/he/login">
+              <UserDashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
               <AdminDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/he/admin" element={
+            <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/he/login">
+              <AdminDashboard />
+            </ProtectedRoute>
+          } />
           <Route path="/admin/inbox" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
+              <LiveInbox />
+            </ProtectedRoute>
+          } />
+          <Route path="/he/admin/inbox" element={
+            <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/he/login">
               <LiveInbox />
             </ProtectedRoute>
           } />
