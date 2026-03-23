@@ -11,12 +11,15 @@ export default function ContactSalesButton({ onClick }: ContactSalesButtonProps)
   const { t } = useLanguage();
 
   return (
+    <>
+    <style>{`@keyframes fabSlideUp { from { opacity: 0; transform: translateY(16px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }`}</style>
     <button
       onClick={onClick}
       className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-white rounded-xl px-5 py-3.5 shadow-lg hover:shadow-2xl transition-all duration-300 group"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        animation: 'fabSlideUp 0.4s ease-out',
         transform: hovered ? 'translate3d(0, -2px, 0)' : 'translate3d(0, 0, 0)',
         willChange: 'transform',
         backfaceVisibility: 'hidden' as const,
@@ -40,5 +43,6 @@ export default function ContactSalesButton({ onClick }: ContactSalesButtonProps)
       </div>
       <span className="text-sm font-semibold text-stripe-dark">{t.buttons.contactSales}</span>
     </button>
+    </>
   );
 }

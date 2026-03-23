@@ -211,6 +211,9 @@ model ChatMessage {
   waMessageId String?
   status      String?
   aiMetadata  Json?          // chunks used, similarity scores, token usage
+  mediaUrl    String?        // External URL or base64 data URL
+  mediaType   String?        // "image" | "video" | "audio" | "document"
+  fileName    String?        // Original filename for documents
   createdAt   DateTime       @default(now())
 
   rating AiRating?

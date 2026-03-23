@@ -58,6 +58,9 @@ export async function saveMessage(data: {
   channel?: 'WEB' | 'WHATSAPP' | 'EMAIL';
   waMessageId?: string;
   aiMetadata?: object;
+  mediaUrl?: string;
+  mediaType?: string;
+  fileName?: string;
 }) {
   return prisma.chatMessage.create({
     data: {
@@ -67,6 +70,9 @@ export async function saveMessage(data: {
       channel: data.channel ?? 'WEB',
       waMessageId: data.waMessageId,
       aiMetadata: data.aiMetadata ?? undefined,
+      mediaUrl: data.mediaUrl,
+      mediaType: data.mediaType,
+      fileName: data.fileName,
     },
   });
 }

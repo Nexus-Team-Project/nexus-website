@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
 import { validate } from '../middleware/validate';
 import { authenticate, requireAgent } from '../middleware/authenticate';
 import { chatLimiter, apiLimiter } from '../middleware/rateLimiter';
@@ -12,6 +13,19 @@ import { env } from '../config/env';
 import { getIO } from '../socket';
 
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/', 'audio/', 'video/', 'application/pdf', 'application/'];
+    if (allowed.some(t => file.mimetype.startsWith(t))) {
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported file type'));
+    }
+  },
+});
 
 // ─── POST /api/chat/sessions ───────────────────────────────
 
@@ -115,6 +129,9 @@ router.post(
         sender: customerMsg.sender,
         channel: customerMsg.channel,
         timestamp: customerMsg.createdAt,
+        mediaUrl: (customerMsg as any).mediaUrl ?? undefined,
+        mediaType: (customerMsg as any).mediaType ?? undefined,
+        fileName: (customerMsg as any).fileName ?? undefined,
       });
 
       // 3. Mirror customer message to email thread (all modes)
@@ -401,9 +418,53 @@ router.post(
         sender: agentMsg.sender,
         channel: agentMsg.channel,
         timestamp: agentMsg.createdAt,
+        mediaUrl: (agentMsg as any).mediaUrl ?? undefined,
+        mediaType: (agentMsg as any).mediaType ?? undefined,
+        fileName: (agentMsg as any).fileName ?? undefined,
       });
 
       res.status(201).json(agentMsg);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/chat/sessions/:id/ai-draft ───────────────────
+
+router.post(
+  '/sessions/:id/ai-draft',
+  authenticate,
+  requireAgent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.params.id;
+      const session = await ChatService.getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const sessionMeta = (session as any).metadata ?? {};
+      const sessionLang = sessionMeta.language?.startsWith?.('en') ? 'en' : 'he';
+
+      const customerMessages = session.messages.filter(m => m.sender === 'CUSTOMER');
+      const lastCustomerMsg = customerMessages[customerMessages.length - 1]?.text ?? '';
+
+      const recentMessages = session.messages.map(m => ({
+        sender: m.sender,
+        text: m.text,
+      }));
+
+      const aiReply = await AiService.generateReply(
+        sessionId,
+        lastCustomerMsg,
+        recentMessages,
+        sessionLang,
+        { visitorId: session.visitorId, page: sessionMeta.page },
+      );
+
+      res.json({ text: aiReply?.text ?? '' });
     } catch (err) {
       next(err);
     }
@@ -599,6 +660,139 @@ router.post(
       }
 
       res.json(rating);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── POST /api/chat/sessions/:id/agent-reply-media ──────────
+
+router.post(
+  '/sessions/:id/agent-reply-media',
+  authenticate,
+  requireAgent,
+  upload.single('file'),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sessionId = req.params.id;
+      const file = req.file;
+      const caption = (req.body?.caption as string) || '';
+
+      if (!file) {
+        res.status(400).json({ error: 'No file uploaded' });
+        return;
+      }
+
+      const session = await ChatService.getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      // Auto-take session if not already in HUMAN mode
+      if (session.mode !== 'HUMAN') {
+        const { prisma } = await import('../config/database');
+        await prisma.chatSession.update({
+          where: { id: sessionId },
+          data: {
+            mode: 'HUMAN',
+            status: 'OPEN',
+            assignedAgentName: req.user?.email ?? 'Agent',
+            modeLockUntil: new Date(Date.now() + 5000),
+          },
+        });
+        const io = getIO();
+        io.to(`session:${sessionId}`).emit('mode_changed', { mode: 'HUMAN' });
+      }
+
+      // Determine media type from mimetype
+      let mediaType = 'document';
+      if (file.mimetype.startsWith('image/')) mediaType = 'image';
+      else if (file.mimetype.startsWith('audio/')) mediaType = 'audio';
+      else if (file.mimetype.startsWith('video/')) mediaType = 'video';
+
+      // Store as base64 data URL (no external storage needed)
+      const dataUrl = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+
+      const agentMsg = await ChatService.saveMessage({
+        sessionId,
+        text: caption || `[${mediaType}: ${file.originalname}]`,
+        sender: 'AGENT',
+        channel: 'WEB',
+        mediaUrl: dataUrl,
+        mediaType,
+        fileName: file.originalname,
+      });
+
+      const io = getIO();
+      io.to(`session:${sessionId}`).emit('new_message', {
+        id: agentMsg.id,
+        text: agentMsg.text,
+        sender: agentMsg.sender,
+        channel: agentMsg.channel,
+        timestamp: agentMsg.createdAt,
+        mediaUrl: dataUrl,
+        mediaType,
+        fileName: file.originalname,
+      });
+
+      res.status(201).json(agentMsg);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+// ─── GET /api/chat/media/:messageId ─────────────────────────
+
+router.get(
+  '/media/:messageId',
+  authenticate,
+  requireAgent,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { prisma } = await import('../config/database');
+      const message = await prisma.chatMessage.findUnique({
+        where: { id: req.params.messageId },
+        select: { mediaUrl: true, mediaType: true, fileName: true },
+      });
+
+      if (!message?.mediaUrl) {
+        res.status(404).json({ error: 'Media not found' });
+        return;
+      }
+
+      // If it's a data URL, decode and serve directly
+      if (message.mediaUrl.startsWith('data:')) {
+        const match = message.mediaUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          const contentType = match[1];
+          const buffer = Buffer.from(match[2], 'base64');
+          res.setHeader('Content-Type', contentType);
+          if (message.fileName) {
+            res.setHeader('Content-Disposition', `inline; filename="${message.fileName}"`);
+          }
+          res.send(buffer);
+          return;
+        }
+      }
+
+      // Fetch from external URL and pipe through
+      const response = await fetch(message.mediaUrl);
+      if (!response.ok) {
+        res.status(502).json({ error: 'Failed to fetch media' });
+        return;
+      }
+
+      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      res.setHeader('Content-Type', contentType);
+      if (message.fileName) {
+        res.setHeader('Content-Disposition', `inline; filename="${message.fileName}"`);
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      res.send(buffer);
     } catch (err) {
       next(err);
     }

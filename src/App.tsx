@@ -245,10 +245,13 @@ function ChatWidget() {
         </Suspense>
       )}
       {chatState === 'minimized' && (
+        <>
+        <style>{`@keyframes barSlideUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }`}</style>
         <button
           onClick={() => setChatState('open')}
           className="fixed bottom-0 z-50 bg-white rounded-t-2xl px-5 py-3 flex items-center gap-3 border border-b-0 border-slate-200 hover:bg-slate-50 transition-all cursor-pointer"
           style={{
+            animation: 'barSlideUp 0.35s ease-out',
             [isHebrew ? 'right' : 'left']: '1.5rem',
             boxShadow: '0 -4px 20px rgba(0,0,0,0.1)',
           }}
@@ -264,6 +267,7 @@ function ChatWidget() {
             </span>
           </div>
         </button>
+        </>
       )}
       {chatState === 'open' && (
         <Suspense fallback={null}>
