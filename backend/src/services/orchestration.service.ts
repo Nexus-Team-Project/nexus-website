@@ -1,4 +1,5 @@
 import { prisma } from '../config/database';
+import { env } from '../config/env';
 import * as ChatService from './chat.service';
 import * as WhatsAppProvider from './whatsapp-provider';
 import { getIO, broadcastToAdmins } from '../socket';
@@ -179,11 +180,32 @@ async function handleAgentMessage(
   }
 
   if (session.mode !== 'HUMAN') {
-    await WhatsAppProvider.sendText(
-      agentPhone,
-      `סשן ${shortId} במצב AI. שלח /take ${shortId} כדי לקחת שליטה.`,
-    );
-    return;
+    // Auto-take the session from WhatsApp instead of rejecting
+    await prisma.chatSession.update({
+      where: { id: session.id },
+      data: {
+        mode: 'HUMAN',
+        status: 'OPEN',
+        assignedAgentWa: agentPhone,
+        modeLockUntil: new Date(Date.now() + 5000),
+      },
+    });
+    const io2 = getIO();
+    io2.to(`session:${session.id}`).emit('mode_changed', { mode: 'HUMAN' });
+    await ChatService.saveMessage({
+      sessionId: session.id,
+      text: 'נציג הצטרף לשיחה.',
+      sender: 'SYSTEM',
+      channel: 'WEB',
+    });
+  }
+
+  // Auto-link WhatsApp number if not set
+  if (!session.assignedAgentWa) {
+    await prisma.chatSession.update({
+      where: { id: session.id },
+      data: { assignedAgentWa: agentPhone },
+    });
   }
 
   // Save agent message to DB
@@ -213,14 +235,39 @@ async function handleUnstructuredMessage(
   text: string,
   externalId: string,
 ): Promise<void> {
-  // Find sessions where this agent is actively assigned
-  const activeSessions = await prisma.chatSession.findMany({
+  // Find sessions where this agent is actively assigned via WhatsApp
+  let activeSessions = await prisma.chatSession.findMany({
     where: {
       assignedAgentWa: agentPhone,
       mode: 'HUMAN',
       status: { in: ['OPEN', 'PENDING_HUMAN'] },
     },
   });
+
+  // Also include sessions taken from the web UI (assignedAgentWa is null)
+  // if the sender is the configured AGENT_WHATSAPP_NUMBER
+  if (activeSessions.length === 0 && env.AGENT_WHATSAPP_NUMBER) {
+    const cleanAgentPhone = env.AGENT_WHATSAPP_NUMBER.replace(/[^0-9]/g, '');
+    const cleanSenderPhone = agentPhone.replace(/[^0-9]/g, '');
+    if (cleanSenderPhone === cleanAgentPhone) {
+      activeSessions = await prisma.chatSession.findMany({
+        where: {
+          mode: 'HUMAN',
+          status: { in: ['OPEN', 'PENDING_HUMAN'] },
+          assignedAgentWa: null,
+        },
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      // Auto-link the WhatsApp number to these sessions
+      if (activeSessions.length > 0) {
+        await prisma.chatSession.updateMany({
+          where: { id: { in: activeSessions.map((s) => s.id) } },
+          data: { assignedAgentWa: agentPhone },
+        });
+      }
+    }
+  }
 
   if (activeSessions.length === 1) {
     // Single active session — route message there
