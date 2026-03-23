@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import * as MondayService from './monday.service';
 import * as EmailService from './email.service';
 import * as OutlookGraph from './outlook-graph.service';
+import * as WhatsApp from './whatsapp-provider';
 import { broadcastToAdmins } from '../socket';
 import * as AnalyticsService from './analytics.service';
 import { env } from '../config/env';
@@ -49,6 +50,14 @@ export async function handleVisitorArrival(data: {
     apolloData,
     timestamp: notification.createdAt,
   });
+
+  // 3. Send WhatsApp notification to agent
+  const waMsg = WhatsApp.formatVisitorAlert({
+    page: data.page,
+    country: data.country,
+    apolloData: apolloData ?? undefined,
+  });
+  await WhatsApp.notifyAgent(waMsg);
 }
 
 // ─── Chat session opened ──────────────────────────────────
@@ -94,6 +103,14 @@ export async function handleChatOpened(data: {
     apolloData,
     timestamp: notification.createdAt,
   });
+
+  // WhatsApp
+  const waMsg = WhatsApp.formatChatOpenedAlert({
+    sessionId: data.sessionId,
+    page: data.page,
+    apolloData: apolloData ?? undefined,
+  });
+  await WhatsApp.notifyAgent(waMsg);
 }
 
 // ─── Chat escalated to human ──────────────────────────────
@@ -138,6 +155,27 @@ export async function handleChatEscalated(data: {
     leadData: data.leadData,
     timestamp: notification.createdAt,
   });
+
+  // ─── WhatsApp notification with takeover instructions ────
+
+  {
+    let waMessage = `🚨 *צ'אט דורש נציג*\nסשן: ${shortId}\nנושא: ${topicLabel}`;
+    if (data.page) waMessage += `\nעמוד: ${data.page}`;
+    if (data.leadData) {
+      const ld = data.leadData;
+      if (ld.name) waMessage += `\n👤 ${ld.name}`;
+      if (ld.company) waMessage += ` | ${ld.company}`;
+      if (ld.email) waMessage += `\n✉️ ${ld.email}`;
+    }
+    if (data.recentMessages?.length) {
+      waMessage += '\n\n📝 הודעות אחרונות:';
+      for (const m of data.recentMessages.slice(-3)) {
+        waMessage += `\n${m.sender}: ${m.text.slice(0, 120)}`;
+      }
+    }
+    waMessage += `\n\n👉 לקחת שליטה:\n/take ${shortId}`;
+    await WhatsApp.notifyAgent(waMessage);
+  }
 
   // ─── Email notification (reply-enabled) ─────────────────
 
@@ -220,6 +258,10 @@ export async function handleLeadSubmitted(data: {
     company: data.company,
     timestamp: notification.createdAt,
   });
+
+  // WhatsApp
+  const waMsg = WhatsApp.formatLeadAlert(data);
+  await WhatsApp.notifyAgent(waMsg).catch(console.error);
 }
 
 // ─── Get unread notifications ─────────────────────────────
