@@ -141,12 +141,21 @@ router.post('/greenapi', async (req: Request, res: Response) => {
     return;
   }
 
-  // Only process incoming messages
-  if (payload.typeWebhook !== 'incomingMessageReceived') return;
+  const webhookType = payload.typeWebhook as string;
+
+  // Process incoming messages + outgoing messages from phone (full WhatsApp inbox)
+  const isIncoming = webhookType === 'incomingMessageReceived';
+  const isOutgoing = webhookType === 'outgoingMessage' || webhookType === 'outgoingMessageReceived';
+  if (!isIncoming && !isOutgoing) return;
 
   const externalId = payload.idMessage as string;
-  const from = (payload.senderData?.sender?.replace('@c.us', '') ?? '') as string;
-  const senderName = (payload.senderData?.senderName ?? '') as string;
+  // For incoming: sender is the contact. For outgoing: we sent it, chatId is the recipient
+  const from = isIncoming
+    ? (payload.senderData?.sender?.replace('@c.us', '') ?? '') as string
+    : (payload.chatId?.replace('@c.us', '') ?? '') as string;
+  const senderName = isIncoming
+    ? (payload.senderData?.senderName ?? '') as string
+    : '';
   const msgData = payload.messageData;
   const msgType = msgData?.typeMessage as string;
 
@@ -195,6 +204,19 @@ router.post('/greenapi', async (req: Request, res: Response) => {
   }
 
   if (!text && !mediaUrl) return;
+
+  // For outgoing messages (sent from the phone), route differently
+  if (isOutgoing) {
+    await OrchestrationService.handleOutgoingWhatsAppMessage({
+      to: from, // 'from' here is actually the recipient for outgoing
+      text: text || '',
+      externalId,
+      mediaUrl,
+      mediaType,
+      fileName,
+    });
+    return;
+  }
 
   await OrchestrationService.handleIncomingWhatsAppMessage({
     from,

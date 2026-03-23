@@ -392,3 +392,83 @@ async function handleCustomerWhatsAppMessage(data: {
     `💬 *הודעה חדשה מ-${contactLabel}*\nסשן: ${shortId}\n\n${preview}\n\n👉 להשיב:\n${shortId}: ההודעה שלך`,
   ).catch(console.error);
 }
+
+// ─── Outgoing WhatsApp Message (sent from phone) ──────────
+
+export async function handleOutgoingWhatsAppMessage(data: {
+  to: string;
+  text: string;
+  externalId: string;
+  mediaUrl?: string;
+  mediaType?: string;
+  fileName?: string;
+}): Promise<void> {
+  const waContactId = data.to.replace('@c.us', '');
+
+  // Skip messages sent to the agent's own number (self-notifications from the system)
+  if (isAgentPhone(waContactId)) return;
+
+  // Find existing open session for this WhatsApp contact
+  let session = await prisma.chatSession.findFirst({
+    where: {
+      waThreadId: waContactId,
+      status: { in: ['OPEN', 'PENDING_HUMAN'] },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  // If no open session, create a new one
+  if (!session) {
+    session = await prisma.chatSession.create({
+      data: {
+        visitorId: `wa_${waContactId}`,
+        waThreadId: waContactId,
+        status: 'OPEN',
+        mode: 'HUMAN',
+        subject: waContactId,
+        metadata: {
+          channel: 'whatsapp',
+          contactPhone: waContactId,
+        },
+      },
+    });
+    console.log(`[Orchestration] New outgoing WhatsApp session: ${session.id} for ${waContactId}`);
+  }
+
+  // Save as AGENT message (sent by the agent from their phone)
+  const msg = await ChatService.saveMessage({
+    sessionId: session.id,
+    text: data.text || (data.fileName ? `📎 ${data.fileName}` : '📎 מדיה'),
+    sender: 'AGENT',
+    channel: 'WHATSAPP',
+    waMessageId: data.externalId,
+    mediaUrl: data.mediaUrl,
+    mediaType: data.mediaType,
+    fileName: data.fileName,
+  });
+
+  await prisma.chatSession.update({
+    where: { id: session.id },
+    data: { updatedAt: new Date() },
+  });
+
+  // Broadcast to admin dashboard
+  const io = getIO();
+  io.to(`session:${session.id}`).emit('new_message', {
+    id: msg.id,
+    text: msg.text,
+    sender: msg.sender,
+    channel: msg.channel,
+    timestamp: msg.createdAt,
+    mediaUrl: msg.mediaUrl,
+    mediaType: msg.mediaType,
+    fileName: msg.fileName,
+  });
+
+  broadcastToAdmins('session_updated', {
+    sessionId: session.id,
+    waThreadId: waContactId,
+    lastMessage: msg.text.slice(0, 100),
+    timestamp: msg.createdAt,
+  });
+}
