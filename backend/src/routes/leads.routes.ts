@@ -4,6 +4,7 @@ import { validate } from '../middleware/validate';
 import { authenticate, requireAdmin } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { prisma } from '../config/database';
+import { env } from '../config/env';
 import * as NotificationService from '../services/notification.service';
 import * as ApolloService from '../services/apollo.service';
 import * as MondayService from '../services/monday.service';
@@ -69,6 +70,18 @@ router.post(
         phone: req.body.phone,
         source: req.body.source ?? 'contact_form',
       }).catch(console.error);
+
+      // Trigger Sales Agent to qualify the lead (fire-and-forget)
+      if (env.AGENT_API_URL && env.AGENT_API_KEY) {
+        fetch(`${env.AGENT_API_URL}/api/agents/sales/skills/lead-qualifier/run`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Agent-Key': env.AGENT_API_KEY,
+          },
+          body: JSON.stringify({ config: { leadId: lead.id } }),
+        }).catch(err => console.error('[Sales Agent] Lead qualification trigger failed:', err.message));
+      }
 
       // Analytics: fire-and-forget
       void ingest({

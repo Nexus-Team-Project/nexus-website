@@ -69,6 +69,10 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
+  // Nexus Agents — proxy to agent service (optional)
+  AGENT_API_URL: z.string().url().optional(),  // e.g. https://nexus-agents-production.up.railway.app
+  AGENT_API_KEY: z.string().min(1).optional(), // must match SEO_AGENT_API_KEY on the agent service
+
 });
 
 // Validate on startup — crash fast if core vars missing
