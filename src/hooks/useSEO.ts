@@ -27,6 +27,11 @@ function ensurePageMetaLoaded(): Promise<void> {
   return _fetchPromise;
 }
 
+/** Reject strings that contain U+FFFD — a sign the DB value was stored with broken encoding. */
+function isCorrupted(s: string | null | undefined): boolean {
+  return typeof s === 'string' && s.includes('\uFFFD');
+}
+
 // ─── Helper: apply meta tags to DOM ──────────────────────────────────────────
 
 function applyMetaTags(
@@ -124,9 +129,12 @@ export function useSEO({ title, description, canonical, alternates }: SEOProps) 
     ensurePageMetaLoaded().then(() => {
       const override = _metaCache?.[slug];
       if (override?.metaTitle || override?.metaDescription) {
-        const overriddenTitle = override.metaTitle ?? title;
-        const overriddenDesc  = override.metaDescription ?? description;
-        applyMetaTags(overriddenTitle, overriddenDesc, canonical, alternates);
+        // Skip corrupted overrides (U+FFFD = broken encoding in DB)
+        const safeTitle = isCorrupted(override.metaTitle) ? null : override.metaTitle;
+        const safeDesc  = isCorrupted(override.metaDescription) ? null : override.metaDescription;
+        if (safeTitle || safeDesc) {
+          applyMetaTags(safeTitle ?? title, safeDesc ?? description, canonical, alternates);
+        }
       }
     });
 

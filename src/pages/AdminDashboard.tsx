@@ -2,14 +2,11 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
 import {
   Users, MessageSquare, TrendingUp, Percent,
-  Star, Brain, CreditCard, RefreshCw, LogOut, Bell,
+  Star, Brain, CreditCard, RefreshCw, Bell,
   CheckCircle, XCircle, Clock, AlertTriangle, Zap, BookOpen,
 } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { PRODUCT } from '../lib/analyticsEvents';
-import NexusLogo from '../components/NexusLogo';
 
 // ─── Types ────────────────────────────────────────────────
 
@@ -335,8 +332,6 @@ function LineChart({ data }: { data: ChartPoint[] }) {
 // ─── Main Page ────────────────────────────────────────────
 
 export default function AdminDashboard() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const { track } = useAnalytics();
 
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('week');
@@ -402,8 +397,6 @@ export default function AdminDashboard() {
     return () => document.removeEventListener('mousedown', handler);
   }, [notifOpen]);
 
-  const handleLogout = async () => { await logout(); navigate('/login'); };
-
   const resolveGap = async (id: string) => {
     setResolvingGap(id);
     try {
@@ -460,14 +453,12 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-stripe-light" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+    <div className="bg-stripe-light" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
 
-      {/* Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-20 shadow-sm">
+      {/* Dashboard toolbar */}
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <Link to="/" dir="ltr">
-            <NexusLogo height={40} variant="black" page="auth" />
-          </Link>
+          <h1 className="text-lg font-bold text-stripe-dark">Dashboard</h1>
 
           <div className="flex items-center gap-2">
             {/* Period selector */}
@@ -539,19 +530,9 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
-
-            <span className="text-sm text-stripe-gray hidden sm:block">{user?.fullName}</span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-xs font-medium text-stripe-gray hover:text-stripe-dark px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all"
-              title="Logout"
-            >
-              <LogOut size={13} />
-              <span className="hidden sm:inline">Sign out</span>
-            </button>
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         {error && (

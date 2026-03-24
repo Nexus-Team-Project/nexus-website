@@ -13,6 +13,19 @@ import * as WhatsAppProvider from '../services/whatsapp-provider';
 import { env } from '../config/env';
 import { getIO } from '../socket';
 
+// ─── Sales Agent hook helper ─────────────────────────────────
+function triggerSalesAgentChat(sessionId: string): void {
+  if (!env.AGENT_API_URL || !env.AGENT_API_KEY) return;
+  fetch(`${env.AGENT_API_URL}/api/agents/sales/skills/lead-qualifier/run`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Agent-Key': env.AGENT_API_KEY,
+    },
+    body: JSON.stringify({ config: { sessionId, source: 'chat_escalation' } }),
+  }).catch(err => console.error('[Sales Agent] Chat escalation trigger failed:', err.message));
+}
+
 const router = Router();
 
 const upload = multer({
@@ -295,6 +308,7 @@ router.post(
               await ChatService.escalateSession(sessionId);
               io.to(`session:${sessionId}`).emit('mode_changed', { mode: 'HUMAN' });
               NotificationService.handleChatEscalated({ sessionId }).catch(console.error);
+              triggerSalesAgentChat(sessionId);
             }
           })
           .catch(console.error);
@@ -318,6 +332,9 @@ router.post(
       const session = await ChatService.escalateSession(req.params.id);
       const io = getIO();
       io.to(`session:${req.params.id}`).emit('mode_changed', { mode: 'HUMAN' });
+
+      // Trigger Sales Agent to handle the escalated chat (fire-and-forget)
+      triggerSalesAgentChat(req.params.id);
 
       // Auto-extract lead data + detect topic on escalation (async, non-blocking)
       const fullSession = await ChatService.getSession(req.params.id);

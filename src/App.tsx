@@ -42,6 +42,9 @@ const LiveInbox          = lazy(() => import('./pages/LiveInbox'));
 const JoinOrg            = lazy(() => import('./pages/JoinOrg'));
 const Profile            = lazy(() => import('./pages/Profile'));
 const OrgSelectPage      = lazy(() => import('./pages/OrgSelectPage'));
+const AdminLayout        = lazy(() => import('./components/admin/AdminLayout'));
+const AgentListPage      = lazy(() => import('./pages/admin/AgentListPage'));
+const AgentDetailPage    = lazy(() => import('./pages/admin/AgentDetailPage'));
 
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
@@ -288,26 +291,27 @@ function App() {
               <UserDashboard />
             </ProtectedRoute>
           } />
+          {/* Admin routes with sidebar layout */}
           <Route path="/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
-              <AdminDashboard />
+              <AdminLayout />
             </ProtectedRoute>
-          } />
+          }>
+            <Route index element={<AdminDashboard />} />
+            <Route path="agents" element={<AgentListPage />} />
+            <Route path="agents/:slug" element={<AgentDetailPage />} />
+            <Route path="inbox" element={<LiveInbox />} />
+          </Route>
           <Route path="/he/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/he/login">
-              <AdminDashboard />
+              <AdminLayout />
             </ProtectedRoute>
-          } />
-          <Route path="/admin/inbox" element={
-            <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">
-              <LiveInbox />
-            </ProtectedRoute>
-          } />
-          <Route path="/he/admin/inbox" element={
-            <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/he/login">
-              <LiveInbox />
-            </ProtectedRoute>
-          } />
+          }>
+            <Route index element={<AdminDashboard />} />
+            <Route path="agents" element={<AgentListPage />} />
+            <Route path="agents/:slug" element={<AgentDetailPage />} />
+            <Route path="inbox" element={<LiveInbox />} />
+          </Route>
           <Route path="/org-select"    element={<LanguageProvider language="en"><OrgSelectPage /></LanguageProvider>} />
           <Route path="/he/org-select" element={<LanguageProvider language="he"><OrgSelectPage /></LanguageProvider>} />
           <Route path="/join/:token" element={<JoinOrg />} />
