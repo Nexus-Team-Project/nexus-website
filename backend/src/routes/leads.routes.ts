@@ -73,7 +73,7 @@ router.post(
 
       // Trigger Sales Agent to qualify the lead (fire-and-forget)
       if (env.AGENT_API_URL && env.AGENT_API_KEY) {
-        fetch(`${env.AGENT_API_URL}/api/agents/sales/skills/lead-qualifier/run`, {
+        fetch(`${env.AGENT_API_URL}/api/agent/skills/lead-qualifier/run`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
