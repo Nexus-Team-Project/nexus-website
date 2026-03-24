@@ -6,6 +6,7 @@ import { authenticate, requireAgent } from '../middleware/authenticate';
 import { chatLimiter, apiLimiter } from '../middleware/rateLimiter';
 import * as ChatService from '../services/chat.service';
 import * as AiService from '../services/ai.service';
+import * as SalesAgentClient from '../services/sales-agent-client';
 import * as NotificationService from '../services/notification.service';
 import * as EmailService from '../services/email.service';
 import * as OutlookGraph from '../services/outlook-graph.service';
@@ -16,7 +17,7 @@ import { getIO } from '../socket';
 // ─── Sales Agent hook helper ─────────────────────────────────
 function triggerSalesAgentChat(sessionId: string): void {
   if (!env.AGENT_API_URL || !env.AGENT_API_KEY) return;
-  fetch(`${env.AGENT_API_URL}/api/agents/sales/skills/lead-qualifier/run`, {
+  fetch(`${env.AGENT_API_URL}/api/agent/skills/lead-qualifier/run`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -213,11 +214,23 @@ router.post(
         const sessionMeta = (session as any).metadata ?? {};
         const sessionLang = sessionMeta.language?.startsWith?.('en') ? 'en' : 'he';
 
-        // Generate AI reply in background (with visitor + page context)
-        AiService.generateReply(sessionId, text, session.messages, sessionLang, {
-          visitorId: session.visitorId,
-          page: sessionMeta.page,
-        })
+        // Generate AI reply: try nexus-agents first, fall back to local AiService
+        (async () => {
+          // Try nexus-agents sales API
+          const agentReply = await SalesAgentClient.requestAiReply({
+            sessionId,
+            userMessage: text,
+            recentMessages: session.messages.map((m: any) => ({ sender: m.sender, text: m.text })),
+            language: sessionLang,
+            context: { visitorId: session.visitorId, page: sessionMeta.page },
+          });
+
+          // Fall back to local AI if agent service unavailable
+          return agentReply ?? await AiService.generateReply(sessionId, text, session.messages, sessionLang, {
+            visitorId: session.visitorId,
+            page: sessionMeta.page,
+          });
+        })()
           .then(async (aiReply) => {
             if (!aiReply) return;
             const aiMsg = await ChatService.saveMessage({
