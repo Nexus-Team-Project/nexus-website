@@ -8,11 +8,11 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authenticate, requireAdmin } from '../middleware/authenticate';
+import { authenticate, requireAgent } from '../middleware/authenticate';
 import { env } from '../config/env';
 
 const router = Router();
-router.use(authenticate, requireAdmin);
+router.use(authenticate, requireAgent);
 
 // Generic proxy: forwards any request to nexus-agents /api/agent/* endpoints
 router.all('/*', async (req: Request, res: Response) => {
