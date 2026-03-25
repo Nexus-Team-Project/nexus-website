@@ -12,6 +12,7 @@ import * as EmailService from '../services/email.service';
 import * as OutlookGraph from '../services/outlook-graph.service';
 import * as WhatsAppProvider from '../services/whatsapp-provider';
 import { env } from '../config/env';
+import { prisma } from '../config/database';
 import { getIO } from '../socket';
 
 // ─── Sales Agent hook helper ─────────────────────────────────
@@ -460,9 +461,19 @@ router.post(
       // If WhatsApp session — also send message to customer on WhatsApp
       if (isWaSession) {
         const waContact = (session as any).waThreadId as string;
-        WhatsAppProvider.sendText(waContact, text).catch((err: Error) =>
-          console.error(`[Chat] Failed to send WhatsApp reply to ${waContact}:`, err.message),
-        );
+        try {
+          const waId = await WhatsAppProvider.sendText(waContact, text);
+          // Pre-register the outgoing message ID to prevent duplicate processing
+          // when Green API fires the outgoing webhook for this sent message
+          if (waId) {
+            await prisma.webhookLog.create({
+              data: { externalId: waId, source: 'admin_reply', processedAt: new Date() },
+            }).catch(() => {}); // Ignore duplicate key
+          }
+          console.log(`[Chat] Forwarded admin reply to WhatsApp ${waContact} (waId=${waId})`);
+        } catch (err: any) {
+          console.error(`[Chat] Failed to send WhatsApp reply to ${waContact}:`, err.message);
+        }
       }
 
       res.status(201).json(agentMsg);

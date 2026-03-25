@@ -54,3 +54,69 @@ export async function getStateInstance(): Promise<string | null> {
     return null;
   }
 }
+
+// ─── Get instance settings ───────────────────────────────
+
+export async function getSettings(): Promise<Record<string, unknown> | null> {
+  if (!env.GREEN_API_ID_INSTANCE || !env.GREEN_API_TOKEN) return null;
+
+  try {
+    const res = await axios.get(buildUrl('getSettings'));
+    return res.data ?? null;
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      console.error('[GreenAPI] getSettings error:', err.response?.data);
+    }
+    return null;
+  }
+}
+
+// ─── Update instance settings ────────────────────────────
+
+export async function setSettings(settings: Record<string, unknown>): Promise<boolean> {
+  if (!env.GREEN_API_ID_INSTANCE || !env.GREEN_API_TOKEN) return false;
+
+  try {
+    await axios.post(buildUrl('setSettings'), settings);
+    return true;
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      console.error('[GreenAPI] setSettings error:', err.response?.data);
+    }
+    return false;
+  }
+}
+
+// ─── Ensure outgoing webhooks are enabled ────────────────
+
+export async function ensureOutgoingWebhooksEnabled(webhookUrl: string): Promise<{
+  changed: boolean;
+  settings: Record<string, unknown> | null;
+}> {
+  const current = await getSettings();
+  if (!current) return { changed: false, settings: null };
+
+  const fixes: Record<string, unknown> = {};
+
+  // Enable outgoing message webhooks (messages sent from phone)
+  if (!current.outgoingWebhook) fixes.outgoingWebhook = 'yes';
+  if (!current.outgoingMessageWebhook) fixes.outgoingMessageWebhook = 'yes';
+  if (!current.outgoingAPIMessageWebhook) fixes.outgoingAPIMessageWebhook = 'yes';
+
+  // Enable incoming message webhooks
+  if (!current.incomingWebhook) fixes.incomingWebhook = 'yes';
+
+  // Ensure webhook URL is set
+  if (webhookUrl && current.webhookUrl !== webhookUrl) {
+    fixes.webhookUrl = webhookUrl;
+  }
+
+  if (Object.keys(fixes).length === 0) {
+    return { changed: false, settings: current };
+  }
+
+  console.log(`[GreenAPI] Fixing settings:`, fixes);
+  const ok = await setSettings(fixes);
+  const updated = ok ? await getSettings() : current;
+  return { changed: ok, settings: updated };
+}
