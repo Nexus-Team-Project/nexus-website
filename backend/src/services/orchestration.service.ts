@@ -32,8 +32,15 @@ export function parseWhatsAppCommand(text: string): WhatsAppCommand {
 
 function isAgentPhone(phone: string): boolean {
   if (!env.AGENT_WHATSAPP_NUMBER) return false;
-  const clean = (p: string) => p.replace(/[^0-9]/g, '');
-  return clean(phone) === clean(env.AGENT_WHATSAPP_NUMBER);
+  const normalize = (p: string) => {
+    const digits = p.replace(/[^0-9]/g, '');
+    // Convert Israeli local format 0XX → 972XX
+    if (digits.startsWith('0') && digits.length === 10) return '972' + digits.slice(1);
+    return digits;
+  };
+  const result = normalize(phone) === normalize(env.AGENT_WHATSAPP_NUMBER);
+  console.log(`[Orchestration] isAgentPhone(${phone}) env=${env.AGENT_WHATSAPP_NUMBER} → ${result}`);
+  return result;
 }
 
 // ─── Session Resolution (8-char suffix → full session) ────
@@ -243,6 +250,23 @@ async function handleAgentMessage(
     channel: agentMsg.channel,
     timestamp: agentMsg.createdAt,
   });
+
+  // Forward agent reply to customer on WhatsApp
+  if (session.waThreadId) {
+    try {
+      const waId = await WhatsAppProvider.sendText(session.waThreadId, messageText);
+      // Pre-register the outgoing message ID to prevent duplicate processing
+      // when Green API fires the outgoing webhook for this sent message
+      if (waId) {
+        await prisma.webhookLog.create({
+          data: { externalId: waId, source: 'agent_forward', processedAt: new Date() },
+        }).catch(() => {}); // Ignore duplicate key
+      }
+      console.log(`[Orchestration] Forwarded agent reply to WhatsApp ${session.waThreadId} (waId=${waId})`);
+    } catch (err) {
+      console.error(`[Orchestration] Failed to forward to WhatsApp:`, err);
+    }
+  }
 }
 
 // ─── Unstructured message fallback ────────────────────────
@@ -263,26 +287,22 @@ async function handleUnstructuredMessage(
 
   // Also include sessions taken from the web UI (assignedAgentWa is null)
   // if the sender is the configured AGENT_WHATSAPP_NUMBER
-  if (activeSessions.length === 0 && env.AGENT_WHATSAPP_NUMBER) {
-    const cleanAgentPhone = env.AGENT_WHATSAPP_NUMBER.replace(/[^0-9]/g, '');
-    const cleanSenderPhone = agentPhone.replace(/[^0-9]/g, '');
-    if (cleanSenderPhone === cleanAgentPhone) {
-      activeSessions = await prisma.chatSession.findMany({
-        where: {
-          mode: 'HUMAN',
-          status: { in: ['OPEN', 'PENDING_HUMAN'] },
-          assignedAgentWa: null,
-        },
-        orderBy: { updatedAt: 'desc' },
-      });
+  if (activeSessions.length === 0 && isAgentPhone(agentPhone)) {
+    activeSessions = await prisma.chatSession.findMany({
+      where: {
+        mode: 'HUMAN',
+        status: { in: ['OPEN', 'PENDING_HUMAN'] },
+        assignedAgentWa: null,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
 
-      // Auto-link the WhatsApp number to these sessions
-      if (activeSessions.length > 0) {
-        await prisma.chatSession.updateMany({
-          where: { id: { in: activeSessions.map((s) => s.id) } },
-          data: { assignedAgentWa: agentPhone },
-        });
-      }
+    // Auto-link the WhatsApp number to these sessions
+    if (activeSessions.length > 0) {
+      await prisma.chatSession.updateMany({
+        where: { id: { in: activeSessions.map((s) => s.id) } },
+        data: { assignedAgentWa: agentPhone },
+      });
     }
   }
 

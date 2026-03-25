@@ -148,6 +148,8 @@ router.post('/greenapi', async (req: Request, res: Response) => {
   const isOutgoing = webhookType === 'outgoingMessage' || webhookType === 'outgoingMessageReceived';
   if (!isIncoming && !isOutgoing) return;
 
+  console.log(`[Webhook/GreenAPI] type=${webhookType} from=${payload.senderData?.sender ?? payload.chatId} msgType=${payload.messageData?.typeMessage}`);
+
   const externalId = payload.idMessage as string;
   // For incoming: sender is the contact. For outgoing: we sent it, chatId is the recipient
   const from = isIncoming

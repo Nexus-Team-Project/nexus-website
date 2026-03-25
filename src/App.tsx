@@ -45,6 +45,7 @@ const OrgSelectPage      = lazy(() => import('./pages/OrgSelectPage'));
 const AdminLayout        = lazy(() => import('./components/admin/AdminLayout'));
 const AgentListPage      = lazy(() => import('./pages/admin/AgentListPage'));
 const AgentDetailPage    = lazy(() => import('./pages/admin/AgentDetailPage'));
+const SeoAnalyticsPage   = lazy(() => import('./pages/admin/SeoAnalyticsPage'));
 
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
@@ -301,6 +302,7 @@ function App() {
             <Route path="agents" element={<AgentListPage />} />
             <Route path="agents/:slug" element={<AgentDetailPage />} />
             <Route path="inbox" element={<LiveInbox />} />
+            <Route path="seo-analytics" element={<SeoAnalyticsPage />} />
           </Route>
           <Route path="/he/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/he/login">
@@ -311,6 +313,7 @@ function App() {
             <Route path="agents" element={<AgentListPage />} />
             <Route path="agents/:slug" element={<AgentDetailPage />} />
             <Route path="inbox" element={<LiveInbox />} />
+            <Route path="seo-analytics" element={<SeoAnalyticsPage />} />
           </Route>
           <Route path="/org-select"    element={<LanguageProvider language="en"><OrgSelectPage /></LanguageProvider>} />
           <Route path="/he/org-select" element={<LanguageProvider language="he"><OrgSelectPage /></LanguageProvider>} />

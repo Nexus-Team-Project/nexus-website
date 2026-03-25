@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Bot, Inbox, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Bot, Inbox, LogOut, Menu, X, BarChart3 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import NexusLogo from '../NexusLogo';
 
@@ -12,9 +12,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { to: '',        icon: LayoutDashboard, labelEn: 'Dashboard', labelHe: 'לוח בקרה' },
-  { to: '/agents', icon: Bot,             labelEn: 'Agents',    labelHe: 'סוכנים' },
-  { to: '/inbox',  icon: Inbox,           labelEn: 'Inbox',     labelHe: "צ'אטים" },
+  { to: '',               icon: LayoutDashboard, labelEn: 'Dashboard',     labelHe: 'לוח בקרה' },
+  { to: '/agents',        icon: Bot,             labelEn: 'Agents',        labelHe: 'סוכנים' },
+  { to: '/inbox',         icon: Inbox,           labelEn: 'Inbox',         labelHe: "צ'אטים" },
+  { to: '/seo-analytics', icon: BarChart3,       labelEn: 'SEO Analytics', labelHe: 'אנליטיקס SEO' },
 ];
 
 export default function AdminLayout() {

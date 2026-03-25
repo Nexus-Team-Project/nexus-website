@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft, ArrowRight, Bot, Play, Pause, CheckCircle, XCircle, Clock,
   AlertTriangle, Zap, Settings, List, BarChart3, ScrollText, Plus,
-  ChevronDown, ChevronRight, Loader2, Save,
+  ChevronDown, ChevronRight, Loader2, Save, FileText,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 
@@ -89,13 +89,14 @@ const STATUS_STYLES: Record<string, string> = {
   SKIPPED:     'bg-gray-50 text-gray-600 border-gray-200',
 };
 
-type TabKey = 'overview' | 'tasks' | 'automations' | 'logs' | 'settings';
+type TabKey = 'overview' | 'tasks' | 'automations' | 'logs' | 'prompts' | 'settings';
 
 const TABS: { key: TabKey; labelEn: string; labelHe: string; icon: React.ElementType }[] = [
   { key: 'overview',    labelEn: 'Overview',    labelHe: 'סקירה',     icon: BarChart3 },
   { key: 'tasks',       labelEn: 'Tasks',       labelHe: 'משימות',    icon: List },
   { key: 'automations', labelEn: 'Automations', labelHe: 'אוטומציות', icon: Zap },
   { key: 'logs',        labelEn: 'Logs',        labelHe: 'לוגים',     icon: ScrollText },
+  { key: 'prompts',     labelEn: 'Prompts',     labelHe: 'פרומפטים',  icon: FileText },
   { key: 'settings',    labelEn: 'Settings',    labelHe: 'הגדרות',    icon: Settings },
 ];
 
@@ -283,6 +284,7 @@ export default function AgentDetailPage() {
       {activeTab === 'tasks'       && <TasksTab slug={slug!} isHe={isHe} />}
       {activeTab === 'automations' && <AutomationsTab slug={slug!} isHe={isHe} />}
       {activeTab === 'logs'        && <LogsTab slug={slug!} isHe={isHe} />}
+      {activeTab === 'prompts'     && <PromptsTab slug={slug!} isHe={isHe} />}
       {activeTab === 'settings'    && <SettingsTab agent={agent} slug={slug!} isHe={isHe} onUpdate={setAgent} />}
     </div>
   );
@@ -904,6 +906,110 @@ function LogsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Prompts Tab ─────────────────────────────────────────
+
+interface PromptEntry {
+  skill: string;
+  content: string | null;
+}
+
+function PromptsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
+  const [prompts, setPrompts] = useState<PromptEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    api.get<PromptEntry[]>(`/api/admin/agents/${slug}/prompts`)
+      .then((data) => {
+        setPrompts(data);
+        // Auto-expand the first prompt with content
+        const first = data.find((p) => p.content);
+        if (first) setExpandedSkill(first.skill);
+      })
+      .catch((e: any) => setError(e?.error ?? 'Failed to load prompts'))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 size={24} className="animate-spin text-stripe-purple" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-600 text-sm">
+        {error}
+      </div>
+    );
+  }
+
+  if (prompts.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <FileText size={48} className="mx-auto text-stripe-gray/30 mb-4" />
+        <p className="text-stripe-gray text-sm">
+          {isHe ? 'אין פרומפטים מוגדרים לסוכן זה' : 'No prompts configured for this agent'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {prompts.map((prompt) => {
+        const isOpen = expandedSkill === prompt.skill;
+        return (
+          <div
+            key={prompt.skill}
+            className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden"
+          >
+            <button
+              onClick={() => setExpandedSkill(isOpen ? null : prompt.skill)}
+              className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <FileText size={16} className="text-stripe-purple" />
+                <span className="text-sm font-semibold text-stripe-dark">{prompt.skill}</span>
+                {!prompt.content && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[10px] font-medium text-amber-600">
+                    {isHe ? 'חסר' : 'Missing'}
+                  </span>
+                )}
+              </div>
+              {isOpen ? <ChevronDown size={16} className="text-stripe-gray" /> : (isHe ? <ChevronDown size={16} className="text-stripe-gray rotate-90" /> : <ChevronRight size={16} className="text-stripe-gray" />)}
+            </button>
+
+            {isOpen && prompt.content && (
+              <div className="border-t border-gray-100 px-5 py-4">
+                <pre
+                  dir="auto"
+                  className="text-xs text-stripe-gray leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 rounded-lg p-4 max-h-[600px] overflow-y-auto"
+                >
+                  {prompt.content}
+                </pre>
+              </div>
+            )}
+
+            {isOpen && !prompt.content && (
+              <div className="border-t border-gray-100 px-5 py-4">
+                <p className="text-xs text-stripe-gray/60 italic">
+                  {isHe ? 'קובץ פרומפט לא נמצא עבור כישור זה.' : 'No prompt file found for this skill.'}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
