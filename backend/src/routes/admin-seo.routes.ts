@@ -2,7 +2,7 @@
  * Admin SEO Analytics Proxy Routes
  *
  * Forwards admin SEO requests from nexus-website to the nexus-agents API.
- * Protected with authenticate + requireAdmin middleware.
+ * Protected with authenticate + requireAgent middleware.
  *
  * Mounted at /api/admin/seo
  */
@@ -14,19 +14,47 @@ import { env } from '../config/env';
 const router = Router();
 router.use(authenticate, requireAgent);
 
-// Generic proxy: forwards any request to nexus-agents /api/agent/* endpoints
+// ─── Diagnostic endpoint (no proxy) ──────────────────────────
+router.get('/status', async (_req: Request, res: Response) => {
+  const configured = !!(env.AGENT_API_URL && env.AGENT_API_KEY);
+  let agentReachable = false;
+  let agentHealth: unknown = null;
+
+  if (configured) {
+    try {
+      const r = await fetch(`${env.AGENT_API_URL}/health`, { signal: AbortSignal.timeout(5000) });
+      agentHealth = await r.json().catch(() => r.statusText);
+      agentReachable = r.ok;
+    } catch (err: any) {
+      agentHealth = err.message;
+    }
+  }
+
+  res.json({
+    configured,
+    agentUrl: env.AGENT_API_URL
+      ? env.AGENT_API_URL.replace(/\/\/(.{4}).*?(@|\.up)/, '//$1***$2')
+      : null,
+    agentReachable,
+    agentHealth,
+  });
+});
+
+// ─── Generic proxy: forwards to nexus-agents /api/agent/* ────
 router.all('/*', async (req: Request, res: Response) => {
   if (!env.AGENT_API_URL || !env.AGENT_API_KEY) {
+    console.warn('[AdminSEO] AGENT_API_URL or AGENT_API_KEY not set');
     return res.status(503).json({ error: 'Agent service not configured' });
   }
 
   // Strip /api/admin/seo prefix → forward as /api/agent/*
-  // e.g. /api/admin/seo/google/search-console/overview → /api/agent/google/search-console/overview
   const agentPath = req.path; // already relative to mount point
   const queryString = req.originalUrl.includes('?')
     ? '?' + req.originalUrl.split('?')[1]
     : '';
   const targetUrl = `${env.AGENT_API_URL}/api/agent${agentPath}${queryString}`;
+
+  console.log(`[AdminSEO] Proxy ${req.method} ${agentPath} → ${targetUrl}`);
 
   try {
     const response = await fetch(targetUrl, {
@@ -40,6 +68,8 @@ router.all('/*', async (req: Request, res: Response) => {
         : {}),
     });
 
+    console.log(`[AdminSEO] Agent responded ${response.status} for ${agentPath}`);
+
     const contentType = response.headers.get('content-type') ?? '';
     if (contentType.includes('application/json')) {
       const data = await response.json();
@@ -48,9 +78,9 @@ router.all('/*', async (req: Request, res: Response) => {
       const text = await response.text();
       res.status(response.status).send(text);
     }
-  } catch (err) {
-    console.error('[AdminSEO] Proxy error:', err);
-    res.status(502).json({ error: 'Agent service unavailable' });
+  } catch (err: any) {
+    console.error(`[AdminSEO] Proxy error for ${agentPath}:`, err.message ?? err);
+    res.status(502).json({ error: 'Agent service unavailable', detail: err.message });
   }
 });
 
