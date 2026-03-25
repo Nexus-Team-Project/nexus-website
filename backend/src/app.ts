@@ -89,7 +89,7 @@ app.get('/api/health', async (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     env: env.NODE_ENV,
-    build: '2026-03-25e',
+    build: '2026-03-25f',
     emailConfigured: !!(env.SENDPULSE_CLIENT_ID && env.SENDPULSE_CLIENT_SECRET),
     agentProxy: {
       configured: !!(env.AGENT_API_URL && env.AGENT_API_KEY),
