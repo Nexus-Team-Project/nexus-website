@@ -530,12 +530,18 @@ function InboxContent() {
               >
                 <div className="relative">
                   {session.waContactAvatar ? (
-                    <img src={session.waContactAvatar} alt="" className="w-10 h-10 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                      <span className="text-slate-400 font-bold text-xs">{sessionInitials(session)}</span>
-                    </div>
-                  )}
+                    <img
+                      src={session.waContactAvatar}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover"
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; if (e.target instanceof HTMLImageElement && e.target.parentElement) { const fb = e.target.parentElement.querySelector('.avatar-fallback'); if (fb) (fb as HTMLElement).style.display = 'flex'; } }}
+                    />
+                  ) : null}
+                  <div className={`w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center ${session.waContactAvatar ? 'hidden avatar-fallback' : ''}`}>
+                    <span className="text-slate-400 font-bold text-xs">{sessionInitials(session)}</span>
+                  </div>
                   <div className={`absolute -bottom-0.5 -end-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${
                     session.status === 'OPEN' ? 'bg-green-500' : session.status === 'PENDING_HUMAN' ? 'bg-amber-500' : 'bg-slate-300'
                   }`} />
@@ -584,12 +590,18 @@ function InboxContent() {
                 </button>
               )}
               {activeSession.waContactAvatar ? (
-                <img src={activeSession.waContactAvatar} alt="" className="w-9 h-9 rounded-full object-cover" />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                  <span className="text-slate-400 font-bold text-xs">{sessionInitials(activeSession)}</span>
-                </div>
-              )}
+                <img
+                  src={activeSession.waContactAvatar}
+                  alt=""
+                  className="w-9 h-9 rounded-full object-cover"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; if (e.target instanceof HTMLImageElement && e.target.parentElement) { const fb = e.target.parentElement.querySelector('.avatar-fallback'); if (fb) (fb as HTMLElement).style.display = 'flex'; } }}
+                />
+              ) : null}
+              <div className={`w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center ${activeSession.waContactAvatar ? 'hidden avatar-fallback' : 'flex'}`}>
+                <span className="text-slate-400 font-bold text-xs">{sessionInitials(activeSession)}</span>
+              </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white">{sessionDisplayName(activeSession)}</h4>
@@ -871,12 +883,18 @@ function InboxContent() {
             {/* Session Info */}
             <div className="text-center pb-4 border-b border-slate-100 dark:border-slate-800">
               {activeSession.waContactAvatar ? (
-                <img src={activeSession.waContactAvatar} alt="" className="w-16 h-16 rounded-full object-cover mx-auto mb-3" />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-3">
-                  <span className="text-slate-400 font-bold text-lg">{sessionInitials(activeSession)}</span>
-                </div>
-              )}
+                <img
+                  src={activeSession.waContactAvatar}
+                  alt=""
+                  className="w-16 h-16 rounded-full object-cover mx-auto mb-3"
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; if (e.target instanceof HTMLImageElement && e.target.parentElement) { const fb = e.target.parentElement.querySelector('.avatar-fallback'); if (fb) (fb as HTMLElement).style.display = 'flex'; } }}
+                />
+              ) : null}
+              <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 items-center justify-center mx-auto mb-3 ${activeSession.waContactAvatar ? 'hidden avatar-fallback' : 'flex'}`}>
+                <span className="text-slate-400 font-bold text-lg">{sessionInitials(activeSession)}</span>
+              </div>
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">{sessionDisplayName(activeSession)}</h3>
               <p className="text-sm text-slate-500 font-mono mt-1">{activeSession.visitorId.slice(0, 16)}...</p>
               <div className="flex flex-wrap gap-1.5 justify-center mt-3">
