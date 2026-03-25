@@ -426,7 +426,12 @@ export async function handleOutgoingWhatsAppMessage(data: {
   const waContactId = data.to.replace('@c.us', '');
 
   // Skip messages sent to the agent's own number (self-notifications from the system)
-  if (isAgentPhone(waContactId)) return;
+  if (isAgentPhone(waContactId)) {
+    console.log(`[Orchestration] Outgoing to self (agent), skipping`);
+    return;
+  }
+
+  console.log(`[Orchestration] handleOutgoingWhatsAppMessage to=${waContactId} text="${(data.text || '').slice(0, 60)}"`);
 
   // Find existing open session for this WhatsApp contact
   let session = await prisma.chatSession.findFirst({
@@ -437,7 +442,26 @@ export async function handleOutgoingWhatsAppMessage(data: {
     orderBy: { updatedAt: 'desc' },
   });
 
-  // If no open session, create a new one
+  // Also try RESOLVED sessions if no open session found (agent might re-engage)
+  if (!session) {
+    session = await prisma.chatSession.findFirst({
+      where: {
+        waThreadId: waContactId,
+        status: 'RESOLVED',
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (session) {
+      // Re-open the resolved session
+      await prisma.chatSession.update({
+        where: { id: session.id },
+        data: { status: 'OPEN', mode: 'HUMAN' },
+      });
+      console.log(`[Orchestration] Re-opened RESOLVED session ${session.id} for outgoing msg`);
+    }
+  }
+
+  // If no session at all, create a new one
   if (!session) {
     session = await prisma.chatSession.create({
       data: {
@@ -491,4 +515,6 @@ export async function handleOutgoingWhatsAppMessage(data: {
     lastMessage: msg.text.slice(0, 100),
     timestamp: msg.createdAt,
   });
+
+  console.log(`[Orchestration] Outgoing msg saved to session ${session.id.slice(-8)} (${msg.id})`);
 }

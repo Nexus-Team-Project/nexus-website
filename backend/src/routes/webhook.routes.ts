@@ -5,6 +5,7 @@ import { hmacSha256 } from '../utils/crypto';
 import * as PaymentService from '../services/payment.service';
 import * as OrchestrationService from '../services/orchestration.service';
 import * as ChatService from '../services/chat.service';
+import * as GreenApi from '../services/greenapi.service';
 import { getIO } from '../socket';
 
 const router = Router();
@@ -145,28 +146,52 @@ router.post('/greenapi', async (req: Request, res: Response) => {
 
   // Process incoming messages + outgoing messages from phone (full WhatsApp inbox)
   const isIncoming = webhookType === 'incomingMessageReceived';
-  const isOutgoing = webhookType === 'outgoingMessage' || webhookType === 'outgoingMessageReceived';
+  const isOutgoing = webhookType === 'outgoingMessage'
+    || webhookType === 'outgoingMessageReceived'
+    || webhookType === 'outgoingAPIMessageReceived';
   if (!isIncoming && !isOutgoing) return;
 
-  console.log(`[Webhook/GreenAPI] type=${webhookType} from=${payload.senderData?.sender ?? payload.chatId} msgType=${payload.messageData?.typeMessage}`);
+  // ── Robust chatId extraction for outgoing messages ──
+  // Green API puts chatId in different places depending on webhook type:
+  //   - top-level payload.chatId (outgoingMessage / outgoingAPIMessageReceived)
+  //   - payload.senderData.chatId (outgoingMessageReceived — sent from phone)
+  const outgoingRecipient =
+    (payload.chatId as string)
+    ?? (payload.senderData?.chatId as string)
+    ?? '';
 
   const externalId = payload.idMessage as string;
-  // For incoming: sender is the contact. For outgoing: we sent it, chatId is the recipient
   const from = isIncoming
-    ? (payload.senderData?.sender?.replace('@c.us', '') ?? '') as string
-    : (payload.chatId?.replace('@c.us', '') ?? '') as string;
+    ? (payload.senderData?.sender?.replace('@c.us', '') ?? '')
+    : outgoingRecipient.replace('@c.us', '');
   const senderName = isIncoming
-    ? (payload.senderData?.senderName ?? '') as string
+    ? (payload.senderData?.senderName ?? '')
     : '';
   const msgData = payload.messageData;
-  const msgType = msgData?.typeMessage as string;
+  const msgType = (msgData?.typeMessage as string) ?? '';
 
-  if (!externalId || !from) return;
+  console.log(
+    `[Webhook/GreenAPI] type=${webhookType} ` +
+    `${isIncoming ? 'from' : 'to'}=${from} ` +
+    `msgType=${msgType} ` +
+    `id=${externalId} ` +
+    `rawChatId=${payload.chatId ?? 'N/A'} ` +
+    `senderData.chatId=${payload.senderData?.chatId ?? 'N/A'} ` +
+    `senderData.sender=${payload.senderData?.sender ?? 'N/A'}`,
+  );
 
-  if (await isProcessed(externalId)) return;
+  if (!externalId || !from) {
+    console.warn(`[Webhook/GreenAPI] DROPPED — missing externalId=${externalId} or from=${from}`);
+    return;
+  }
+
+  if (await isProcessed(externalId)) {
+    console.log(`[Webhook/GreenAPI] DEDUP — already processed ${externalId}`);
+    return;
+  }
   await markProcessed(externalId, 'green_api');
 
-  // Extract text and media depending on message type
+  // ── Extract text and media depending on message type ──
   let text = '';
   let mediaUrl: string | undefined;
   let mediaType: string | undefined;
@@ -178,6 +203,13 @@ router.post('/greenapi', async (req: Request, res: Response) => {
       break;
     case 'extendedTextMessage':
       text = msgData?.extendedTextMessageData?.text ?? '';
+      break;
+    case 'quotedMessage':
+      // Reply / quote — text lives in extendedTextMessageData or textMessageData
+      text = msgData?.extendedTextMessageData?.text
+        ?? msgData?.textMessageData?.textMessage
+        ?? msgData?.quotedMessage?.caption
+        ?? '';
       break;
     case 'imageMessage':
       text = msgData?.imageMessage?.caption ?? '';
@@ -199,16 +231,53 @@ router.post('/greenapi', async (req: Request, res: Response) => {
       mediaType = 'document';
       fileName = msgData?.documentMessage?.fileName ?? msgData?.fileMessageData?.fileName;
       break;
-    default:
-      // Unsupported message type — skip
-      console.log(`[Webhook/GreenAPI] Skipping unsupported type: ${msgType}`);
+    case 'stickerMessage':
+      text = '🏷️';  // Sticker placeholder
+      break;
+    case 'contactMessage':
+    case 'contactsArrayMessage':
+      text = '👤 איש קשר';
+      break;
+    case 'locationMessage':
+      text = `📍 מיקום: ${msgData?.locationMessageData?.latitude ?? ''},${msgData?.locationMessageData?.longitude ?? ''}`;
+      break;
+    case 'listResponseMessage':
+    case 'buttonsResponseMessage':
+    case 'templateButtonReplyMessage':
+      text = msgData?.listResponseMessageData?.title
+        ?? msgData?.buttonsResponseMessageData?.selectedButtonId
+        ?? msgData?.templateButtonReplyMessage?.selectedId
+        ?? JSON.stringify(msgData).slice(0, 200);
+      break;
+    case 'reactionMessage':
+      // Reactions — skip silently (not a real message)
       return;
+    default:
+      // Unknown type — log full payload for debugging but don't drop
+      console.warn(
+        `[Webhook/GreenAPI] Unknown msgType="${msgType}" — attempting text extraction. ` +
+        `Keys: ${Object.keys(msgData ?? {}).join(', ')}`,
+      );
+      // Try to extract text from common patterns
+      text = msgData?.textMessageData?.textMessage
+        ?? msgData?.extendedTextMessageData?.text
+        ?? msgData?.caption
+        ?? '';
+      if (!text) {
+        console.warn(`[Webhook/GreenAPI] Could not extract text for msgType="${msgType}", skipping`);
+        return;
+      }
+      break;
   }
 
-  if (!text && !mediaUrl) return;
+  if (!text && !mediaUrl) {
+    console.log(`[Webhook/GreenAPI] DROPPED — no text or media for ${externalId}`);
+    return;
+  }
 
-  // For outgoing messages (sent from the phone), route differently
+  // ── Route: outgoing vs incoming ──
   if (isOutgoing) {
+    console.log(`[Webhook/GreenAPI] → handleOutgoingWhatsAppMessage to=${from} text="${(text || '').slice(0, 60)}"`);
     await OrchestrationService.handleOutgoingWhatsAppMessage({
       to: from, // 'from' here is actually the recipient for outgoing
       text: text || '',
@@ -220,6 +289,7 @@ router.post('/greenapi', async (req: Request, res: Response) => {
     return;
   }
 
+  console.log(`[Webhook/GreenAPI] → handleIncomingWhatsAppMessage from=${from} text="${(text || '').slice(0, 60)}"`);
   await OrchestrationService.handleIncomingWhatsAppMessage({
     from,
     text: text || '',
@@ -229,6 +299,71 @@ router.post('/greenapi', async (req: Request, res: Response) => {
     mediaType,
     fileName,
   });
+});
+
+// ─── GET /api/webhooks/greenapi/settings — Check & fix Green API settings ──
+
+router.get('/greenapi/settings', async (_req: Request, res: Response) => {
+  try {
+    const settings = await GreenApi.getSettings();
+    if (!settings) {
+      res.status(503).json({ error: 'Green API not configured or unreachable' });
+      return;
+    }
+
+    const issues: string[] = [];
+    if (!settings.outgoingWebhook) issues.push('outgoingWebhook is OFF');
+    if (!settings.outgoingMessageWebhook) issues.push('outgoingMessageWebhook is OFF');
+    if (!settings.outgoingAPIMessageWebhook) issues.push('outgoingAPIMessageWebhook is OFF');
+    if (!settings.incomingWebhook) issues.push('incomingWebhook is OFF');
+    if (!settings.webhookUrl) issues.push('webhookUrl is not set');
+
+    res.json({
+      ok: issues.length === 0,
+      issues,
+      settings: {
+        webhookUrl: settings.webhookUrl,
+        incomingWebhook: settings.incomingWebhook,
+        outgoingWebhook: settings.outgoingWebhook,
+        outgoingMessageWebhook: settings.outgoingMessageWebhook,
+        outgoingAPIMessageWebhook: settings.outgoingAPIMessageWebhook,
+        stateWebhook: settings.stateWebhook,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to check settings' });
+  }
+});
+
+// ─── POST /api/webhooks/greenapi/fix-settings — Auto-fix Green API settings ──
+
+router.post('/greenapi/fix-settings', async (req: Request, res: Response) => {
+  try {
+    // Determine webhook URL from request or env
+    let rawBody: any;
+    try {
+      rawBody = req.body instanceof Buffer ? JSON.parse(req.body.toString()) : req.body;
+    } catch {
+      rawBody = {};
+    }
+    const webhookUrl = rawBody?.webhookUrl
+      || `${env.FRONTEND_URL}/api/webhooks/greenapi`;
+
+    const result = await GreenApi.ensureOutgoingWebhooksEnabled(webhookUrl);
+    res.json({
+      ok: true,
+      changed: result.changed,
+      settings: result.settings ? {
+        webhookUrl: result.settings.webhookUrl,
+        incomingWebhook: result.settings.incomingWebhook,
+        outgoingWebhook: result.settings.outgoingWebhook,
+        outgoingMessageWebhook: result.settings.outgoingMessageWebhook,
+        outgoingAPIMessageWebhook: result.settings.outgoingAPIMessageWebhook,
+      } : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fix settings' });
+  }
 });
 
 // ─── POST /api/webhooks/email-inbound — Agent email replies ─
