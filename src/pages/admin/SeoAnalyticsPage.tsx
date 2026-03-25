@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   BarChart3, Search, Globe, Monitor, Smartphone, Tablet, Loader2,
   ArrowDown, TrendingUp, Eye, MousePointerClick, MapPin,
-  AlertTriangle,
+  AlertTriangle, Calendar,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 
@@ -51,7 +51,7 @@ interface DeviceData {
   users: number;
 }
 
-type DateRange = '7' | '14' | '28' | '30';
+type DateRange = '7' | '14' | '28' | '30' | 'custom';
 
 // ─── Normalizers (map backend field names → UI field names) ──
 
@@ -130,6 +130,17 @@ export default function SeoAnalyticsPage() {
 
   const [days, setDays] = useState<DateRange>('30');
   const [loading, setLoading] = useState(true);
+  const [showCustomPicker, setShowCustomPicker] = useState(false);
+
+  // Custom date range state
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const [customStart, setCustomStart] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [customEnd, setCustomEnd] = useState(today);
+  const customPickerRef = useRef<HTMLDivElement>(null);
 
   // Data states
   const [gscOverview, setGscOverview] = useState<GscOverview | null>(null);
@@ -142,17 +153,27 @@ export default function SeoAnalyticsPage() {
   // Error states per section
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Calculate the actual number of days to send to the API
+  const effectiveDays = useCallback(() => {
+    if (days !== 'custom') return days;
+    const start = new Date(customStart);
+    const end = new Date(customEnd);
+    const diff = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+    return String(diff);
+  }, [days, customStart, customEnd]);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setErrors({});
 
+    const d = effectiveDays();
     const endpoints = [
-      { key: 'gscOverview', path: `/api/admin/seo/google/search-console/overview?days=${days}` },
-      { key: 'gscQueries', path: `/api/admin/seo/google/search-console/queries?days=${days}&limit=20` },
-      { key: 'gscPages', path: `/api/admin/seo/google/search-console/pages?days=${days}&limit=20` },
-      { key: 'ga4Overview', path: `/api/admin/seo/google/analytics/overview?days=${days}` },
-      { key: 'trafficSources', path: `/api/admin/seo/google/analytics/sources?days=${days}` },
-      { key: 'devices', path: `/api/admin/seo/google/analytics/devices?days=${days}` },
+      { key: 'gscOverview', path: `/api/admin/seo/google/search-console/overview?days=${d}` },
+      { key: 'gscQueries', path: `/api/admin/seo/google/search-console/queries?days=${d}&limit=20` },
+      { key: 'gscPages', path: `/api/admin/seo/google/search-console/pages?days=${d}&limit=20` },
+      { key: 'ga4Overview', path: `/api/admin/seo/google/analytics/overview?days=${d}` },
+      { key: 'trafficSources', path: `/api/admin/seo/google/analytics/sources?days=${d}` },
+      { key: 'devices', path: `/api/admin/seo/google/analytics/devices?days=${d}` },
     ];
 
     const results = await Promise.allSettled(
@@ -196,7 +217,7 @@ export default function SeoAnalyticsPage() {
 
     setErrors(newErrors);
     setLoading(false);
-  }, [days]);
+  }, [effectiveDays]);
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
 
@@ -205,7 +226,35 @@ export default function SeoAnalyticsPage() {
     { value: '14', label: isHe ? '14 ימים' : '14 days' },
     { value: '28', label: isHe ? '28 ימים' : '28 days' },
     { value: '30', label: isHe ? '30 ימים' : '30 days' },
+    { value: 'custom', label: isHe ? 'מותאם' : 'Custom' },
   ];
+
+  // Close custom picker on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (customPickerRef.current && !customPickerRef.current.contains(e.target as Node)) {
+        setShowCustomPicker(false);
+      }
+    }
+    if (showCustomPicker) document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showCustomPicker]);
+
+  /** Apply the custom date range and fetch */
+  const applyCustomRange = () => {
+    setShowCustomPicker(false);
+    if (days === 'custom') {
+      // force refetch even if already custom
+      void fetchAll();
+    } else {
+      setDays('custom');
+    }
+  };
+
+  /** Format the custom range for display */
+  const customRangeLabel = days === 'custom'
+    ? `${customStart.slice(5).replace('-', '/')} – ${customEnd.slice(5).replace('-', '/')}`
+    : '';
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
@@ -221,20 +270,80 @@ export default function SeoAnalyticsPage() {
         </div>
 
         {/* Date range selector */}
-        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          {DATE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => setDays(opt.value)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                days === opt.value
-                  ? 'bg-white text-stripe-dark shadow-sm'
-                  : 'text-stripe-gray hover:text-stripe-dark'
-              }`}
+        <div className="relative flex items-center gap-2">
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            {DATE_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  if (opt.value === 'custom') {
+                    setShowCustomPicker((v) => !v);
+                  } else {
+                    setShowCustomPicker(false);
+                    setDays(opt.value);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
+                  days === opt.value
+                    ? 'bg-white text-stripe-dark shadow-sm'
+                    : 'text-stripe-gray hover:text-stripe-dark'
+                }`}
+              >
+                {opt.value === 'custom' && <Calendar size={12} />}
+                {opt.value === 'custom' && days === 'custom' ? customRangeLabel : opt.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Custom date picker popover */}
+          {showCustomPicker && (
+            <div
+              ref={customPickerRef}
+              className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-4 z-50 min-w-[280px]"
             >
-              {opt.label}
-            </button>
-          ))}
+              <p className="text-xs font-medium text-stripe-gray mb-3">
+                {isHe ? 'בחר טווח תאריכים' : 'Select date range'}
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs text-stripe-gray mb-1">
+                    {isHe ? 'מתאריך' : 'Start date'}
+                  </label>
+                  <input
+                    type="date"
+                    value={customStart}
+                    max={customEnd}
+                    onChange={(e) => setCustomStart(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-stripe-dark focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-stripe-gray mb-1">
+                    {isHe ? 'עד תאריך' : 'End date'}
+                  </label>
+                  <input
+                    type="date"
+                    value={customEnd}
+                    min={customStart}
+                    max={today}
+                    onChange={(e) => setCustomEnd(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-stripe-dark focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+                  />
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[10px] text-stripe-gray">
+                    {isHe ? 'GSC מוגבל ל-90 יום' : 'GSC limited to 90 days'}
+                  </span>
+                  <button
+                    onClick={applyCustomRange}
+                    className="px-4 py-1.5 bg-stripe-purple text-white text-xs font-medium rounded-lg hover:bg-stripe-purple/90 transition-colors"
+                  >
+                    {isHe ? 'החל' : 'Apply'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
