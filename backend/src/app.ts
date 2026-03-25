@@ -75,13 +75,26 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 // ─── Health check ─────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
+app.get('/api/health', async (_req, res) => {
+  // Quick agent connectivity check
+  let agentOk = false;
+  if (env.AGENT_API_URL) {
+    try {
+      const r = await fetch(`${env.AGENT_API_URL}/health`, { signal: AbortSignal.timeout(3000) });
+      agentOk = r.ok;
+    } catch { /* ignore */ }
+  }
+
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     env: env.NODE_ENV,
-    build: '2026-03-25d',
+    build: '2026-03-25e',
     emailConfigured: !!(env.SENDPULSE_CLIENT_ID && env.SENDPULSE_CLIENT_SECRET),
+    agentProxy: {
+      configured: !!(env.AGENT_API_URL && env.AGENT_API_KEY),
+      reachable: agentOk,
+    },
   });
 });
 
