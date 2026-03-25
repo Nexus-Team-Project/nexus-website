@@ -80,7 +80,7 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     env: env.NODE_ENV,
-    build: '2026-03-23d',
+    build: '2026-03-25a',
     emailConfigured: !!(env.SENDPULSE_CLIENT_ID && env.SENDPULSE_CLIENT_SECRET),
   });
 });
