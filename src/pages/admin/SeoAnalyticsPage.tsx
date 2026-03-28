@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import {
   BarChart3, Search, Globe, Monitor, Smartphone, Tablet, Loader2,
   ArrowDown, TrendingUp, Eye, MousePointerClick, MapPin,
-  AlertTriangle, Calendar, Sparkles, Zap,
+  AlertTriangle, Calendar, Sparkles, Zap, Activity, Target,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 
@@ -83,6 +83,41 @@ interface DailyTrendsData {
   date: string;
   geo: string;
   trending: DailyTrend[];
+}
+
+// ─── Event Detection types (from trends-analyzer skill) ──
+
+interface TrendOpportunity {
+  title: string;
+  keywords: string[];
+  intent: string;
+  angle: string;
+  scores: {
+    traffic: number;
+    competition: number;
+    relevance: number;
+    urgency: number;
+  };
+}
+
+interface TrendEvent {
+  event_name: string;
+  queries: string[];
+  insight: string;
+  type: string;
+  duration_estimate: string;
+  relevance: boolean;
+  nexus_connection: string;
+  opportunities: TrendOpportunity[];
+}
+
+interface TrendsAnalysisData {
+  events: TrendEvent[];
+  signalsProcessed: number;
+  eventsDetected: number;
+  opportunityCount: number;
+  discardedSignals: string[];
+  model: string;
 }
 
 type DateRange = '7' | '14' | '28' | '30' | 'custom';
@@ -189,6 +224,11 @@ export default function SeoAnalyticsPage() {
   const [trendsRelated, setTrendsRelated] = useState<RelatedQueriesData | null>(null);
   const [dailyTrends, setDailyTrends] = useState<DailyTrendsData | null>(null);
 
+  // Event Detection states (from trends-analyzer skill)
+  const [trendsAnalysis, setTrendsAnalysis] = useState<TrendsAnalysisData | null>(null);
+  const [trendsAnalysisLoading, setTrendsAnalysisLoading] = useState(false);
+  const [trendsAnalysisSummary, setTrendsAnalysisSummary] = useState('');
+
   // Error states per section
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -271,6 +311,27 @@ export default function SeoAnalyticsPage() {
   }, [effectiveDays]);
 
   useEffect(() => { void fetchAll(); }, [fetchAll]);
+
+  /** Run the AI event-detection skill via the agent backend */
+  const runTrendsAnalysis = useCallback(async () => {
+    setTrendsAnalysisLoading(true);
+    setErrors((prev) => { const n = { ...prev }; delete n.trendsAnalysis; return n; });
+    try {
+      const result = await api.post<any>('/api/admin/seo/skills/trends-analyzer/run', {
+        config: { days: Number(effectiveDays()), includeCompetitors: true },
+      });
+      if (result.success && result.data) {
+        setTrendsAnalysis(result.data as TrendsAnalysisData);
+        setTrendsAnalysisSummary(result.summary ?? '');
+      } else {
+        setErrors((prev) => ({ ...prev, trendsAnalysis: 'unavailable' }));
+      }
+    } catch {
+      setErrors((prev) => ({ ...prev, trendsAnalysis: 'unavailable' }));
+    } finally {
+      setTrendsAnalysisLoading(false);
+    }
+  }, [effectiveDays]);
 
   const DATE_OPTIONS: { value: DateRange; label: string }[] = [
     { value: '7', label: isHe ? '7 ימים' : '7 days' },
@@ -637,169 +698,363 @@ export default function SeoAnalyticsPage() {
             )}
           </section>
 
-          {/* ─── Google Trends — Interest Over Time ──────────── */}
+          {/* ─── Google Trends & Event Detection ─────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-stripe-dark mb-4 flex items-center gap-2">
-              <TrendingUp size={18} className="text-orange-500" />
-              {isHe ? 'מגמות חיפוש — עניין לאורך זמן' : 'Search Trends — Interest Over Time'}
-            </h2>
-            {errors.trendsInterest ? (
-              <UnavailableCard isHe={isHe} message={isHe ? 'Google Trends לא זמין כרגע — נסה שוב מאוחר יותר' : 'Google Trends temporarily unavailable — try again later'} />
-            ) : trendsInterest && trendsInterest.timeline?.length > 0 ? (
-              <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/50">
-                        <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
-                          {isHe ? 'תאריך' : 'Date'}
-                        </th>
-                        {trendsInterest.keywords.map((kw) => (
-                          <th key={kw} className="text-end px-4 py-2.5 font-medium text-stripe-gray text-xs">
-                            {kw}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {trendsInterest.timeline.slice(-12).map((entry, i) => (
-                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className="px-4 py-2.5 text-stripe-dark text-xs tabular-nums whitespace-nowrap" dir="ltr">
-                            {entry.date}
-                          </td>
-                          {entry.values.map((v, j) => (
-                            <td key={j} className="px-4 py-2.5 text-end">
-                              <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full bg-stripe-purple/70"
-                                    style={{ width: `${Math.min(v.value, 100)}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs tabular-nums text-stripe-gray w-6 text-end">
-                                  {v.value}
-                                </span>
-                              </div>
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-stripe-gray text-xs">
-                {isHe ? 'אין נתוני מגמות' : 'No trends data'}
-              </div>
-            )}
-          </section>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold text-stripe-dark flex items-center gap-2">
+                <TrendingUp size={18} className="text-orange-500" />
+                {isHe ? 'מגמות חיפוש וזיהוי אירועים' : 'Search Trends & Event Detection'}
+              </h2>
+              <button
+                onClick={runTrendsAnalysis}
+                disabled={trendsAnalysisLoading}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all self-start sm:self-auto"
+              >
+                {trendsAnalysisLoading ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    {isHe ? 'מנתח...' : 'Analyzing...'}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    {isHe ? 'הפעל ניתוח אירועים' : 'Run Event Detection'}
+                  </>
+                )}
+              </button>
+            </div>
 
-          {/* ─── Rising Queries ──────────────────────────────── */}
-          <section>
-            <h2 className="text-base font-semibold text-stripe-dark mb-3 flex items-center gap-2">
-              <Sparkles size={16} className="text-amber-500" />
-              {isHe ? 'שאילתות עולות' : 'Rising Queries'}
-            </h2>
-            {errors.trendsRelated ? (
-              <UnavailableCard isHe={isHe} message={isHe ? 'Google Trends לא זמין כרגע — נסה שוב מאוחר יותר' : 'Google Trends temporarily unavailable — try again later'} />
-            ) : trendsRelated && trendsRelated.rising?.length > 0 ? (
-              <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/50">
-                        <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
-                          {isHe ? 'שאילתה' : 'Query'}
-                        </th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">
-                          {isHe ? 'מגמה' : 'Trend'}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {trendsRelated.rising.slice(0, 10).map((q, i) => (
-                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className="px-4 py-2.5 font-medium text-stripe-dark">{q.query}</td>
-                          <td className="px-4 py-2.5 text-end">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              q.trend === 'Breakout' || q.trend === 'פריצה'
-                                ? 'bg-red-100 text-red-700'
-                                : 'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {q.trend}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {trendsRelated.top?.length > 0 && (
-                  <div className="border-t border-gray-100 px-4 py-3">
-                    <p className="text-xs font-medium text-stripe-gray mb-2">
-                      {isHe ? 'שאילתות מובילות' : 'Top Queries'}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {trendsRelated.top.slice(0, 8).map((q, i) => (
-                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs text-stripe-gray">
-                          {q.query}
-                          <span className="text-stripe-purple font-semibold">{q.value}</span>
-                        </span>
-                      ))}
+            {/* Event Detection Results */}
+            {errors.trendsAnalysis ? (
+              <UnavailableCard isHe={isHe} message={isHe ? 'ניתוח המגמות נכשל — נסה שוב מאוחר יותר' : 'Trends analysis failed — try again later'} />
+            ) : trendsAnalysis ? (
+              <div className="space-y-4 mb-8">
+                {/* Summary banner */}
+                <div className="bg-gradient-to-r from-stripe-purple/5 to-orange-50 border border-stripe-purple/10 rounded-xl p-4">
+                  <div className="flex flex-wrap gap-4 mb-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Activity size={14} className="text-stripe-purple" />
+                      <span className="text-stripe-gray">{isHe ? 'אותות:' : 'Signals:'}</span>
+                      <span className="font-semibold text-stripe-dark">{trendsAnalysis.signalsProcessed}</span>
                     </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Zap size={14} className="text-orange-500" />
+                      <span className="text-stripe-gray">{isHe ? 'אירועים:' : 'Events:'}</span>
+                      <span className="font-semibold text-stripe-dark">{trendsAnalysis.eventsDetected}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Target size={14} className="text-emerald-600" />
+                      <span className="text-stripe-gray">{isHe ? 'הזדמנויות:' : 'Opportunities:'}</span>
+                      <span className="font-semibold text-stripe-dark">{trendsAnalysis.opportunityCount}</span>
+                    </div>
+                  </div>
+                  {trendsAnalysisSummary && (
+                    <p className="text-sm text-stripe-dark/80 leading-relaxed">{trendsAnalysisSummary}</p>
+                  )}
+                </div>
+
+                {/* Event cards */}
+                {trendsAnalysis.events.length > 0 ? (
+                  <div className="space-y-4">
+                    {trendsAnalysis.events.map((event, idx) => (
+                      <div key={idx} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                        {/* Event header */}
+                        <div className="p-5 border-b border-gray-50">
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="text-base font-semibold text-stripe-dark">{event.event_name}</h3>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                event.type === 'seasonal' ? 'bg-blue-100 text-blue-700' :
+                                event.type === 'news-driven' ? 'bg-red-100 text-red-700' :
+                                'bg-amber-100 text-amber-700'
+                              }`}>
+                                {event.type === 'seasonal' ? (isHe ? 'עונתי' : 'Seasonal') :
+                                 event.type === 'news-driven' ? (isHe ? 'חדשות' : 'News') :
+                                 (isHe ? 'מגמה' : 'Trend')}
+                              </span>
+                              <span className="text-[10px] text-stripe-gray">{event.duration_estimate}</span>
+                            </div>
+                          </div>
+                          <p className="text-sm text-stripe-gray mb-3">{event.insight}</p>
+
+                          {/* Query tags */}
+                          <div className="flex flex-wrap gap-1.5 mb-3">
+                            {event.queries.map((q, qi) => (
+                              <span key={qi} className="px-2 py-0.5 rounded-md bg-gray-100 text-xs text-stripe-dark">
+                                {q}
+                              </span>
+                            ))}
+                          </div>
+
+                          {/* Nexus connection */}
+                          {event.nexus_connection && (
+                            <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+                              <Target size={12} className="text-emerald-600 mt-0.5 shrink-0" />
+                              <span className="text-xs text-emerald-800">{event.nexus_connection}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Opportunities */}
+                        {event.opportunities?.length > 0 && (
+                          <div className="p-5 bg-gray-50/30">
+                            <p className="text-xs font-medium text-stripe-gray mb-3">
+                              {isHe ? 'הזדמנויות תוכן' : 'Content Opportunities'}
+                            </p>
+                            <div className="space-y-3">
+                              {event.opportunities.map((opp, oi) => (
+                                <div key={oi} className="bg-white border border-gray-100 rounded-lg p-4">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <h4 className="text-sm font-semibold text-stripe-dark leading-tight flex-1">{opp.title}</h4>
+                                    <span className={`shrink-0 ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                      opp.intent === 'transactional' ? 'bg-emerald-100 text-emerald-700' :
+                                      opp.intent === 'commercial' ? 'bg-blue-100 text-blue-700' :
+                                      'bg-gray-100 text-stripe-gray'
+                                    }`}>
+                                      {opp.intent}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-stripe-gray mb-2">{opp.angle}</p>
+
+                                  {/* Keywords */}
+                                  <div className="flex flex-wrap gap-1 mb-3">
+                                    {opp.keywords.map((kw, ki) => (
+                                      <span key={ki} className="px-1.5 py-0.5 rounded bg-stripe-purple/5 text-[10px] text-stripe-purple font-medium">
+                                        {kw}
+                                      </span>
+                                    ))}
+                                  </div>
+
+                                  {/* Score bars */}
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {[
+                                      { score: opp.scores.traffic, label: isHe ? 'תנועה' : 'Traffic', color: 'bg-blue-500' },
+                                      { score: opp.scores.competition, label: isHe ? 'תחרות' : 'Competition', color: 'bg-emerald-500' },
+                                      { score: opp.scores.relevance, label: isHe ? 'רלוונטיות' : 'Relevance', color: 'bg-stripe-purple' },
+                                      { score: opp.scores.urgency, label: isHe ? 'דחיפות' : 'Urgency', color: 'bg-orange-500' },
+                                    ].map((s, si) => (
+                                      <div key={si}>
+                                        <div className="flex items-center justify-between mb-0.5">
+                                          <span className="text-[10px] text-stripe-gray">{s.label}</span>
+                                          <span className="text-[10px] font-semibold text-stripe-dark">{s.score}</span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                          <div className={`h-full rounded-full ${s.color}`} style={{ width: `${s.score * 10}%` }} />
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-stripe-gray text-xs">
+                    {isHe ? 'לא זוהו אירועים רלוונטיים' : 'No relevant events detected'}
+                  </div>
+                )}
+
+                {/* Discarded signals */}
+                {trendsAnalysis.discardedSignals?.length > 0 && (
+                  <div className="bg-gray-50 rounded-lg px-4 py-3">
+                    <p className="text-[10px] font-medium text-stripe-gray mb-1">
+                      {isHe ? 'אותות שנדחו:' : 'Discarded signals:'}
+                    </p>
+                    <p className="text-[10px] text-stripe-gray/70 leading-relaxed">
+                      {trendsAnalysis.discardedSignals.join(' • ')}
+                    </p>
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="text-center py-8 text-stripe-gray text-xs">
-                {isHe ? 'אין נתונים' : 'No data'}
+            ) : !trendsAnalysisLoading ? (
+              <div className="bg-gradient-to-r from-stripe-purple/5 to-orange-50 border border-dashed border-stripe-purple/20 rounded-xl p-6 text-center mb-8">
+                <Sparkles size={24} className="text-stripe-purple mx-auto mb-2" />
+                <p className="text-sm font-medium text-stripe-dark mb-1">
+                  {isHe ? 'ניתוח אירועים מבוסס AI' : 'AI-Powered Event Detection'}
+                </p>
+                <p className="text-xs text-stripe-gray">
+                  {isHe
+                    ? 'זיהוי אירועים מעולם האמיתי מתוך מגמות חיפוש, סינון לרלוונטיות עסקית, ויצירת הזדמנויות תוכן'
+                    : 'Detect real-world events from search trends, filter for business relevance, and generate content opportunities'}
+                </p>
               </div>
-            )}
+            ) : null}
           </section>
 
-          {/* ─── Trending in Israel Today ────────────────────── */}
+          {/* ─── Raw Trends Data ──────────────────────────────── */}
           <section>
-            <h2 className="text-base font-semibold text-stripe-dark mb-3 flex items-center gap-2">
-              <Zap size={16} className="text-yellow-500" />
-              {isHe ? 'טרנדים בישראל היום' : 'Trending in Israel Today'}
-            </h2>
-            {errors.dailyTrends ? (
-              <UnavailableCard isHe={isHe} message={isHe ? 'Google Trends לא זמין כרגע — נסה שוב מאוחר יותר' : 'Google Trends temporarily unavailable — try again later'} />
-            ) : dailyTrends && dailyTrends.trending?.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {dailyTrends.trending.slice(0, 9).map((t, i) => (
-                  <div key={i} className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-stripe-dark leading-tight">
-                        {t.query}
-                      </h3>
-                      <span className="shrink-0 ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stripe-purple/10 text-stripe-purple">
-                        {t.traffic}
-                      </span>
+            <h3 className="text-sm font-medium text-stripe-gray mb-4 border-b border-gray-100 pb-2">
+              {isHe ? 'נתוני מגמות גולמיים' : 'Raw Trends Data'}
+            </h3>
+            <div className="space-y-6">
+              {/* Interest Over Time */}
+              <div>
+                <h4 className="text-sm font-semibold text-stripe-dark mb-2">
+                  {isHe ? 'עניין לאורך זמן' : 'Interest Over Time'}
+                </h4>
+                {errors.trendsInterest ? (
+                  <UnavailableCard isHe={isHe} message={isHe ? 'Google Trends לא זמין כרגע' : 'Google Trends temporarily unavailable'} />
+                ) : trendsInterest && trendsInterest.timeline?.length > 0 ? (
+                  <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100 bg-gray-50/50">
+                            <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                              {isHe ? 'תאריך' : 'Date'}
+                            </th>
+                            {trendsInterest.keywords.map((kw) => (
+                              <th key={kw} className="text-end px-4 py-2.5 font-medium text-stripe-gray text-xs">
+                                {kw}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {trendsInterest.timeline.slice(-12).map((entry, i) => (
+                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                              <td className="px-4 py-2.5 text-stripe-dark text-xs tabular-nums whitespace-nowrap" dir="ltr">
+                                {entry.date}
+                              </td>
+                              {entry.values.map((v, j) => (
+                                <td key={j} className="px-4 py-2.5 text-end">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-full rounded-full bg-stripe-purple/70"
+                                        style={{ width: `${Math.min(v.value, 100)}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-xs tabular-nums text-stripe-gray w-6 text-end">
+                                      {v.value}
+                                    </span>
+                                  </div>
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    {t.context && (
-                      <p className="text-xs text-stripe-gray mb-2 line-clamp-2">
-                        {t.context}
-                      </p>
-                    )}
-                    {t.relatedQueries?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {t.relatedQueries.slice(0, 4).map((rq, j) => (
-                          <span key={j} className="px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-stripe-gray">
-                            {rq}
-                          </span>
-                        ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-stripe-gray text-xs">
+                    {isHe ? 'אין נתוני מגמות' : 'No trends data'}
+                  </div>
+                )}
+              </div>
+
+              {/* Rising Queries */}
+              <div>
+                <h4 className="text-sm font-semibold text-stripe-dark mb-2 flex items-center gap-2">
+                  <Sparkles size={14} className="text-amber-500" />
+                  {isHe ? 'שאילתות עולות' : 'Rising Queries'}
+                </h4>
+                {errors.trendsRelated ? (
+                  <UnavailableCard isHe={isHe} message={isHe ? 'Google Trends לא זמין כרגע' : 'Google Trends temporarily unavailable'} />
+                ) : trendsRelated && trendsRelated.rising?.length > 0 ? (
+                  <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-100 bg-gray-50/50">
+                            <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                              {isHe ? 'שאילתה' : 'Query'}
+                            </th>
+                            <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">
+                              {isHe ? 'מגמה' : 'Trend'}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {trendsRelated.rising.slice(0, 10).map((q, i) => (
+                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                              <td className="px-4 py-2.5 font-medium text-stripe-dark">{q.query}</td>
+                              <td className="px-4 py-2.5 text-end">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                  q.trend === 'Breakout' || q.trend === 'פריצה'
+                                    ? 'bg-red-100 text-red-700'
+                                    : 'bg-emerald-100 text-emerald-700'
+                                }`}>
+                                  {q.trend}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {trendsRelated.top?.length > 0 && (
+                      <div className="border-t border-gray-100 px-4 py-3">
+                        <p className="text-xs font-medium text-stripe-gray mb-2">
+                          {isHe ? 'שאילתות מובילות' : 'Top Queries'}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {trendsRelated.top.slice(0, 8).map((q, i) => (
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs text-stripe-gray">
+                              {q.query}
+                              <span className="text-stripe-purple font-semibold">{q.value}</span>
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
-                ))}
+                ) : (
+                  <div className="text-center py-6 text-stripe-gray text-xs">
+                    {isHe ? 'אין נתונים' : 'No data'}
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="text-center py-8 text-stripe-gray text-xs">
-                {isHe ? 'אין נתוני טרנדים' : 'No trending data'}
+
+              {/* Trending in Israel Today */}
+              <div>
+                <h4 className="text-sm font-semibold text-stripe-dark mb-2 flex items-center gap-2">
+                  <Zap size={14} className="text-yellow-500" />
+                  {isHe ? 'טרנדים בישראל היום' : 'Trending in Israel Today'}
+                </h4>
+                {errors.dailyTrends ? (
+                  <UnavailableCard isHe={isHe} message={isHe ? 'Google Trends לא זמין כרגע' : 'Google Trends temporarily unavailable'} />
+                ) : dailyTrends && dailyTrends.trending?.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {dailyTrends.trending.slice(0, 9).map((t, i) => (
+                      <div key={i} className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="text-sm font-semibold text-stripe-dark leading-tight">
+                            {t.query}
+                          </h3>
+                          <span className="shrink-0 ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stripe-purple/10 text-stripe-purple">
+                            {t.traffic}
+                          </span>
+                        </div>
+                        {t.context && (
+                          <p className="text-xs text-stripe-gray mb-2 line-clamp-2">
+                            {t.context}
+                          </p>
+                        )}
+                        {t.relatedQueries?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {t.relatedQueries.slice(0, 4).map((rq, j) => (
+                              <span key={j} className="px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-stripe-gray">
+                                {rq}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-stripe-gray text-xs">
+                    {isHe ? 'אין נתוני טרנדים' : 'No trending data'}
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </section>
         </div>
       )}
