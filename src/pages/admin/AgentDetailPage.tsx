@@ -71,6 +71,44 @@ interface BudgetSummary {
   limit: number;
 }
 
+/** Normalize budget response — agents-admin returns { today, limit }, agents-crud returns { costUsd, budgetUsd } */
+function normalizeBudget(raw: any): BudgetSummary | null {
+  if (!raw) return null;
+  return {
+    today: raw.today ?? raw.costUsd ?? 0,
+    limit: raw.limit ?? raw.budgetUsd ?? 0.30,
+  };
+}
+
+/** Normalize log — backend may return `costUsd` instead of `cost` */
+function normalizeLog(raw: any): AgentLog {
+  return {
+    ...raw,
+    cost: raw.cost ?? raw.costUsd ?? null,
+  };
+}
+
+/** Normalize automation — backend may return raw Prisma fields */
+function normalizeAutomation(raw: any): AgentAutomation {
+  return {
+    id: raw.id,
+    name: raw.name,
+    skill: raw.skill,
+    cron: raw.cron ?? raw.cronExpr ?? '',
+    enabled: raw.enabled ?? (raw.status === 'ACTIVE'),
+    lastRunAt: raw.lastRunAt ?? null,
+    nextRunAt: raw.nextRunAt ?? null,
+    recentRuns: raw.recentRuns?.map((r: any) => ({
+      id: r.id,
+      status: r.status,
+      durationMs: r.durationMs ?? null,
+      cost: r.cost ?? r.costUsd ?? null,
+      summary: r.summary ?? null,
+      createdAt: r.createdAt ?? r.startedAt ?? '',
+    })),
+  };
+}
+
 // ─── Color helpers ────────────────────────────────────────
 
 const TYPE_COLORS: Record<string, string> = {
@@ -299,11 +337,11 @@ function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: s
 
   useEffect(() => {
     Promise.all([
-      api.get<AgentLog[]>(`/api/admin/agents/${slug}/logs?limit=10`).catch(() => []),
-      api.get<BudgetSummary>(`/api/admin/agents/${slug}/budget`).catch(() => null),
+      api.get<any[]>(`/api/admin/agents/${slug}/logs?limit=10`).catch(() => []),
+      api.get<any>(`/api/admin/agents/${slug}/budget`).catch(() => null),
     ]).then(([l, b]) => {
-      setLogs(l);
-      setBudget(b);
+      setLogs(l.map(normalizeLog));
+      setBudget(normalizeBudget(b));
     }).finally(() => setLoadingLogs(false));
   }, [slug]);
 
@@ -343,7 +381,7 @@ function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: s
         />
         <StatCard
           label={isHe ? 'תקציב היום' : "Today's Budget"}
-          value={budget ? `$${budget.today.toFixed(2)}` : '—'}
+          value={budget?.today != null ? `$${Number(budget.today).toFixed(2)}` : '—'}
           icon={BarChart3}
           color="#ec4899"
         />
@@ -589,15 +627,16 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    api.get<AgentAutomation[]>(`/api/admin/agents/${slug}/automations`)
-      .then(setAutomations)
+    api.get<any[]>(`/api/admin/agents/${slug}/automations`)
+      .then((data) => setAutomations(data.map(normalizeAutomation)))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [slug]);
 
   const toggleEnabled = async (id: string, enabled: boolean) => {
     try {
-      await api.patch(`/api/admin/agents/${slug}/automations/${id}`, { enabled: !enabled });
+      const newStatus = enabled ? 'PAUSED' : 'ACTIVE';
+      await api.patch(`/api/admin/agents/${slug}/automations/${id}`, { status: newStatus });
       setAutomations((prev) =>
         prev.map((a) => (a.id === id ? { ...a, enabled: !a.enabled } : a))
       );
@@ -610,11 +649,12 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
     if (!newName.trim() || !newSkill.trim() || !newCron.trim()) return;
     setCreating(true);
     try {
-      const automation = await api.post<AgentAutomation>(`/api/admin/agents/${slug}/automations`, {
+      const raw = await api.post<any>(`/api/admin/agents/${slug}/automations`, {
         name: newName.trim(),
         skill: newSkill.trim(),
-        cron: newCron.trim(),
+        cronExpr: newCron.trim(),
       });
+      const automation = normalizeAutomation(raw);
       setAutomations((prev) => [automation, ...prev]);
       setNewName('');
       setNewSkill('');
@@ -637,7 +677,15 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
     const auto = automations.find((a) => a.id === id);
     if (auto && !auto.recentRuns) {
       try {
-        const runs = await api.get<AutomationRun[]>(`/api/admin/agents/${slug}/automations/${id}/runs?limit=5`);
+        const rawRuns = await api.get<any[]>(`/api/admin/agents/${slug}/automations/${id}/runs?limit=5`);
+        const runs: AutomationRun[] = rawRuns.map((r) => ({
+          id: r.id,
+          status: r.status,
+          durationMs: r.durationMs ?? null,
+          cost: r.cost ?? r.costUsd ?? null,
+          summary: r.summary ?? null,
+          createdAt: r.createdAt ?? r.startedAt ?? '',
+        }));
         setAutomations((prev) =>
           prev.map((a) => (a.id === id ? { ...a, recentRuns: runs } : a))
         );
@@ -824,7 +872,8 @@ function LogsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
     if (isMore) setLoadingMore(true); else setLoading(true);
 
     try {
-      const data = await api.get<AgentLog[]>(`/api/admin/agents/${slug}/logs?limit=${PAGE_SIZE}&offset=${offset}`);
+      const rawData = await api.get<any[]>(`/api/admin/agents/${slug}/logs?limit=${PAGE_SIZE}&offset=${offset}`);
+      const data = rawData.map(normalizeLog);
       if (isMore) {
         setLogs((prev) => [...prev, ...data]);
       } else {
@@ -1036,8 +1085,8 @@ function SettingsTab({
     try {
       const updated = await api.patch<AgentDetail>(`/api/admin/agents/${slug}`, {
         systemPrompt: systemPrompt || null,
-        model: model || null,
         description: description || null,
+        config: { model: model || null },
       });
       onUpdate(updated);
       setSaved(true);

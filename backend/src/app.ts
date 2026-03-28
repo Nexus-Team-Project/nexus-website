@@ -220,6 +220,11 @@ if (existsSync(frontendDist)) {
       immutable: true,
     }),
   );
+  // Return 404 for missing assets (e.g. stale chunk hashes after deploy)
+  // instead of falling through to the SPA catch-all which would serve index.html as JS
+  app.use('/assets', (_req, res) => {
+    res.status(404).end();
+  });
   app.use(
     express.static(frontendDist, {
       redirect: false,

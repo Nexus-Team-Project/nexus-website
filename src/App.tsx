@@ -4,6 +4,7 @@ import { LanguageProvider } from './i18n/LanguageContext';
 import { useAnalytics } from './hooks/useAnalytics';
 import ProtectedRoute from './components/ProtectedRoute';
 import AccessibilityWidget from './components/AccessibilityWidget';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
@@ -312,10 +313,10 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<AdminDashboard />} />
-            <Route path="agents" element={<AgentListPage />} />
-            <Route path="agents/:slug" element={<AgentDetailPage />} />
-            <Route path="inbox" element={<LiveInbox />} />
-            <Route path="seo-analytics" element={<SeoAnalyticsPage />} />
+            <Route path="agents" element={<ErrorBoundary><AgentListPage /></ErrorBoundary>} />
+            <Route path="agents/:slug" element={<ErrorBoundary><AgentDetailPage /></ErrorBoundary>} />
+            <Route path="inbox" element={<ErrorBoundary><LiveInbox /></ErrorBoundary>} />
+            <Route path="seo-analytics" element={<ErrorBoundary><SeoAnalyticsPage /></ErrorBoundary>} />
           </Route>
           <Route path="/he/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/he/login">
@@ -323,10 +324,10 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<AdminDashboard />} />
-            <Route path="agents" element={<AgentListPage />} />
-            <Route path="agents/:slug" element={<AgentDetailPage />} />
-            <Route path="inbox" element={<LiveInbox />} />
-            <Route path="seo-analytics" element={<SeoAnalyticsPage />} />
+            <Route path="agents" element={<ErrorBoundary><AgentListPage /></ErrorBoundary>} />
+            <Route path="agents/:slug" element={<ErrorBoundary><AgentDetailPage /></ErrorBoundary>} />
+            <Route path="inbox" element={<ErrorBoundary><LiveInbox /></ErrorBoundary>} />
+            <Route path="seo-analytics" element={<ErrorBoundary><SeoAnalyticsPage /></ErrorBoundary>} />
           </Route>
           <Route path="/org-select"    element={<LanguageProvider language="en"><OrgSelectPage /></LanguageProvider>} />
           <Route path="/he/org-select" element={<LanguageProvider language="he"><OrgSelectPage /></LanguageProvider>} />
