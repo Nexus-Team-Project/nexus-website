@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import {
   BarChart3, Search, Globe, Monitor, Smartphone, Tablet, Loader2,
   ArrowDown, TrendingUp, Eye, MousePointerClick, MapPin,
-  AlertTriangle, Calendar,
+  AlertTriangle, Calendar, Sparkles, Zap,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 
@@ -49,6 +49,40 @@ interface DeviceData {
   device: string;
   sessions: number;
   users: number;
+}
+
+// ─── Google Trends types ──────────────────────────────────
+
+interface TrendsTimelineEntry {
+  date: string;
+  values: Array<{ keyword: string; value: number }>;
+}
+
+interface TrendsInterest {
+  keywords: string[];
+  period_days: number;
+  geo: string;
+  timeline: TrendsTimelineEntry[];
+}
+
+interface RelatedQueriesData {
+  keyword: string;
+  geo: string;
+  top: Array<{ query: string; value: number }>;
+  rising: Array<{ query: string; trend: string }>;
+}
+
+interface DailyTrend {
+  query: string;
+  traffic: string;
+  relatedQueries: string[];
+  context: string | null;
+}
+
+interface DailyTrendsData {
+  date: string;
+  geo: string;
+  trending: DailyTrend[];
 }
 
 type DateRange = '7' | '14' | '28' | '30' | 'custom';
@@ -150,6 +184,11 @@ export default function SeoAnalyticsPage() {
   const [trafficSources, setTrafficSources] = useState<TrafficSource[]>([]);
   const [devices, setDevices] = useState<DeviceData[]>([]);
 
+  // Google Trends states
+  const [trendsInterest, setTrendsInterest] = useState<TrendsInterest | null>(null);
+  const [trendsRelated, setTrendsRelated] = useState<RelatedQueriesData | null>(null);
+  const [dailyTrends, setDailyTrends] = useState<DailyTrendsData | null>(null);
+
   // Error states per section
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -174,6 +213,9 @@ export default function SeoAnalyticsPage() {
       { key: 'ga4Overview', path: `/api/admin/seo/google/analytics/overview?days=${d}` },
       { key: 'trafficSources', path: `/api/admin/seo/google/analytics/sources?days=${d}` },
       { key: 'devices', path: `/api/admin/seo/google/analytics/devices?days=${d}` },
+      { key: 'trendsInterest', path: `/api/admin/seo/google/trends/interest?keywords=${encodeURIComponent('תוכנית נאמנות,מועדון הטבות,מתנות לעובדים,קאשבק,שוברים')}&days=${d}` },
+      { key: 'trendsRelated', path: `/api/admin/seo/google/trends/related?keyword=${encodeURIComponent('מתנות לעובדים')}` },
+      { key: 'dailyTrends', path: `/api/admin/seo/google/trends/daily` },
     ];
 
     const results = await Promise.allSettled(
@@ -205,6 +247,15 @@ export default function SeoAnalyticsPage() {
               break;
             case 'devices':
               setDevices(normalizeDevices(data));
+              break;
+            case 'trendsInterest':
+              setTrendsInterest(data as TrendsInterest);
+              break;
+            case 'trendsRelated':
+              setTrendsRelated(data as RelatedQueriesData);
+              break;
+            case 'dailyTrends':
+              setDailyTrends(data as DailyTrendsData);
               break;
           }
         } catch {
@@ -265,7 +316,7 @@ export default function SeoAnalyticsPage() {
             {isHe ? 'אנליטיקס SEO' : 'SEO Analytics'}
           </h1>
           <p className="text-sm text-stripe-gray mt-1">
-            {isHe ? 'נתונים מ-Google Search Console ו-Analytics' : 'Data from Google Search Console & Analytics'}
+            {isHe ? 'נתונים מ-Google Search Console, Analytics ו-Trends' : 'Data from Google Search Console, Analytics & Trends'}
           </p>
         </div>
 
@@ -582,6 +633,171 @@ export default function SeoAnalyticsPage() {
                     {isHe ? 'אין נתונים' : 'No data'}
                   </div>
                 )}
+              </div>
+            )}
+          </section>
+
+          {/* ─── Google Trends — Interest Over Time ──────────── */}
+          <section>
+            <h2 className="text-lg font-semibold text-stripe-dark mb-4 flex items-center gap-2">
+              <TrendingUp size={18} className="text-orange-500" />
+              {isHe ? 'מגמות חיפוש — עניין לאורך זמן' : 'Search Trends — Interest Over Time'}
+            </h2>
+            {errors.trendsInterest ? (
+              <UnavailableCard isHe={isHe} />
+            ) : trendsInterest && trendsInterest.timeline?.length > 0 ? (
+              <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                          {isHe ? 'תאריך' : 'Date'}
+                        </th>
+                        {trendsInterest.keywords.map((kw) => (
+                          <th key={kw} className="text-end px-4 py-2.5 font-medium text-stripe-gray text-xs">
+                            {kw}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trendsInterest.timeline.slice(-12).map((entry, i) => (
+                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <td className="px-4 py-2.5 text-stripe-dark text-xs tabular-nums whitespace-nowrap" dir="ltr">
+                            {entry.date}
+                          </td>
+                          {entry.values.map((v, j) => (
+                            <td key={j} className="px-4 py-2.5 text-end">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full bg-stripe-purple/70"
+                                    style={{ width: `${Math.min(v.value, 100)}%` }}
+                                  />
+                                </div>
+                                <span className="text-xs tabular-nums text-stripe-gray w-6 text-end">
+                                  {v.value}
+                                </span>
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-stripe-gray text-xs">
+                {isHe ? 'אין נתוני מגמות' : 'No trends data'}
+              </div>
+            )}
+          </section>
+
+          {/* ─── Rising Queries ──────────────────────────────── */}
+          <section>
+            <h2 className="text-base font-semibold text-stripe-dark mb-3 flex items-center gap-2">
+              <Sparkles size={16} className="text-amber-500" />
+              {isHe ? 'שאילתות עולות' : 'Rising Queries'}
+            </h2>
+            {errors.trendsRelated ? (
+              <UnavailableCard isHe={isHe} />
+            ) : trendsRelated && trendsRelated.rising?.length > 0 ? (
+              <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                          {isHe ? 'שאילתה' : 'Query'}
+                        </th>
+                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">
+                          {isHe ? 'מגמה' : 'Trend'}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trendsRelated.rising.slice(0, 10).map((q, i) => (
+                        <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <td className="px-4 py-2.5 font-medium text-stripe-dark">{q.query}</td>
+                          <td className="px-4 py-2.5 text-end">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                              q.trend === 'Breakout' || q.trend === 'פריצה'
+                                ? 'bg-red-100 text-red-700'
+                                : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {q.trend}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {trendsRelated.top?.length > 0 && (
+                  <div className="border-t border-gray-100 px-4 py-3">
+                    <p className="text-xs font-medium text-stripe-gray mb-2">
+                      {isHe ? 'שאילתות מובילות' : 'Top Queries'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {trendsRelated.top.slice(0, 8).map((q, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs text-stripe-gray">
+                          {q.query}
+                          <span className="text-stripe-purple font-semibold">{q.value}</span>
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-stripe-gray text-xs">
+                {isHe ? 'אין נתונים' : 'No data'}
+              </div>
+            )}
+          </section>
+
+          {/* ─── Trending in Israel Today ────────────────────── */}
+          <section>
+            <h2 className="text-base font-semibold text-stripe-dark mb-3 flex items-center gap-2">
+              <Zap size={16} className="text-yellow-500" />
+              {isHe ? 'טרנדים בישראל היום' : 'Trending in Israel Today'}
+            </h2>
+            {errors.dailyTrends ? (
+              <UnavailableCard isHe={isHe} />
+            ) : dailyTrends && dailyTrends.trending?.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {dailyTrends.trending.slice(0, 9).map((t, i) => (
+                  <div key={i} className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-stripe-dark leading-tight">
+                        {t.query}
+                      </h3>
+                      <span className="shrink-0 ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stripe-purple/10 text-stripe-purple">
+                        {t.traffic}
+                      </span>
+                    </div>
+                    {t.context && (
+                      <p className="text-xs text-stripe-gray mb-2 line-clamp-2">
+                        {t.context}
+                      </p>
+                    )}
+                    {t.relatedQueries?.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {t.relatedQueries.slice(0, 4).map((rq, j) => (
+                          <span key={j} className="px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-stripe-gray">
+                            {rq}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-stripe-gray text-xs">
+                {isHe ? 'אין נתוני טרנדים' : 'No trending data'}
               </div>
             )}
           </section>
