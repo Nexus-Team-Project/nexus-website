@@ -19,6 +19,12 @@ export function errorHandler(
     console.error(`[ERROR ${statusCode}]`, err?.message, err?.constructor?.name, (err as any)?.code);
   }
 
+  // Prevent ERR_HTTP_HEADERS_SENT crash if response already started
+  if (res.headersSent) {
+    console.error('[ERROR] Headers already sent, skipping error response');
+    return;
+  }
+
   res.status(statusCode).json({
     error: message,
     ...(env.NODE_ENV === 'development' && { stack: err.stack }),

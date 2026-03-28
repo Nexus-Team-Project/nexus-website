@@ -235,7 +235,9 @@ if (existsSync(frontendDist)) {
 
 // ─── 404 for unknown API routes ───────────────────────────
 app.use((_req, res) => {
-  res.status(404).json({ error: 'Not found' });
+  if (!res.headersSent) {
+    res.status(404).json({ error: 'Not found' });
+  }
 });
 
 // ─── Global error handler ─────────────────────────────────

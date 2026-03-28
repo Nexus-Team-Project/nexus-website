@@ -1,4 +1,17 @@
 import 'dotenv/config'; // Load .env before anything else
+
+// ─── Process-level crash protection ─────────────────────────
+// Prevents silent crashes on unhandled promise rejections (Node 20+ default)
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[FATAL] Unhandled promise rejection:', reason);
+  console.error('[FATAL] Promise:', promise);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err);
+  process.exit(1);
+});
+
 import http from 'http';
 import app from './app';
 import { initSocket } from './socket';
