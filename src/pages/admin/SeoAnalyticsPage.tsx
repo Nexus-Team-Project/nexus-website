@@ -87,6 +87,15 @@ interface DailyTrendsData {
 
 // ─── Event Detection types (from trends-analyzer skill) ──
 
+interface TrendSignal {
+  query: string;
+  growth: string;
+  source: string;          // "rising_query" | "daily_trend" | "related_topic"
+  keyword?: string;
+  context?: string | null;
+  related?: string[];
+}
+
 interface TrendOpportunity {
   title: string;
   keywords: string[];
@@ -112,6 +121,7 @@ interface TrendEvent {
 }
 
 interface TrendsAnalysisData {
+  signals: TrendSignal[];
   events: TrendEvent[];
   signalsProcessed: number;
   eventsDetected: number;
@@ -753,7 +763,77 @@ export default function SeoAnalyticsPage() {
                   )}
                 </div>
 
-                {/* Event cards */}
+                {/* ── Signals table ─────────────────────────── */}
+                {trendsAnalysis.signals?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-stripe-dark mb-2 flex items-center gap-2">
+                      <Activity size={14} className="text-stripe-purple" />
+                      {isHe ? 'סיגנלים שזוהו' : 'Detected Signals'}
+                      <span className="text-[10px] font-normal text-stripe-gray">({trendsAnalysis.signals.length})</span>
+                    </h3>
+                    <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-100 bg-gray-50/50">
+                              <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                                {isHe ? 'שאילתה / נושא' : 'Query / Topic'}
+                              </th>
+                              <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                                {isHe ? 'מקור' : 'Source'}
+                              </th>
+                              <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">
+                                {isHe ? 'צמיחה' : 'Growth'}
+                              </th>
+                              <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                                {isHe ? 'הקשר' : 'Context'}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {trendsAnalysis.signals.map((sig, si) => (
+                              <tr key={si} className="border-b border-gray-50 hover:bg-gray-50/50">
+                                <td className="px-4 py-2.5 font-medium text-stripe-dark max-w-xs">
+                                  {sig.query}
+                                </td>
+                                <td className="px-4 py-2.5">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                                    sig.source === 'daily_trend'   ? 'bg-yellow-100 text-yellow-700' :
+                                    sig.source === 'rising_query'  ? 'bg-blue-100 text-blue-700' :
+                                    'bg-purple-100 text-purple-700'
+                                  }`}>
+                                    {sig.source === 'daily_trend' ? (isHe ? 'טרנד יומי' : 'Daily') :
+                                     sig.source === 'rising_query' ? (isHe ? 'שאילתה עולה' : 'Rising') :
+                                     (isHe ? 'נושא קשור' : 'Topic')}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5 text-end">
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                    sig.growth === 'Breakout' || sig.growth === 'פריצה'
+                                      ? 'bg-red-100 text-red-700'
+                                      : 'bg-emerald-100 text-emerald-700'
+                                  }`}>
+                                    {sig.growth}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5 text-xs text-stripe-gray max-w-xs truncate">
+                                  {sig.context ?? sig.keyword ?? (sig.related?.slice(0, 2).join(', ')) ?? '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Event cards ─────────────────────────────── */}
+                <h3 className="text-sm font-semibold text-stripe-dark flex items-center gap-2 mt-2">
+                  <Zap size={14} className="text-orange-500" />
+                  {isHe ? 'אירועים שזוהו' : 'Detected Events'}
+                  <span className="text-[10px] font-normal text-stripe-gray">({trendsAnalysis.eventsDetected})</span>
+                </h3>
                 {trendsAnalysis.events.length > 0 ? (
                   <div className="space-y-4">
                     {trendsAnalysis.events.map((event, idx) => (
