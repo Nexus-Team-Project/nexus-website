@@ -8,19 +8,19 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
       className="absolute inset-0 overflow-hidden"
       style={{ clipPath }}
     >
-      {/* Base gradient — balanced warm presence */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#ffb74d] via-[#ff91b8] to-[#9c88ff]" />
+      {/* Base gradient — teal → sky blue → soft orange */}
+      <div className="absolute inset-0 bg-gradient-to-r from-[#0D9488] via-[#0EA5E9] to-[#FB923C]" />
 
       {/* Animated blobs — bigger, faster, more travel distance */}
       <div
         className="absolute w-[150%] h-[150%] -top-[25%] -left-[25%]"
         style={{ filter: 'blur(70px)', transform: 'translateZ(0)' }}
       >
-        {/* Soft purple/magenta */}
+        {/* Teal */}
         <div
           className="absolute w-[55%] h-[65%] rounded-full opacity-90"
           style={{
-            background: 'radial-gradient(circle, #d881f4 0%, #c068e0 40%, transparent 65%)',
+            background: 'radial-gradient(circle, #0D9488 0%, #0B7F74 40%, transparent 65%)',
             top: '0%',
             left: '50%',
             animation: 'blob1 10s ease-in-out infinite alternate',
@@ -28,11 +28,11 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             backfaceVisibility: 'hidden' as const,
           }}
         />
-        {/* Light cyan/turquoise */}
+        {/* Sky blue */}
         <div
           className="absolute w-[60%] h-[60%] rounded-full opacity-90"
           style={{
-            background: 'radial-gradient(circle, #80deea 0%, #4dd0e1 40%, transparent 65%)',
+            background: 'radial-gradient(circle, #0EA5E9 0%, #0284C7 40%, transparent 65%)',
             top: '20%',
             left: '20%',
             animation: 'blob2 13s ease-in-out infinite alternate',
@@ -40,11 +40,11 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             backfaceVisibility: 'hidden' as const,
           }}
         />
-        {/* Golden yellow — soft and warm */}
+        {/* Soft orange */}
         <div
           className="absolute w-[45%] h-[45%] rounded-full opacity-80"
           style={{
-            background: 'radial-gradient(circle, #ffd54f 0%, #ffb74d 35%, transparent 65%)',
+            background: 'radial-gradient(circle, #FB923C 0%, #F97316 35%, transparent 65%)',
             top: '12%',
             left: '-5%',
             animation: 'blob3 12s ease-in-out infinite alternate',
@@ -52,11 +52,11 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             backfaceVisibility: 'hidden' as const,
           }}
         />
-        {/* Soft pink accent */}
+        {/* Mint */}
         <div
           className="absolute w-[55%] h-[55%] rounded-full opacity-85"
           style={{
-            background: 'radial-gradient(circle, #f48fb1 0%, #ec407a 40%, transparent 65%)',
+            background: 'radial-gradient(circle, #34D399 0%, #10B981 40%, transparent 65%)',
             top: '30%',
             left: '40%',
             animation: 'blob4 11s ease-in-out infinite alternate',
@@ -64,11 +64,11 @@ export default function AnimatedGradient({ clipPath = 'polygon(0 0, 100% 0, 100%
             backfaceVisibility: 'hidden' as const,
           }}
         />
-        {/* Light lavender */}
+        {/* Teal (cycle back) */}
         <div
           className="absolute w-[50%] h-[55%] rounded-full opacity-85"
           style={{
-            background: 'radial-gradient(circle, #b39ddb 0%, #9575cd 40%, transparent 65%)',
+            background: 'radial-gradient(circle, #14B8A6 0%, #0D9488 40%, transparent 65%)',
             top: '5%',
             left: '30%',
             animation: 'blob5 14s ease-in-out infinite alternate',
