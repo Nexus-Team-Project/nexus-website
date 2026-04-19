@@ -216,8 +216,8 @@ export default function HomeContent() {
 
   useSEO({
     title: language === 'he'
-      ? 'Nexus — תשתית פיננסית לעסקים מודרניים'
-      : 'Nexus — Financial Infrastructure for Modern Business',
+      ? 'Nexus — בנה את המוצר הפיננסי שלך'
+      : 'Nexus — Build your financial product',
     description: language === 'he'
       ? 'Nexus מספקת תשלומים, הנפקת כרטיסים, תוכניות נאמנות והטבות ארגוניות ל-50M+ עסקים ב-135+ מטבעות.'
       : 'Nexus provides payment processing, card issuance, loyalty programs, and corporate benefits for 50M+ businesses in 135+ currencies.',
