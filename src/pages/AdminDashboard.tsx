@@ -630,13 +630,13 @@ export default function AdminDashboard() {
                 </div>
                 <div className="text-xl font-bold text-red-600">{aiStats?.lowRatedCount ?? 0}</div>
               </div>
-              <div className="bg-indigo-50 rounded-lg p-3">
+              <div className="bg-teal-50 rounded-lg p-3">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <BookOpen size={12} className="text-indigo-600" />
-                  <span className="text-xs text-indigo-700 font-medium">Knowledge</span>
+                  <BookOpen size={12} className="text-teal-600" />
+                  <span className="text-xs text-teal-700 font-medium">Knowledge</span>
                 </div>
-                <div className="text-xl font-bold text-indigo-700">{aiStats?.knowledgeChunks ?? 0}</div>
-                <div className="text-[10px] text-indigo-600 mt-0.5">{aiStats?.autoExamplesCount ?? 0} auto-examples</div>
+                <div className="text-xl font-bold text-teal-700">{aiStats?.knowledgeChunks ?? 0}</div>
+                <div className="text-[10px] text-teal-600 mt-0.5">{aiStats?.autoExamplesCount ?? 0} auto-examples</div>
               </div>
             </div>
 

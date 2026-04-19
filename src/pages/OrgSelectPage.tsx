@@ -7,7 +7,7 @@ import NexusLogo from '../components/NexusLogo';
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5174';
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
-  OWNER:  { label: 'Owner',  color: '#7c3aed' },
+  OWNER:  { label: 'Owner',  color: '#0D9488' },
   ADMIN:  { label: 'Admin',  color: '#0ea5e9' },
   MEMBER: { label: 'Member', color: '#10b981' },
 };

@@ -33,7 +33,7 @@ const ORG_ROLE_LABELS: Record<string, string> = {
 };
 
 const ORG_ROLE_COLORS: Record<string, string> = {
-  OWNER:  'bg-purple-500/20 text-purple-300',
+  OWNER:  'bg-teal-500/20 text-teal-300',
   ADMIN:  'bg-blue-500/20 text-blue-300',
   MEMBER: 'bg-white/10 text-white/50',
 };
@@ -93,7 +93,7 @@ function StatusBadge({ status }: { status: Order['status'] }) {
     PROCESSING: { label: 'Processing', cls: 'text-blue-400 bg-blue-400/10',    icon: RefreshCw },
     SUCCEEDED:  { label: 'Paid',       cls: 'text-green-400 bg-green-400/10',  icon: CheckCircle },
     FAILED:     { label: 'Failed',     cls: 'text-red-400 bg-red-400/10',      icon: XCircle },
-    REFUNDED:   { label: 'Refunded',   cls: 'text-purple-400 bg-purple-400/10', icon: RefreshCw },
+    REFUNDED:   { label: 'Refunded',   cls: 'text-teal-400 bg-teal-400/10', icon: RefreshCw },
   };
   const { label, cls, icon: Icon } = map[status] ?? map.PENDING;
   return (
@@ -187,7 +187,7 @@ export default function UserDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-purple-500 animate-spin" />
+        <div className="w-10 h-10 rounded-full border-2 border-white/10 border-t-teal-500 animate-spin" />
       </div>
     );
   }
@@ -197,7 +197,7 @@ export default function UserDashboard() {
       {/* Header */}
       <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 bg-gray-950/90 backdrop-blur-sm z-20">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg" />
+          <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-sky-500 rounded-lg" />
           <span className="font-semibold">My Account</span>
         </div>
         <div className="flex items-center gap-3">
@@ -255,7 +255,7 @@ export default function UserDashboard() {
         {/* Stats row */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: 'Total Orders',    value: stats?.totalOrders ?? 0,     icon: ShoppingBag, color: '#8b5cf6' },
+            { label: 'Total Orders',    value: stats?.totalOrders ?? 0,     icon: ShoppingBag, color: '#0D9488' },
             { label: 'Total Spent',     value: `₪${(stats?.totalSpent ?? 0).toFixed(2)}`, icon: CreditCard, color: '#10b981' },
             { label: 'Successful Pays', value: stats?.succeededOrders ?? 0,  icon: TrendingUp, color: '#06b6d4' },
             { label: 'Support Chats',   value: stats?.chatSessions ?? 0,     icon: MessageSquare, color: '#f59e0b' },
@@ -273,7 +273,7 @@ export default function UserDashboard() {
         {/* Orders */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/10 flex items-center gap-2">
-            <ShoppingBag size={16} className="text-purple-400" />
+            <ShoppingBag size={16} className="text-teal-400" />
             <h2 className="font-semibold text-sm">Orders</h2>
             {ordersData && (
               <span className="ml-auto text-xs text-white/30">{ordersData.total} total</span>
@@ -375,7 +375,7 @@ export default function UserDashboard() {
         {/* My Organizations */}
         <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-white/10 flex items-center gap-2">
-            <Building2 size={16} className="text-indigo-400" />
+            <Building2 size={16} className="text-teal-400" />
             <h2 className="font-semibold text-sm">My Organizations</h2>
             {!orgsLoading && orgs.length > 0 && (
               <span className="ml-auto text-xs text-white/30">{orgs.length}</span>
@@ -430,7 +430,7 @@ export default function UserDashboard() {
                     href={`${DASHBOARD_URL}/organizations/${m.org.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors flex-shrink-0"
+                    className="text-xs font-medium text-teal-400 hover:text-teal-300 transition-colors flex-shrink-0"
                   >
                     נהל →
                   </a>

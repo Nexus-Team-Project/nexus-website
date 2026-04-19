@@ -27,7 +27,7 @@ const ORG_ROLE_LABELS: Record<string, string> = {
 };
 
 const ORG_ROLE_COLORS: Record<string, string> = {
-  OWNER:  'bg-purple-100 text-purple-700',
+  OWNER:  'bg-teal-100 text-teal-700',
   ADMIN:  'bg-blue-100 text-blue-700',
   MEMBER: 'bg-slate-100 text-slate-600',
 };
@@ -145,7 +145,7 @@ export default function Profile() {
                 </div>
                 <div className="mr-auto flex-shrink-0">
                   {user?.role !== 'USER' && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 font-medium">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-100 text-teal-700 font-medium">
                       {user?.role === 'ADMIN' ? 'אדמין' : 'סוכן'}
                     </span>
                   )}

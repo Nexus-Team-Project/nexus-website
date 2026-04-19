@@ -800,7 +800,7 @@ export default function SeoAnalyticsPage() {
                                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                                     sig.source === 'daily_trend'   ? 'bg-yellow-100 text-yellow-700' :
                                     sig.source === 'rising_query'  ? 'bg-blue-100 text-blue-700' :
-                                    'bg-purple-100 text-purple-700'
+                                    'bg-teal-100 text-teal-700'
                                   }`}>
                                     {sig.source === 'daily_trend' ? (isHe ? 'טרנד יומי' : 'Daily') :
                                      sig.source === 'rising_query' ? (isHe ? 'שאילתה עולה' : 'Rising') :
