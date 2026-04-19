@@ -128,7 +128,7 @@
   width: 8px;
   height: 8px;
   border-radius: 3px;
-  background: linear-gradient(135deg, #635bff, #7c3aed);
+  background: linear-gradient(135deg, #0d9488, #7c3aed);
 }
 
 .phone-list {
@@ -465,7 +465,7 @@
   right: -80px;
   width: 200px;
   height: 200px;
-  background: #635bff;
+  background: #0d9488;
 }
 
 .pricing-bg-blob-2 {
@@ -473,7 +473,7 @@
   left: -80px;
   width: 250px;
   height: 250px;
-  background: #635bff;
+  background: #0d9488;
 }
 
 .pricing-plans {
@@ -506,7 +506,7 @@
 
 /* Featured Plan Styling */
 .plan-featured {
-  border: 2px solid #635bff;
+  border: 2px solid #0d9488;
   box-shadow: 0 20px 40px rgba(99, 91, 255, 0.15);
   transform: scale(1.05);
   z-index: 10;
@@ -576,7 +576,7 @@
   top: -10px;
   left: 50%;
   transform: translateX(-50%);
-  background: #635bff;
+  background: #0d9488;
   color: white;
   font-size: 7px;
   font-weight: 900;
@@ -657,7 +657,7 @@
 
 .plan-button-primary {
   border: none;
-  background: #635bff;
+  background: #0d9488;
   color: white;
   box-shadow: 0 4px 12px rgba(99, 91, 255, 0.25);
 }
@@ -684,7 +684,7 @@
 }
 
 .feature-check {
-  color: #635bff;
+  color: #0d9488;
   font-weight: 900;
   font-size: 11px;
   line-height: 1;
@@ -856,8 +856,8 @@
 }
 
 .payment-method-btn.active {
-  background: #635bff;
-  border-color: #635bff;
+  background: #0d9488;
+  border-color: #0d9488;
   color: #ffffff;
   box-shadow: 0 4px 14px rgba(99, 91, 255, 0.35);
 }

@@ -24,7 +24,7 @@ export default function BenefitsProviderGrid() {
       {PROVIDERS.map((p) => (
         <div
           key={p.name}
-          className="provider-logo flex items-center justify-center rounded-xl border border-slate-200 bg-white p-4 h-20 hover:shadow-md hover:border-stripe-purple/30 transition-all"
+          className="provider-logo flex items-center justify-center rounded-xl border border-slate-200 bg-white p-4 h-20 hover:shadow-md hover:border-nx-primary/30 transition-all"
         >
           <img
             src={p.logo}

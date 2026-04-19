@@ -58,7 +58,7 @@ export default function ResetPassword() {
             <p className="text-sm text-slate-500 mb-5">
               {isHe ? 'הקישור לאיפוס סיסמה חסר או לא תקין.' : 'This reset link is missing or invalid.'}
             </p>
-            <Link to={forgotPath} className="text-sm text-stripe-purple hover:underline font-semibold">
+            <Link to={forgotPath} className="text-sm text-nx-primary hover:underline font-semibold">
               {isHe ? 'בקש קישור איפוס חדש' : 'Request a new reset link'}
             </Link>
           </div>
@@ -102,7 +102,7 @@ export default function ResetPassword() {
                 </div>
               ) : (
                 <>
-                  <h1 className="text-xl font-bold text-stripe-dark mb-1">
+                  <h1 className="text-xl font-bold text-nx-dark mb-1">
                     {isHe ? 'איפוס סיסמה' : 'Set new password'}
                   </h1>
                   <p className="text-sm text-slate-500 mb-5">
@@ -111,7 +111,7 @@ export default function ResetPassword() {
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-xs text-stripe-dark font-medium mb-1">
+                      <label className="block text-xs text-nx-dark font-medium mb-1">
                         {isHe ? 'סיסמה חדשה' : 'New password'}
                       </label>
                       <div className="relative">
@@ -120,7 +120,7 @@ export default function ResetPassword() {
                           autoComplete="new-password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors"
+                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors"
                         />
                         <button
                           type="button"
@@ -145,7 +145,7 @@ export default function ResetPassword() {
                       disabled={isLoading || password.length < 8}
                       className={`w-full font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center ${
                         password.length >= 8 && !isLoading
-                          ? 'bg-stripe-purple hover:bg-stripe-purple/90 text-white cursor-pointer'
+                          ? 'bg-nx-primary hover:bg-nx-primary/90 text-white cursor-pointer'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
                       }`}
                     >

@@ -21,7 +21,7 @@ const getNavItems = (t: any, lang: 'en' | 'he') => [
           items: [
             { name: t.navbar.loyaltyClub, desc: t.navbar.loyaltyClubDesc, icon: Users, href: lang === 'he' ? '/he/benefits' : '/benefits' },
             { name: t.navbar.loyaltyPartnerships, desc: t.navbar.loyaltyPartnershipsDesc, icon: Gift, href: lang === 'he' ? '/he/partners' : '/partners' },
-            { name: t.navbar.giftsWelfare, desc: t.navbar.giftsWelfareDesc, icon: Heart, href: lang === 'he' ? '/he/welfare' : '/he/welfare' },
+            { name: t.navbar.giftsWelfare, desc: t.navbar.giftsWelfareDesc, icon: Heart, href: lang === 'he' ? '/he/welfare' : '/welfare' },
           ],
         },
         {
@@ -344,7 +344,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
           <div className="mt-8 space-y-3">
             <Link
               to={language === 'he' ? '/he/signup' : '/signup'}
-              className="block bg-stripe-purple text-white text-sm font-semibold px-5 py-3 rounded-lg text-center"
+              className="block bg-nx-primary text-white text-sm font-semibold px-5 py-3 rounded-lg text-center"
               onClick={() => setMobileOpen(false)}
             >
               {t.buttons.startNow}
@@ -445,7 +445,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                               <div
                                 className={`absolute bottom-0 left-0 right-0 h-[2px] transition-all duration-300 ${
                                   hoveredColumn === index
-                                    ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400'
+                                    ? 'bg-gradient-to-r from-teal-500 via-sky-500 to-orange-400'
                                     : 'bg-slate-100'
                                 }`}
                               />
@@ -461,9 +461,9 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                                     className={`group flex items-start gap-3 relative ${isComingSoon ? 'cursor-default' : ''}`}
                                     onClick={isComingSoon ? (e: React.MouseEvent) => e.preventDefault() : undefined}
                                   >
-                                    <Icon className={`text-xl mt-0.5 group-hover:scale-110 transition-transform ${isComingSoon ? 'text-slate-400' : 'text-stripe-purple'}`} size={20} />
+                                    <Icon className={`text-xl mt-0.5 group-hover:scale-110 transition-transform ${isComingSoon ? 'text-slate-400' : 'text-nx-primary'}`} size={20} />
                                     <div>
-                                      <div className={`font-semibold text-sm transition-colors ${isComingSoon ? 'text-slate-400' : 'text-slate-900 group-hover:text-stripe-purple'}`}>
+                                      <div className={`font-semibold text-sm transition-colors ${isComingSoon ? 'text-slate-400' : 'text-slate-900 group-hover:text-nx-primary'}`}>
                                         {subItem.name}
                                       </div>
                                       <p className="text-[13px] text-slate-500">{subItem.desc}</p>
@@ -492,7 +492,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                           <div
                             className={`absolute bottom-0 left-0 right-0 h-[2px] transition-all duration-300 ${
                               hoveredColumn === 4
-                                ? 'bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400'
+                                ? 'bg-gradient-to-r from-teal-500 via-sky-500 to-orange-400'
                                 : 'bg-slate-100'
                             }`}
                           />
@@ -513,7 +513,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                               <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                             </a>
                           ) : (
-                            <div className="w-full h-24 bg-gradient-to-br from-stripe-purple to-stripe-blue rounded-lg mb-4 flex items-center justify-center text-white font-bold text-sm">
+                            <div className="w-full h-24 bg-gradient-to-br from-nx-primary to-nx-blue rounded-lg mb-4 flex items-center justify-center text-white font-bold text-sm">
                               Nexus
                             </div>
                           )}
@@ -524,7 +524,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                             href={item.megaMenu.sidebar.link || '#'}
                             target={item.megaMenu.sidebar.link ? '_blank' : undefined}
                             rel={item.megaMenu.sidebar.link ? 'noopener noreferrer' : undefined}
-                            className="text-xs font-bold text-stripe-purple flex items-center gap-1 hover:gap-2 transition-all"
+                            className="text-xs font-bold text-nx-primary flex items-center gap-1 hover:gap-2 transition-all"
                           >
                             {item.megaMenu.sidebar.cta} <ArrowRight size={12} className={direction === 'rtl' ? 'scale-x-[-1]' : ''} />
                           </a>
@@ -549,7 +549,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
               userOrgs.length === 1 ? (
                 <a
                   href={`${DASHBOARD_URL}/organizations/${userOrgs[0].org.slug}`}
-                  className="group flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-stripe-purple/25"
+                  className="group flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-nx-primary/25"
                 >
                   {isHe ? 'דשבורד' : 'Dashboard'}
                   <span className="inline-block w-0 overflow-hidden group-hover:w-4 transition-all duration-300 ease-out">
@@ -559,7 +559,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
               ) : (
                 <Link
                   to={isHe ? '/he/org-select' : '/org-select'}
-                  className="group flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-stripe-purple/25"
+                  className="group flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-nx-primary/25"
                 >
                   {isHe ? 'דשבורד' : 'Dashboard'}
                   <span className="inline-block w-0 overflow-hidden group-hover:w-4 transition-all duration-300 ease-out">
@@ -584,7 +584,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
               </Link>
               <Link
                 to={language === 'he' ? '/he/signup' : '/signup'}
-                className="group flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-stripe-purple/25"
+                className="group flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-nx-primary/25"
                 onClick={() => track(MARKETING.NAVBAR_CTA_CLICKED, 'MARKETING', { button_text: t.navbar.getStarted, destination: 'signup' })}
               >
                 {t.navbar.getStarted}

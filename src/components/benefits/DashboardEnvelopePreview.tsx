@@ -45,8 +45,8 @@ export default function DashboardEnvelopePreview() {
                   <div className="text-[10px] text-slate-400 mb-0.5">{he ? 'סה״כ הטבות פעילות' : 'Total Active Benefits'}</div>
                   <div className="text-lg font-bold text-slate-900">{he ? '₪ 2,450,000' : '$2,450,000'}</div>
                 </div>
-                <div className="h-8 w-8 bg-stripe-purple/10 rounded-full flex items-center justify-center">
-                  <BarChart3 size={16} className="text-stripe-purple" />
+                <div className="h-8 w-8 bg-nx-primary/10 rounded-full flex items-center justify-center">
+                  <BarChart3 size={16} className="text-nx-primary" />
                 </div>
               </div>
 
@@ -74,7 +74,7 @@ export default function DashboardEnvelopePreview() {
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-l from-stripe-purple to-purple-400 rounded-full transition-all duration-1000 ease-out"
+                    className="h-full bg-gradient-to-l from-nx-primary to-purple-400 rounded-full transition-all duration-1000 ease-out"
                     style={{ width: animated ? '78%' : '0%' }}
                   />
                 </div>

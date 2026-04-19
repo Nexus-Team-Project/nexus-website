@@ -106,7 +106,7 @@ interface AgentRequest {
 
 function Sparkline({
   data,
-  color = '#635bff',
+  color = '#0d9488',
   height = 60,
 }: {
   data: number[];
@@ -176,16 +176,16 @@ function MetricCard({
   return (
     <div className="bg-white border border-gray-100 rounded-xl p-5 shadow-sm flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-stripe-gray">{title}</span>
+        <span className="text-xs font-medium text-nx-gray">{title}</span>
         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}18` }}>
           <Icon size={16} style={{ color }} />
         </div>
       </div>
       <div>
-        <span className="text-2xl font-bold text-stripe-dark">
+        <span className="text-2xl font-bold text-nx-dark">
           {unit === '$' ? `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}` : value.toLocaleString()}
         </span>
-        {unit && unit !== '$' && <span className="text-stripe-gray text-sm ml-1">{unit}</span>}
+        {unit && unit !== '$' && <span className="text-nx-gray text-sm ml-1">{unit}</span>}
       </div>
       {change !== null && (
         <span className={`text-xs font-medium ${positive ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -202,7 +202,7 @@ function MetricCard({
 function LineChart({ data }: { data: ChartPoint[] }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
-  if (!data.length) return <div className="h-48 flex items-center justify-center text-stripe-gray/40 text-sm">No data</div>;
+  if (!data.length) return <div className="h-48 flex items-center justify-center text-nx-gray/40 text-sm">No data</div>;
 
   const overallMax = Math.max(...data.map(d => Math.max(d.visitors, d.chats, d.leads, d.signups)), 1);
 
@@ -231,7 +231,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
     }));
 
   const series = [
-    { key: 'visitors' as const, color: '#635bff', label: 'Visitors' },
+    { key: 'visitors' as const, color: '#0d9488', label: 'Visitors' },
     { key: 'chats' as const,    color: '#0ea5e9', label: 'Chats' },
     { key: 'leads' as const,    color: '#10b981', label: 'Leads' },
     { key: 'signups' as const,  color: '#f59e0b', label: 'Signups' },
@@ -241,7 +241,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
     <div className="relative">
       <div className="flex gap-4 mb-3">
         {series.map(s => (
-          <div key={s.key} className="flex items-center gap-1.5 text-xs text-stripe-gray">
+          <div key={s.key} className="flex items-center gap-1.5 text-xs text-nx-gray">
             <span className="w-3 h-0.5 rounded-full inline-block" style={{ background: s.color }} />
             {s.label}
           </div>
@@ -310,7 +310,7 @@ function LineChart({ data }: { data: ChartPoint[] }) {
 
       {hovered !== null && (
         <div
-          className="absolute top-6 bg-stripe-dark border border-gray-200 rounded-lg px-3 py-2 text-xs text-white pointer-events-none z-10 shadow-xl"
+          className="absolute top-6 bg-nx-dark border border-gray-200 rounded-lg px-3 py-2 text-xs text-white pointer-events-none z-10 shadow-xl"
           style={{ left: `${((hovered / Math.max(data.length - 1, 1)) * 100).toFixed(1)}%`, transform: 'translateX(-50%)' }}
         >
           <div className="font-semibold mb-1 text-white/70">
@@ -446,19 +446,19 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-stripe-light flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-stripe-purple animate-spin" />
+      <div className="min-h-screen bg-nx-light flex items-center justify-center">
+        <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-nx-primary animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="bg-stripe-light" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
+    <div className="bg-nx-light" style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}>
 
       {/* Dashboard toolbar */}
       <div className="bg-white border-b border-gray-100 sticky top-0 z-10 shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-stripe-dark">Dashboard</h1>
+          <h1 className="text-lg font-bold text-nx-dark">Dashboard</h1>
 
           <div className="flex items-center gap-2">
             {/* Period selector */}
@@ -469,8 +469,8 @@ export default function AdminDashboard() {
                   onClick={() => setPeriod(p)}
                   className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                     period === p
-                      ? 'bg-white text-stripe-dark shadow-sm border border-gray-200'
-                      : 'text-stripe-gray hover:text-stripe-dark'
+                      ? 'bg-white text-nx-dark shadow-sm border border-gray-200'
+                      : 'text-nx-gray hover:text-nx-dark'
                   }`}
                 >
                   {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -484,7 +484,7 @@ export default function AdminDashboard() {
               className="p-2 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all disabled:opacity-50"
               title="Refresh"
             >
-              <RefreshCw size={14} className={`text-stripe-gray ${refreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw size={14} className={`text-nx-gray ${refreshing ? 'animate-spin' : ''}`} />
             </button>
 
             {/* Notifications */}
@@ -494,7 +494,7 @@ export default function AdminDashboard() {
                 className="relative p-2 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all"
                 title="Notifications"
               >
-                <Bell size={14} className="text-stripe-gray" />
+                <Bell size={14} className="text-nx-gray" />
                 {notifications.length > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] flex items-center justify-center font-bold">
                     {notifications.length > 9 ? '9+' : notifications.length}
@@ -505,22 +505,22 @@ export default function AdminDashboard() {
               {notifOpen && (
                 <div className="absolute right-0 top-10 w-80 bg-white border border-gray-200 rounded-xl shadow-xl z-50 overflow-hidden">
                   <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                    <span className="text-sm font-semibold text-stripe-dark">Notifications</span>
+                    <span className="text-sm font-semibold text-nx-dark">Notifications</span>
                     {notifications.length > 0 && (
-                      <button onClick={markAllRead} className="text-xs text-stripe-purple hover:text-stripe-purple/80 transition-colors">
+                      <button onClick={markAllRead} className="text-xs text-nx-primary hover:text-nx-primary/80 transition-colors">
                         Mark all read
                       </button>
                     )}
                   </div>
                   <div className="max-h-72 overflow-y-auto divide-y divide-gray-50">
                     {notifications.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-stripe-gray/50 text-sm">All caught up!</div>
+                      <div className="px-4 py-6 text-center text-nx-gray/50 text-sm">All caught up!</div>
                     ) : (
                       notifications.map(n => (
-                        <div key={n.id} className="px-4 py-3 hover:bg-stripe-light transition-colors">
-                          <div className="text-sm text-stripe-dark">{n.title}</div>
-                          {n.body && <div className="text-xs text-stripe-gray mt-0.5">{n.body}</div>}
-                          <div className="text-[10px] text-stripe-gray/50 mt-1">
+                        <div key={n.id} className="px-4 py-3 hover:bg-nx-light transition-colors">
+                          <div className="text-sm text-nx-dark">{n.title}</div>
+                          {n.body && <div className="text-xs text-nx-gray mt-0.5">{n.body}</div>}
+                          <div className="text-[10px] text-nx-gray/50 mt-1">
                             {new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
@@ -541,7 +541,7 @@ export default function AdminDashboard() {
 
         {/* Metric cards */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-          <MetricCard title="Unique Visitors"   value={metrics?.visitors.value ?? 0}   change={metrics?.visitors.change ?? null}   icon={Users}        color="#635bff" sparkData={chart.map(d => d.visitors)} />
+          <MetricCard title="Unique Visitors"   value={metrics?.visitors.value ?? 0}   change={metrics?.visitors.change ?? null}   icon={Users}        color="#0d9488" sparkData={chart.map(d => d.visitors)} />
           <MetricCard title="Chat Sessions"     value={metrics?.chats.value ?? 0}      change={metrics?.chats.change ?? null}      icon={MessageSquare} color="#0ea5e9" sparkData={chart.map(d => d.chats)} />
           <MetricCard title="Leads"             value={metrics?.leads.value ?? 0}      change={metrics?.leads.change ?? null}      icon={TrendingUp}   color="#10b981" sparkData={chart.map(d => d.leads)} />
           <MetricCard title="Signups"           value={metrics?.signups.value ?? 0}    change={metrics?.signups.change ?? null}    icon={Users}        color="#f59e0b" sparkData={chart.map(d => d.signups)} />
@@ -551,28 +551,28 @@ export default function AdminDashboard() {
         {/* Chart + Revenue */}
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6">
-            <h2 className="text-sm font-semibold text-stripe-dark mb-4">Traffic Overview</h2>
+            <h2 className="text-sm font-semibold text-nx-dark mb-4">Traffic Overview</h2>
             <LineChart data={chart} />
           </div>
 
           <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 flex flex-col gap-4">
             <div className="flex items-center gap-2">
-              <CreditCard size={15} className="text-stripe-purple" />
-              <h2 className="text-sm font-semibold text-stripe-dark">Revenue</h2>
+              <CreditCard size={15} className="text-nx-primary" />
+              <h2 className="text-sm font-semibold text-nx-dark">Revenue</h2>
             </div>
             <div>
-              <div className="text-3xl font-bold text-stripe-dark">
+              <div className="text-3xl font-bold text-nx-dark">
                 ₪{(revenue?.total_revenue ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-xs text-stripe-gray mt-1">{revenue?.total_transactions ?? 0} transactions</div>
+              <div className="text-xs text-nx-gray mt-1">{revenue?.total_transactions ?? 0} transactions</div>
             </div>
             {revenue?.points && revenue.points.length > 0 && (
               <div className="mt-auto">
-                <Sparkline data={revenue.points.map(p => p.revenue)} color="#635bff" height={50} />
+                <Sparkline data={revenue.points.map(p => p.revenue)} color="#0d9488" height={50} />
               </div>
             )}
             {!revenue?.total_revenue && (
-              <div className="flex-1 flex items-center justify-center text-stripe-gray/40 text-sm">No payments yet</div>
+              <div className="flex-1 flex items-center justify-center text-nx-gray/40 text-sm">No payments yet</div>
             )}
           </div>
         </div>
@@ -581,15 +581,15 @@ export default function AdminDashboard() {
         <div className="grid lg:grid-cols-3 gap-4">
           <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 flex flex-col gap-5">
             <div className="flex items-center gap-2">
-              <Brain size={15} className="text-stripe-purple" />
-              <h2 className="text-sm font-semibold text-stripe-dark">AI Assistant</h2>
+              <Brain size={15} className="text-nx-primary" />
+              <h2 className="text-sm font-semibold text-nx-dark">AI Assistant</h2>
             </div>
 
             {/* Rating row */}
             <div className="flex items-end gap-3">
               <div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold text-stripe-dark">{aiStats?.avgRating.toFixed(1) ?? '—'}</span>
+                  <span className="text-3xl font-bold text-nx-dark">{aiStats?.avgRating.toFixed(1) ?? '—'}</span>
                   {aiStats?.ratingTrend !== null && aiStats?.ratingTrend !== undefined && (
                     <span className={`text-xs font-medium ${aiStats.ratingTrend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                       {aiStats.ratingTrend >= 0 ? '+' : ''}{aiStats.ratingTrend}
@@ -601,7 +601,7 @@ export default function AdminDashboard() {
                     <Star key={i} size={11} fill={i <= Math.round(aiStats?.avgRating ?? 0) ? '#f59e0b' : 'none'} stroke="#f59e0b" />
                   ))}
                 </div>
-                <div className="text-xs text-stripe-gray mt-1">{aiStats?.totalRatings ?? 0} ratings</div>
+                <div className="text-xs text-nx-gray mt-1">{aiStats?.totalRatings ?? 0} ratings</div>
               </div>
             </div>
 
@@ -644,7 +644,7 @@ export default function AdminDashboard() {
             {(aiStats?.unresolvedGaps ?? 0) > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-stripe-dark">Knowledge Gaps</span>
+                  <span className="text-xs font-semibold text-nx-dark">Knowledge Gaps</span>
                   <span className="text-[10px] font-medium text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">
                     {aiStats!.unresolvedGaps} unresolved
                   </span>
@@ -652,11 +652,11 @@ export default function AdminDashboard() {
                 <div className="space-y-1.5">
                   {aiStats!.topKnowledgeGaps.map(gap => (
                     <div key={gap.id} className="flex items-start gap-2 bg-gray-50 rounded-lg px-3 py-2 text-xs">
-                      <span className="flex-1 text-stripe-dark leading-snug line-clamp-2">{gap.question}</span>
+                      <span className="flex-1 text-nx-dark leading-snug line-clamp-2">{gap.question}</span>
                       <button
                         onClick={() => void resolveGap(gap.id)}
                         disabled={resolvingGap === gap.id}
-                        className="shrink-0 text-[10px] font-semibold text-stripe-purple hover:text-stripe-purple/80 disabled:opacity-40 transition-colors mt-0.5"
+                        className="shrink-0 text-[10px] font-semibold text-nx-primary hover:text-nx-primary/80 disabled:opacity-40 transition-colors mt-0.5"
                       >
                         {resolvingGap === gap.id ? '…' : 'Resolve'}
                       </button>
@@ -669,16 +669,16 @@ export default function AdminDashboard() {
 
           <div className="lg:col-span-2 bg-white border border-gray-100 rounded-xl shadow-sm p-6 overflow-hidden">
             <div className="flex items-center gap-2 mb-4">
-              <Users size={15} className="text-stripe-purple" />
-              <h2 className="text-sm font-semibold text-stripe-dark">Recent Visitors</h2>
+              <Users size={15} className="text-nx-primary" />
+              <h2 className="text-sm font-semibold text-nx-dark">Recent Visitors</h2>
             </div>
             {visitors.length === 0 ? (
-              <div className="text-center py-8 text-stripe-gray/40 text-sm">No visitor data yet</div>
+              <div className="text-center py-8 text-nx-gray/40 text-sm">No visitor data yet</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-stripe-gray/60 border-b border-gray-100">
+                    <tr className="text-nx-gray/60 border-b border-gray-100">
                       <th className="text-left pb-2 font-medium">Visitor</th>
                       <th className="text-left pb-2 font-medium">Location</th>
                       <th className="text-left pb-2 font-medium">Device</th>
@@ -688,21 +688,21 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {visitors.map(v => (
-                      <tr key={v.visitorId} className="hover:bg-stripe-light transition-colors">
+                      <tr key={v.visitorId} className="hover:bg-nx-light transition-colors">
                         <td className="py-2 pr-4">
-                          <div className="font-mono text-stripe-gray truncate max-w-[80px]" title={v.visitorId}>
+                          <div className="font-mono text-nx-gray truncate max-w-[80px]" title={v.visitorId}>
                             {v.visitorId.slice(-8)}
                           </div>
-                          <div className="text-stripe-gray/50 truncate max-w-[80px]">{v.ip ?? '—'}</div>
+                          <div className="text-nx-gray/50 truncate max-w-[80px]">{v.ip ?? '—'}</div>
                         </td>
-                        <td className="py-2 pr-4 text-stripe-gray">
+                        <td className="py-2 pr-4 text-nx-gray">
                           {[v.city, v.country].filter(Boolean).join(', ') || '—'}
                         </td>
-                        <td className="py-2 pr-4 text-stripe-gray">
+                        <td className="py-2 pr-4 text-nx-gray">
                           {[v.device, v.browser].filter(Boolean).join(' / ') || '—'}
                         </td>
-                        <td className="py-2 text-right text-stripe-dark font-semibold">{v.pageViews}</td>
-                        <td className="py-2 text-right text-stripe-gray/60">
+                        <td className="py-2 text-right text-nx-dark font-semibold">{v.pageViews}</td>
+                        <td className="py-2 text-right text-nx-gray/60">
                           {new Date(v.lastSeen).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                         </td>
                       </tr>
@@ -718,8 +718,8 @@ export default function AdminDashboard() {
         {(agentLoading || agentRequests.length > 0) && (
           <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 overflow-hidden">
             <div className="flex items-center gap-2 mb-4">
-              <Clock size={15} className="text-stripe-purple" />
-              <h2 className="text-sm font-semibold text-stripe-dark">Agent Requests</h2>
+              <Clock size={15} className="text-nx-primary" />
+              <h2 className="text-sm font-semibold text-nx-dark">Agent Requests</h2>
               {agentRequests.filter(r => r.status === 'PENDING').length > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-semibold">
                   {agentRequests.filter(r => r.status === 'PENDING').length} pending
@@ -732,7 +732,7 @@ export default function AdminDashboard() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-stripe-gray/60 border-b border-gray-100">
+                    <tr className="text-nx-gray/60 border-b border-gray-100">
                       <th className="text-left pb-2 font-medium">Requested</th>
                       <th className="text-left pb-2 font-medium">Action</th>
                       <th className="text-left pb-2 font-medium">Article</th>
@@ -742,8 +742,8 @@ export default function AdminDashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {agentRequests.map(req => (
-                      <tr key={req.id} className="hover:bg-stripe-light transition-colors">
-                        <td className="py-2 pr-4 text-stripe-gray/60">
+                      <tr key={req.id} className="hover:bg-nx-light transition-colors">
+                        <td className="py-2 pr-4 text-nx-gray/60">
                           {new Date(req.requestedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="py-2 pr-4">
@@ -755,7 +755,7 @@ export default function AdminDashboard() {
                             {req.action === 'BLOG_PUBLISH' ? 'Publish' : req.action === 'BLOG_UPDATE_PUBLISHED' ? 'Update Live' : 'Unpublish'}
                           </span>
                         </td>
-                        <td className="py-2 pr-4 text-stripe-gray font-mono text-[10px] max-w-[200px] truncate">
+                        <td className="py-2 pr-4 text-nx-gray font-mono text-[10px] max-w-[200px] truncate">
                           {req.payload?.articleId ?? JSON.stringify(req.payload).slice(0, 40)}
                         </td>
                         <td className="py-2 pr-4">
@@ -800,12 +800,12 @@ export default function AdminDashboard() {
           <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-6 overflow-hidden">
             <div className="flex items-center gap-2 mb-4">
               <TrendingUp size={15} className="text-emerald-600" />
-              <h2 className="text-sm font-semibold text-stripe-dark">Recent Leads</h2>
+              <h2 className="text-sm font-semibold text-nx-dark">Recent Leads</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-stripe-gray/60 border-b border-gray-100">
+                  <tr className="text-nx-gray/60 border-b border-gray-100">
                     <th className="text-left pb-2 font-medium">Name</th>
                     <th className="text-left pb-2 font-medium">Email</th>
                     <th className="text-left pb-2 font-medium">Company</th>
@@ -815,10 +815,10 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {leads.map(lead => (
-                    <tr key={lead.id} className="hover:bg-stripe-light transition-colors">
-                      <td className="py-2 pr-4 text-stripe-dark">{lead.fullName ?? '—'}</td>
-                      <td className="py-2 pr-4 text-stripe-gray font-mono text-[10px]">{lead.email ?? '—'}</td>
-                      <td className="py-2 pr-4 text-stripe-gray">{lead.company ?? '—'}</td>
+                    <tr key={lead.id} className="hover:bg-nx-light transition-colors">
+                      <td className="py-2 pr-4 text-nx-dark">{lead.fullName ?? '—'}</td>
+                      <td className="py-2 pr-4 text-nx-gray font-mono text-[10px]">{lead.email ?? '—'}</td>
+                      <td className="py-2 pr-4 text-nx-gray">{lead.company ?? '—'}</td>
                       <td className="py-2 pr-4">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border ${
                           lead.status === 'NEW'       ? 'bg-blue-50 text-blue-600 border-blue-200' :
@@ -827,7 +827,7 @@ export default function AdminDashboard() {
                                                         'bg-red-50 text-red-600 border-red-200'
                         }`}>{lead.status}</span>
                       </td>
-                      <td className="py-2 text-right text-stripe-gray/60">
+                      <td className="py-2 text-right text-nx-gray/60">
                         {new Date(lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </td>
                     </tr>

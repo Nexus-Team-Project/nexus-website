@@ -72,7 +72,7 @@ function SidebarItem({
       className={`w-full text-left px-3 py-1.5 rounded-lg text-sm transition-colors ${
         indent ? 'ml-4' : ''
       } ${active
-        ? 'bg-stripe-purple/10 text-stripe-purple font-medium'
+        ? 'bg-nx-primary/10 text-nx-primary font-medium'
         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
       }`}
     >
@@ -439,9 +439,9 @@ export default function ApiDocsPage() {
       <Navbar variant="light" />
 
       {/* ── Hero ─────────────────────────────────────────── */}
-      <section className="relative pt-32 pb-20 bg-gradient-to-b from-stripe-blue to-[#0c1e33] overflow-hidden">
+      <section className="relative pt-32 pb-20 bg-gradient-to-b from-nx-blue to-[#0c1e33] overflow-hidden">
         <div className="absolute inset-0">
-          <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-stripe-purple/15 rounded-full blur-3xl" />
+          <div className="absolute top-1/3 left-1/4 w-[500px] h-[500px] bg-nx-primary/15 rounded-full blur-3xl" />
           <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-blue-500/10 rounded-full blur-3xl" />
         </div>
         <div className="relative max-w-4xl mx-auto px-6 text-center">
@@ -458,7 +458,7 @@ export default function ApiDocsPage() {
           <div className="flex items-center justify-center gap-4 flex-wrap">
             <button
               onClick={() => scrollTo('getting-started')}
-              className="px-6 py-3 rounded-full bg-stripe-purple text-white font-medium hover:bg-stripe-purple/90 transition-colors flex items-center gap-2"
+              className="px-6 py-3 rounded-full bg-nx-primary text-white font-medium hover:bg-nx-primary/90 transition-colors flex items-center gap-2"
             >
               {tx.quickStartBtn}
               <ChevronRight className="w-4 h-4" />
@@ -511,12 +511,12 @@ export default function ApiDocsPage() {
                   { icon: Terminal, num: '2', title: tx.step2Title, desc: tx.step2Desc },
                   { icon: Zap, num: '3', title: tx.step3Title, desc: tx.step3Desc },
                 ].map((step) => (
-                  <div key={step.num} className="p-5 rounded-xl border border-slate-200 hover:border-stripe-purple/30 hover:shadow-md transition-all">
+                  <div key={step.num} className="p-5 rounded-xl border border-slate-200 hover:border-nx-primary/30 hover:shadow-md transition-all">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-lg bg-stripe-purple/10 flex items-center justify-center text-stripe-purple font-bold text-sm">
+                      <div className="w-8 h-8 rounded-lg bg-nx-primary/10 flex items-center justify-center text-nx-primary font-bold text-sm">
                         {step.num}
                       </div>
-                      <step.icon className="w-5 h-5 text-stripe-purple" />
+                      <step.icon className="w-5 h-5 text-nx-primary" />
                     </div>
                     <h3 className="font-semibold text-slate-900 mb-1">{step.title}</h3>
                     <p className="text-sm text-slate-500">{step.desc}</p>
@@ -543,7 +543,7 @@ export default function ApiDocsPage() {
               <h2 className="text-3xl font-bold text-slate-900 mb-4">{tx.baseUrlTitle}</h2>
               <p className="text-slate-600 mb-6">{tx.baseUrlDesc}</p>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <code className="text-lg font-mono text-stripe-purple font-semibold">
+                <code className="text-lg font-mono text-nx-primary font-semibold">
                   https://api.nexus.com/v1
                 </code>
               </div>
@@ -637,7 +637,7 @@ export default function ApiDocsPage() {
               <ul className="space-y-2 mb-8">
                 {[tx.purchaseCompleted, tx.purchaseFailed, tx.memberCreated, tx.offerRedeemed].map((evt, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
-                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-stripe-purple flex-shrink-0" />
+                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-nx-primary flex-shrink-0" />
                     <code className="text-slate-700">{evt}</code>
                   </li>
                 ))}

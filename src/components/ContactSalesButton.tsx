@@ -28,20 +28,20 @@ export default function ContactSalesButton({ onClick }: ContactSalesButtonProps)
       <div className="relative">
         <MessageCircle
           size={22}
-          className="text-stripe-purple transition-transform duration-300"
+          className="text-nx-primary transition-transform duration-300"
           style={{
             transform: hovered ? 'scale(1.15) rotate(-8deg)' : 'scale(1) rotate(0)',
           }}
         />
         {/* Animated ping dot */}
         <span
-          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-stripe-purple transition-opacity duration-300"
+          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-nx-primary transition-opacity duration-300"
           style={{ opacity: hovered ? 1 : 0 }}
         >
-          <span className="absolute inset-0 rounded-full bg-stripe-purple animate-ping" />
+          <span className="absolute inset-0 rounded-full bg-nx-primary animate-ping" />
         </span>
       </div>
-      <span className="text-sm font-semibold text-stripe-dark">{t.buttons.contactSales}</span>
+      <span className="text-sm font-semibold text-nx-dark">{t.buttons.contactSales}</span>
     </button>
     </>
   );

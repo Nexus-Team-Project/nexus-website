@@ -113,7 +113,7 @@ function normalizeAutomation(raw: any): AgentAutomation {
 
 const TYPE_COLORS: Record<string, string> = {
   SEO: '#10b981',
-  MARKETING: '#635bff',
+  MARKETING: '#0d9488',
   SALES: '#f59e0b',
 };
 
@@ -198,7 +198,7 @@ export default function AgentDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-stripe-purple animate-spin" />
+        <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-nx-primary animate-spin" />
       </div>
     );
   }
@@ -213,14 +213,14 @@ export default function AgentDetailPage() {
     );
   }
 
-  const color = agent.color || TYPE_COLORS[agent.type] || '#635bff';
+  const color = agent.color || TYPE_COLORS[agent.type] || '#0d9488';
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       {/* Back button */}
       <button
         onClick={() => navigate(`${basePath}/agents`)}
-        className="flex items-center gap-1.5 text-sm text-stripe-gray hover:text-stripe-dark transition-colors mb-6"
+        className="flex items-center gap-1.5 text-sm text-nx-gray hover:text-nx-dark transition-colors mb-6"
       >
         {isHe ? <ArrowRight size={16} /> : <ArrowLeft size={16} />}
         <span>{isHe ? 'חזרה לסוכנים' : 'Back to Agents'}</span>
@@ -238,7 +238,7 @@ export default function AgentDetailPage() {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-stripe-dark">
+                <h1 className="text-xl font-bold text-nx-dark">
                   {isHe && agent.nameHe ? agent.nameHe : agent.name}
                 </h1>
                 <span
@@ -286,7 +286,7 @@ export default function AgentDetailPage() {
             <button
               onClick={runCycle}
               disabled={runningCycle}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-nx-primary text-white hover:bg-nx-primary/90 transition-all disabled:opacity-50"
             >
               {runningCycle ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
               {isHe ? 'הרץ מחזור' : 'Run Cycle'}
@@ -306,8 +306,8 @@ export default function AgentDetailPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
                 active
-                  ? 'border-stripe-purple text-stripe-purple'
-                  : 'border-transparent text-stripe-gray hover:text-stripe-dark hover:border-gray-300'
+                  ? 'border-nx-primary text-nx-primary'
+                  : 'border-transparent text-nx-gray hover:text-nx-dark hover:border-gray-300'
               }`}
             >
               <Icon size={15} />
@@ -350,10 +350,10 @@ function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: s
       {/* Description */}
       {agent.description && (
         <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-          <h3 className="text-sm font-semibold text-stripe-dark mb-2">
+          <h3 className="text-sm font-semibold text-nx-dark mb-2">
             {isHe ? 'תיאור' : 'Description'}
           </h3>
-          <p className="text-sm text-stripe-gray leading-relaxed">
+          <p className="text-sm text-nx-gray leading-relaxed">
             {isHe && agent.descriptionHe ? agent.descriptionHe : agent.description}
           </p>
         </div>
@@ -365,7 +365,7 @@ function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: s
           label={isHe ? 'סה"כ משימות' : 'Total Tasks'}
           value={agent._count.tasks}
           icon={List}
-          color="#635bff"
+          color="#0d9488"
         />
         <StatCard
           label={isHe ? 'הושלמו' : 'Completed'}
@@ -389,20 +389,20 @@ function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: s
 
       {/* Recent logs */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-        <h3 className="text-sm font-semibold text-stripe-dark mb-4">
+        <h3 className="text-sm font-semibold text-nx-dark mb-4">
           {isHe ? 'לוגים אחרונים' : 'Recent Logs'}
         </h3>
         {loadingLogs ? (
           <div className="h-24 animate-pulse bg-gray-50 rounded-lg" />
         ) : logs.length === 0 ? (
-          <p className="text-sm text-stripe-gray/50 text-center py-6">
+          <p className="text-sm text-nx-gray/50 text-center py-6">
             {isHe ? 'אין לוגים עדיין' : 'No logs yet'}
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-stripe-gray/60 border-b border-gray-100">
+                <tr className="text-nx-gray/60 border-b border-gray-100">
                   <th className="text-left pb-2 font-medium">{isHe ? 'זמן' : 'Time'}</th>
                   <th className="text-left pb-2 font-medium">{isHe ? 'כישור' : 'Skill'}</th>
                   <th className="text-left pb-2 font-medium">{isHe ? 'פעולה' : 'Action'}</th>
@@ -411,14 +411,14 @@ function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: s
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-stripe-light transition-colors">
-                    <td className="py-2 pr-4 text-stripe-gray/60 whitespace-nowrap">
+                  <tr key={log.id} className="hover:bg-nx-light transition-colors">
+                    <td className="py-2 pr-4 text-nx-gray/60 whitespace-nowrap">
                       {new Date(log.createdAt).toLocaleString('en-US', {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
                       })}
                     </td>
-                    <td className="py-2 pr-4 text-stripe-gray font-mono">{log.skill ?? '—'}</td>
-                    <td className="py-2 pr-4 text-stripe-dark">{log.action}</td>
+                    <td className="py-2 pr-4 text-nx-gray font-mono">{log.skill ?? '—'}</td>
+                    <td className="py-2 pr-4 text-nx-dark">{log.action}</td>
                     <td className="py-2 pr-4">
                       <StatusBadge status={log.status} />
                     </td>
@@ -500,8 +500,8 @@ function TasksTab({ slug, isHe }: { slug: string; isHe: boolean }) {
               onClick={() => setFilter(s)}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                 filter === s
-                  ? 'bg-white text-stripe-dark shadow-sm border border-gray-200'
-                  : 'text-stripe-gray hover:text-stripe-dark'
+                  ? 'bg-white text-nx-dark shadow-sm border border-gray-200'
+                  : 'text-nx-gray hover:text-nx-dark'
               }`}
             >
               {s === 'ALL' ? (isHe ? 'הכל' : 'All') : s.replace('_', ' ')}
@@ -510,7 +510,7 @@ function TasksTab({ slug, isHe }: { slug: string; isHe: boolean }) {
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-nx-primary text-white hover:bg-nx-primary/90 transition-all"
         >
           <Plus size={13} />
           {isHe ? 'משימה חדשה' : 'New Task'}
@@ -526,26 +526,26 @@ function TasksTab({ slug, isHe }: { slug: string; isHe: boolean }) {
               placeholder={isHe ? 'כותרת המשימה...' : 'Task title...'}
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
             />
             <input
               type="text"
               placeholder={isHe ? 'כישור (אופציונלי)' : 'Skill (optional)'}
               value={newSkill}
               onChange={(e) => setNewSkill(e.target.value)}
-              className="sm:w-40 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+              className="sm:w-40 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
             />
             <div className="flex gap-2">
               <button
                 onClick={createTask}
                 disabled={creating || !newTitle.trim()}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 transition-all disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-nx-primary text-white hover:bg-nx-primary/90 transition-all disabled:opacity-50"
               >
                 {creating ? '...' : (isHe ? 'צור' : 'Create')}
               </button>
               <button
                 onClick={() => { setShowForm(false); setNewTitle(''); setNewSkill(''); }}
-                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-stripe-gray hover:text-stripe-dark hover:border-gray-300 transition-all"
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-nx-gray hover:text-nx-dark hover:border-gray-300 transition-all"
               >
                 {isHe ? 'ביטול' : 'Cancel'}
               </button>
@@ -559,14 +559,14 @@ function TasksTab({ slug, isHe }: { slug: string; isHe: boolean }) {
         {loading ? (
           <div className="h-32 animate-pulse bg-gray-50" />
         ) : tasks.length === 0 ? (
-          <div className="text-center py-12 text-stripe-gray/50 text-sm">
+          <div className="text-center py-12 text-nx-gray/50 text-sm">
             {isHe ? 'אין משימות' : 'No tasks found'}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-stripe-gray/60 border-b border-gray-100 bg-gray-50/50">
+                <tr className="text-nx-gray/60 border-b border-gray-100 bg-gray-50/50">
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'כותרת' : 'Title'}</th>
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'סטטוס' : 'Status'}</th>
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'כישור' : 'Skill'}</th>
@@ -577,12 +577,12 @@ function TasksTab({ slug, isHe }: { slug: string; isHe: boolean }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-stripe-light transition-colors">
-                    <td className="px-5 py-3 text-stripe-dark font-medium">{task.title}</td>
+                  <tr key={task.id} className="hover:bg-nx-light transition-colors">
+                    <td className="px-5 py-3 text-nx-dark font-medium">{task.title}</td>
                     <td className="px-5 py-3"><StatusBadge status={task.status} /></td>
-                    <td className="px-5 py-3 text-stripe-gray font-mono">{task.skill ?? '—'}</td>
-                    <td className="px-5 py-3 text-stripe-gray">{task.iceScore ?? '—'}</td>
-                    <td className="px-5 py-3 text-stripe-gray/60 whitespace-nowrap">
+                    <td className="px-5 py-3 text-nx-gray font-mono">{task.skill ?? '—'}</td>
+                    <td className="px-5 py-3 text-nx-gray">{task.iceScore ?? '—'}</td>
+                    <td className="px-5 py-3 text-nx-gray/60 whitespace-nowrap">
                       {new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </td>
                     <td className="px-5 py-3 text-right">
@@ -700,7 +700,7 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
       <div className="flex justify-end">
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 transition-all"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-nx-primary text-white hover:bg-nx-primary/90 transition-all"
         >
           <Plus size={13} />
           {isHe ? 'אוטומציה חדשה' : 'New Automation'}
@@ -716,33 +716,33 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
               placeholder={isHe ? 'שם...' : 'Name...'}
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+              className="flex-1 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
             />
             <input
               type="text"
               placeholder={isHe ? 'כישור' : 'Skill'}
               value={newSkill}
               onChange={(e) => setNewSkill(e.target.value)}
-              className="sm:w-36 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+              className="sm:w-36 px-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
             />
             <input
               type="text"
               placeholder="Cron (e.g. 0 9 * * *)"
               value={newCron}
               onChange={(e) => setNewCron(e.target.value)}
-              className="sm:w-44 px-3 py-2 rounded-lg border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+              className="sm:w-44 px-3 py-2 rounded-lg border border-gray-200 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
             />
             <div className="flex gap-2">
               <button
                 onClick={createAutomation}
                 disabled={creating || !newName.trim() || !newSkill.trim() || !newCron.trim()}
-                className="px-4 py-2 rounded-lg text-sm font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 transition-all disabled:opacity-50"
+                className="px-4 py-2 rounded-lg text-sm font-medium bg-nx-primary text-white hover:bg-nx-primary/90 transition-all disabled:opacity-50"
               >
                 {creating ? '...' : (isHe ? 'צור' : 'Create')}
               </button>
               <button
                 onClick={() => { setShowForm(false); setNewName(''); setNewSkill(''); setNewCron(''); }}
-                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-stripe-gray hover:text-stripe-dark hover:border-gray-300 transition-all"
+                className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 text-nx-gray hover:text-nx-dark hover:border-gray-300 transition-all"
               >
                 {isHe ? 'ביטול' : 'Cancel'}
               </button>
@@ -756,14 +756,14 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
         {loading ? (
           <div className="h-32 animate-pulse bg-gray-50" />
         ) : automations.length === 0 ? (
-          <div className="text-center py-12 text-stripe-gray/50 text-sm">
+          <div className="text-center py-12 text-nx-gray/50 text-sm">
             {isHe ? 'אין אוטומציות' : 'No automations configured'}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-stripe-gray/60 border-b border-gray-100 bg-gray-50/50">
+                <tr className="text-nx-gray/60 border-b border-gray-100 bg-gray-50/50">
                   <th className="w-8 px-3 py-3" />
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'שם' : 'Name'}</th>
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'כישור' : 'Skill'}</th>
@@ -776,13 +776,13 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
               <tbody className="divide-y divide-gray-50">
                 {automations.map((auto) => (
                   <>
-                    <tr key={auto.id} className="hover:bg-stripe-light transition-colors cursor-pointer" onClick={() => toggleExpand(auto.id)}>
+                    <tr key={auto.id} className="hover:bg-nx-light transition-colors cursor-pointer" onClick={() => toggleExpand(auto.id)}>
                       <td className="px-3 py-3">
-                        {expanded === auto.id ? <ChevronDown size={14} className="text-stripe-gray" /> : <ChevronRight size={14} className="text-stripe-gray" />}
+                        {expanded === auto.id ? <ChevronDown size={14} className="text-nx-gray" /> : <ChevronRight size={14} className="text-nx-gray" />}
                       </td>
-                      <td className="px-5 py-3 text-stripe-dark font-medium">{auto.name}</td>
-                      <td className="px-5 py-3 text-stripe-gray font-mono">{auto.skill}</td>
-                      <td className="px-5 py-3 text-stripe-gray font-mono">{auto.cron}</td>
+                      <td className="px-5 py-3 text-nx-dark font-medium">{auto.name}</td>
+                      <td className="px-5 py-3 text-nx-gray font-mono">{auto.skill}</td>
+                      <td className="px-5 py-3 text-nx-gray font-mono">{auto.cron}</td>
                       <td className="px-5 py-3">
                         <button
                           onClick={(e) => { e.stopPropagation(); toggleEnabled(auto.id, auto.enabled); }}
@@ -795,12 +795,12 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
                           />
                         </button>
                       </td>
-                      <td className="px-5 py-3 text-stripe-gray/60 whitespace-nowrap">
+                      <td className="px-5 py-3 text-nx-gray/60 whitespace-nowrap">
                         {auto.lastRunAt
                           ? new Date(auto.lastRunAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
                           : '—'}
                       </td>
-                      <td className="px-5 py-3 text-stripe-gray/60 whitespace-nowrap">
+                      <td className="px-5 py-3 text-nx-gray/60 whitespace-nowrap">
                         {auto.nextRunAt
                           ? new Date(auto.nextRunAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
                           : '—'}
@@ -813,11 +813,11 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
                           {!auto.recentRuns ? (
                             <div className="h-12 animate-pulse bg-gray-100 rounded" />
                           ) : auto.recentRuns.length === 0 ? (
-                            <p className="text-stripe-gray/50 text-xs">{isHe ? 'אין ריצות אחרונות' : 'No recent runs'}</p>
+                            <p className="text-nx-gray/50 text-xs">{isHe ? 'אין ריצות אחרונות' : 'No recent runs'}</p>
                           ) : (
                             <table className="w-full text-[11px]">
                               <thead>
-                                <tr className="text-stripe-gray/50">
+                                <tr className="text-nx-gray/50">
                                   <th className="text-left pb-1 font-medium">{isHe ? 'סטטוס' : 'Status'}</th>
                                   <th className="text-left pb-1 font-medium">{isHe ? 'משך' : 'Duration'}</th>
                                   <th className="text-left pb-1 font-medium">{isHe ? 'עלות' : 'Cost'}</th>
@@ -829,14 +829,14 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
                                 {auto.recentRuns.map((run) => (
                                   <tr key={run.id}>
                                     <td className="py-1.5 pr-3"><StatusBadge status={run.status} /></td>
-                                    <td className="py-1.5 pr-3 text-stripe-gray">
+                                    <td className="py-1.5 pr-3 text-nx-gray">
                                       {run.durationMs != null ? `${(run.durationMs / 1000).toFixed(1)}s` : '—'}
                                     </td>
-                                    <td className="py-1.5 pr-3 text-stripe-gray">
+                                    <td className="py-1.5 pr-3 text-nx-gray">
                                       {run.cost != null ? `$${run.cost.toFixed(4)}` : '—'}
                                     </td>
-                                    <td className="py-1.5 pr-3 text-stripe-gray truncate max-w-xs">{run.summary ?? '—'}</td>
-                                    <td className="py-1.5 text-stripe-gray/60 whitespace-nowrap">
+                                    <td className="py-1.5 pr-3 text-nx-gray truncate max-w-xs">{run.summary ?? '—'}</td>
+                                    <td className="py-1.5 text-nx-gray/60 whitespace-nowrap">
                                       {new Date(run.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                     </td>
                                   </tr>
@@ -896,14 +896,14 @@ function LogsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
         {loading ? (
           <div className="h-48 animate-pulse bg-gray-50" />
         ) : logs.length === 0 ? (
-          <div className="text-center py-12 text-stripe-gray/50 text-sm">
+          <div className="text-center py-12 text-nx-gray/50 text-sm">
             {isHe ? 'אין לוגים' : 'No logs found'}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-stripe-gray/60 border-b border-gray-100 bg-gray-50/50">
+                <tr className="text-nx-gray/60 border-b border-gray-100 bg-gray-50/50">
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'זמן' : 'Timestamp'}</th>
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'כישור' : 'Skill'}</th>
                   <th className="text-left px-5 py-3 font-medium">{isHe ? 'פעולה' : 'Action'}</th>
@@ -915,22 +915,22 @@ function LogsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-stripe-light transition-colors">
-                    <td className="px-5 py-3 text-stripe-gray/60 whitespace-nowrap">
+                  <tr key={log.id} className="hover:bg-nx-light transition-colors">
+                    <td className="px-5 py-3 text-nx-gray/60 whitespace-nowrap">
                       {new Date(log.createdAt).toLocaleString('en-US', {
                         month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
                       })}
                     </td>
-                    <td className="px-5 py-3 text-stripe-gray font-mono">{log.skill ?? '—'}</td>
-                    <td className="px-5 py-3 text-stripe-dark">{log.action}</td>
+                    <td className="px-5 py-3 text-nx-gray font-mono">{log.skill ?? '—'}</td>
+                    <td className="px-5 py-3 text-nx-dark">{log.action}</td>
                     <td className="px-5 py-3"><StatusBadge status={log.status} /></td>
-                    <td className="px-5 py-3 text-stripe-gray">
+                    <td className="px-5 py-3 text-nx-gray">
                       {log.tokensUsed != null ? log.tokensUsed.toLocaleString() : '—'}
                     </td>
-                    <td className="px-5 py-3 text-stripe-gray">
+                    <td className="px-5 py-3 text-nx-gray">
                       {log.cost != null ? `$${log.cost.toFixed(4)}` : '—'}
                     </td>
-                    <td className="px-5 py-3 text-stripe-gray">
+                    <td className="px-5 py-3 text-nx-gray">
                       {log.durationMs != null ? `${(log.durationMs / 1000).toFixed(1)}s` : '—'}
                     </td>
                   </tr>
@@ -947,7 +947,7 @@ function LogsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
           <button
             onClick={() => fetchLogs(logs.length)}
             disabled={loadingMore}
-            className="px-4 py-2 rounded-lg text-xs font-medium border border-gray-200 text-stripe-gray hover:text-stripe-dark hover:border-gray-300 transition-all disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-xs font-medium border border-gray-200 text-nx-gray hover:text-nx-dark hover:border-gray-300 transition-all disabled:opacity-50"
           >
             {loadingMore
               ? (isHe ? 'טוען...' : 'Loading...')
@@ -989,7 +989,7 @@ function PromptsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 size={24} className="animate-spin text-stripe-purple" />
+        <Loader2 size={24} className="animate-spin text-nx-primary" />
       </div>
     );
   }
@@ -1005,8 +1005,8 @@ function PromptsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
   if (prompts.length === 0) {
     return (
       <div className="text-center py-16">
-        <FileText size={48} className="mx-auto text-stripe-gray/30 mb-4" />
-        <p className="text-stripe-gray text-sm">
+        <FileText size={48} className="mx-auto text-nx-gray/30 mb-4" />
+        <p className="text-nx-gray text-sm">
           {isHe ? 'אין פרומפטים מוגדרים לסוכן זה' : 'No prompts configured for this agent'}
         </p>
       </div>
@@ -1027,22 +1027,22 @@ function PromptsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
               className="w-full flex items-center justify-between px-5 py-3.5 text-left hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <FileText size={16} className="text-stripe-purple" />
-                <span className="text-sm font-semibold text-stripe-dark">{prompt.skill}</span>
+                <FileText size={16} className="text-nx-primary" />
+                <span className="text-sm font-semibold text-nx-dark">{prompt.skill}</span>
                 {!prompt.content && (
                   <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-[10px] font-medium text-amber-600">
                     {isHe ? 'חסר' : 'Missing'}
                   </span>
                 )}
               </div>
-              {isOpen ? <ChevronDown size={16} className="text-stripe-gray" /> : (isHe ? <ChevronDown size={16} className="text-stripe-gray rotate-90" /> : <ChevronRight size={16} className="text-stripe-gray" />)}
+              {isOpen ? <ChevronDown size={16} className="text-nx-gray" /> : (isHe ? <ChevronDown size={16} className="text-nx-gray rotate-90" /> : <ChevronRight size={16} className="text-nx-gray" />)}
             </button>
 
             {isOpen && prompt.content && (
               <div className="border-t border-gray-100 px-5 py-4">
                 <pre
                   dir="auto"
-                  className="text-xs text-stripe-gray leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 rounded-lg p-4 max-h-[600px] overflow-y-auto"
+                  className="text-xs text-nx-gray leading-relaxed whitespace-pre-wrap font-mono bg-gray-50 rounded-lg p-4 max-h-[600px] overflow-y-auto"
                 >
                   {prompt.content}
                 </pre>
@@ -1051,7 +1051,7 @@ function PromptsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
 
             {isOpen && !prompt.content && (
               <div className="border-t border-gray-100 px-5 py-4">
-                <p className="text-xs text-stripe-gray/60 italic">
+                <p className="text-xs text-nx-gray/60 italic">
                   {isHe ? 'קובץ פרומפט לא נמצא עבור כישור זה.' : 'No prompt file found for this skill.'}
                 </p>
               </div>
@@ -1102,49 +1102,49 @@ function SettingsTab({
     <div className="max-w-3xl space-y-6">
       {/* System Prompt */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-        <label className="block text-sm font-semibold text-stripe-dark mb-2">
+        <label className="block text-sm font-semibold text-nx-dark mb-2">
           {isHe ? 'הנחיית מערכת' : 'System Prompt'}
         </label>
         <textarea
           value={systemPrompt}
           onChange={(e) => setSystemPrompt(e.target.value)}
           rows={8}
-          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm font-mono leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
           placeholder={isHe ? 'הנחיות לסוכן...' : 'Agent system instructions...'}
         />
       </div>
 
       {/* Model */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-        <label className="block text-sm font-semibold text-stripe-dark mb-2">
+        <label className="block text-sm font-semibold text-nx-dark mb-2">
           {isHe ? 'מודל' : 'Model'}
         </label>
         <input
           type="text"
           value={model}
           onChange={(e) => setModel(e.target.value)}
-          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
           placeholder="e.g. gpt-4o-mini"
         />
       </div>
 
       {/* Description */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-        <label className="block text-sm font-semibold text-stripe-dark mb-2">
+        <label className="block text-sm font-semibold text-nx-dark mb-2">
           {isHe ? 'תיאור' : 'Description'}
         </label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
-          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+          className="w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm leading-relaxed resize-y focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
           placeholder={isHe ? 'תיאור הסוכן...' : 'Agent description...'}
         />
       </div>
 
       {/* Skills (display only) */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-        <label className="block text-sm font-semibold text-stripe-dark mb-2">
+        <label className="block text-sm font-semibold text-nx-dark mb-2">
           {isHe ? 'כישורים' : 'Skills'}
         </label>
         {agent.skills.length > 0 ? (
@@ -1152,20 +1152,20 @@ function SettingsTab({
             {agent.skills.map((skill) => (
               <span
                 key={skill}
-                className="px-3 py-1 rounded-lg bg-gray-50 border border-gray-100 text-xs font-medium text-stripe-gray"
+                className="px-3 py-1 rounded-lg bg-gray-50 border border-gray-100 text-xs font-medium text-nx-gray"
               >
                 {skill}
               </span>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-stripe-gray/50">{isHe ? 'אין כישורים' : 'No skills configured'}</p>
+          <p className="text-sm text-nx-gray/50">{isHe ? 'אין כישורים' : 'No skills configured'}</p>
         )}
       </div>
 
       {/* Integrations (display only) */}
       <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-        <label className="block text-sm font-semibold text-stripe-dark mb-2">
+        <label className="block text-sm font-semibold text-nx-dark mb-2">
           {isHe ? 'אינטגרציות' : 'Integrations'}
         </label>
         {agent.integrations.length > 0 ? (
@@ -1173,14 +1173,14 @@ function SettingsTab({
             {agent.integrations.map((integration) => (
               <span
                 key={integration}
-                className="px-3 py-1 rounded-lg bg-gray-50 border border-gray-100 text-xs font-medium text-stripe-gray"
+                className="px-3 py-1 rounded-lg bg-gray-50 border border-gray-100 text-xs font-medium text-nx-gray"
               >
                 {integration}
               </span>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-stripe-gray/50">{isHe ? 'אין אינטגרציות' : 'No integrations configured'}</p>
+          <p className="text-sm text-nx-gray/50">{isHe ? 'אין אינטגרציות' : 'No integrations configured'}</p>
         )}
       </div>
 
@@ -1189,7 +1189,7 @@ function SettingsTab({
         <button
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 transition-all disabled:opacity-50"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-nx-primary text-white hover:bg-nx-primary/90 transition-all disabled:opacity-50"
         >
           {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
           {isHe ? 'שמור שינויים' : 'Save Changes'}
@@ -1227,7 +1227,7 @@ function StatCard({
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-stripe-gray">{label}</span>
+        <span className="text-xs font-medium text-nx-gray">{label}</span>
         <div
           className="w-8 h-8 rounded-lg flex items-center justify-center"
           style={{ background: `${color}18` }}
@@ -1235,7 +1235,7 @@ function StatCard({
           <Icon size={16} style={{ color }} />
         </div>
       </div>
-      <div className="text-2xl font-bold text-stripe-dark">{value}</div>
+      <div className="text-2xl font-bold text-nx-dark">{value}</div>
     </div>
   );
 }

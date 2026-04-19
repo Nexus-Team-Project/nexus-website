@@ -120,7 +120,7 @@ html.a11y-big-cursor * {
 
 html.a11y-focus-highlight *:focus,
 html.a11y-focus-highlight *:focus-visible {
-  outline: 3px solid #635bff !important;
+  outline: 3px solid #0d9488 !important;
   outline-offset: 3px !important;
   border-radius: 4px !important;
 }

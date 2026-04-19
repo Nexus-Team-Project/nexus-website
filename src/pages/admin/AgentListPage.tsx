@@ -24,12 +24,12 @@ interface AgentSummary {
 
 const TYPE_COLORS: Record<string, string> = {
   SEO: '#10b981',
-  MARKETING: '#635bff',
+  MARKETING: '#0d9488',
   SALES: '#f59e0b',
 };
 
 function getAgentColor(agent: AgentSummary): string {
-  return agent.color || TYPE_COLORS[agent.type] || '#635bff';
+  return agent.color || TYPE_COLORS[agent.type] || '#0d9488';
 }
 
 // ─── Component ────────────────────────────────────────────
@@ -66,7 +66,7 @@ export default function AgentListPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-stripe-purple animate-spin" />
+        <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-nx-primary animate-spin" />
       </div>
     );
   }
@@ -76,10 +76,10 @@ export default function AgentListPage() {
       {/* Page header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-stripe-dark">
+          <h1 className="text-2xl font-bold text-nx-dark">
             {isHe ? 'סוכנים' : 'Agents'}
           </h1>
-          <p className="text-sm text-stripe-gray mt-1">
+          <p className="text-sm text-nx-gray mt-1">
             {isHe
               ? `${agents.length} סוכנים פעילים`
               : `${agents.length} agent${agents.length !== 1 ? 's' : ''} configured`}
@@ -96,8 +96,8 @@ export default function AgentListPage() {
       {/* Agent grid */}
       {agents.length === 0 && !error ? (
         <div className="text-center py-16">
-          <Bot size={48} className="mx-auto text-stripe-gray/30 mb-4" />
-          <p className="text-stripe-gray text-sm">
+          <Bot size={48} className="mx-auto text-nx-gray/30 mb-4" />
+          <p className="text-nx-gray text-sm">
             {isHe ? 'עדיין אין סוכנים מוגדרים' : 'No agents configured yet'}
           </p>
         </div>
@@ -118,7 +118,7 @@ export default function AgentListPage() {
                   {/* Agent name + status */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-semibold text-stripe-dark group-hover:text-stripe-purple transition-colors truncate">
+                      <h3 className="text-base font-semibold text-nx-dark group-hover:text-nx-primary transition-colors truncate">
                         {isHe && agent.nameHe ? agent.nameHe : agent.name}
                       </h3>
                       {/* Type badge */}
@@ -155,21 +155,21 @@ export default function AgentListPage() {
 
                   {/* Description */}
                   {agent.description && (
-                    <p className="text-xs text-stripe-gray line-clamp-2 mb-4 leading-relaxed">
+                    <p className="text-xs text-nx-gray line-clamp-2 mb-4 leading-relaxed">
                       {isHe && agent.descriptionHe ? agent.descriptionHe : agent.description}
                     </p>
                   )}
 
                   {/* Stats row */}
-                  <div className="flex items-center gap-4 text-xs text-stripe-gray mb-3">
+                  <div className="flex items-center gap-4 text-xs text-nx-gray mb-3">
                     <div className="flex items-center gap-1">
-                      <CheckCircle size={12} className="text-stripe-gray/60" />
+                      <CheckCircle size={12} className="text-nx-gray/60" />
                       <span>
                         {agent._count.tasks} {isHe ? 'משימות' : 'tasks'}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Zap size={12} className="text-stripe-gray/60" />
+                      <Zap size={12} className="text-nx-gray/60" />
                       <span>
                         {agent._count.automations} {isHe ? 'אוטומציות' : 'automations'}
                       </span>
@@ -182,13 +182,13 @@ export default function AgentListPage() {
                       {agent.skills.slice(0, 4).map((skill) => (
                         <span
                           key={skill}
-                          className="px-2 py-0.5 rounded-md bg-gray-50 border border-gray-100 text-[10px] font-medium text-stripe-gray"
+                          className="px-2 py-0.5 rounded-md bg-gray-50 border border-gray-100 text-[10px] font-medium text-nx-gray"
                         >
                           {skill}
                         </span>
                       ))}
                       {agent.skills.length > 4 && (
-                        <span className="px-2 py-0.5 rounded-md bg-gray-50 border border-gray-100 text-[10px] font-medium text-stripe-gray">
+                        <span className="px-2 py-0.5 rounded-md bg-gray-50 border border-gray-100 text-[10px] font-medium text-nx-gray">
                           +{agent.skills.length - 4}
                         </span>
                       )}

@@ -69,7 +69,7 @@ function NexusSemicircleBaseShape({ color }: { color: string }) {
   );
 }
 
-function RotatingBlob({ color = '#635bff' }: { color?: string }) {
+function RotatingBlob({ color = '#0d9488' }: { color?: string }) {
   return (
     <motion.svg
       width={78} height={78} viewBox="0 0 100 100"
@@ -277,14 +277,14 @@ export default function StoryInsightsCarousel() {
               {/* Slider */}
               <div className="w-full h-3 rounded-full overflow-hidden bg-slate-200">
                 <motion.div
-                  style={{ width: fillWidthCss, marginLeft: 'auto', backgroundColor: '#635bff' }}
+                  style={{ width: fillWidthCss, marginLeft: 'auto', backgroundColor: '#0d9488' }}
                   className="h-full rounded-full"
                 />
               </div>
 
               {/* Numbers */}
               <div className="flex justify-between items-center mt-2 px-1">
-                <motion.div className="text-[11px] font-bold" style={{ color: '#635bff' }}>
+                <motion.div className="text-[11px] font-bold" style={{ color: '#0d9488' }}>
                   {formattedAmount}
                 </motion.div>
                 <div className="text-[11px] font-semibold text-slate-400">

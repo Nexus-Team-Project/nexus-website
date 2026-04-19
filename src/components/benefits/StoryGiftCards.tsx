@@ -84,7 +84,7 @@ export default function StoryGiftCards() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         className={`mb-8 text-2xl font-semibold leading-relaxed w-full max-w-sm ${he ? 'text-right' : 'text-left'}`}
-        style={{ color: '#635bff' }}
+        style={{ color: '#0d9488' }}
       >
         <div>{he ? 'בחר גיפט קארד מהמותגים האהובים עליך' : 'Choose gift cards from your favorite brands'}</div>
         <div className="text-base font-normal mt-1 text-slate-500">

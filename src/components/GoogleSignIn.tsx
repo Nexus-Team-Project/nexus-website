@@ -30,8 +30,8 @@ export default function GoogleSignIn({ variant = 'form', redirectTo = '/workspac
 
   const buttonStyles =
     variant === 'hero'
-      ? 'inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 border border-gray-300 rounded-lg shadow-sm bg-white text-xs sm:text-sm font-bold text-stripe-dark hover:bg-gray-50 hover:border-stripe-purple transition-colors whitespace-nowrap disabled:opacity-60'
-      : 'w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg shadow-sm bg-white text-sm font-semibold text-stripe-dark hover:bg-gray-50 hover:border-stripe-purple transition-colors disabled:opacity-60';
+      ? 'inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 sm:py-4 border border-gray-300 rounded-lg shadow-sm bg-white text-xs sm:text-sm font-bold text-nx-dark hover:bg-gray-50 hover:border-nx-primary transition-colors whitespace-nowrap disabled:opacity-60'
+      : 'w-full flex items-center justify-center gap-3 px-4 py-2.5 border border-gray-200 rounded-lg shadow-sm bg-white text-sm font-semibold text-nx-dark hover:bg-gray-50 hover:border-nx-primary transition-colors disabled:opacity-60';
 
   return (
     <button

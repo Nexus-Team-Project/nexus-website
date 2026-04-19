@@ -66,13 +66,13 @@ export default function ForgotPassword() {
                       <>If <span className="font-medium text-slate-700">{email}</span> is registered, you'll receive a reset link shortly.</>
                     )}
                   </p>
-                  <Link to={loginPath} className="text-sm text-stripe-purple hover:underline font-semibold">
+                  <Link to={loginPath} className="text-sm text-nx-primary hover:underline font-semibold">
                     {isHe ? 'חזרה להתחברות' : 'Back to sign in'}
                   </Link>
                 </div>
               ) : (
                 <>
-                  <h1 className="text-xl font-bold text-stripe-dark mb-1">
+                  <h1 className="text-xl font-bold text-nx-dark mb-1">
                     {isHe ? 'איפוס סיסמה' : 'Reset your password'}
                   </h1>
                   <p className="text-sm text-slate-500 mb-5">
@@ -81,7 +81,7 @@ export default function ForgotPassword() {
 
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <label className="block text-xs text-stripe-dark font-medium mb-1">
+                      <label className="block text-xs text-nx-dark font-medium mb-1">
                         {isHe ? 'אימייל' : 'Email'}
                       </label>
                       <input
@@ -89,7 +89,7 @@ export default function ForgotPassword() {
                         autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors"
                       />
                     </div>
 
@@ -102,7 +102,7 @@ export default function ForgotPassword() {
                       disabled={isLoading || !email.trim()}
                       className={`w-full font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center ${
                         email.trim() && !isLoading
-                          ? 'bg-stripe-purple hover:bg-stripe-purple/90 text-white cursor-pointer'
+                          ? 'bg-nx-primary hover:bg-nx-primary/90 text-white cursor-pointer'
                           : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
                       }`}
                     >
@@ -115,7 +115,7 @@ export default function ForgotPassword() {
                   </form>
 
                   <div className="text-center mt-4 pt-4 -mx-6 -mb-6 px-6 pb-4 bg-slate-50 rounded-b-xl border-t border-gray-100">
-                    <Link to={loginPath} className="text-sm text-stripe-gray hover:text-stripe-purple font-medium">
+                    <Link to={loginPath} className="text-sm text-nx-gray hover:text-nx-primary font-medium">
                       {isHe ? '→ חזרה להתחברות' : '← Back to sign in'}
                     </Link>
                   </div>

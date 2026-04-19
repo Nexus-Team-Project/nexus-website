@@ -140,7 +140,7 @@ function ToggleRow({ icon, label, checked, onChange, id }: ToggleRowProps) {
           cursor: 'pointer',
           flexShrink: 0,
           background: checked
-            ? 'linear-gradient(135deg, #635bff, #00d4ff)'
+            ? 'linear-gradient(135deg, #0d9488, #00d4ff)'
             : 'rgba(255,255,255,0.15)',
           transition: 'background 0.25s',
           outline: 'none',
@@ -450,7 +450,7 @@ export default function AccessibilityWidget() {
                           fontWeight: 700,
                           fontFamily: 'inherit',
                           background: active
-                            ? 'linear-gradient(135deg, #635bff, #00d4ff)'
+                            ? 'linear-gradient(135deg, #0d9488, #00d4ff)'
                             : 'rgba(255,255,255,0.08)',
                           color: active ? '#fff' : 'rgba(255,255,255,0.6)',
                           transition: 'all 0.2s',
@@ -607,7 +607,7 @@ export default function AccessibilityWidget() {
             cursor: dragRef.current.active ? 'grabbing' : 'grab',
             background: open
               ? 'linear-gradient(135deg, #4f46e5, #0ea5e9)'
-              : 'linear-gradient(135deg, #635bff, #00d4ff)',
+              : 'linear-gradient(135deg, #0d9488, #00d4ff)',
             boxShadow: open
               ? '0 4px 20px rgba(99,91,255,0.6)'
               : '0 4px 16px rgba(99,91,255,0.45)',
@@ -681,7 +681,7 @@ export default function AccessibilityWidget() {
               transition: 'background 0.15s, color 0.15s',
             }}
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = '#635bff';
+              (e.currentTarget as HTMLButtonElement).style.background = '#0d9488';
               (e.currentTarget as HTMLButtonElement).style.color = '#fff';
             }}
             onMouseLeave={(e) => {

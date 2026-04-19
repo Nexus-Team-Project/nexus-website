@@ -114,7 +114,7 @@ export default function PartnersPage() {
         {/* Decorative blob */}
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #635BFF 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, #0D9488 0%, transparent 70%)' }}
         />
 
         {/* Rotating partner logo rings */}
@@ -148,7 +148,7 @@ export default function PartnersPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={pT?.searchPlaceholder ?? (language === 'he' ? 'חפש מותג...' : 'Search brand...')}
-              className="w-full border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-all py-2"
+              className="w-full border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-all py-2"
               style={direction === 'rtl' ? { paddingRight: '36px', paddingLeft: '12px' } : { paddingLeft: '36px', paddingRight: '12px' }}
             />
             {search && (
@@ -167,7 +167,7 @@ export default function PartnersPage() {
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
             className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
-                       focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple
+                       focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary
                        py-2 px-3 cursor-pointer"
             dir={direction}
           >
@@ -186,7 +186,7 @@ export default function PartnersPage() {
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
               className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
-                         focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple
+                         focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary
                          py-2 px-3 cursor-pointer"
               dir={direction}
             >
@@ -237,7 +237,7 @@ export default function PartnersPage() {
             </p>
             <button
               onClick={() => { setSearch(''); setSelectedCategory(''); setSortBy('default'); }}
-              className="mt-4 text-stripe-purple text-sm font-semibold hover:underline"
+              className="mt-4 text-nx-primary text-sm font-semibold hover:underline"
             >
               {language === 'he' ? 'נקה סינון' : 'Clear filters'}
             </button>
@@ -262,8 +262,8 @@ export default function PartnersPage() {
                 onClick={() => { setCurrentPage(page); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className={`w-9 h-9 rounded-lg text-sm font-semibold transition-colors ${
                   currentPage === page
-                    ? 'bg-stripe-purple text-white'
-                    : 'bg-white border border-slate-200 text-slate-600 hover:border-stripe-purple hover:text-stripe-purple'
+                    ? 'bg-nx-primary text-white'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-nx-primary hover:text-nx-primary'
                 }`}
               >
                 {page}
@@ -274,7 +274,7 @@ export default function PartnersPage() {
 
         {/* Guest CTA banner */}
         {!isLoggedIn && !loading && sorted.length > 0 && (
-          <div className="mt-12 bg-gradient-to-r from-stripe-blue to-violet-900 rounded-2xl p-8 text-white text-center">
+          <div className="mt-12 bg-gradient-to-r from-nx-blue to-violet-900 rounded-2xl p-8 text-white text-center">
             <h2 className="text-xl font-bold mb-2">
               {language === 'he' ? 'הצטרפו לקהילת Nexus וגלו את כל ההטבות' : 'Join Nexus Community and unlock all benefits'}
             </h2>
@@ -285,7 +285,7 @@ export default function PartnersPage() {
             </p>
             <Link
               to={signupLink}
-              className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+              className="inline-block bg-nx-primary text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
             >
               {pT?.joinNow ?? (language === 'he' ? 'הצטרפות חינם' : 'Join free')}
             </Link>
@@ -306,7 +306,7 @@ export default function PartnersPage() {
           </p>
           <Link
             to={signupLink}
-            className="inline-block bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+            className="inline-block bg-nx-primary text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors"
           >
             {language === 'he' ? 'הצטרף כשותף' : 'Become a Partner'}
           </Link>

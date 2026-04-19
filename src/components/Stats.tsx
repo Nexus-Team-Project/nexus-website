@@ -12,7 +12,7 @@ export default function Stats() {
   const stats = getStats(t);
 
   return (
-    <section className="py-24 bg-stripe-light">
+    <section className="py-24 bg-nx-light">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 lg:gap-12">
           {stats.map((stat, index) => (
@@ -90,11 +90,11 @@ function StatCounter({
       className="text-center animate-fade-in-up opacity-0"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-stripe-purple to-stripe-cyan bg-clip-text text-transparent mb-3">
+      <div className="text-4xl lg:text-5xl font-bold bg-gradient-to-r from-nx-primary to-nx-cyan bg-clip-text text-transparent mb-3">
         {decimals > 0 ? count.toFixed(decimals) : Math.floor(count)}
         {suffix}
       </div>
-      <div className="text-sm text-stripe-gray font-medium">{label}</div>
+      <div className="text-sm text-nx-gray font-medium">{label}</div>
     </div>
   );
 }

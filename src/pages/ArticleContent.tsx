@@ -213,7 +213,7 @@ export default function ArticleContent() {
           </h1>
           <Link
             to={`${prefix}/blog`}
-            className="text-[#635BFF] font-medium hover:underline"
+            className="text-[#0D9488] font-medium hover:underline"
           >
             {language === 'he' ? '← חזרה לבלוג' : '← Back to blog'}
           </Link>
@@ -266,7 +266,7 @@ export default function ArticleContent() {
 
           <div className="flex flex-wrap items-center gap-6 text-sm text-slate-500">
             <span className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#635BFF]/10 flex items-center justify-center text-[#635BFF] text-xs font-bold">
+              <div className="w-8 h-8 rounded-full bg-[#0D9488]/10 flex items-center justify-center text-[#0D9488] text-xs font-bold">
                 {article.author.name.charAt(0)}
               </div>
               {article.author.name}
@@ -301,7 +301,7 @@ export default function ArticleContent() {
                       href={`#${h.id}`}
                       className={`block ps-4 py-1 text-sm transition-colors border-s-2 -ms-px ${
                         activeId === h.id
-                          ? 'border-[#635BFF] text-[#635BFF] font-medium'
+                          ? 'border-[#0D9488] text-[#0D9488] font-medium'
                           : 'border-transparent text-slate-500 hover:text-slate-800'
                       }`}
                       onClick={(e) => {
@@ -351,7 +351,7 @@ export default function ArticleContent() {
             {/* ─── Author Card ─── */}
             <div className="mt-16 pt-12 border-t border-slate-200">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#635BFF] to-indigo-600 flex items-center justify-center text-white text-xl font-bold">
+                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#0D9488] to-indigo-600 flex items-center justify-center text-white text-xl font-bold">
                   {article.author.name.charAt(0)}
                 </div>
                 <div>
@@ -385,7 +385,7 @@ export default function ArticleContent() {
                     <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium mb-3 ${CATEGORY_COLORS[r.category]}`}>
                       {categoryLabel[language]?.[r.category]}
                     </span>
-                    <h3 className="font-semibold text-slate-900 group-hover:text-[#635BFF] transition-colors line-clamp-2">
+                    <h3 className="font-semibold text-slate-900 group-hover:text-[#0D9488] transition-colors line-clamp-2">
                       {r.title}
                     </h3>
                     <p className="text-sm text-slate-600 mt-2 line-clamp-2">{r.excerpt}</p>
@@ -397,7 +397,7 @@ export default function ArticleContent() {
             <div className="text-center mt-10">
               <Link
                 to={`${prefix}/blog`}
-                className="inline-flex items-center gap-2 text-[#635BFF] font-medium hover:gap-3 transition-all"
+                className="inline-flex items-center gap-2 text-[#0D9488] font-medium hover:gap-3 transition-all"
               >
                 {isRTL ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
                 {language === 'he' ? 'חזרה לכל המאמרים' : 'Back to all articles'}
@@ -431,14 +431,14 @@ function InlineText({ text }: { text: string }) {
         const isInternal = href.startsWith('/');
         if (isInternal) {
           return (
-            <Link key={i} to={href} className="text-[#635BFF] hover:underline font-medium">
+            <Link key={i} to={href} className="text-[#0D9488] hover:underline font-medium">
               {label}
             </Link>
           );
         }
         return (
           <a key={i} href={href} target="_blank" rel="noopener noreferrer"
-            className="text-[#635BFF] hover:underline font-medium">
+            className="text-[#0D9488] hover:underline font-medium">
             {label}
           </a>
         );
@@ -504,9 +504,9 @@ function SectionRenderer({ section }: { section: ArticleSection }) {
 
     case 'callout':
       return (
-        <div className="my-6 rounded-xl border-s-4 border-[#635BFF] bg-slate-50 p-5">
+        <div className="my-6 rounded-xl border-s-4 border-[#0D9488] bg-slate-50 p-5">
           <div className="flex gap-3">
-            <AlertCircle className="w-5 h-5 text-[#635BFF] flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-[#0D9488] flex-shrink-0 mt-0.5" />
             <div className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">
               {section.text}
             </div>
@@ -532,14 +532,14 @@ function SectionRenderer({ section }: { section: ArticleSection }) {
 
     case 'link':
       return (
-        <div className="my-4 rounded-lg border border-slate-200 bg-slate-50/50 px-5 py-4 flex items-start gap-3 hover:border-[#635BFF]/30 transition-colors">
-          <ExternalLink className="w-4 h-4 text-[#635BFF] flex-shrink-0 mt-1" />
+        <div className="my-4 rounded-lg border border-slate-200 bg-slate-50/50 px-5 py-4 flex items-start gap-3 hover:border-[#0D9488]/30 transition-colors">
+          <ExternalLink className="w-4 h-4 text-[#0D9488] flex-shrink-0 mt-1" />
           <div>
             <a
               href={section.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#635BFF] font-medium hover:underline text-sm"
+              className="text-[#0D9488] font-medium hover:underline text-sm"
             >
               {section.text}
             </a>

@@ -313,10 +313,10 @@ export default function Signup() {
               <div className="space-y-6">
                 {features.map((f) => (
                   <div key={f.title} className="flex gap-3">
-                    <div className="w-1 bg-stripe-purple rounded-full shrink-0" />
+                    <div className="w-1 bg-nx-primary rounded-full shrink-0" />
                     <div>
-                      <h3 className="text-sm font-semibold text-stripe-dark mb-1">{f.title}</h3>
-                      <p className="text-xs text-stripe-gray leading-relaxed">{f.desc}</p>
+                      <h3 className="text-sm font-semibold text-nx-dark mb-1">{f.title}</h3>
+                      <p className="text-xs text-nx-gray leading-relaxed">{f.desc}</p>
                     </div>
                   </div>
                 ))}
@@ -326,20 +326,20 @@ export default function Signup() {
             {/* Right — signup form */}
             <div className="w-full max-w-md mx-auto lg:mx-0">
               <div className={`bg-white rounded-xl shadow-xl border border-gray-100 p-6 ${shouldShake ? 'animate-shake' : ''}`}>
-                <h1 className="text-xl font-bold text-stripe-dark mb-5 max-w-sm mx-auto">
+                <h1 className="text-xl font-bold text-nx-dark mb-5 max-w-sm mx-auto">
                   {t.auth.createAccount}
                 </h1>
 
                 <form className="space-y-3 max-w-sm mx-auto" onSubmit={handleSubmit}>
                   <div>
-                    <label className="block text-xs text-stripe-dark font-medium mb-1">{t.auth.email}</label>
+                    <label className="block text-xs text-nx-dark font-medium mb-1">{t.auth.email}</label>
                     <input
                       type="email"
                       name="email"
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors ${
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors ${
                         errors.email ? 'border-red-500' : 'border-gray-300'
                       }`}
                     />
@@ -354,14 +354,14 @@ export default function Signup() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-stripe-dark font-medium mb-1">{t.auth.fullName}</label>
+                    <label className="block text-xs text-nx-dark font-medium mb-1">{t.auth.fullName}</label>
                     <input
                       type="text"
                       name="name"
                       autoComplete="name"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors ${
+                      className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors ${
                         errors.fullName ? 'border-red-500' : 'border-gray-300'
                       }`}
                     />
@@ -376,7 +376,7 @@ export default function Signup() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-stripe-dark font-medium mb-1">{t.auth.password}</label>
+                    <label className="block text-xs text-nx-dark font-medium mb-1">{t.auth.password}</label>
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
@@ -384,7 +384,7 @@ export default function Signup() {
                         autoComplete="new-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className={`w-full px-3 py-2 ${isHe ? 'pl-10' : 'pr-10'} border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors ${
+                        className={`w-full px-3 py-2 ${isHe ? 'pl-10' : 'pr-10'} border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors ${
                           errors.password ? 'border-red-500' : 'border-gray-300'
                         }`}
                       />
@@ -444,14 +444,14 @@ export default function Signup() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-stripe-dark font-medium mb-1">
-                      {t.auth.country} <span className="text-stripe-gray/60 cursor-help">&#9432;</span>
+                    <label className="block text-xs text-nx-dark font-medium mb-1">
+                      {t.auth.country} <span className="text-nx-gray/60 cursor-help">&#9432;</span>
                     </label>
                     <div className="relative" ref={countryDropdownRef}>
                       <button
                         type="button"
                         onClick={() => setIsCountryOpen(!isCountryOpen)}
-                        className={`w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors ${isHe ? 'pl-10' : 'pr-10'} text-${isHe ? 'right' : 'left'} flex items-center ${
+                        className={`w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors ${isHe ? 'pl-10' : 'pr-10'} text-${isHe ? 'right' : 'left'} flex items-center ${
                           errors.country ? 'border-red-500' : 'border-gray-300'
                         }`}
                       >
@@ -474,8 +474,8 @@ export default function Signup() {
                               }}
                               className={`w-full flex items-center px-3 py-2 text-sm text-${isHe ? 'right' : 'left'} transition-colors ${
                                 country === c.code
-                                  ? 'bg-stripe-purple/10 text-stripe-purple'
-                                  : 'text-stripe-dark hover:bg-slate-50'
+                                  ? 'bg-nx-primary/10 text-nx-primary'
+                                  : 'text-nx-dark hover:bg-slate-50'
                               }`}
                             >
                               <FlagIcon code={c.code} />
@@ -511,12 +511,12 @@ export default function Signup() {
                       type="checkbox"
                       checked={emailUpdates}
                       onChange={(e) => setEmailUpdates(e.target.checked)}
-                      className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-stripe-purple focus:ring-stripe-purple/30"
+                      className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300 text-nx-primary focus:ring-nx-primary/30"
                     />
-                    <span className="text-[11px] text-stripe-gray leading-relaxed">
+                    <span className="text-[11px] text-nx-gray leading-relaxed">
                       {t.auth.emailUpdates}{' '}
-                      <a href="#" className="text-stripe-purple hover:underline">{t.auth.unsubscribe}</a> {t.auth.atAnyTime}{' '}
-                      <a href="#" className="text-stripe-purple hover:underline">{t.auth.privacyPolicy}</a>
+                      <a href="#" className="text-nx-primary hover:underline">{t.auth.unsubscribe}</a> {t.auth.atAnyTime}{' '}
+                      <a href="#" className="text-nx-primary hover:underline">{t.auth.privacyPolicy}</a>
                     </span>
                   </div>
 
@@ -525,7 +525,7 @@ export default function Signup() {
                     disabled={isLoading}
                     className={`w-full font-medium py-2 rounded-lg transition-colors text-sm flex items-center justify-center ${
                       isFormValid && !isLoading
-                        ? 'bg-stripe-purple hover:bg-stripe-purple/90 text-white cursor-pointer'
+                        ? 'bg-nx-primary hover:bg-nx-primary/90 text-white cursor-pointer'
                         : 'bg-gray-300 text-gray-500 cursor-pointer opacity-60'
                     }`}
                   >
@@ -541,7 +541,7 @@ export default function Signup() {
                   {/* Divider */}
                   <div className="flex items-center gap-4 my-3">
                     <div className="flex-1 h-px bg-gray-200" />
-                    <span className="text-xs text-stripe-gray">{t.auth.or}</span>
+                    <span className="text-xs text-nx-gray">{t.auth.or}</span>
                     <div className="flex-1 h-px bg-gray-200" />
                   </div>
 
@@ -551,9 +551,9 @@ export default function Signup() {
 
                 {/* Already have account */}
                 <div className="text-center mt-4 pt-3 -mx-6 -mb-6 px-6 pb-3 bg-cyan-900/5 rounded-b-xl">
-                  <p className="text-xs text-stripe-gray">
+                  <p className="text-xs text-nx-gray">
                     {t.auth.alreadyHaveAccount}{' '}
-                    <Link to={loginPath} className="text-stripe-purple hover:underline font-medium">{t.auth.signIn}</Link>
+                    <Link to={loginPath} className="text-nx-primary hover:underline font-medium">{t.auth.signIn}</Link>
                   </p>
                 </div>
               </div>

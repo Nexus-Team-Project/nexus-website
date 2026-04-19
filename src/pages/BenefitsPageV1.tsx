@@ -32,8 +32,8 @@ function Bullet({ text, icon: Icon = Check }: { text: string; icon?: React.Eleme
   const isRtl = direction === 'rtl';
   return (
     <li className={`flex items-start gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
-      <span className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-stripe-purple/10 flex items-center justify-center">
-        <Icon size={12} className="text-stripe-purple" />
+      <span className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-nx-primary/10 flex items-center justify-center">
+        <Icon size={12} className="text-nx-primary" />
       </span>
       <span className="text-slate-600">{text}</span>
     </li>
@@ -128,7 +128,7 @@ export default function BenefitsPageV1() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             {/* Text column */}
             <div className={isRtl ? 'text-right' : 'text-left'}>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+              <p className="text-nx-primary font-semibold text-sm uppercase tracking-wider mb-4">
                 {he ? 'מועדון הטבות ארגוני' : 'Corporate Benefits Club'}
               </p>
               <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold text-slate-900 mb-6 leading-tight">
@@ -150,7 +150,7 @@ export default function BenefitsPageV1() {
               <div className={`flex flex-wrap gap-4 ${isRtl ? '' : 'flex-row-reverse'}`}>
                 <Link
                   to={signupLink}
-                  className="inline-flex items-center gap-2 bg-stripe-purple text-white px-7 py-3.5 rounded-full font-semibold text-sm hover:bg-[#5649d8] transition-all shadow-lg shadow-stripe-purple/25 hover:shadow-xl hover:shadow-stripe-purple/30"
+                  className="inline-flex items-center gap-2 bg-nx-primary text-white px-7 py-3.5 rounded-full font-semibold text-sm hover:bg-[#5649d8] transition-all shadow-lg shadow-nx-primary/25 hover:shadow-xl hover:shadow-nx-primary/30"
                 >
                   {he ? 'התחילו עכשיו' : 'Get Started'}
                 </Link>
@@ -182,7 +182,7 @@ export default function BenefitsPageV1() {
 
             {/* Text */}
             <div className={`order-1 ${isRtl ? 'lg:order-1 text-right' : 'lg:order-2 text-left'}`}>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+              <p className="text-nx-primary font-semibold text-sm uppercase tracking-wider mb-4">
                 {he ? 'האתגר' : 'The Challenge'}
               </p>
               <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">
@@ -217,7 +217,7 @@ export default function BenefitsPageV1() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             {/* Text */}
             <div className={isRtl ? 'text-right' : 'text-left'}>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+              <p className="text-nx-primary font-semibold text-sm uppercase tracking-wider mb-4">
                 {he ? 'הפתרון' : 'The Solution'}
               </p>
               <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-6">
@@ -254,7 +254,7 @@ export default function BenefitsPageV1() {
       <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
-            <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-block bg-nx-primary/10 text-nx-primary text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
               {he ? 'כוח מיקוח' : 'Bargaining Power'}
             </span>
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
@@ -274,7 +274,7 @@ export default function BenefitsPageV1() {
       <section className="scroll-reveal relative py-20 md:py-32 bg-slate-50 overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
-            <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-block bg-nx-primary/10 text-nx-primary text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
               {he ? 'הפלטפורמה' : 'The Platform'}
             </span>
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
@@ -318,7 +318,7 @@ export default function BenefitsPageV1() {
       </section>
 
       {/* ═══════════════════════ S7: STATS ═══════════════════════ */}
-      <section className="scroll-reveal relative py-20 md:py-28 bg-stripe-light overflow-x-hidden">
+      <section className="scroll-reveal relative py-20 md:py-28 bg-nx-light overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
@@ -352,7 +352,7 @@ export default function BenefitsPageV1() {
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
               to={signupLink}
-              className="inline-flex items-center gap-2 bg-stripe-purple text-white px-8 py-4 rounded-full font-semibold text-base hover:bg-[#5649d8] transition-all shadow-lg shadow-stripe-purple/30 hover:shadow-xl hover:shadow-stripe-purple/40"
+              className="inline-flex items-center gap-2 bg-nx-primary text-white px-8 py-4 rounded-full font-semibold text-base hover:bg-[#5649d8] transition-all shadow-lg shadow-nx-primary/30 hover:shadow-xl hover:shadow-nx-primary/40"
             >
               {he ? 'התחילו עכשיו' : 'Get Started'}
             </Link>
@@ -367,7 +367,7 @@ export default function BenefitsPageV1() {
       </section>
 
       {/* ═══════════════════════ FOOTER ═══════════════════════ */}
-      <Suspense fallback={<div className="h-64 bg-stripe-blue" />}>
+      <Suspense fallback={<div className="h-64 bg-nx-blue" />}>
         <Footer />
       </Suspense>
     </div>

@@ -61,7 +61,7 @@ function FeaturesSkeleton() {
 
 function StatsSkeleton() {
   return (
-    <section className="py-24 bg-stripe-light">
+    <section className="py-24 bg-nx-light">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
           {[...Array(4)].map((_, i) => (
@@ -79,7 +79,7 @@ function StatsSkeleton() {
 function GlobalSectionSkeleton() {
   return (
     <section className="relative py-20 md:py-48 overflow-x-hidden">
-      <div className="absolute inset-0 bg-stripe-blue" />
+      <div className="absolute inset-0 bg-nx-blue" />
       <div className="relative max-w-7xl mx-auto px-6 animate-pulse">
         <div className="grid lg:grid-cols-2 gap-16 items-center min-h-[320px]">
           <div className="space-y-4">
@@ -92,7 +92,7 @@ function GlobalSectionSkeleton() {
               <div className="h-4 w-72 bg-white/10 rounded" />
             </div>
             <div className="flex gap-3 mt-6">
-              <div className="h-12 w-36 bg-stripe-purple/40 rounded-lg" />
+              <div className="h-12 w-36 bg-nx-primary/40 rounded-lg" />
               <div className="h-12 w-28 bg-white/10 rounded-lg" />
             </div>
           </div>
@@ -140,7 +140,7 @@ function TestimonialsSkeleton() {
 
 function CTASkeleton() {
   return (
-    <section className="py-24 bg-stripe-blue">
+    <section className="py-24 bg-nx-blue">
       <div className="max-w-7xl mx-auto px-6 animate-pulse">
         <div className="grid lg:grid-cols-2 gap-16 items-center min-h-[340px]">
           <div className="space-y-4">
@@ -152,7 +152,7 @@ function CTASkeleton() {
               <div className="h-4 w-64 bg-white/10 rounded" />
             </div>
             <div className="mt-6">
-              <div className="h-12 w-40 bg-stripe-purple/50 rounded-lg" />
+              <div className="h-12 w-40 bg-nx-primary/50 rounded-lg" />
             </div>
           </div>
           <div className="h-72 bg-white/5 rounded-2xl border border-white/10 p-6">
@@ -174,7 +174,7 @@ function CTASkeleton() {
 
 function FooterSkeleton() {
   return (
-    <footer className="bg-stripe-blue py-16">
+    <footer className="bg-nx-blue py-16">
       <div className="max-w-7xl mx-auto px-6 animate-pulse">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-10 mb-12">
           {/* Logo column */}
@@ -276,7 +276,7 @@ export default function HomeContent() {
             {[...Array(8)].map((_, i) => (
               <div
                 key={i}
-                className="w-px h-full bg-gradient-to-b from-transparent via-stripe-purple/20 to-transparent"
+                className="w-px h-full bg-gradient-to-b from-transparent via-nx-primary/20 to-transparent"
               />
             ))}
           </div>
@@ -382,7 +382,7 @@ export default function HomeContent() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-16 items-center">
             {/* Left: Content */}
             <div>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+              <p className="text-nx-primary font-semibold text-sm uppercase tracking-wider mb-4">
                 {t.partners.title}
               </p>
               <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
@@ -393,8 +393,8 @@ export default function HomeContent() {
               </p>
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
+                  <div className="w-6 h-6 rounded-full bg-nx-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-nx-primary" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900 mb-1">{t.partners.universalIntegration}</h3>
@@ -402,8 +402,8 @@ export default function HomeContent() {
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
+                  <div className="w-6 h-6 rounded-full bg-nx-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-nx-primary" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900 mb-1">{t.partners.trustedPartners}</h3>
@@ -411,8 +411,8 @@ export default function HomeContent() {
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0 mt-1">
-                    <div className="w-2 h-2 rounded-full bg-stripe-purple" />
+                  <div className="w-6 h-6 rounded-full bg-nx-primary/10 flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-2 h-2 rounded-full bg-nx-primary" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-slate-900 mb-1">{t.partners.globalReach}</h3>
@@ -454,7 +454,7 @@ export default function HomeContent() {
           <div className="flex flex-wrap justify-center gap-4">
             <Link
               to={language === 'he' ? '/he/signup' : '/signup'}
-              className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/90 text-white font-medium px-8 py-4 rounded-lg transition-all hover:shadow-xl hover:shadow-stripe-purple/25 text-sm"
+              className="group inline-flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white font-medium px-8 py-4 rounded-lg transition-all hover:shadow-xl hover:shadow-nx-primary/25 text-sm"
               onClick={() => track(MARKETING.HERO_CTA_CLICKED, 'MARKETING', { button_text: t.cta.startNow, variant: 'bottom_cta' })}
             >
               {t.cta.startNow}

@@ -84,7 +84,7 @@ export default function Testimonials() {
           {[...Array(8)].map((_, i) => (
             <div
               key={i}
-              className="w-px h-full bg-gradient-to-b from-transparent via-stripe-purple/20 to-transparent"
+              className="w-px h-full bg-gradient-to-b from-transparent via-nx-primary/20 to-transparent"
             />
           ))}
         </div>
@@ -92,7 +92,7 @@ export default function Testimonials() {
 
       {/* Diagonal Bottom Background */}
       <div
-        className="absolute bg-stripe-blue z-0"
+        className="absolute bg-nx-blue z-0"
         style={{
           top: 'auto',
           left: 0,
@@ -104,8 +104,8 @@ export default function Testimonials() {
             : 'polygon(0 100px, 100% 0, 100% 100%, 0 100%)',
         }}
       >
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-stripe-purple/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-stripe-cyan/10 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-nx-primary/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-nx-cyan/10 rounded-full blur-3xl" />
       </div>
 
       {/* Image Grid */}
@@ -120,7 +120,7 @@ export default function Testimonials() {
                 item.type === 'placeholder' ? (
                   <div
                     key={imgIndex}
-                    className="w-full aspect-square bg-gradient-to-br from-stripe-purple/5 via-stripe-blue/5 to-stripe-cyan/5 rounded-2xl border border-slate-100"
+                    className="w-full aspect-square bg-gradient-to-br from-nx-primary/5 via-nx-blue/5 to-nx-cyan/5 rounded-2xl border border-slate-100"
                   />
                 ) : (
                   <img
@@ -139,13 +139,13 @@ export default function Testimonials() {
 
       {/* Text Content */}
       <div className="relative z-20 text-center max-w-2xl px-6">
-        <span className="inline-block px-4 py-1 rounded-full bg-stripe-purple/10 text-stripe-purple text-sm font-semibold mb-6 uppercase tracking-wider">
+        <span className="inline-block px-4 py-1 rounded-full bg-nx-primary/10 text-nx-primary text-sm font-semibold mb-6 uppercase tracking-wider">
           {t.testimonials.badge}
         </span>
         <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-2">
           <span className="text-slate-900">{t.testimonials.title}</span>
           <br />
-          <span className="bg-gradient-to-r from-stripe-purple via-stripe-blue to-stripe-cyan bg-clip-text text-transparent">
+          <span className="bg-gradient-to-r from-nx-primary via-nx-blue to-nx-cyan bg-clip-text text-transparent">
             {t.testimonials.subtitle}
           </span>
         </h1>
@@ -153,7 +153,7 @@ export default function Testimonials() {
           {t.testimonials.description}
         </p>
         <div className="mt-10 flex flex-col items-center">
-          <button className="bg-stripe-purple hover:bg-stripe-purple/90 text-white px-8 py-4 rounded-lg font-semibold flex items-center hover:shadow-xl hover:shadow-stripe-purple/30 transition-all duration-300 group">
+          <button className="bg-nx-primary hover:bg-nx-primary/90 text-white px-8 py-4 rounded-lg font-semibold flex items-center hover:shadow-xl hover:shadow-nx-primary/30 transition-all duration-300 group">
             {t.testimonials.readSuccessStories}
             <ArrowRight className={`ml-2 group-hover:translate-x-1 transition-transform ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`} size={20} />
           </button>

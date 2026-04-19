@@ -47,7 +47,7 @@ function AnimatedCounter({ target, suffix }: { target: number; suffix: string })
   }, [target]);
 
   return (
-    <div ref={ref} className="text-5xl lg:text-6xl font-black text-stripe-purple">
+    <div ref={ref} className="text-5xl lg:text-6xl font-black text-nx-primary">
       {count}{suffix}
     </div>
   );

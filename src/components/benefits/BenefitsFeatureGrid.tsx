@@ -236,8 +236,8 @@ export default function BenefitsFeatureGrid() {
                     <div className="text-xs text-slate-400 mb-1">{he ? 'סה״כ הטבות פעילות' : 'Total Active Benefits'}</div>
                     <div className="text-xl font-bold text-slate-900">{he ? '₪ 2,450,000' : '$2,450,000'}</div>
                   </div>
-                  <div className="h-9 w-9 bg-stripe-purple/10 rounded-full flex items-center justify-center">
-                    <BarChart3 size={18} className="text-stripe-purple" />
+                  <div className="h-9 w-9 bg-nx-primary/10 rounded-full flex items-center justify-center">
+                    <BarChart3 size={18} className="text-nx-primary" />
                   </div>
                 </div>
                 {/* Stats row */}
@@ -263,7 +263,7 @@ export default function BenefitsFeatureGrid() {
                   </div>
                   <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-stripe-purple to-purple-400 rounded-full transition-all duration-1000 ease-out`}
+                      className={`h-full bg-gradient-to-${isRtl ? 'l' : 'r'} from-nx-primary to-purple-400 rounded-full transition-all duration-1000 ease-out`}
                       style={{ width: isVisible ? '78%' : '0%' }}
                     />
                   </div>

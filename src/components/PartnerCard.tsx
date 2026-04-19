@@ -80,10 +80,10 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
                 <span className="text-slate-400 font-bold text-sm blur-[3px]">00% הנחה</span>
               </div>
               <div className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-xl backdrop-blur-[0.5px] bg-white/60">
-                <Lock size={11} className="text-stripe-purple shrink-0" />
+                <Lock size={11} className="text-nx-primary shrink-0" />
                 <Link
                   to={loginTo}
-                  className="text-[11px] font-semibold text-stripe-purple hover:underline whitespace-nowrap"
+                  className="text-[11px] font-semibold text-nx-primary hover:underline whitespace-nowrap"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {lockLabel}

@@ -147,7 +147,7 @@ export default function BenefitsPage() {
                 <div className={`flex flex-wrap gap-4 ${isRtl ? '' : 'flex-row-reverse'}`}>
                   <Link
                     to={signupLink}
-                    className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+                    className="inline-block bg-nx-primary text-white font-semibold px-8 py-3 rounded-xl hover:bg-sky-600 transition-colors"
                   >
                     {he ? 'התחילו עכשיו' : 'Get Started'}
                   </Link>
@@ -211,11 +211,11 @@ export default function BenefitsPage() {
           }}
         />
 
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none" style={{ background: 'rgba(99,91,255,0.08)', filter: 'blur(80px)' }} />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none" style={{ background: 'rgba(14,165,233,0.08)', filter: 'blur(80px)' }} />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
-            <span className="inline-block bg-white/10 text-violet-300 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-block bg-white/10 text-sky-300 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
               {he ? 'למה מועדון הטבות?' : 'Why a Benefits Club?'}
             </span>
             <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
@@ -235,9 +235,9 @@ export default function BenefitsPage() {
                 <BorderHighlightCard key={r.titleEn} className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-8">
                   <div
                     className="w-12 h-12 rounded-xl flex items-center justify-center mb-5"
-                    style={{ background: 'rgba(99,91,255,0.15)' }}
+                    style={{ background: 'rgba(14,165,233,0.15)' }}
                   >
-                    <Icon size={24} className="text-violet-400" />
+                    <Icon size={24} className="text-sky-400" />
                   </div>
                   <h3 className={`text-xl font-bold text-white mb-3 ${isRtl ? 'text-right' : 'text-left'}`}>
                     {he ? r.titleHe : r.titleEn}
@@ -258,7 +258,7 @@ export default function BenefitsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           {/* Header */}
           <div className="text-center mb-12">
-            <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-block bg-nx-primary/10 text-nx-primary text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
               {he ? 'הקהילה שלכם' : 'Your Community'}
             </span>
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
@@ -303,9 +303,9 @@ export default function BenefitsPage() {
                   key={card.id}
                   className="flex-shrink-0 w-[320px] sm:w-[380px] snap-center rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                 >
-                  {/* Card header — single purple title only */}
+                  {/* Card header — single title only */}
                   <div className={`px-5 pt-5 pb-3 ${isRtl ? 'text-right' : 'text-left'}`}>
-                    <h3 className="text-lg font-bold" style={{ color: '#635BFF' }}>
+                    <h3 className="text-lg font-bold" style={{ color: '#0D9488' }}>
                       {he ? card.titleHe : card.titleEn}
                     </h3>
                   </div>
@@ -329,7 +329,7 @@ export default function BenefitsPage() {
                 onClick={() => scrollToIndex(i)}
                 className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
                   i === activeIndex
-                    ? 'bg-stripe-purple w-7'
+                    ? 'bg-nx-primary w-7'
                     : 'bg-slate-300 hover:bg-slate-400'
                 }`}
                 aria-label={`Go to story ${i + 1}`}
@@ -355,7 +355,7 @@ export default function BenefitsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.5fr] gap-16 items-center">
             {/* Left: Content */}
             <div>
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+              <p className="text-nx-primary font-semibold text-sm uppercase tracking-wider mb-4">
                 {he ? 'אקוסיסטם של שותפים' : 'Partner Ecosystem'}
               </p>
               <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
@@ -380,7 +380,7 @@ export default function BenefitsPage() {
       <section className="scroll-reveal relative py-20 md:py-32 bg-white overflow-x-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-14">
-            <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-block bg-nx-primary/10 text-nx-primary text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
               {he ? 'הפלטפורמה' : 'The Platform'}
             </span>
             <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
@@ -402,11 +402,11 @@ export default function BenefitsPage() {
         className="scroll-reveal relative py-20 md:py-32 overflow-x-hidden"
         style={{ background: 'linear-gradient(135deg, #0A2540 0%, #1a1f5e 60%, #0A2540 100%)' }}
       >
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none" style={{ background: 'rgba(99,91,255,0.08)', filter: 'blur(80px)' }} />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full pointer-events-none" style={{ background: 'rgba(14,165,233,0.08)', filter: 'blur(80px)' }} />
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-16">
-            <span className="inline-block bg-white/10 text-violet-300 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+            <span className="inline-block bg-white/10 text-sky-300 text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
               {he ? 'תהליך' : 'Process'}
             </span>
             <h2 className="text-3xl lg:text-4xl font-bold text-white mb-4">
@@ -438,7 +438,7 @@ export default function BenefitsPage() {
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
               to={signupLink}
-              className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+              className="inline-block bg-nx-primary text-white font-semibold px-8 py-3 rounded-xl hover:bg-sky-600 transition-colors"
             >
               {he ? 'התחילו עכשיו' : 'Get Started'}
             </Link>
@@ -453,7 +453,7 @@ export default function BenefitsPage() {
       </section>
 
       {/* ═══════════════════════ FOOTER ═══════════════════════ */}
-      <Suspense fallback={<div className="h-64 bg-stripe-blue" />}>
+      <Suspense fallback={<div className="h-64 bg-nx-blue" />}>
         <Footer />
       </Suspense>
     </div>

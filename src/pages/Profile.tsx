@@ -112,7 +112,7 @@ export default function Profile() {
             </Link>
             <Link
               to={dashboardPath}
-              className="text-xs text-stripe-gray hover:text-stripe-dark font-medium flex items-center gap-1"
+              className="text-xs text-nx-gray hover:text-nx-dark font-medium flex items-center gap-1"
               dir="rtl"
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,19 +129,19 @@ export default function Profile() {
 
             {/* Profile Card */}
             <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-6">
-              <h1 className="text-xl font-bold text-stripe-dark mb-1">הפרופיל שלי</h1>
-              <p className="text-xs text-stripe-gray mb-5">עדכן את פרטיך האישיים</p>
+              <h1 className="text-xl font-bold text-nx-dark mb-1">הפרופיל שלי</h1>
+              <p className="text-xs text-nx-gray mb-5">עדכן את פרטיך האישיים</p>
 
               {/* Read-only info */}
               <div className="flex items-center gap-3 mb-5 p-3 bg-slate-50 rounded-lg border border-slate-100">
-                <div className="w-10 h-10 rounded-full bg-stripe-purple/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-stripe-purple font-bold text-sm">
+                <div className="w-10 h-10 rounded-full bg-nx-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="text-nx-primary font-bold text-sm">
                     {user?.fullName?.charAt(0)?.toUpperCase() ?? '?'}
                   </span>
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-stripe-dark truncate">{user?.fullName}</p>
-                  <p className="text-xs text-stripe-gray truncate">{user?.email}</p>
+                  <p className="text-sm font-semibold text-nx-dark truncate">{user?.fullName}</p>
+                  <p className="text-xs text-nx-gray truncate">{user?.email}</p>
                 </div>
                 <div className="mr-auto flex-shrink-0">
                   {user?.role !== 'USER' && (
@@ -155,37 +155,37 @@ export default function Profile() {
               {/* Edit form */}
               <form onSubmit={handleSave} className="space-y-3">
                 <div>
-                  <label className="block text-xs text-stripe-dark font-medium mb-1">שם מלא</label>
+                  <label className="block text-xs text-nx-dark font-medium mb-1">שם מלא</label>
                   <input
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors"
                     dir="rtl"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-stripe-dark font-medium mb-1">טלפון</label>
+                  <label className="block text-xs text-nx-dark font-medium mb-1">טלפון</label>
                   <input
                     type="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="050-0000000"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors"
                     dir="rtl"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs text-stripe-dark font-medium mb-1">תפקיד</label>
+                  <label className="block text-xs text-nx-dark font-medium mb-1">תפקיד</label>
                   <input
                     type="text"
                     value={jobTitle}
                     onChange={(e) => setJobTitle(e.target.value)}
                     placeholder="למשל: מנהל שיווק"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors"
                     dir="rtl"
                   />
                 </div>
@@ -199,7 +199,7 @@ export default function Profile() {
                   disabled={isSaving || !fullName.trim()}
                   className={`w-full font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center gap-2 ${
                     !isSaving && fullName.trim()
-                      ? 'bg-stripe-purple hover:bg-stripe-purple/90 text-white'
+                      ? 'bg-nx-primary hover:bg-nx-primary/90 text-white'
                       : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                   }`}
                 >
@@ -219,8 +219,8 @@ export default function Profile() {
 
             {/* My Organizations Card */}
             <div className="bg-white rounded-xl shadow-xl border border-gray-100 p-6">
-              <h2 className="text-base font-bold text-stripe-dark mb-1">הארגונים שלי</h2>
-              <p className="text-xs text-stripe-gray mb-4">הארגונים שאתה חבר בהם ותפקידך בכל אחד</p>
+              <h2 className="text-base font-bold text-nx-dark mb-1">הארגונים שלי</h2>
+              <p className="text-xs text-nx-gray mb-4">הארגונים שאתה חבר בהם ותפקידך בכל אחד</p>
 
               {orgsLoading ? (
                 <div className="space-y-3">
@@ -235,7 +235,7 @@ export default function Profile() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                   </div>
-                  <p className="text-sm text-stripe-gray mb-3">אינך חבר באף ארגון</p>
+                  <p className="text-sm text-nx-gray mb-3">אינך חבר באף ארגון</p>
                   <p className="text-xs text-gray-400">השתמש בקישור הזמנה כדי להצטרף לארגון</p>
                 </div>
               ) : (
@@ -259,9 +259,9 @@ export default function Profile() {
 
                       {/* Org info */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-stripe-dark truncate">{m.org.name}</p>
+                        <p className="text-sm font-semibold text-nx-dark truncate">{m.org.name}</p>
                         {m.org._count && (
-                          <p className="text-xs text-stripe-gray">{m.org._count.members} חברים</p>
+                          <p className="text-xs text-nx-gray">{m.org._count.members} חברים</p>
                         )}
                       </div>
 
@@ -281,7 +281,7 @@ export default function Profile() {
       {/* Footer */}
       <div className="fixed bottom-0 left-0 right-0 z-20 py-3 px-8" dir="ltr">
         <div className="max-w-6xl mx-auto">
-          <span className="text-xs text-stripe-dark font-medium">© 2025 Nexus</span>
+          <span className="text-xs text-nx-dark font-medium">© 2025 Nexus</span>
         </div>
       </div>
     </div>

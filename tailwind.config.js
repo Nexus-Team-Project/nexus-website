@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        'stripe-purple': '#635BFF',
-        'stripe-blue': '#0A2540',
-        'stripe-dark': '#1A1F36',
+        'nx-primary': '#0EA5E9',
+        'nx-blue': '#0A2540',
+        'nx-dark': '#1A1F36',
       },
       animation: {
         'fade-in': 'fadeIn 0.6s ease-out',

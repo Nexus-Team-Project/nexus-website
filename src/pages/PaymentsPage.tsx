@@ -141,8 +141,8 @@ function Bullet({ text, icon: Icon = Check }: { text: string; icon?: React.Eleme
   const isRtl = direction === 'rtl';
   return (
     <li className={`flex items-start gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
-      <span className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-stripe-purple/10 flex items-center justify-center">
-        <Icon size={12} className="text-stripe-purple" />
+      <span className="mt-1 flex-shrink-0 w-5 h-5 rounded-full bg-nx-primary/10 flex items-center justify-center">
+        <Icon size={12} className="text-nx-primary" />
       </span>
       <span className="text-slate-600">{text}</span>
     </li>
@@ -180,7 +180,7 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
 
         {/* Header */}
         <div className="text-center mb-14">
-          <span className="inline-block bg-stripe-purple/10 text-stripe-purple text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
+          <span className="inline-block bg-nx-primary/10 text-nx-primary text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full mb-4">
             {he ? 'תמחור' : 'Pricing'}
           </span>
           <h2 className="text-3xl lg:text-4xl font-bold text-slate-900 mb-4">
@@ -196,7 +196,7 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
           <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest block mb-2">
             {he ? 'העמלה שלך' : 'Your rate'}
           </span>
-          <span className="text-8xl font-black text-stripe-purple transition-all duration-300 tabular-nums">
+          <span className="text-8xl font-black text-nx-primary transition-all duration-300 tabular-nums">
             {MILESTONES[activeIdx].pct}
           </span>
         </div>
@@ -207,7 +207,7 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
           <div className="relative h-2 bg-slate-200 rounded-full mx-8">
             {/* Fill */}
             <div
-              className="absolute inset-y-0 left-0 bg-stripe-purple rounded-full transition-all duration-300"
+              className="absolute inset-y-0 left-0 bg-nx-primary rounded-full transition-all duration-300"
               style={{ width: `${fillPct}%` }}
             />
 
@@ -226,14 +226,14 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
                   {/* dot */}
                   <div className={`w-6 h-6 rounded-full border-2 transition-all duration-300 flex items-center justify-center
                     ${reached
-                      ? 'bg-stripe-purple border-stripe-purple shadow-lg shadow-stripe-purple/40 scale-110'
-                      : 'bg-white border-slate-300 group-hover:border-stripe-purple/50'}`}
+                      ? 'bg-nx-primary border-nx-primary shadow-lg shadow-nx-primary/40 scale-110'
+                      : 'bg-white border-slate-300 group-hover:border-nx-primary/50'}`}
                   >
                     {reached && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
                   </div>
                   {/* % label above */}
                   <div className="absolute bottom-9 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
-                    <span className={`text-base font-black tabular-nums transition-colors duration-300 ${reached ? 'text-stripe-purple' : 'text-slate-300'}`}>
+                    <span className={`text-base font-black tabular-nums transition-colors duration-300 ${reached ? 'text-nx-primary' : 'text-slate-300'}`}>
                       {m.pct}
                     </span>
                   </div>
@@ -262,10 +262,10 @@ function PricingCalculatorSection({ he, signupLink }: { he: boolean; isRtl: bool
         {/* CTAs */}
         <div className="flex flex-col items-center gap-4 mt-4">
           <div className="flex flex-wrap justify-center gap-4">
-            <Link to={signupLink} className="inline-flex items-center gap-2 bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors">
+            <Link to={signupLink} className="inline-flex items-center gap-2 bg-nx-primary text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors">
               {he ? 'התחילו עכשיו' : 'Get Started'}
             </Link>
-            <Link to={signupLink} className="inline-flex items-center gap-2 border-2 border-stripe-purple text-stripe-purple font-semibold px-10 py-3 rounded-xl hover:bg-stripe-purple/5 transition-colors">
+            <Link to={signupLink} className="inline-flex items-center gap-2 border-2 border-nx-primary text-nx-primary font-semibold px-10 py-3 rounded-xl hover:bg-nx-primary/5 transition-colors">
               {he ? 'הצעה מותאמת' : 'Custom Quote'}
             </Link>
           </div>
@@ -339,7 +339,7 @@ export default function PaymentsPage() {
               <div className="text-right">
 
                 {/* Label chip */}
-                <div className={`inline-flex items-center gap-2 bg-stripe-purple/10 border border-stripe-purple/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 text-stripe-purple ${isRtl ? '' : 'flex-row-reverse'}`}>
+                <div className={`inline-flex items-center gap-2 bg-nx-primary/10 border border-nx-primary/20 rounded-full px-4 py-1.5 text-sm font-medium mb-6 text-nx-primary ${isRtl ? '' : 'flex-row-reverse'}`}>
                   <CreditCard size={13} />
                   <span>{he ? 'סליקה' : 'Payments'}</span>
                 </div>
@@ -366,7 +366,7 @@ export default function PaymentsPage() {
                     : ['Credit & digital wallet processing', 'Subscriptions & recurring payments', 'Payment links & Checkout pages', 'Sell within communities and organizations']
                   ).map((item) => (
                     <li key={item} className={`flex items-center gap-3 ${isRtl ? '' : 'flex-row-reverse'}`}>
-                      <Check size={16} className="text-stripe-purple flex-shrink-0" />
+                      <Check size={16} className="text-nx-primary flex-shrink-0" />
                       <span className="text-slate-700">{item}</span>
                     </li>
                   ))}
@@ -376,7 +376,7 @@ export default function PaymentsPage() {
                 <div className={`flex flex-wrap gap-4 ${isRtl ? 'justify-start' : 'justify-end'}`}>
                   <Link
                     to={signupLink}
-                    className="inline-block bg-stripe-purple text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+                    className="inline-block bg-nx-primary text-white font-semibold px-8 py-3 rounded-xl hover:bg-violet-500 transition-colors"
                   >
                     {he ? 'פתחו חשבון סליקה' : 'Open a payments account'}
                   </Link>
@@ -422,7 +422,7 @@ export default function PaymentsPage() {
 
             {/* ── Text column ── */}
             <div className="text-right">
-              <p className="text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4">
+              <p className="text-nx-primary font-semibold text-sm uppercase tracking-wider mb-4">
                 {he ? 'תשלומים' : 'Payments'}
               </p>
               <h2 className="text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6 leading-tight">
@@ -457,7 +457,7 @@ export default function PaymentsPage() {
                   { src: '/apple-pay.png', alt: 'Apple Pay', label: 'Apple Pay' },
                   { src: '/google-pay.png', alt: 'Google Pay', label: 'Google Pay' },
                 ].map((pm) => (
-                  <BorderHighlightCard key={pm.alt} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center gap-2 hover:shadow-md hover:border-stripe-purple/30 transition-all duration-300">
+                  <BorderHighlightCard key={pm.alt} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col items-center justify-center gap-2 hover:shadow-md hover:border-nx-primary/30 transition-all duration-300">
                     <img src={pm.src} alt={pm.alt} className="h-8 object-contain" />
                     <span className="text-xs text-slate-500 font-medium">{pm.label}</span>
                   </BorderHighlightCard>
@@ -532,7 +532,7 @@ export default function PaymentsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
 
             <div className="text-right">
-              <p className={`text-stripe-purple font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? '' : 'flex-row-reverse'}`}>
+              <p className={`text-nx-primary font-semibold text-sm uppercase tracking-wider mb-4 flex items-center gap-2 ${isRtl ? '' : 'flex-row-reverse'}`}>
                 <RefreshCw size={14} />
                 {he ? 'מנויים' : 'Subscriptions'}
               </p>
@@ -582,7 +582,7 @@ export default function PaymentsPage() {
         />
         <div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[300px] rounded-full opacity-10 pointer-events-none"
-          style={{ background: 'radial-gradient(circle, #635BFF 0%, transparent 70%)' }}
+          style={{ background: 'radial-gradient(circle, #0D9488 0%, transparent 70%)' }}
         />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl ml-auto text-right">
@@ -627,13 +627,13 @@ export default function PaymentsPage() {
           <div className="flex flex-wrap gap-4 justify-center">
             <Link
               to={signupLink}
-              className="inline-block bg-stripe-purple text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors"
+              className="inline-block bg-nx-primary text-white font-semibold px-10 py-3 rounded-xl hover:bg-violet-500 transition-colors"
             >
               {he ? 'פתחו חשבון סליקה' : 'Open a payments account'}
             </Link>
             <Link
               to={signupLink}
-              className="inline-block border-2 border-stripe-purple text-stripe-purple font-semibold px-10 py-3 rounded-xl hover:bg-stripe-purple/5 transition-colors"
+              className="inline-block border-2 border-nx-primary text-nx-primary font-semibold px-10 py-3 rounded-xl hover:bg-nx-primary/5 transition-colors"
             >
               {he ? 'קבעו שיחת היכרות' : 'Schedule a call'}
             </Link>

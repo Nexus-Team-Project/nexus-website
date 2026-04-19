@@ -16,7 +16,7 @@ interface Props {
   variant?: 'default' | 'branded';
 }
 
-export default function BenefitsPhoneMockup({ orgName, orgColor = '#635bff', variant = 'default' }: Props) {
+export default function BenefitsPhoneMockup({ orgName, orgColor = '#0d9488', variant = 'default' }: Props) {
   const { language } = useLanguage();
   const he = language === 'he';
 
@@ -97,7 +97,7 @@ export default function BenefitsPhoneMockup({ orgName, orgColor = '#635bff', var
                   {variant === 'branded' ? (
                     <div style={{ width: 8, height: 8, borderRadius: 3, background: orgColor }} />
                   ) : (
-                    <div style={{ width: 8, height: 8, borderRadius: 3, background: 'linear-gradient(135deg, #635bff, #7c3aed)' }} />
+                    <div style={{ width: 8, height: 8, borderRadius: 3, background: 'linear-gradient(135deg, #0d9488, #7c3aed)' }} />
                   )}
                   <span>{variant === 'branded' && orgName ? orgName : (he ? 'מועדון הטבות' : 'Benefits Club')}</span>
                 </div>

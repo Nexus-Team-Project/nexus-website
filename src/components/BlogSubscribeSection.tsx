@@ -24,7 +24,7 @@ export default function BlogSubscribeSection() {
           {/* Column 1: Subscribe */}
           <div>
             <div className="flex items-center gap-3 mb-3">
-              <Mail className="w-5 h-5 text-[#635BFF]" />
+              <Mail className="w-5 h-5 text-[#0D9488]" />
               <h3 className="text-base font-semibold text-slate-900">
                 {isHe ? 'הירשמו לבלוג' : 'Subscribe to our blog'}
               </h3>
@@ -46,11 +46,11 @@ export default function BlogSubscribeSection() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={isHe ? 'כתובת אימייל' : 'Email address'}
-                  className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#635BFF] focus:border-transparent"
+                  className="flex-1 px-4 py-2.5 rounded-lg bg-white border border-slate-300 text-slate-900 placeholder-slate-400 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D9488] focus:border-transparent"
                 />
                 <button
                   type="submit"
-                  className="px-5 py-2.5 rounded-lg bg-[#635BFF] text-white text-sm font-medium hover:bg-[#5147e5] transition-colors cursor-pointer whitespace-nowrap"
+                  className="px-5 py-2.5 rounded-lg bg-[#0D9488] text-white text-sm font-medium hover:bg-[#5147e5] transition-colors cursor-pointer whitespace-nowrap"
                 >
                   {isHe ? 'הרשמה' : 'Subscribe'}
                 </button>

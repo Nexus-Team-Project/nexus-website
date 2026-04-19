@@ -291,7 +291,8 @@ function App() {
           <Route path="/he/accessibility" element={<LanguageProvider language="he"><AccessibilityPage /></LanguageProvider>} />
           <Route path="/terms"       element={<LanguageGate><LanguageProvider language="en"><TermsOfUsePage /></LanguageProvider></LanguageGate>} />
           <Route path="/he/terms"    element={<LanguageProvider language="he"><TermsOfUsePage /></LanguageProvider>} />
-          <Route path="/he/welfare"  element={<NexusLandingPage />} />
+          <Route path="/welfare"     element={<LanguageGate><LanguageProvider language="en"><NexusLandingPage /></LanguageProvider></LanguageGate>} />
+          <Route path="/he/welfare"  element={<LanguageProvider language="he"><NexusLandingPage /></LanguageProvider>} />
           <Route path="/docs"        element={<LanguageGate><LanguageProvider language="en"><ApiDocsPage /></LanguageProvider></LanguageGate>} />
           <Route path="/he/docs"     element={<LanguageProvider language="he"><ApiDocsPage /></LanguageProvider>} />
           <Route path="/changelog"   element={<LanguageGate><ChangelogPage /></LanguageGate>} />

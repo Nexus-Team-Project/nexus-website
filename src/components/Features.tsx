@@ -114,11 +114,11 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
   }, [isPulsing]);
 
   return (
-    <BorderHighlightCard className={`order-1 md:order-none feature-expandable md:col-span-7 md:row-span-1 md:col-start-6 group overflow-hidden bg-gradient-to-br from-purple-50 via-white to-blue-50 rounded-lg border border-slate-200 shadow-sm transition-all duration-500 ${isGlobeHovered ? 'md:-translate-y-20' : ''} ${isMobileActive ? 'mobile-active' : ''}`} onClick={onMobileClick}>
+    <BorderHighlightCard className={`order-1 md:order-none feature-expandable md:col-span-7 md:row-span-1 md:col-start-6 group overflow-hidden bg-gradient-to-br from-teal-50 via-white to-sky-50 rounded-lg border border-slate-200 shadow-sm transition-all duration-500 ${isGlobeHovered ? 'md:-translate-y-20' : ''} ${isMobileActive ? 'mobile-active' : ''}`} onClick={onMobileClick}>
       <div className="p-6 relative">
         <div className="flex justify-between items-start mb-4">
           <h3 className="text-xl font-semibold max-w-xs text-slate-900">{t.features.incentivesRewards}</h3>
-          <svg className="w-5 h-5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-teal-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
           </svg>
         </div>
@@ -208,7 +208,7 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
                 animationDelay: '0ms',
               }}
             >
-              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-purple-400 to-blue-400 flex items-center justify-center text-white text-[8px] font-bold">
+              <div className="w-5 h-5 rounded-full bg-gradient-to-br from-teal-400 to-sky-400 flex items-center justify-center text-white text-[8px] font-bold">
                 {notification.name.charAt(0)}
               </div>
               <span className="text-[10px] font-medium text-slate-700">{notification.name} redeemed!</span>
@@ -287,7 +287,7 @@ export default function Features() {
 
           {/* Card 5: Borderless money */}
           <BorderHighlightCard
-            className={`order-5 md:order-none peer/borderless borderless-shrinkable borderless-expandable md:col-span-7 md:col-start-6 group bg-gradient-to-br from-cyan-50 via-blue-50/80 to-purple-50 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 ease-out relative overflow-hidden ${expandedCard === 'borderless' ? 'mobile-active' : ''}`}
+            className={`order-5 md:order-none peer/borderless borderless-shrinkable borderless-expandable md:col-span-7 md:col-start-6 group bg-gradient-to-br from-teal-50 via-sky-50/80 to-emerald-50 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 ease-out relative overflow-hidden ${expandedCard === 'borderless' ? 'mobile-active' : ''}`}
             onMouseEnter={() => setIsGlobeHovered(true)}
             onMouseLeave={() => setIsGlobeHovered(false)}
             onClick={() => toggleCard('borderless')}
@@ -307,7 +307,7 @@ export default function Features() {
           </BorderHighlightCard>
 
           {/* Card 4: Card issuing */}
-          <BorderHighlightCard className={`order-3 md:order-none md:col-span-5 group overflow-hidden bg-gradient-to-br from-cyan-50 via-white to-blue-50 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 ease-out flex flex-col ${expandedCard === 'issuing' ? 'mobile-active' : ''}`} onClick={() => toggleCard('issuing')}>
+          <BorderHighlightCard className={`order-3 md:order-none md:col-span-5 group overflow-hidden bg-gradient-to-br from-sky-50 via-white to-teal-50 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-500 ease-out flex flex-col ${expandedCard === 'issuing' ? 'mobile-active' : ''}`} onClick={() => toggleCard('issuing')}>
             <div className="p-8">
               <div className="flex justify-between items-start">
                 <h3 className="text-xl font-semibold text-slate-900">{t.features.cardIssuing}</h3>
@@ -316,7 +316,7 @@ export default function Features() {
             </div>
             <div className="flex-grow flex items-center justify-center relative pb-12">
               <div
-                className="w-64 h-40 rounded-lg bg-gradient-to-br from-purple-400 via-pink-400 to-orange-400 relative shadow-2xl overflow-hidden group/card"
+                className="w-64 h-40 rounded-lg bg-gradient-to-br from-teal-500 via-sky-400 to-orange-400 relative shadow-2xl overflow-hidden group/card"
                 style={{
                   transformStyle: 'preserve-3d',
                   transition: 'transform 0.1s ease-out',
@@ -356,21 +356,21 @@ export default function Features() {
                   </div>
                 </div>
               </div>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl pointer-events-none"></div>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-teal-500/20 rounded-full blur-3xl pointer-events-none"></div>
             </div>
           </BorderHighlightCard>
 
           {/* Wallet Editor Card */}
-          <BorderHighlightCard className={`order-4 md:order-none peer md:col-span-7 md:row-span-2 md:col-start-6 md:h-[340px] md:hover:h-[560px] wallet-card-hover group bg-gradient-to-tr from-orange-100/50 to-orange-400/20 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-600 ease-out overflow-hidden peer-hover/borderless:translate-y-20 ${expandedCard === 'wallet' ? 'mobile-active' : ''}`} onClick={() => toggleCard('wallet')}>
+          <BorderHighlightCard className={`order-4 md:order-none peer md:col-span-7 md:row-span-2 md:col-start-6 md:h-[340px] md:hover:h-[560px] wallet-card-hover group bg-gradient-to-tr from-emerald-100/50 to-emerald-400/20 rounded-lg border border-slate-200 shadow-sm hover:shadow-md transition-all duration-600 ease-out overflow-hidden peer-hover/borderless:translate-y-20 ${expandedCard === 'wallet' ? 'mobile-active' : ''}`} onClick={() => toggleCard('wallet')}>
             <div className="pt-8 px-8 pb-2 h-full relative">
               {/* Icon - fixed top right */}
-              <svg className="absolute top-8 right-8 w-5 h-5 text-purple-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="absolute top-8 right-8 w-5 h-5 text-teal-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
               </svg>
 
               {/* Title - animated position */}
               <div className="wallet-title-animated absolute transition-all duration-600 ease-out">
-                <h3 className="font-semibold leading-tight wallet-title-text bg-gradient-to-r from-purple-600 via-pink-500 to-orange-500 bg-clip-text text-transparent pr-1">
+                <h3 className="font-semibold leading-tight wallet-title-text bg-gradient-to-r from-teal-600 via-sky-500 to-orange-500 bg-clip-text text-transparent pr-1">
                   <span className="wallet-title-3lines text-4xl">{t.features.buildCustom}<br />{t.features.custom}<br />{t.features.experiences}</span>
                   <span className="wallet-title-2lines hidden text-xl">{t.features.customExperiences}</span>
                 </h3>
@@ -390,7 +390,7 @@ export default function Features() {
               <p className="text-slate-600 mb-6">
                 {t.features.embedPaymentsDesc}
               </p>
-              <a href="#" className="text-stripe-purple font-medium flex items-center gap-1 hover:gap-2 transition-all">
+              <a href="#" className="text-teal-600 font-medium flex items-center gap-1 hover:gap-2 transition-all">
                 {t.features.learnMore} <ArrowRight className={`w-4 h-4 ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`} />
               </a>
             </div>
@@ -399,7 +399,7 @@ export default function Features() {
             <div className="md:hidden relative bg-slate-50 border-t border-slate-200" style={{ height: '200px', overflow: 'hidden' }}>
               {/* Background gradient */}
               <div className="absolute top-0 right-0 w-full h-full opacity-10 pointer-events-none overflow-hidden">
-                <div className="absolute -top-1/4 -right-1/4 w-[150%] h-[150%] bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rotate-12"></div>
+                <div className="absolute -top-1/4 -right-1/4 w-[150%] h-[150%] bg-gradient-to-br from-teal-500 via-sky-500 to-emerald-500 rotate-12"></div>
               </div>
 
               {/* Dashboard mockup illustration - always visible, fades when animation active */}
@@ -407,8 +407,8 @@ export default function Features() {
                 <div className="relative bg-white/70 backdrop-blur-md border border-white/50 rounded-2xl shadow-xl p-4 h-full">
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded bg-stripe-purple/20 flex items-center justify-center">
-                        <div className="w-3 h-3 rounded-sm bg-stripe-purple"></div>
+                      <div className="w-6 h-6 rounded bg-teal-500/20 flex items-center justify-center">
+                        <div className="w-3 h-3 rounded-sm bg-teal-500"></div>
                       </div>
                       <span className="font-semibold text-xs text-slate-900">FintechOS</span>
                     </div>
@@ -459,15 +459,15 @@ export default function Features() {
             {/* Desktop: full interactive dashboard */}
             <div className="hidden md:block md:w-2/3 relative bg-slate-50 p-6 md:p-12 overflow-hidden border-t md:border-t-0 md:border-l border-slate-200">
               <div className="absolute top-0 right-0 w-full h-full opacity-10 pointer-events-none overflow-hidden">
-                <div className="absolute -top-1/4 -right-1/4 w-[150%] h-[150%] bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rotate-12"></div>
+                <div className="absolute -top-1/4 -right-1/4 w-[150%] h-[150%] bg-gradient-to-br from-teal-500 via-sky-500 to-emerald-500 rotate-12"></div>
               </div>
 
               {/* Dashboard mockup - expands on hover */}
               <div className="relative bg-white/70 backdrop-blur-md border border-white/50 rounded-2xl shadow-xl p-6 h-full transition-all duration-500 scale-95 group-hover:scale-100">
                 <div className="flex items-center justify-between mb-8 transition-opacity duration-300 group-hover:opacity-50">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded bg-stripe-purple/20 flex items-center justify-center">
-                      <div className="w-4 h-4 rounded-sm bg-stripe-purple"></div>
+                    <div className="w-8 h-8 rounded bg-teal-500/20 flex items-center justify-center">
+                      <div className="w-4 h-4 rounded-sm bg-teal-500"></div>
                     </div>
                     <span className="font-semibold text-sm text-slate-900">FintechOS</span>
                   </div>

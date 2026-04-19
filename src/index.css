@@ -2,13 +2,13 @@
 
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --color-stripe-purple: #635bff;
-  --color-stripe-blue: #0a2540;
-  --color-stripe-cyan: #00d4ff;
-  --color-stripe-green: #7dd3a8;
-  --color-stripe-light: #f6f9fc;
-  --color-stripe-gray: #425466;
-  --color-stripe-dark: #0a2540;
+  --color-nx-primary: #0ea5e9;
+  --color-nx-blue: #0a2540;
+  --color-nx-cyan: #00d4ff;
+  --color-nx-green: #7dd3a8;
+  --color-nx-light: #f6f9fc;
+  --color-nx-gray: #425466;
+  --color-nx-dark: #0a2540;
 }
 
 html {

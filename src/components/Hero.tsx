@@ -21,8 +21,8 @@ export default function Hero() {
 
       {/* Hero Mockup - English: right, Hebrew: left */}
       <div
-        className={`absolute hidden lg:block z-50 ${direction === 'rtl' ? 'w-4/5 max-w-6xl top-20' : 'w-1/2 max-w-3xl top-32 right-0'}`}
-        style={direction === 'rtl' ? { left: '-27%' } : {}}
+        className={`absolute hidden lg:block z-50 ${direction === 'rtl' ? 'w-4/5 max-w-6xl top-20' : 'w-[90%] max-w-5xl top-28 right-0'}`}
+        style={direction === 'rtl' ? { left: '-27%' } : { transform: 'translateX(32%)' }}
       >
         <picture>
           <source
@@ -46,12 +46,6 @@ export default function Hero() {
           <div className="grid lg:grid-cols-2 gap-16 items-center">
             {/* Text content */}
             <div className={direction === 'rtl' ? 'lg:order-1' : 'lg:order-1'}>
-              <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5 mb-8">
-                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-xs text-white font-medium">New: Revenue Recognition is here</span>
-                <ArrowRight size={12} className={`text-white/70 ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`} />
-              </div>
-
               <h1 className="text-5xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-6 drop-shadow-lg">
                 {t.hero.title}
               </h1>
@@ -63,7 +57,7 @@ export default function Hero() {
               <div className="flex flex-nowrap gap-2 sm:gap-4">
                 <Link
                   to={language === 'he' ? '/he/signup' : '/signup'}
-                  className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/85 text-white font-semibold px-5 sm:px-8 py-3.5 sm:py-4 rounded-lg transition-all duration-300 hover:shadow-xl hover:shadow-stripe-purple/30 sm:hover:px-10 text-sm"
+                  className="group inline-flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/85 text-white font-semibold px-5 sm:px-8 py-3.5 sm:py-4 rounded-lg transition-all duration-300 hover:shadow-xl hover:shadow-nx-primary/30 sm:hover:px-10 text-sm"
                   onClick={() => track(MARKETING.HERO_CTA_CLICKED, 'MARKETING', { button_text: t.hero.startNow, page_path: window.location.pathname })}
                 >
                   {t.hero.startNow}

@@ -58,14 +58,14 @@ export default function CTA() {
     <section className="relative pt-32 pb-32 -mt-24 overflow-hidden">
       {/* Diagonal slanted background */}
       <div
-        className="absolute inset-0 bg-stripe-blue"
+        className="absolute inset-0 bg-nx-blue"
         style={{
           clipPath: direction === 'rtl'
             ? 'polygon(0 0, 100% 100px, 100% 100%, 0 100%)'
             : 'polygon(0 100px, 100% 0, 100% 100%, 0 100%)',
         }}
       >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-stripe-purple/20 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-nx-primary/20 rounded-full blur-3xl" />
       </div>
 
       <div className="max-w-7xl mx-auto px-6 relative">
@@ -85,7 +85,7 @@ export default function CTA() {
             <div className="flex flex-wrap gap-4">
               <Link
                 to={language === 'he' ? '/he/signup' : '/signup'}
-                className="group inline-flex items-center gap-2 bg-stripe-purple hover:bg-stripe-purple/90 text-white font-medium px-8 py-4 rounded-lg transition-all hover:shadow-xl hover:shadow-stripe-purple/25 text-sm"
+                className="group inline-flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white font-medium px-8 py-4 rounded-lg transition-all hover:shadow-xl hover:shadow-nx-primary/25 text-sm"
                 onClick={() => track(MARKETING.HERO_CTA_CLICKED, 'MARKETING', { button_text: t.cta.startBuilding, variant: 'cta_section' })}
               >
                 {t.cta.startBuilding}

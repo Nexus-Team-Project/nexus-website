@@ -103,7 +103,7 @@ export default function BlogListContent() {
                   >
                     {categoryLabel(featured.category)}
                   </span>
-                  <h2 className="text-2xl font-bold text-slate-900 mb-3 group-hover:text-[#635BFF] transition-colors">
+                  <h2 className="text-2xl font-bold text-slate-900 mb-3 group-hover:text-[#0D9488] transition-colors">
                     {featured.title}
                   </h2>
                   <p className="text-slate-600 mb-4 line-clamp-3">{featured.excerpt}</p>
@@ -136,7 +136,7 @@ export default function BlogListContent() {
                 onClick={() => setActiveCategory(cat)}
                 className={`px-5 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
                   activeCategory === cat
-                    ? 'border-[#635BFF] text-[#635BFF]'
+                    ? 'border-[#0D9488] text-[#0D9488]'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
                 }`}
               >
@@ -218,7 +218,7 @@ function ArticleCard({
         >
           {categoryLabel}
         </span>
-        <h3 className="text-lg font-semibold text-slate-900 mb-2 group-hover:text-[#635BFF] transition-colors line-clamp-2">
+        <h3 className="text-lg font-semibold text-slate-900 mb-2 group-hover:text-[#0D9488] transition-colors line-clamp-2">
           {article.title}
         </h3>
         <p className="text-sm text-slate-600 mb-4 line-clamp-3 flex-1">
@@ -230,7 +230,7 @@ function ArticleCard({
             <Clock className="w-3.5 h-3.5" />
             {article.readTime} {language === 'he' ? 'דק\'' : 'min'}
           </span>
-          <span className="flex items-center gap-1 text-[#635BFF] font-medium group-hover:gap-2 transition-all">
+          <span className="flex items-center gap-1 text-[#0D9488] font-medium group-hover:gap-2 transition-all">
             {language === 'he' ? 'קרא עוד' : 'Read more'}
             <ArrowRight className={`w-4 h-4 ${language === 'he' ? 'rotate-180' : ''}`} />
           </span>

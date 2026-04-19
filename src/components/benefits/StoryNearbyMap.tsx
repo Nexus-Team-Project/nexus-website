@@ -46,7 +46,7 @@ const userIcon = L.divIcon({
   html: `<div style="position:relative;width:20px;height:20px;">
     <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(99,91,255,0.4);animation:nearbyPulse 2s ease-out infinite;"></div>
     <div style="position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(99,91,255,0.3);animation:nearbyPulse 2s ease-out infinite 1s;"></div>
-    <div style="width:20px;height:20px;background:#635bff;border:3px solid white;border-radius:50%;box-shadow:0 2px 10px rgba(99,91,255,0.5);position:relative;z-index:2;"></div>
+    <div style="width:20px;height:20px;background:#0d9488;border:3px solid white;border-radius:50%;box-shadow:0 2px 10px rgba(99,91,255,0.5);position:relative;z-index:2;"></div>
   </div>`,
   iconSize: [20, 20],
   iconAnchor: [10, 10],
@@ -69,7 +69,7 @@ function createOfferIcon(logo: string, discount: string) {
       <div style="width:44px;height:44px;border-radius:50%;background:white;box-shadow:0 4px 16px rgba(0,0,0,0.25);border:2.5px solid white;display:flex;align-items:center;justify-content:center;overflow:hidden;">
         <img src="${logo}" style="width:26px;height:26px;object-fit:contain;" />
       </div>
-      <div style="position:absolute;top:-8px;right:-14px;background:#635bff;color:white;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 8px rgba(99,91,255,0.5);line-height:1.4;">
+      <div style="position:absolute;top:-8px;right:-14px;background:#0d9488;color:white;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 8px rgba(99,91,255,0.5);line-height:1.4;">
         ${discount}
       </div>
     </div>`,
@@ -240,14 +240,14 @@ export default function StoryNearbyMap() {
                 {phase >= 3 && (
                   <Polyline
                     positions={ROUTE_COORDS}
-                    pathOptions={{ color: '#635bff', weight: 3, opacity: 0.2, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }}
+                    pathOptions={{ color: '#0d9488', weight: 3, opacity: 0.2, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }}
                   />
                 )}
 
                 {fillIndex >= 2 && (
                   <Polyline
                     positions={filledCoords}
-                    pathOptions={{ color: '#635bff', weight: 4, opacity: 0.9, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }}
+                    pathOptions={{ color: '#0d9488', weight: 4, opacity: 0.9, dashArray: '8 6', lineCap: 'round', lineJoin: 'round' }}
                   />
                 )}
 

@@ -121,7 +121,7 @@ export default function Login() {
         <div className="flex-1 flex items-start md:items-center justify-center px-8 pt-6 md:pt-0 overflow-y-auto">
           <div className="w-full max-w-md">
             <div className={`bg-white rounded-xl shadow-xl border border-gray-100 p-6 ${shouldShake ? 'animate-shake' : ''}`}>
-              <h1 className="text-xl font-bold text-stripe-dark mb-5">
+              <h1 className="text-xl font-bold text-nx-dark mb-5">
                 {t.auth.signInToAccount}
               </h1>
 
@@ -140,14 +140,14 @@ export default function Login() {
               <form className="space-y-3" onSubmit={handleSubmit}>
                 {/* Email Field */}
                 <div>
-                  <label className="block text-xs text-stripe-dark font-medium mb-1">{t.auth.email}</label>
+                  <label className="block text-xs text-nx-dark font-medium mb-1">{t.auth.email}</label>
                   <input
                     type="email"
                     name="email"
                     autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors ${
+                    className={`w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors ${
                       errors.email ? 'border-red-500' : 'border-gray-300'
                     }`}
                   />
@@ -164,8 +164,8 @@ export default function Login() {
                 {/* Password Field */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs text-stripe-dark font-medium">{t.auth.password}</label>
-                    <Link to={isHe ? '/he/forgot-password' : '/forgot-password'} className="text-[10px] font-semibold text-stripe-purple hover:text-stripe-purple/80">
+                    <label className="block text-xs text-nx-dark font-medium">{t.auth.password}</label>
+                    <Link to={isHe ? '/he/forgot-password' : '/forgot-password'} className="text-[10px] font-semibold text-nx-primary hover:text-nx-primary/80">
                       {t.auth.forgotYourPassword}
                     </Link>
                   </div>
@@ -176,7 +176,7 @@ export default function Login() {
                       autoComplete="current-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className={`w-full px-3 py-2 ${isHe ? 'pl-10' : 'pr-10'} border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple transition-colors ${
+                      className={`w-full px-3 py-2 ${isHe ? 'pl-10' : 'pr-10'} border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary transition-colors ${
                         errors.password ? 'border-red-500' : 'border-gray-300'
                       }`}
                     />
@@ -222,10 +222,10 @@ export default function Login() {
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-stripe-purple focus:ring-stripe-purple/30 cursor-pointer"
+                    className="h-4 w-4 rounded border-gray-300 text-nx-primary focus:ring-nx-primary/30 cursor-pointer"
                     id="remember-me"
                   />
-                  <label htmlFor="remember-me" className={`${isHe ? 'mr-2' : 'ml-2'} block text-sm text-stripe-gray cursor-pointer`}>
+                  <label htmlFor="remember-me" className={`${isHe ? 'mr-2' : 'ml-2'} block text-sm text-nx-gray cursor-pointer`}>
                     {t.auth.rememberMeDevice}
                   </label>
                 </div>
@@ -236,7 +236,7 @@ export default function Login() {
                   disabled={isLoading}
                   className={`w-full font-semibold py-2.5 rounded-lg transition-colors text-sm flex items-center justify-center ${
                     isFormValid && !isLoading
-                      ? 'bg-stripe-purple hover:bg-stripe-purple/90 text-white cursor-pointer'
+                      ? 'bg-nx-primary hover:bg-nx-primary/90 text-white cursor-pointer'
                       : 'bg-gray-300 text-gray-500 cursor-pointer opacity-60'
                   }`}
                 >
@@ -265,9 +265,9 @@ export default function Login() {
 
               {/* New User Link */}
               <div className="text-center mt-4 pt-4 -mx-6 -mb-6 px-6 pb-4 bg-slate-50 rounded-b-xl border-t border-gray-100">
-                <p className="text-sm text-stripe-gray">
+                <p className="text-sm text-nx-gray">
                   {t.auth.newToNexus}{' '}
-                  <Link to={signupPath} className="text-stripe-purple hover:underline font-semibold">
+                  <Link to={signupPath} className="text-nx-primary hover:underline font-semibold">
                     {t.auth.createAccountLink}
                   </Link>
                 </p>
@@ -280,8 +280,8 @@ export default function Login() {
       {/* Footer - Fixed at bottom */}
       <div className="fixed bottom-0 left-0 right-0 z-20 py-3 px-8" dir="ltr">
         <div className="max-w-6xl mx-auto flex items-center gap-6">
-          <span className="text-xs text-stripe-dark font-medium">{t.auth.copyright}</span>
-          <a href="#" className="text-xs text-stripe-dark hover:text-stripe-purple font-medium">{t.auth.privacyTerms}</a>
+          <span className="text-xs text-nx-dark font-medium">{t.auth.copyright}</span>
+          <a href="#" className="text-xs text-nx-dark hover:text-nx-primary font-medium">{t.auth.privacyTerms}</a>
         </div>
       </div>
 

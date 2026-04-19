@@ -90,7 +90,7 @@ export default function BenefitsHowItWorks() {
           <div
             className="h-full rounded-full transition-all ease-out"
             style={{
-              background: 'linear-gradient(90deg, #635bff, #7c3aed, #635bff)',
+              background: 'linear-gradient(90deg, #0d9488, #7c3aed, #0d9488)',
               width: activeStep >= 2 ? '100%' : activeStep >= 1 ? '50%' : activeStep >= 0 ? '0%' : '0%',
               transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
               transitionDelay: activeStep >= 1 ? '0.3s' : '0s',
@@ -104,7 +104,7 @@ export default function BenefitsHowItWorks() {
           <div
             className="w-full rounded-full transition-all ease-out"
             style={{
-              background: 'linear-gradient(180deg, #635bff, #7c3aed, #635bff)',
+              background: 'linear-gradient(180deg, #0d9488, #7c3aed, #0d9488)',
               height: activeStep >= 2 ? '100%' : activeStep >= 1 ? '50%' : activeStep >= 0 ? '0%' : '0%',
               transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)',
               transitionDelay: activeStep >= 1 ? '0.3s' : '0s',
@@ -137,7 +137,7 @@ export default function BenefitsHowItWorks() {
                   className="w-16 h-16 rounded-full flex items-center justify-center transition-all duration-500"
                   style={{
                     background: isActive
-                      ? 'linear-gradient(135deg, #635bff, #7c3aed)'
+                      ? 'linear-gradient(135deg, #0d9488, #7c3aed)'
                       : 'rgba(255,255,255,0.1)',
                     boxShadow: isActive
                       ? '0 8px 24px rgba(99,91,255,0.35)'

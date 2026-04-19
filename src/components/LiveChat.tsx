@@ -491,19 +491,19 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
         {/* Resize handles — desktop only */}
         <div
           onMouseDown={startResize('left')}
-          className="hidden sm:block absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-stripe-purple/20 transition-colors z-10"
+          className="hidden sm:block absolute left-0 top-0 bottom-0 w-2 cursor-ew-resize hover:bg-nx-primary/20 transition-colors z-10"
           style={{ borderRadius: '1rem 0 0 1rem' }}
         />
 
         <div
           onMouseDown={startResize('top')}
-          className="hidden sm:block absolute top-0 left-0 right-0 h-2 cursor-ns-resize hover:bg-stripe-purple/20 transition-colors z-10"
+          className="hidden sm:block absolute top-0 left-0 right-0 h-2 cursor-ns-resize hover:bg-nx-primary/20 transition-colors z-10"
           style={{ borderRadius: '1rem 1rem 0 0' }}
         />
 
         <div
           onMouseDown={startResize('top-left')}
-          className="hidden sm:block absolute top-0 left-0 w-8 h-8 cursor-nwse-resize hover:bg-stripe-purple/30 transition-colors z-20"
+          className="hidden sm:block absolute top-0 left-0 w-8 h-8 cursor-nwse-resize hover:bg-nx-primary/30 transition-colors z-20"
           style={{ borderRadius: '1rem 0 0 0' }}
         />
 
@@ -574,7 +574,7 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
                   style={
                     message.sender === 'user'
                       ? {
-                          background: 'linear-gradient(180deg, #635BFF 0%, #5348E6 100%)',
+                          background: 'linear-gradient(180deg, #0D9488 0%, #5348E6 100%)',
                           boxShadow: '0 2px 8px rgba(99, 91, 255, 0.2)',
                         }
                       : {
@@ -596,7 +596,7 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all hover:shadow-sm"
                         style={{
                           background: 'rgba(99, 91, 255, 0.08)',
-                          color: '#635BFF',
+                          color: '#0D9488',
                           border: '1px solid rgba(99, 91, 255, 0.2)',
                         }}
                         onMouseEnter={(e) => {
@@ -663,7 +663,7 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
                     setShowQuickActions(false);
                     action.action();
                   }}
-                  className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all active:scale-95 hover:border-stripe-purple/40 hover:shadow-sm"
+                  className="px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all active:scale-95 hover:border-nx-primary/40 hover:shadow-sm"
                   style={{
                     background: 'rgba(255, 255, 255, 0.9)',
                     border: '1px solid rgba(0, 0, 0, 0.08)',
@@ -709,7 +709,7 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
         {/* Input */}
         <footer className="px-6 pb-4 pt-3">
           <div
-            className="group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all focus-within:ring-2 focus-within:ring-stripe-purple/20"
+            className="group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all focus-within:ring-2 focus-within:ring-nx-primary/20"
             style={{
               background: 'rgba(255, 255, 255, 0.7)',
               border: '1px solid rgba(0, 0, 0, 0.06)',
@@ -726,7 +726,7 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
             <button
               onClick={handleSend}
               disabled={!inputValue.trim()}
-              className="bg-stripe-purple text-white w-8 h-8 rounded-full flex items-center justify-center shadow-sm hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="bg-nx-primary text-white w-8 h-8 rounded-full flex items-center justify-center shadow-sm hover:brightness-110 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send size={14} className={isRtl ? 'rotate-180' : ''} />
             </button>

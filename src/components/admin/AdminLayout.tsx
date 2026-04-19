@@ -41,7 +41,7 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-stripe-light" dir={dir}>
+    <div className="flex h-screen overflow-hidden bg-nx-light" dir={dir}>
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -88,7 +88,7 @@ export default function AdminLayout() {
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all
                   ${active
-                    ? 'bg-gray-800 text-white border-stripe-purple ' + (isHe ? 'border-r-2' : 'border-l-2')
+                    ? 'bg-gray-800 text-white border-nx-primary ' + (isHe ? 'border-r-2' : 'border-l-2')
                     : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
                   }
                 `}
@@ -103,7 +103,7 @@ export default function AdminLayout() {
         {/* User info + Logout */}
         <div className="px-3 py-4 border-t border-gray-800">
           <div className="flex items-center gap-3 px-3 py-2 mb-2">
-            <div className="w-8 h-8 rounded-full bg-stripe-purple/20 flex items-center justify-center text-stripe-purple text-xs font-bold">
+            <div className="w-8 h-8 rounded-full bg-nx-primary/20 flex items-center justify-center text-nx-primary text-xs font-bold">
               {user?.fullName?.charAt(0)?.toUpperCase() ?? '?'}
             </div>
             <div className="flex-1 min-w-0">
@@ -129,7 +129,7 @@ export default function AdminLayout() {
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg border border-gray-200 bg-white hover:border-gray-300 transition-all"
           >
-            <Menu size={18} className="text-stripe-gray" />
+            <Menu size={18} className="text-nx-gray" />
           </button>
           <Link to={basePath} dir="ltr">
             <NexusLogo height={28} variant="black" page="auth" />

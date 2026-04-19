@@ -383,10 +383,10 @@ export default function SeoAnalyticsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-stripe-dark">
+          <h1 className="text-2xl font-bold text-nx-dark">
             {isHe ? 'אנליטיקס SEO' : 'SEO Analytics'}
           </h1>
-          <p className="text-sm text-stripe-gray mt-1">
+          <p className="text-sm text-nx-gray mt-1">
             {isHe ? 'נתונים מ-Google Search Console, Analytics ו-Trends' : 'Data from Google Search Console, Analytics & Trends'}
           </p>
         </div>
@@ -407,8 +407,8 @@ export default function SeoAnalyticsPage() {
                 }}
                 className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5 ${
                   days === opt.value
-                    ? 'bg-white text-stripe-dark shadow-sm'
-                    : 'text-stripe-gray hover:text-stripe-dark'
+                    ? 'bg-white text-nx-dark shadow-sm'
+                    : 'text-nx-gray hover:text-nx-dark'
                 }`}
               >
                 {opt.value === 'custom' && <Calendar size={12} />}
@@ -423,12 +423,12 @@ export default function SeoAnalyticsPage() {
               ref={customPickerRef}
               className="absolute top-full right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg p-4 z-50 min-w-[280px]"
             >
-              <p className="text-xs font-medium text-stripe-gray mb-3">
+              <p className="text-xs font-medium text-nx-gray mb-3">
                 {isHe ? 'בחר טווח תאריכים' : 'Select date range'}
               </p>
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs text-stripe-gray mb-1">
+                  <label className="block text-xs text-nx-gray mb-1">
                     {isHe ? 'מתאריך' : 'Start date'}
                   </label>
                   <input
@@ -436,11 +436,11 @@ export default function SeoAnalyticsPage() {
                     value={customStart}
                     max={customEnd}
                     onChange={(e) => setCustomStart(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-stripe-dark focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-nx-dark focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-stripe-gray mb-1">
+                  <label className="block text-xs text-nx-gray mb-1">
                     {isHe ? 'עד תאריך' : 'End date'}
                   </label>
                   <input
@@ -449,16 +449,16 @@ export default function SeoAnalyticsPage() {
                     min={customStart}
                     max={today}
                     onChange={(e) => setCustomEnd(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-stripe-dark focus:outline-none focus:ring-2 focus:ring-stripe-purple/30 focus:border-stripe-purple"
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-nx-dark focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary"
                   />
                 </div>
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-[10px] text-stripe-gray">
+                  <span className="text-[10px] text-nx-gray">
                     {isHe ? 'GSC מוגבל ל-90 יום' : 'GSC limited to 90 days'}
                   </span>
                   <button
                     onClick={applyCustomRange}
-                    className="px-4 py-1.5 bg-stripe-purple text-white text-xs font-medium rounded-lg hover:bg-stripe-purple/90 transition-colors"
+                    className="px-4 py-1.5 bg-nx-primary text-white text-xs font-medium rounded-lg hover:bg-nx-primary/90 transition-colors"
                   >
                     {isHe ? 'החל' : 'Apply'}
                   </button>
@@ -471,14 +471,14 @@ export default function SeoAnalyticsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 size={32} className="animate-spin text-stripe-purple" />
+          <Loader2 size={32} className="animate-spin text-nx-primary" />
         </div>
       ) : (
         <div className="space-y-8">
           {/* ─── GSC Overview KPIs ──────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-stripe-dark mb-4 flex items-center gap-2">
-              <Search size={18} className="text-stripe-purple" />
+            <h2 className="text-lg font-semibold text-nx-dark mb-4 flex items-center gap-2">
+              <Search size={18} className="text-nx-primary" />
               Google Search Console
             </h2>
             {errors.gscOverview ? (
@@ -489,7 +489,7 @@ export default function SeoAnalyticsPage() {
                   label={isHe ? 'קליקים' : 'Clicks'}
                   value={formatNumber(gscOverview.clicks)}
                   icon={MousePointerClick}
-                  color="#635bff"
+                  color="#0d9488"
                 />
                 <KpiCard
                   label={isHe ? 'חשיפות' : 'Impressions'}
@@ -515,7 +515,7 @@ export default function SeoAnalyticsPage() {
 
           {/* ─── Top Queries ────────────────────────────────── */}
           <section>
-            <h2 className="text-base font-semibold text-stripe-dark mb-3">
+            <h2 className="text-base font-semibold text-nx-dark mb-3">
               {isHe ? 'שאילתות מובילות' : 'Top Queries'}
             </h2>
             {errors.gscQueries ? (
@@ -526,27 +526,27 @@ export default function SeoAnalyticsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/50">
-                        <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                        <th className="text-start px-4 py-2.5 font-medium text-nx-gray">
                           {isHe ? 'שאילתה' : 'Query'}
                         </th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'קליקים' : 'Clicks'}</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'חשיפות' : 'Impr.'}</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">CTR</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'מיקום' : 'Pos.'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'קליקים' : 'Clicks'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'חשיפות' : 'Impr.'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">CTR</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'מיקום' : 'Pos.'}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {gscQueries.map((q, i) => (
                         <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className="px-4 py-2.5 font-medium text-stripe-dark max-w-xs truncate">{q.query}</td>
+                          <td className="px-4 py-2.5 font-medium text-nx-dark max-w-xs truncate">{q.query}</td>
                           <td className="px-4 py-2.5 text-end tabular-nums">{formatNumber(q.clicks)}</td>
-                          <td className="px-4 py-2.5 text-end tabular-nums text-stripe-gray">{formatNumber(q.impressions)}</td>
-                          <td className="px-4 py-2.5 text-end tabular-nums text-stripe-gray">{q.ctr.toFixed(1)}%</td>
-                          <td className="px-4 py-2.5 text-end tabular-nums text-stripe-gray">{q.position.toFixed(1)}</td>
+                          <td className="px-4 py-2.5 text-end tabular-nums text-nx-gray">{formatNumber(q.impressions)}</td>
+                          <td className="px-4 py-2.5 text-end tabular-nums text-nx-gray">{q.ctr.toFixed(1)}%</td>
+                          <td className="px-4 py-2.5 text-end tabular-nums text-nx-gray">{q.position.toFixed(1)}</td>
                         </tr>
                       ))}
                       {gscQueries.length === 0 && (
-                        <tr><td colSpan={5} className="px-4 py-8 text-center text-stripe-gray text-xs">{isHe ? 'אין נתונים' : 'No data'}</td></tr>
+                        <tr><td colSpan={5} className="px-4 py-8 text-center text-nx-gray text-xs">{isHe ? 'אין נתונים' : 'No data'}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -557,7 +557,7 @@ export default function SeoAnalyticsPage() {
 
           {/* ─── Top Pages ──────────────────────────────────── */}
           <section>
-            <h2 className="text-base font-semibold text-stripe-dark mb-3">
+            <h2 className="text-base font-semibold text-nx-dark mb-3">
               {isHe ? 'עמודים מובילים' : 'Top Pages'}
             </h2>
             {errors.gscPages ? (
@@ -568,27 +568,27 @@ export default function SeoAnalyticsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/50">
-                        <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                        <th className="text-start px-4 py-2.5 font-medium text-nx-gray">
                           {isHe ? 'עמוד' : 'Page'}
                         </th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'קליקים' : 'Clicks'}</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'חשיפות' : 'Impr.'}</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">CTR</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'מיקום' : 'Pos.'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'קליקים' : 'Clicks'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'חשיפות' : 'Impr.'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">CTR</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'מיקום' : 'Pos.'}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {gscPages.map((p, i) => (
                         <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className="px-4 py-2.5 font-medium text-stripe-dark max-w-md truncate" dir="ltr">{p.page}</td>
+                          <td className="px-4 py-2.5 font-medium text-nx-dark max-w-md truncate" dir="ltr">{p.page}</td>
                           <td className="px-4 py-2.5 text-end tabular-nums">{formatNumber(p.clicks)}</td>
-                          <td className="px-4 py-2.5 text-end tabular-nums text-stripe-gray">{formatNumber(p.impressions)}</td>
-                          <td className="px-4 py-2.5 text-end tabular-nums text-stripe-gray">{p.ctr.toFixed(1)}%</td>
-                          <td className="px-4 py-2.5 text-end tabular-nums text-stripe-gray">{p.position.toFixed(1)}</td>
+                          <td className="px-4 py-2.5 text-end tabular-nums text-nx-gray">{formatNumber(p.impressions)}</td>
+                          <td className="px-4 py-2.5 text-end tabular-nums text-nx-gray">{p.ctr.toFixed(1)}%</td>
+                          <td className="px-4 py-2.5 text-end tabular-nums text-nx-gray">{p.position.toFixed(1)}</td>
                         </tr>
                       ))}
                       {gscPages.length === 0 && (
-                        <tr><td colSpan={5} className="px-4 py-8 text-center text-stripe-gray text-xs">{isHe ? 'אין נתונים' : 'No data'}</td></tr>
+                        <tr><td colSpan={5} className="px-4 py-8 text-center text-nx-gray text-xs">{isHe ? 'אין נתונים' : 'No data'}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -599,7 +599,7 @@ export default function SeoAnalyticsPage() {
 
           {/* ─── GA4 Overview ───────────────────────────────── */}
           <section>
-            <h2 className="text-lg font-semibold text-stripe-dark mb-4 flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-nx-dark mb-4 flex items-center gap-2">
               <BarChart3 size={18} className="text-emerald-600" />
               Google Analytics
             </h2>
@@ -611,7 +611,7 @@ export default function SeoAnalyticsPage() {
                   label={isHe ? 'סשנים' : 'Sessions'}
                   value={formatNumber(ga4Overview.sessions)}
                   icon={Globe}
-                  color="#635bff"
+                  color="#0d9488"
                 />
                 <KpiCard
                   label={isHe ? 'משתמשים' : 'Users'}
@@ -637,7 +637,7 @@ export default function SeoAnalyticsPage() {
 
           {/* ─── Traffic Sources ─────────────────────────────── */}
           <section>
-            <h2 className="text-base font-semibold text-stripe-dark mb-3">
+            <h2 className="text-base font-semibold text-nx-dark mb-3">
               {isHe ? 'מקורות תנועה' : 'Traffic Sources'}
             </h2>
             {errors.trafficSources ? (
@@ -648,21 +648,21 @@ export default function SeoAnalyticsPage() {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50/50">
-                        <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'ערוץ' : 'Channel'}</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'סשנים' : 'Sessions'}</th>
-                        <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">{isHe ? 'משתמשים' : 'Users'}</th>
+                        <th className="text-start px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'ערוץ' : 'Channel'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'סשנים' : 'Sessions'}</th>
+                        <th className="text-end px-4 py-2.5 font-medium text-nx-gray">{isHe ? 'משתמשים' : 'Users'}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {trafficSources.map((s, i) => (
                         <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                          <td className="px-4 py-2.5 font-medium text-stripe-dark">{s.source}</td>
+                          <td className="px-4 py-2.5 font-medium text-nx-dark">{s.source}</td>
                           <td className="px-4 py-2.5 text-end tabular-nums">{formatNumber(s.sessions)}</td>
-                          <td className="px-4 py-2.5 text-end tabular-nums text-stripe-gray">{formatNumber(s.users)}</td>
+                          <td className="px-4 py-2.5 text-end tabular-nums text-nx-gray">{formatNumber(s.users)}</td>
                         </tr>
                       ))}
                       {trafficSources.length === 0 && (
-                        <tr><td colSpan={3} className="px-4 py-8 text-center text-stripe-gray text-xs">{isHe ? 'אין נתונים' : 'No data'}</td></tr>
+                        <tr><td colSpan={3} className="px-4 py-8 text-center text-nx-gray text-xs">{isHe ? 'אין נתונים' : 'No data'}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -673,7 +673,7 @@ export default function SeoAnalyticsPage() {
 
           {/* ─── Devices ────────────────────────────────────── */}
           <section>
-            <h2 className="text-base font-semibold text-stripe-dark mb-3">
+            <h2 className="text-base font-semibold text-nx-dark mb-3">
               {isHe ? 'מכשירים' : 'Devices'}
             </h2>
             {errors.devices ? (
@@ -687,12 +687,12 @@ export default function SeoAnalyticsPage() {
                   return (
                     <div key={i} className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
                       <div className="flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-lg bg-stripe-purple/10 flex items-center justify-center">
-                          <Icon size={20} className="text-stripe-purple" />
+                        <div className="w-10 h-10 rounded-lg bg-nx-primary/10 flex items-center justify-center">
+                          <Icon size={20} className="text-nx-primary" />
                         </div>
-                        <div className="text-sm font-semibold text-stripe-dark capitalize">{d.device}</div>
+                        <div className="text-sm font-semibold text-nx-dark capitalize">{d.device}</div>
                       </div>
-                      <div className="flex items-center gap-4 text-xs text-stripe-gray">
+                      <div className="flex items-center gap-4 text-xs text-nx-gray">
                         <span>{formatNumber(d.sessions)} {isHe ? 'סשנים' : 'sessions'}</span>
                         <span>{formatNumber(d.users)} {isHe ? 'משתמשים' : 'users'}</span>
                       </div>
@@ -700,7 +700,7 @@ export default function SeoAnalyticsPage() {
                   );
                 })}
                 {devices.length === 0 && (
-                  <div className="col-span-3 text-center py-8 text-stripe-gray text-xs">
+                  <div className="col-span-3 text-center py-8 text-nx-gray text-xs">
                     {isHe ? 'אין נתונים' : 'No data'}
                   </div>
                 )}
@@ -711,14 +711,14 @@ export default function SeoAnalyticsPage() {
           {/* ─── Google Trends & Event Detection ─────────────── */}
           <section>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-              <h2 className="text-lg font-semibold text-stripe-dark flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-nx-dark flex items-center gap-2">
                 <TrendingUp size={18} className="text-orange-500" />
                 {isHe ? 'מגמות חיפוש וזיהוי אירועים' : 'Search Trends & Event Detection'}
               </h2>
               <button
                 onClick={runTrendsAnalysis}
                 disabled={trendsAnalysisLoading}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-stripe-purple text-white hover:bg-stripe-purple/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all self-start sm:self-auto"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-nx-primary text-white hover:bg-nx-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all self-start sm:self-auto"
               >
                 {trendsAnalysisLoading ? (
                   <>
@@ -740,52 +740,52 @@ export default function SeoAnalyticsPage() {
             ) : trendsAnalysis ? (
               <div className="space-y-4 mb-8">
                 {/* Summary banner */}
-                <div className="bg-gradient-to-r from-stripe-purple/5 to-orange-50 border border-stripe-purple/10 rounded-xl p-4">
+                <div className="bg-gradient-to-r from-nx-primary/5 to-orange-50 border border-nx-primary/10 rounded-xl p-4">
                   <div className="flex flex-wrap gap-4 mb-3">
                     <div className="flex items-center gap-2 text-sm">
-                      <Activity size={14} className="text-stripe-purple" />
-                      <span className="text-stripe-gray">{isHe ? 'אותות:' : 'Signals:'}</span>
-                      <span className="font-semibold text-stripe-dark">{trendsAnalysis.signalsProcessed}</span>
+                      <Activity size={14} className="text-nx-primary" />
+                      <span className="text-nx-gray">{isHe ? 'אותות:' : 'Signals:'}</span>
+                      <span className="font-semibold text-nx-dark">{trendsAnalysis.signalsProcessed}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Zap size={14} className="text-orange-500" />
-                      <span className="text-stripe-gray">{isHe ? 'אירועים:' : 'Events:'}</span>
-                      <span className="font-semibold text-stripe-dark">{trendsAnalysis.eventsDetected}</span>
+                      <span className="text-nx-gray">{isHe ? 'אירועים:' : 'Events:'}</span>
+                      <span className="font-semibold text-nx-dark">{trendsAnalysis.eventsDetected}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Target size={14} className="text-emerald-600" />
-                      <span className="text-stripe-gray">{isHe ? 'הזדמנויות:' : 'Opportunities:'}</span>
-                      <span className="font-semibold text-stripe-dark">{trendsAnalysis.opportunityCount}</span>
+                      <span className="text-nx-gray">{isHe ? 'הזדמנויות:' : 'Opportunities:'}</span>
+                      <span className="font-semibold text-nx-dark">{trendsAnalysis.opportunityCount}</span>
                     </div>
                   </div>
                   {trendsAnalysisSummary && (
-                    <p className="text-sm text-stripe-dark/80 leading-relaxed">{trendsAnalysisSummary}</p>
+                    <p className="text-sm text-nx-dark/80 leading-relaxed">{trendsAnalysisSummary}</p>
                   )}
                 </div>
 
                 {/* ── Signals table ─────────────────────────── */}
                 {trendsAnalysis.signals?.length > 0 && (
                   <div>
-                    <h3 className="text-sm font-semibold text-stripe-dark mb-2 flex items-center gap-2">
-                      <Activity size={14} className="text-stripe-purple" />
+                    <h3 className="text-sm font-semibold text-nx-dark mb-2 flex items-center gap-2">
+                      <Activity size={14} className="text-nx-primary" />
                       {isHe ? 'סיגנלים שזוהו' : 'Detected Signals'}
-                      <span className="text-[10px] font-normal text-stripe-gray">({trendsAnalysis.signals.length})</span>
+                      <span className="text-[10px] font-normal text-nx-gray">({trendsAnalysis.signals.length})</span>
                     </h3>
                     <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-gray-100 bg-gray-50/50">
-                              <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                              <th className="text-start px-4 py-2.5 font-medium text-nx-gray">
                                 {isHe ? 'שאילתה / נושא' : 'Query / Topic'}
                               </th>
-                              <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                              <th className="text-start px-4 py-2.5 font-medium text-nx-gray">
                                 {isHe ? 'מקור' : 'Source'}
                               </th>
-                              <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">
+                              <th className="text-end px-4 py-2.5 font-medium text-nx-gray">
                                 {isHe ? 'צמיחה' : 'Growth'}
                               </th>
-                              <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                              <th className="text-start px-4 py-2.5 font-medium text-nx-gray">
                                 {isHe ? 'הקשר' : 'Context'}
                               </th>
                             </tr>
@@ -793,7 +793,7 @@ export default function SeoAnalyticsPage() {
                           <tbody>
                             {trendsAnalysis.signals.map((sig, si) => (
                               <tr key={si} className="border-b border-gray-50 hover:bg-gray-50/50">
-                                <td className="px-4 py-2.5 font-medium text-stripe-dark max-w-xs">
+                                <td className="px-4 py-2.5 font-medium text-nx-dark max-w-xs">
                                   {sig.query}
                                 </td>
                                 <td className="px-4 py-2.5">
@@ -816,7 +816,7 @@ export default function SeoAnalyticsPage() {
                                     {sig.growth}
                                   </span>
                                 </td>
-                                <td className="px-4 py-2.5 text-xs text-stripe-gray max-w-xs truncate">
+                                <td className="px-4 py-2.5 text-xs text-nx-gray max-w-xs truncate">
                                   {sig.context ?? sig.keyword ?? (sig.related?.slice(0, 2).join(', ')) ?? '—'}
                                 </td>
                               </tr>
@@ -829,10 +829,10 @@ export default function SeoAnalyticsPage() {
                 )}
 
                 {/* ── Event cards ─────────────────────────────── */}
-                <h3 className="text-sm font-semibold text-stripe-dark flex items-center gap-2 mt-2">
+                <h3 className="text-sm font-semibold text-nx-dark flex items-center gap-2 mt-2">
                   <Zap size={14} className="text-orange-500" />
                   {isHe ? 'אירועים שזוהו' : 'Detected Events'}
-                  <span className="text-[10px] font-normal text-stripe-gray">({trendsAnalysis.eventsDetected})</span>
+                  <span className="text-[10px] font-normal text-nx-gray">({trendsAnalysis.eventsDetected})</span>
                 </h3>
                 {trendsAnalysis.events.length > 0 ? (
                   <div className="space-y-4">
@@ -841,7 +841,7 @@ export default function SeoAnalyticsPage() {
                         {/* Event header */}
                         <div className="p-5 border-b border-gray-50">
                           <div className="flex items-start justify-between mb-2">
-                            <h3 className="text-base font-semibold text-stripe-dark">{event.event_name}</h3>
+                            <h3 className="text-base font-semibold text-nx-dark">{event.event_name}</h3>
                             <div className="flex items-center gap-2 shrink-0">
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                                 event.type === 'seasonal' ? 'bg-blue-100 text-blue-700' :
@@ -852,15 +852,15 @@ export default function SeoAnalyticsPage() {
                                  event.type === 'news-driven' ? (isHe ? 'חדשות' : 'News') :
                                  (isHe ? 'מגמה' : 'Trend')}
                               </span>
-                              <span className="text-[10px] text-stripe-gray">{event.duration_estimate}</span>
+                              <span className="text-[10px] text-nx-gray">{event.duration_estimate}</span>
                             </div>
                           </div>
-                          <p className="text-sm text-stripe-gray mb-3">{event.insight}</p>
+                          <p className="text-sm text-nx-gray mb-3">{event.insight}</p>
 
                           {/* Query tags */}
                           <div className="flex flex-wrap gap-1.5 mb-3">
                             {event.queries.map((q, qi) => (
-                              <span key={qi} className="px-2 py-0.5 rounded-md bg-gray-100 text-xs text-stripe-dark">
+                              <span key={qi} className="px-2 py-0.5 rounded-md bg-gray-100 text-xs text-nx-dark">
                                 {q}
                               </span>
                             ))}
@@ -878,28 +878,28 @@ export default function SeoAnalyticsPage() {
                         {/* Opportunities */}
                         {event.opportunities?.length > 0 && (
                           <div className="p-5 bg-gray-50/30">
-                            <p className="text-xs font-medium text-stripe-gray mb-3">
+                            <p className="text-xs font-medium text-nx-gray mb-3">
                               {isHe ? 'הזדמנויות תוכן' : 'Content Opportunities'}
                             </p>
                             <div className="space-y-3">
                               {event.opportunities.map((opp, oi) => (
                                 <div key={oi} className="bg-white border border-gray-100 rounded-lg p-4">
                                   <div className="flex items-start justify-between mb-2">
-                                    <h4 className="text-sm font-semibold text-stripe-dark leading-tight flex-1">{opp.title}</h4>
+                                    <h4 className="text-sm font-semibold text-nx-dark leading-tight flex-1">{opp.title}</h4>
                                     <span className={`shrink-0 ml-2 px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                                       opp.intent === 'transactional' ? 'bg-emerald-100 text-emerald-700' :
                                       opp.intent === 'commercial' ? 'bg-blue-100 text-blue-700' :
-                                      'bg-gray-100 text-stripe-gray'
+                                      'bg-gray-100 text-nx-gray'
                                     }`}>
                                       {opp.intent}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-stripe-gray mb-2">{opp.angle}</p>
+                                  <p className="text-xs text-nx-gray mb-2">{opp.angle}</p>
 
                                   {/* Keywords */}
                                   <div className="flex flex-wrap gap-1 mb-3">
                                     {opp.keywords.map((kw, ki) => (
-                                      <span key={ki} className="px-1.5 py-0.5 rounded bg-stripe-purple/5 text-[10px] text-stripe-purple font-medium">
+                                      <span key={ki} className="px-1.5 py-0.5 rounded bg-nx-primary/5 text-[10px] text-nx-primary font-medium">
                                         {kw}
                                       </span>
                                     ))}
@@ -910,13 +910,13 @@ export default function SeoAnalyticsPage() {
                                     {[
                                       { score: opp.scores.traffic, label: isHe ? 'תנועה' : 'Traffic', color: 'bg-blue-500' },
                                       { score: opp.scores.competition, label: isHe ? 'תחרות' : 'Competition', color: 'bg-emerald-500' },
-                                      { score: opp.scores.relevance, label: isHe ? 'רלוונטיות' : 'Relevance', color: 'bg-stripe-purple' },
+                                      { score: opp.scores.relevance, label: isHe ? 'רלוונטיות' : 'Relevance', color: 'bg-nx-primary' },
                                       { score: opp.scores.urgency, label: isHe ? 'דחיפות' : 'Urgency', color: 'bg-orange-500' },
                                     ].map((s, si) => (
                                       <div key={si}>
                                         <div className="flex items-center justify-between mb-0.5">
-                                          <span className="text-[10px] text-stripe-gray">{s.label}</span>
-                                          <span className="text-[10px] font-semibold text-stripe-dark">{s.score}</span>
+                                          <span className="text-[10px] text-nx-gray">{s.label}</span>
+                                          <span className="text-[10px] font-semibold text-nx-dark">{s.score}</span>
                                         </div>
                                         <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
                                           <div className={`h-full rounded-full ${s.color}`} style={{ width: `${s.score * 10}%` }} />
@@ -933,7 +933,7 @@ export default function SeoAnalyticsPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-stripe-gray text-xs">
+                  <div className="text-center py-8 text-nx-gray text-xs">
                     {isHe ? 'לא זוהו אירועים רלוונטיים' : 'No relevant events detected'}
                   </div>
                 )}
@@ -941,22 +941,22 @@ export default function SeoAnalyticsPage() {
                 {/* Discarded signals */}
                 {trendsAnalysis.discardedSignals?.length > 0 && (
                   <div className="bg-gray-50 rounded-lg px-4 py-3">
-                    <p className="text-[10px] font-medium text-stripe-gray mb-1">
+                    <p className="text-[10px] font-medium text-nx-gray mb-1">
                       {isHe ? 'אותות שנדחו:' : 'Discarded signals:'}
                     </p>
-                    <p className="text-[10px] text-stripe-gray/70 leading-relaxed">
+                    <p className="text-[10px] text-nx-gray/70 leading-relaxed">
                       {trendsAnalysis.discardedSignals.join(' • ')}
                     </p>
                   </div>
                 )}
               </div>
             ) : !trendsAnalysisLoading ? (
-              <div className="bg-gradient-to-r from-stripe-purple/5 to-orange-50 border border-dashed border-stripe-purple/20 rounded-xl p-6 text-center mb-8">
-                <Sparkles size={24} className="text-stripe-purple mx-auto mb-2" />
-                <p className="text-sm font-medium text-stripe-dark mb-1">
+              <div className="bg-gradient-to-r from-nx-primary/5 to-orange-50 border border-dashed border-nx-primary/20 rounded-xl p-6 text-center mb-8">
+                <Sparkles size={24} className="text-nx-primary mx-auto mb-2" />
+                <p className="text-sm font-medium text-nx-dark mb-1">
                   {isHe ? 'ניתוח אירועים מבוסס AI' : 'AI-Powered Event Detection'}
                 </p>
-                <p className="text-xs text-stripe-gray">
+                <p className="text-xs text-nx-gray">
                   {isHe
                     ? 'זיהוי אירועים מעולם האמיתי מתוך מגמות חיפוש, סינון לרלוונטיות עסקית, ויצירת הזדמנויות תוכן'
                     : 'Detect real-world events from search trends, filter for business relevance, and generate content opportunities'}
@@ -967,13 +967,13 @@ export default function SeoAnalyticsPage() {
 
           {/* ─── Raw Trends Data ──────────────────────────────── */}
           <section>
-            <h3 className="text-sm font-medium text-stripe-gray mb-4 border-b border-gray-100 pb-2">
+            <h3 className="text-sm font-medium text-nx-gray mb-4 border-b border-gray-100 pb-2">
               {isHe ? 'נתוני מגמות גולמיים' : 'Raw Trends Data'}
             </h3>
             <div className="space-y-6">
               {/* Interest Over Time */}
               <div>
-                <h4 className="text-sm font-semibold text-stripe-dark mb-2">
+                <h4 className="text-sm font-semibold text-nx-dark mb-2">
                   {isHe ? 'עניין לאורך זמן' : 'Interest Over Time'}
                 </h4>
                 {errors.trendsInterest ? (
@@ -984,11 +984,11 @@ export default function SeoAnalyticsPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-gray-100 bg-gray-50/50">
-                            <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                            <th className="text-start px-4 py-2.5 font-medium text-nx-gray">
                               {isHe ? 'תאריך' : 'Date'}
                             </th>
                             {trendsInterest.keywords.map((kw) => (
-                              <th key={kw} className="text-end px-4 py-2.5 font-medium text-stripe-gray text-xs">
+                              <th key={kw} className="text-end px-4 py-2.5 font-medium text-nx-gray text-xs">
                                 {kw}
                               </th>
                             ))}
@@ -997,7 +997,7 @@ export default function SeoAnalyticsPage() {
                         <tbody>
                           {trendsInterest.timeline.slice(-12).map((entry, i) => (
                             <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                              <td className="px-4 py-2.5 text-stripe-dark text-xs tabular-nums whitespace-nowrap" dir="ltr">
+                              <td className="px-4 py-2.5 text-nx-dark text-xs tabular-nums whitespace-nowrap" dir="ltr">
                                 {entry.date}
                               </td>
                               {entry.values.map((v, j) => (
@@ -1005,11 +1005,11 @@ export default function SeoAnalyticsPage() {
                                   <div className="flex items-center justify-end gap-2">
                                     <div className="w-16 h-2 bg-gray-100 rounded-full overflow-hidden">
                                       <div
-                                        className="h-full rounded-full bg-stripe-purple/70"
+                                        className="h-full rounded-full bg-nx-primary/70"
                                         style={{ width: `${Math.min(v.value, 100)}%` }}
                                       />
                                     </div>
-                                    <span className="text-xs tabular-nums text-stripe-gray w-6 text-end">
+                                    <span className="text-xs tabular-nums text-nx-gray w-6 text-end">
                                       {v.value}
                                     </span>
                                   </div>
@@ -1022,7 +1022,7 @@ export default function SeoAnalyticsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-stripe-gray text-xs">
+                  <div className="text-center py-6 text-nx-gray text-xs">
                     {isHe ? 'אין נתוני מגמות' : 'No trends data'}
                   </div>
                 )}
@@ -1030,7 +1030,7 @@ export default function SeoAnalyticsPage() {
 
               {/* Rising Queries */}
               <div>
-                <h4 className="text-sm font-semibold text-stripe-dark mb-2 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-nx-dark mb-2 flex items-center gap-2">
                   <Sparkles size={14} className="text-amber-500" />
                   {isHe ? 'שאילתות עולות' : 'Rising Queries'}
                 </h4>
@@ -1042,10 +1042,10 @@ export default function SeoAnalyticsPage() {
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-gray-100 bg-gray-50/50">
-                            <th className="text-start px-4 py-2.5 font-medium text-stripe-gray">
+                            <th className="text-start px-4 py-2.5 font-medium text-nx-gray">
                               {isHe ? 'שאילתה' : 'Query'}
                             </th>
-                            <th className="text-end px-4 py-2.5 font-medium text-stripe-gray">
+                            <th className="text-end px-4 py-2.5 font-medium text-nx-gray">
                               {isHe ? 'מגמה' : 'Trend'}
                             </th>
                           </tr>
@@ -1053,7 +1053,7 @@ export default function SeoAnalyticsPage() {
                         <tbody>
                           {trendsRelated.rising.slice(0, 10).map((q, i) => (
                             <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
-                              <td className="px-4 py-2.5 font-medium text-stripe-dark">{q.query}</td>
+                              <td className="px-4 py-2.5 font-medium text-nx-dark">{q.query}</td>
                               <td className="px-4 py-2.5 text-end">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                                   q.trend === 'Breakout' || q.trend === 'פריצה'
@@ -1070,14 +1070,14 @@ export default function SeoAnalyticsPage() {
                     </div>
                     {trendsRelated.top?.length > 0 && (
                       <div className="border-t border-gray-100 px-4 py-3">
-                        <p className="text-xs font-medium text-stripe-gray mb-2">
+                        <p className="text-xs font-medium text-nx-gray mb-2">
                           {isHe ? 'שאילתות מובילות' : 'Top Queries'}
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {trendsRelated.top.slice(0, 8).map((q, i) => (
-                            <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs text-stripe-gray">
+                            <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-gray-100 text-xs text-nx-gray">
                               {q.query}
-                              <span className="text-stripe-purple font-semibold">{q.value}</span>
+                              <span className="text-nx-primary font-semibold">{q.value}</span>
                             </span>
                           ))}
                         </div>
@@ -1085,7 +1085,7 @@ export default function SeoAnalyticsPage() {
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-stripe-gray text-xs">
+                  <div className="text-center py-6 text-nx-gray text-xs">
                     {isHe ? 'אין נתונים' : 'No data'}
                   </div>
                 )}
@@ -1093,7 +1093,7 @@ export default function SeoAnalyticsPage() {
 
               {/* Trending in Israel Today */}
               <div>
-                <h4 className="text-sm font-semibold text-stripe-dark mb-2 flex items-center gap-2">
+                <h4 className="text-sm font-semibold text-nx-dark mb-2 flex items-center gap-2">
                   <Zap size={14} className="text-yellow-500" />
                   {isHe ? 'טרנדים בישראל היום' : 'Trending in Israel Today'}
                 </h4>
@@ -1104,22 +1104,22 @@ export default function SeoAnalyticsPage() {
                     {dailyTrends.trending.slice(0, 9).map((t, i) => (
                       <div key={i} className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
                         <div className="flex items-start justify-between mb-2">
-                          <h3 className="text-sm font-semibold text-stripe-dark leading-tight">
+                          <h3 className="text-sm font-semibold text-nx-dark leading-tight">
                             {t.query}
                           </h3>
-                          <span className="shrink-0 ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-stripe-purple/10 text-stripe-purple">
+                          <span className="shrink-0 ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-nx-primary/10 text-nx-primary">
                             {t.traffic}
                           </span>
                         </div>
                         {t.context && (
-                          <p className="text-xs text-stripe-gray mb-2 line-clamp-2">
+                          <p className="text-xs text-nx-gray mb-2 line-clamp-2">
                             {t.context}
                           </p>
                         )}
                         {t.relatedQueries?.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-2">
                             {t.relatedQueries.slice(0, 4).map((rq, j) => (
-                              <span key={j} className="px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-stripe-gray">
+                              <span key={j} className="px-1.5 py-0.5 rounded bg-gray-100 text-[10px] text-nx-gray">
                                 {rq}
                               </span>
                             ))}
@@ -1129,7 +1129,7 @@ export default function SeoAnalyticsPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-6 text-stripe-gray text-xs">
+                  <div className="text-center py-6 text-nx-gray text-xs">
                     {isHe ? 'אין נתוני טרנדים' : 'No trending data'}
                   </div>
                 )}
@@ -1155,7 +1155,7 @@ function KpiCard({
   return (
     <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-stripe-gray">{label}</span>
+        <span className="text-xs font-medium text-nx-gray">{label}</span>
         <div
           className="w-8 h-8 rounded-lg flex items-center justify-center"
           style={{ background: `${color}18` }}
@@ -1163,7 +1163,7 @@ function KpiCard({
           <Icon size={16} style={{ color }} />
         </div>
       </div>
-      <div className="text-2xl font-bold text-stripe-dark">{value}</div>
+      <div className="text-2xl font-bold text-nx-dark">{value}</div>
     </div>
   );
 }
