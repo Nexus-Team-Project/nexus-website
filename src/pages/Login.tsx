@@ -2,7 +2,7 @@
  * Renders the website sign-in page and redirects regular users into the
  * separate dashboard app after the backend creates a one-time SSO code.
  */
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import AnimatedGradient from '../components/AnimatedGradient';
 import GoogleSignIn from '../components/GoogleSignIn';
@@ -25,9 +25,10 @@ export default function Login() {
     email: '',
     password: '',
   });
+  const hasRedirectedExistingSession = useRef(false);
 
   const { t, language, direction } = useLanguage();
-  const { login } = useAuth();
+  const { user: authenticatedUser, isLoading: isAuthLoading, login } = useAuth();
   const navigate = useNavigate();
   const { search } = useLocation();
   const { identify } = useAnalytics();
@@ -54,17 +55,49 @@ export default function Login() {
   };
 
   /**
+   * Chooses the dashboard path that should open after auth handoff.
+   * Input: authenticated user profile returned by the website backend.
+   * Output: organization dashboard path, or "/" when no single organization exists.
+   */
+  const getDashboardRedirectPath = (user: { orgMemberships?: { org: { slug: string } }[] }) => {
+    const orgs = user.orgMemberships ?? [];
+    return orgs.length === 1 ? `/organizations/${orgs[0].org.slug}` : '/';
+  };
+
+  /**
+   * Sends an authenticated website user to the dashboard with a fresh SSO code.
+   * Input: authenticated user profile returned by the website backend.
+   * Output: navigation occurs in the current browser tab.
+   */
+  const redirectToDashboard = async (user: { orgMemberships?: { org: { slug: string } }[] }) => {
+    const { code } = await api.post<{ code: string }>('/api/auth/create-code');
+    window.location.replace(buildDashboardCallbackUrl(code, getDashboardRedirectPath(user)));
+  };
+
+  /**
    * Sends a regular authenticated user to the dashboard with a fresh SSO code.
    * Input: verified user profile returned after login.
    * Output: navigation occurs in the current browser tab.
    */
   const navigateAfterLogin = async (user: { role: string; onboardingDone: boolean; orgMemberships?: { org: { slug: string } }[] }) => {
     if (nextPath) { navigate(nextPath); return; }
-    const orgs = user.orgMemberships ?? [];
-    const redirectPath = orgs.length === 1 ? `/organizations/${orgs[0].org.slug}` : '/';
-    const { code } = await api.post<{ code: string }>('/api/auth/create-code');
-    window.location.replace(buildDashboardCallbackUrl(code, redirectPath));
+    await redirectToDashboard(user);
   };
+
+  useEffect(() => {
+    /**
+     * Sends already-authenticated visitors away from the login page.
+     * Input: restored auth context user from the website session.
+     * Output: redirects to the dashboard with a fresh SSO code.
+     */
+    const redirectExistingSession = async () => {
+      if (isAuthLoading || !authenticatedUser || hasRedirectedExistingSession.current) return;
+      hasRedirectedExistingSession.current = true;
+      await redirectToDashboard(authenticatedUser);
+    };
+
+    void redirectExistingSession();
+  }, [authenticatedUser, isAuthLoading]);
 
   const isFormValid = email.trim() !== '' && password.trim() !== '';
 
