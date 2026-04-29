@@ -1,3 +1,7 @@
+/**
+ * Provides authentication services for local email login, Google login,
+ * refresh-token rotation, password reset, and dashboard SSO code exchange.
+ */
 import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
@@ -6,6 +10,132 @@ import { signAccessToken } from '../utils/jwt';
 import { createError } from '../middleware/errorHandler';
 
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+const DASHBOARD_AUTH_CODE_TTL_MS = 30 * 1000;
+const dashboardAuthCodes = new Map<string, { userId: string; expiresAt: number }>();
+
+export interface AuthUserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  country?: string;
+  avatarUrl?: string | null;
+  emailVerified: boolean;
+  emailUpdates?: boolean;
+  provider?: string;
+  lastLoginAt?: Date | null;
+  createdAt?: Date;
+  onboardingDone: boolean;
+  orgMemberships: {
+    role: string;
+    org: { id: string; slug: string; name: string; logoUrl?: string | null; primaryColor?: string | null };
+  }[];
+}
+
+/**
+ * Removes expired dashboard auth codes so the in-memory store stays small.
+ * Input: none.
+ * Output: expired entries are deleted from module memory.
+ */
+function pruneExpiredDashboardAuthCodes(): void {
+  const now = Date.now();
+  for (const [code, entry] of dashboardAuthCodes.entries()) {
+    if (entry.expiresAt <= now) dashboardAuthCodes.delete(code);
+  }
+}
+
+/**
+ * Loads the safe user profile that frontend apps are allowed to see.
+ * Input: user ID from a verified access token or one-time auth code.
+ * Output: public profile data, or null when the user no longer exists.
+ */
+export async function getUserProfile(userId: string): Promise<AuthUserProfile | null> {
+  try {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        country: true,
+        avatarUrl: true,
+        emailVerified: true,
+        emailUpdates: true,
+        provider: true,
+        lastLoginAt: true,
+        createdAt: true,
+        onboardingDone: true,
+        orgMemberships: {
+          select: {
+            role: true,
+            org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
+          },
+        },
+      },
+    });
+  } catch {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        country: true,
+        avatarUrl: true,
+        emailVerified: true,
+        emailUpdates: true,
+        provider: true,
+        lastLoginAt: true,
+        createdAt: true,
+        onboardingDone: true,
+      },
+    });
+    return user ? { ...user, orgMemberships: [] } : null;
+  }
+}
+
+/**
+ * Creates a short-lived, single-use code for logging into the dashboard.
+ * Input: authenticated website user ID.
+ * Output: random URL-safe code that can be exchanged once within 30 seconds.
+ */
+export function createDashboardAuthCode(userId: string): string {
+  pruneExpiredDashboardAuthCodes();
+  const code = generateToken(48);
+  dashboardAuthCodes.set(code, {
+    userId,
+    expiresAt: Date.now() + DASHBOARD_AUTH_CODE_TTL_MS,
+  });
+  return code;
+}
+
+/**
+ * Exchanges a dashboard auth code for fresh access and refresh tokens.
+ * Input: one-time code from the dashboard callback URL and request metadata.
+ * Output: tokens plus the public user profile, or a 401 error for invalid codes.
+ */
+export async function exchangeDashboardAuthCode(
+  code: string,
+  meta: { userAgent?: string; ipAddress?: string } = {},
+) {
+  const entry = dashboardAuthCodes.get(code);
+  dashboardAuthCodes.delete(code);
+
+  if (!entry || entry.expiresAt <= Date.now()) {
+    throw createError('Invalid or expired auth code', 401);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: entry.userId } });
+  if (!user) throw createError('User not found', 401);
+
+  const profile = await getUserProfile(user.id);
+  if (!profile) throw createError('User not found', 401);
+
+  const tokens = await issueTokens(user.id, user.email, user.role, false, meta);
+  return { ...tokens, user: profile };
+}
 
 export async function register(
   data: {
@@ -15,7 +145,7 @@ export async function register(
     country?: string;
     emailUpdates?: boolean;
   },
-  meta: { userAgent?: string; ipAddress?: string } = {},
+  _meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
   const email = data.email.toLowerCase().trim();
   const fullName = data.fullName.trim();

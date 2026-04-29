@@ -1,3 +1,7 @@
+/**
+ * Owns the website authentication state and bridges successful user login
+ * into the dashboard app with a short-lived backend-issued SSO code.
+ */
 import {
   createContext,
   useContext,
@@ -8,6 +12,8 @@ import {
 } from 'react';
 import { api, setAccessToken, refreshAccessToken } from '../lib/api';
 import { getVisitorId } from '../lib/visitorId';
+
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5174';
 
 export interface AuthUser {
   id: string;
@@ -38,14 +44,45 @@ interface AuthContextType {
   updateUser: (partial: Partial<AuthUser>) => void;
 }
 
+interface GoogleAuthResponse {
+  accessToken: string;
+  dashboardCode?: string;
+  dashboardUrl?: string;
+  isNew?: boolean;
+}
+
 export const AuthContext = createContext<AuthContextType | null>(null);
+
+/**
+ * Builds a dashboard callback URL for a one-time SSO code.
+ * Input: backend-issued code and dashboard path to open after exchange.
+ * Output: absolute dashboard URL containing the code and redirect path.
+ */
+function buildDashboardCallbackUrl(code: string, redirectPath: string): string {
+  const url = new URL('/auth/callback', DASHBOARD_URL);
+  url.searchParams.set('code', code);
+  url.searchParams.set('redirect', redirectPath);
+  return url.toString();
+}
+
+/**
+ * Redirects normal users from the website app into the dashboard app.
+ * Input: authenticated user profile from the website backend.
+ * Output: true when a full-page dashboard redirect was started.
+ */
+async function redirectDashboardUser(profile: AuthUser, existingCode?: string): Promise<void> {
+  const orgs = profile.orgMemberships ?? [];
+  const redirectPath = orgs.length === 1 ? `/organizations/${orgs[0].org.slug}` : '/';
+  const code = existingCode ?? (await api.post<{ code: string }>('/api/auth/create-code')).code;
+  window.location.replace(buildDashboardCallbackUrl(code, redirectPath));
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const googleLogin = useCallback(async (accessToken: string): Promise<AuthUser> => {
-    const data = await api.post<{ accessToken: string; isNew?: boolean }>('/api/auth/google', { accessToken });
+    const data = await api.post<GoogleAuthResponse>('/api/auth/google', { accessToken });
     setAccessToken(data.accessToken);
     const profile = await api.get<AuthUser>('/api/auth/me');
     setUser(profile);
@@ -72,11 +109,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clean the URL immediately so a refresh doesn't re-submit the code
       window.history.replaceState({}, document.title, window.location.pathname);
       setIsLoading(true);
-      api.post<{ accessToken: string }>('/api/auth/google', {
+      api.post<GoogleAuthResponse>('/api/auth/google', {
         code,
         redirectUri: window.location.origin,
       })
         .then(async (data) => {
+          sessionStorage.removeItem('google_oauth_redirect');
+          if (data.dashboardUrl) {
+            window.location.replace(data.dashboardUrl);
+            return;
+          }
+
           setAccessToken(data.accessToken);
           const profile = await api.get<AuthUser>('/api/auth/me');
           setUser(profile);
@@ -85,12 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (profile.fullName) {
             sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
           }
-          // Navigate to the destination that was saved before the Google redirect.
-          // window.location.replace is used because useNavigate isn't available here
-          // (AuthContext lives outside the Router boundary).
-          const redirect = sessionStorage.getItem('google_oauth_redirect');
-          sessionStorage.removeItem('google_oauth_redirect');
-          window.location.replace(redirect ?? '/');
+          await redirectDashboardUser(profile, data.dashboardCode);
         })
         .catch(console.error)
         .finally(() => setIsLoading(false));

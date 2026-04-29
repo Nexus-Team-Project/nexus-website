@@ -1,3 +1,7 @@
+/**
+ * Defines public and authenticated auth HTTP routes for the website backend.
+ * These routes also act as the identity provider for the dashboard app.
+ */
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
@@ -19,6 +23,26 @@ const COOKIE_OPTS = (maxAge: number) => ({
   maxAge,
   path: '/',
 });
+
+const authCodeSchema = z.object({
+  body: z.object({
+    code: z.string().min(32).max(128).regex(/^[A-Za-z0-9_-]+$/),
+  }),
+});
+
+/**
+ * Builds the dashboard callback URL that exchanges a one-time auth code.
+ * Input: backend-issued dashboard code.
+ * Output: absolute dashboard callback URL, or undefined when no dashboard URL is configured.
+ */
+function buildDashboardCallbackUrl(code: string): string | undefined {
+  if (!env.DASHBOARD_URL) return undefined;
+
+  const url = new URL('/auth/callback', env.DASHBOARD_URL);
+  url.searchParams.set('code', code);
+  url.searchParams.set('redirect', '/');
+  return url.toString();
+}
 
 const registerSchema = z.object({
   body: z.object({
@@ -105,8 +129,10 @@ router.post(
       } else {
         result = await AuthService.googleAuth(req.body.idToken, meta);
       }
+      const dashboardCode = AuthService.createDashboardAuthCode(result.userId);
+      const dashboardUrl = buildDashboardCallbackUrl(dashboardCode);
       res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
-      res.json({ accessToken: result.accessToken, isNew: result.isNew ?? false });
+      res.json({ accessToken: result.accessToken, dashboardCode, dashboardUrl, isNew: result.isNew ?? false });
     } catch (err) {
       next(err);
     }
@@ -168,41 +194,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
     });
-    let user: any = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: result.userId },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          avatarUrl: true,
-          emailVerified: true,
-          onboardingDone: true,
-          orgMemberships: {
-            select: {
-              role: true,
-              org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
-            },
-          },
-        },
-      });
-    } catch {
-      user = await prisma.user.findUnique({
-        where: { id: result.userId },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          avatarUrl: true,
-          emailVerified: true,
-          onboardingDone: true,
-        },
-      });
-      if (user) user.orgMemberships = [];
-    }
+    const user = await AuthService.getUserProfile(result.userId);
     const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
     res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
     res.json({ accessToken: result.accessToken, user });
@@ -210,6 +202,34 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
     next(err);
   }
 });
+
+router.post('/create-code', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const code = AuthService.createDashboardAuthCode(req.user!.sub);
+    res.json({ code });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/code-exchange',
+  authLimiter,
+  validate(authCodeSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await AuthService.exchangeDashboardAuthCode(req.body.code, {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      });
+      const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
+      res.json({ accessToken: result.accessToken, user: result.user });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -337,53 +357,7 @@ router.post(
 
 router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Try full query with orgMemberships first; fall back without if table missing
-    let user: any = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: req.user!.sub },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          country: true,
-          avatarUrl: true,
-          emailVerified: true,
-          emailUpdates: true,
-          provider: true,
-          lastLoginAt: true,
-          createdAt: true,
-          onboardingDone: true,
-          orgMemberships: {
-            select: {
-              role: true,
-              org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
-            },
-          },
-        },
-      });
-    } catch {
-      // orgMemberships table may not exist yet — query without it
-      user = await prisma.user.findUnique({
-        where: { id: req.user!.sub },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          country: true,
-          avatarUrl: true,
-          emailVerified: true,
-          emailUpdates: true,
-          provider: true,
-          lastLoginAt: true,
-          createdAt: true,
-          onboardingDone: true,
-        },
-      });
-      if (user) (user as any).orgMemberships = [];
-    }
+    const user = await AuthService.getUserProfile(req.user!.sub);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;
