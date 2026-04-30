@@ -9,16 +9,16 @@ import { createError } from '../middleware/errorHandler';
 import {
   BusinessSetupDocument,
   MemberDocument,
-  OnboardingStateDocument,
   TenantDocument,
   TenantMemberDocument,
   getOnboardingCollections,
 } from '../models/onboarding.models';
-import { BusinessSetupInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
+import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
 
 export interface UserContext {
   isTenant: boolean;
   isMember: boolean;
+  mode: 'tenant' | 'regular_user' | 'workspace_setup_deferred' | 'needs_workspace_setup';
   tenantId: string | null;
   memberId: string | null;
   role: string | null;
@@ -26,7 +26,7 @@ export interface UserContext {
 
 export interface OnboardingInfo {
   required: boolean;
-  step: 'workspace_setup' | 'business_setup' | 'complete';
+  step: 'workspace_setup' | 'workspace_setup_deferred' | 'business_setup' | null;
 }
 
 export interface MeResponse {
@@ -76,6 +76,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
     return {
       isTenant: true,
       isMember: false,
+      mode: 'tenant',
       tenantId: tenantMembership.tenantId.toHexString(),
       memberId: null,
       role: tenantMembership.role,
@@ -87,13 +88,33 @@ export async function getUserContext(userId: string): Promise<UserContext> {
     return {
       isTenant: false,
       isMember: true,
+      mode: 'regular_user',
       tenantId: null,
       memberId: toId(member._id),
       role: null,
     };
   }
 
-  return { isTenant: false, isMember: false, tenantId: null, memberId: null, role: null };
+  const onboardingState = await collections.onboardingStates.findOne({ userId });
+  if (onboardingState?.state === 'workspace_setup_deferred') {
+    return {
+      isTenant: false,
+      isMember: false,
+      mode: 'workspace_setup_deferred',
+      tenantId: null,
+      memberId: null,
+      role: null,
+    };
+  }
+
+  return {
+    isTenant: false,
+    isMember: false,
+    mode: 'needs_workspace_setup',
+    tenantId: null,
+    memberId: null,
+    role: null,
+  };
 }
 
 /**
@@ -103,6 +124,9 @@ export async function getUserContext(userId: string): Promise<UserContext> {
  */
 export async function getOnboardingStatus(userId: string): Promise<{ context: UserContext; onboarding: OnboardingInfo }> {
   const context = await getUserContext(userId);
+  if (context.mode === 'workspace_setup_deferred') {
+    return { context, onboarding: { required: true, step: 'workspace_setup_deferred' } };
+  }
   if (!context.isTenant && !context.isMember) {
     return { context, onboarding: { required: true, step: 'workspace_setup' } };
   }
@@ -114,7 +138,7 @@ export async function getOnboardingStatus(userId: string): Promise<{ context: Us
       return { context, onboarding: { required: false, step: 'business_setup' } };
     }
   }
-  return { context, onboarding: { required: false, step: 'complete' } };
+  return { context, onboarding: { required: false, step: null } };
 }
 
 /**
@@ -170,16 +194,19 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
   };
   await collections.tenantMembers.insertOne(membership);
 
-  const state: Omit<OnboardingStateDocument, '_id' | 'createdAt'> = {
-    userId,
-    state: 'business_setup_required',
-    skippedWorkspaceSetup: false,
-    tenantId: tenantInsert.insertedId,
-    updatedAt: now,
-  };
   await collections.onboardingStates.updateOne(
     { userId },
-    { $setOnInsert: { createdAt: now }, $set: state },
+    {
+      $setOnInsert: { createdAt: now },
+      $set: {
+        userId,
+        state: 'business_setup_required',
+        skippedWorkspaceSetup: false,
+        tenantId: tenantInsert.insertedId,
+        updatedAt: now,
+      },
+      $unset: { skipReason: '', memberId: '' },
+    },
     { upsert: true },
   );
 
@@ -193,16 +220,17 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
 }
 
 /**
- * Creates a member record when the user skips workspace setup.
- * Input: Prisma user id from auth middleware.
- * Output: member id and redirect target.
+ * Handles an explicit workspace setup skip choice from the dashboard.
+ * Input: Prisma user id and validated skip reason.
+ * Output: member or deferred onboarding result.
  */
-export async function skipWorkspaceSetup(userId: string) {
+export async function skipWorkspaceSetup(userId: string, input: SkipWorkspaceInput) {
   const existing = await getUserContext(userId);
   if (existing.isTenant || existing.isMember) {
     return {
       success: true,
       userType: existing.isTenant ? 'tenant' as const : 'member' as const,
+      mode: existing.mode,
       memberId: existing.memberId,
       redirectTo: '/dashboard',
     };
@@ -211,6 +239,33 @@ export async function skipWorkspaceSetup(userId: string) {
   const db = await getMongoDb();
   const collections = getOnboardingCollections(db);
   const now = new Date();
+
+  if (input.skipReason === 'complete_later') {
+    await collections.onboardingStates.updateOne(
+      { userId },
+      {
+        $setOnInsert: { createdAt: now },
+        $set: {
+          userId,
+          state: 'workspace_setup_deferred',
+          skippedWorkspaceSetup: true,
+          skipReason: 'complete_later',
+          updatedAt: now,
+        },
+        $unset: { tenantId: '', memberId: '' },
+      },
+      { upsert: true },
+    );
+
+    return {
+      success: true,
+      userType: 'deferred' as const,
+      mode: 'workspace_setup_deferred' as const,
+      memberId: null,
+      redirectTo: '/dashboard',
+    };
+  }
+
   const member: MemberDocument = {
     userId,
     status: 'active',
@@ -228,6 +283,7 @@ export async function skipWorkspaceSetup(userId: string) {
         userId,
         state: 'member_created',
         skippedWorkspaceSetup: true,
+        skipReason: 'regular_user',
         memberId: memberInsert.insertedId,
         updatedAt: now,
       },
@@ -238,6 +294,7 @@ export async function skipWorkspaceSetup(userId: string) {
   return {
     success: true,
     userType: 'member' as const,
+    mode: 'regular_user' as const,
     memberId: memberInsert.insertedId.toHexString(),
     redirectTo: '/dashboard',
   };

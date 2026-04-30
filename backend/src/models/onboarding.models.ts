@@ -49,7 +49,14 @@ export type TenantRole = typeof TENANT_ROLES[number];
 export type TenantStatus = 'onboarding' | 'active' | 'suspended';
 export type BusinessSetupStatus = 'not_started' | 'in_progress' | 'submitted' | 'approved' | 'rejected';
 export type MemberStatus = 'active' | 'pending' | 'suspended' | 'deactivated';
-export type OnboardingStateName = 'needs_workspace_setup' | 'tenant_created' | 'member_created' | 'business_setup_required' | 'complete';
+export type SkipReason = 'regular_user' | 'complete_later';
+export type OnboardingStateName =
+  | 'needs_workspace_setup'
+  | 'workspace_setup_deferred'
+  | 'tenant_created'
+  | 'member_created'
+  | 'business_setup_required'
+  | 'complete';
 
 export interface TenantDocument {
   _id?: ObjectId;
@@ -91,6 +98,7 @@ export interface OnboardingStateDocument {
   userId: string;
   state: OnboardingStateName;
   skippedWorkspaceSetup: boolean;
+  skipReason?: SkipReason;
   tenantId?: ObjectId;
   memberId?: ObjectId;
   createdAt: Date;
