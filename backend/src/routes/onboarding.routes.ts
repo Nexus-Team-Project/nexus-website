@@ -8,6 +8,7 @@ import { validate } from '../middleware/validate';
 import {
   businessSetupPatchRequestSchema,
   businessSetupSubmitRequestSchema,
+  skipWorkspaceRequestSchema,
   workspaceSetupRequestSchema,
 } from '../schemas/onboarding.schemas';
 import * as onboardingService from '../services/onboarding.service';
@@ -46,14 +47,19 @@ router.post(
   },
 );
 
-router.post('/onboarding/skip', authenticate, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const result = await onboardingService.skipWorkspaceSetup(req.user!.sub);
-    res.json(result);
-  } catch (err) {
-    next(err);
-  }
-});
+router.post(
+  '/onboarding/skip',
+  authenticate,
+  validate(skipWorkspaceRequestSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await onboardingService.skipWorkspaceSetup(req.user!.sub, req.body);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.get('/business-setup', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {

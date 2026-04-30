@@ -36,6 +36,12 @@ export const workspaceSetupRequestSchema = z.object({
   body: workspaceSetupBodySchema,
 });
 
+export const skipWorkspaceRequestSchema = z.object({
+  body: z.object({
+    skipReason: z.enum(['regular_user', 'complete_later']),
+  }),
+});
+
 const ownerSchema = z.object({
   first_name: z.string().max(120).optional(),
   last_name: z.string().max(120).optional(),
@@ -120,4 +126,5 @@ export const businessSetupSubmitRequestSchema = z.object({
 });
 
 export type WorkspaceSetupInput = z.infer<typeof workspaceSetupBodySchema>;
+export type SkipWorkspaceInput = z.infer<typeof skipWorkspaceRequestSchema>['body'];
 export type BusinessSetupInput = z.infer<typeof businessSetupDataSchema>;
