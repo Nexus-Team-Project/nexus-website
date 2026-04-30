@@ -51,6 +51,7 @@ export default function Login() {
     const url = new URL('/auth/callback', DASHBOARD_URL);
     url.searchParams.set('code', code);
     url.searchParams.set('redirect', redirectPath);
+    url.searchParams.set('lang', language);
     return url.toString();
   };
 
