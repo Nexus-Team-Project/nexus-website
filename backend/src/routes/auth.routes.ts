@@ -205,7 +205,10 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
 
 router.post('/create-code', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const code = AuthService.createDashboardAuthCode(req.user!.sub);
+    const rawRememberMe = typeof req.body?.rememberMe === 'boolean' ? req.body.rememberMe : undefined;
+    const cookieRememberMe = await AuthService.getRefreshTokenRememberMe(req.cookies?.[REFRESH_COOKIE]);
+    const rememberMe = rawRememberMe ?? cookieRememberMe;
+    const code = AuthService.createDashboardAuthCode(req.user!.sub, rememberMe);
     res.json({ code });
   } catch (err) {
     next(err);

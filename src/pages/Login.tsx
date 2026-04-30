@@ -66,11 +66,14 @@ export default function Login() {
 
   /**
    * Sends an authenticated website user to the dashboard with a fresh SSO code.
-   * Input: authenticated user profile returned by the website backend.
+   * Input: authenticated user profile and the remembered-device choice.
    * Output: navigation occurs in the current browser tab.
    */
-  const redirectToDashboard = async (user: { orgMemberships?: { org: { slug: string } }[] }) => {
-    const { code } = await api.post<{ code: string }>('/api/auth/create-code');
+  const redirectToDashboard = async (
+    user: { orgMemberships?: { org: { slug: string } }[] },
+    shouldRememberDevice?: boolean,
+  ) => {
+    const { code } = await api.post<{ code: string }>('/api/auth/create-code', { rememberMe: shouldRememberDevice });
     window.location.replace(buildDashboardCallbackUrl(code, getDashboardRedirectPath(user)));
   };
 
@@ -81,7 +84,7 @@ export default function Login() {
    */
   const navigateAfterLogin = async (user: { role: string; onboardingDone: boolean; orgMemberships?: { org: { slug: string } }[] }) => {
     if (nextPath) { navigate(nextPath); return; }
-    await redirectToDashboard(user);
+    await redirectToDashboard(user, rememberMe);
   };
 
   useEffect(() => {

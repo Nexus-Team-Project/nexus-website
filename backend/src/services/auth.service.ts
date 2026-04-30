@@ -11,7 +11,9 @@ import { createError } from '../middleware/errorHandler';
 
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
 const DASHBOARD_AUTH_CODE_TTL_MS = 30 * 1000;
-const dashboardAuthCodes = new Map<string, { userId: string; expiresAt: number }>();
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const REMEMBER_ME_THRESHOLD_MS = 14 * MS_PER_DAY;
+const dashboardAuthCodes = new Map<string, { userId: string; expiresAt: number; rememberMe: boolean }>();
 
 export interface AuthUserProfile {
   id: string;
@@ -42,6 +44,30 @@ function pruneExpiredDashboardAuthCodes(): void {
   for (const [code, entry] of dashboardAuthCodes.entries()) {
     if (entry.expiresAt <= now) dashboardAuthCodes.delete(code);
   }
+}
+
+/**
+ * Detects whether a refresh-token row represents a remembered device.
+ * Input: refresh token creation and expiry dates from the database.
+ * Output: true when the original lifetime is closer to 30 days than 7 days.
+ */
+function isRememberedRefreshToken(record: { createdAt: Date; expiresAt: Date }): boolean {
+  return record.expiresAt.getTime() - record.createdAt.getTime() > REMEMBER_ME_THRESHOLD_MS;
+}
+
+/**
+ * Reads the remembered-device choice from an existing refresh cookie.
+ * Input: raw refresh token from the httpOnly cookie.
+ * Output: true when the stored token has a long remembered-device lifetime.
+ */
+export async function getRefreshTokenRememberMe(rawToken: string | undefined): Promise<boolean> {
+  if (!rawToken) return false;
+
+  const tokenHash = hashToken(rawToken);
+  const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
+  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) return false;
+
+  return isRememberedRefreshToken(stored);
 }
 
 /**
@@ -98,14 +124,15 @@ export async function getUserProfile(userId: string): Promise<AuthUserProfile | 
 
 /**
  * Creates a short-lived, single-use code for logging into the dashboard.
- * Input: authenticated website user ID.
+ * Input: authenticated website user ID and remembered-device choice.
  * Output: random URL-safe code that can be exchanged once within 30 seconds.
  */
-export function createDashboardAuthCode(userId: string): string {
+export function createDashboardAuthCode(userId: string, rememberMe = false): string {
   pruneExpiredDashboardAuthCodes();
   const code = generateToken(48);
   dashboardAuthCodes.set(code, {
     userId,
+    rememberMe,
     expiresAt: Date.now() + DASHBOARD_AUTH_CODE_TTL_MS,
   });
   return code;
@@ -133,7 +160,7 @@ export async function exchangeDashboardAuthCode(
   const profile = await getUserProfile(user.id);
   if (!profile) throw createError('User not found', 401);
 
-  const tokens = await issueTokens(user.id, user.email, user.role, false, meta);
+  const tokens = await issueTokens(user.id, user.email, user.role, entry.rememberMe, meta);
   return { ...tokens, user: profile };
 }
 
@@ -378,7 +405,8 @@ export async function refreshTokens(
   const user = await prisma.user.findUnique({ where: { id: stored.userId } });
   if (!user) throw createError('User not found', 401);
 
-  return issueTokens(user.id, user.email, user.role, false, meta);
+  const rememberMe = isRememberedRefreshToken(stored);
+  return issueTokens(user.id, user.email, user.role, rememberMe, meta);
 }
 
 export async function logout(rawToken: string) {

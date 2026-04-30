@@ -1,10 +1,12 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { LanguageProvider } from './i18n/LanguageContext';
 import { useAnalytics } from './hooks/useAnalytics';
 import ProtectedRoute from './components/ProtectedRoute';
 import AccessibilityWidget from './components/AccessibilityWidget';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { useAuth } from './contexts/AuthContext';
+import { api } from './lib/api';
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
@@ -49,6 +51,43 @@ const AgentDetailPage    = lazy(() => import('./pages/admin/AgentDetailPage'));
 const SeoAnalyticsPage   = lazy(() => import('./pages/admin/SeoAnalyticsPage'));
 
 const LANG_PREF_KEY = 'nexus-lang-preference';
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5174';
+
+interface DashboardRedirectProfile {
+  orgMemberships?: { org: { slug: string } }[];
+}
+
+/**
+ * Builds the dashboard callback URL that exchanges a one-time auth code.
+ * Input: backend-issued SSO code and the dashboard path to open afterward.
+ * Output: absolute dashboard callback URL.
+ */
+function buildDashboardCallbackUrl(code: string, redirectPath: string): string {
+  const url = new URL('/auth/callback', DASHBOARD_URL);
+  url.searchParams.set('code', code);
+  url.searchParams.set('redirect', redirectPath);
+  return url.toString();
+}
+
+/**
+ * Chooses the dashboard route for an authenticated website session.
+ * Input: restored website user profile with organization memberships.
+ * Output: organization dashboard route when there is one org, otherwise root.
+ */
+function getDashboardRedirectPath(user: DashboardRedirectProfile): string {
+  const orgs = user.orgMemberships ?? [];
+  return orgs.length === 1 ? `/organizations/${orgs[0].org.slug}` : '/';
+}
+
+/**
+ * Redirects authenticated website visitors into the dashboard app.
+ * Input: restored website user profile.
+ * Output: browser leaves the website after receiving a one-time SSO code.
+ */
+async function redirectWebsiteSessionToDashboard(user: DashboardRedirectProfile): Promise<void> {
+  const { code } = await api.post<{ code: string }>('/api/auth/create-code');
+  window.location.replace(buildDashboardCallbackUrl(code, getDashboardRedirectPath(user)));
+}
 
 // ─── Subdomain-aware root route ───────────────────────────
 // docs.nexus-payment.com → ApiDocsPage (EN), rendered directly — no redirect,
@@ -70,8 +109,11 @@ function RootRoute() {
 // If unknown → render Home immediately, detect IP in background.
 // This avoids a 1-3 second spinner (which killed mobile LCP).
 function GeoDetectHome() {
+  const { user, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const hasRedirectedDashboard = useRef(false);
+  const [redirectFailed, setRedirectFailed] = useState(false);
 
   /**
    * Builds the Hebrew root redirect target without losing OAuth query data.
@@ -87,6 +129,27 @@ function GeoDetectHome() {
     if (!s && (navigator.language ?? '').toLowerCase().startsWith('he')) return true;
     return false;
   })();
+
+  useEffect(() => {
+    /**
+     * Sends restored website sessions to the dashboard from the main page.
+     * Input: current auth context state.
+     * Output: dashboard handoff starts once when a user session exists.
+     */
+    const redirectAuthenticatedRoot = async () => {
+      if (isAuthLoading || !user || hasRedirectedDashboard.current) return;
+      hasRedirectedDashboard.current = true;
+
+      try {
+        await redirectWebsiteSessionToDashboard(user);
+      } catch (error) {
+        console.error('[Nexus auth] Main-page dashboard redirect failed', error);
+        setRedirectFailed(true);
+      }
+    };
+
+    void redirectAuthenticatedRoot();
+  }, [isAuthLoading, user]);
 
   useEffect(() => {
     const stored = localStorage.getItem(LANG_PREF_KEY);
@@ -122,8 +185,43 @@ function GeoDetectHome() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (knownHe) return <PageLoader />;
+  if ((isAuthLoading || (user && !redirectFailed)) || knownHe) return <PageLoader />;
   return <Home />;
+}
+
+/**
+ * Keeps language-specific home routes session-aware.
+ * Input: public home page content.
+ * Output: loading state during auth restore, dashboard redirect for users, or content.
+ */
+function WebsiteHomeSessionGate({ children }: { children: ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const hasRedirectedDashboard = useRef(false);
+  const [redirectFailed, setRedirectFailed] = useState(false);
+
+  useEffect(() => {
+    /**
+     * Starts a dashboard handoff for already-authenticated home visitors.
+     * Input: current auth context state.
+     * Output: dashboard navigation starts once when possible.
+     */
+    const redirectAuthenticatedHome = async () => {
+      if (isLoading || !user || hasRedirectedDashboard.current) return;
+      hasRedirectedDashboard.current = true;
+
+      try {
+        await redirectWebsiteSessionToDashboard(user);
+      } catch (error) {
+        console.error('[Nexus auth] Home dashboard redirect failed', error);
+        setRedirectFailed(true);
+      }
+    };
+
+    void redirectAuthenticatedHome();
+  }, [isLoading, user]);
+
+  if (isLoading || (user && !redirectFailed)) return <PageLoader />;
+  return <>{children}</>;
 }
 
 // ─── Language Gate ───────────────────────────────────────
@@ -264,7 +362,7 @@ function App() {
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/"         element={<RootRoute />} />
-          <Route path="/he"       element={<HomeHe />} />
+          <Route path="/he"       element={<WebsiteHomeSessionGate><HomeHe /></WebsiteHomeSessionGate>} />
           {/* ── Auth ─────────────────────────────────────────── */}
           <Route path="/signup"   element={<LanguageGate><LanguageProvider language="en"><Signup /></LanguageProvider></LanguageGate>} />
           <Route path="/login"    element={<LanguageGate><LanguageProvider language="en"><Login /></LanguageProvider></LanguageGate>} />
