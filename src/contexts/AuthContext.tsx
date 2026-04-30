@@ -56,6 +56,18 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 const googleCodeRequests = new Map<string, Promise<GoogleAuthResponse>>();
 
 /**
+ * Infers the active website language without depending on React context.
+ * Input: current route, saved preference, and document language.
+ * Output: "he" for Hebrew context, otherwise "en".
+ */
+function getCurrentWebsiteLanguage(): 'he' | 'en' {
+  if (window.location.pathname.startsWith('/he')) return 'he';
+  const saved = localStorage.getItem('nexus-lang-preference');
+  if (saved === 'he' || saved === 'en') return saved;
+  return document.documentElement.lang === 'he' ? 'he' : 'en';
+}
+
+/**
  * Exchanges a Google OAuth code exactly once in dev StrictMode.
  * Input: Google code from the browser URL.
  * Output: backend auth response containing website tokens and dashboard handoff data.
@@ -67,6 +79,7 @@ function exchangeGoogleCodeOnce(code: string): Promise<GoogleAuthResponse> {
   const request = api.post<GoogleAuthResponse>('/api/auth/google', {
     code,
     redirectUri: window.location.origin,
+    language: getCurrentWebsiteLanguage(),
   });
 
   googleCodeRequests.set(code, request);
@@ -92,6 +105,7 @@ function buildDashboardCallbackUrl(code: string, redirectPath: string): string {
   const url = new URL('/auth/callback', DASHBOARD_URL);
   url.searchParams.set('code', code);
   url.searchParams.set('redirect', redirectPath);
+  url.searchParams.set('lang', getCurrentWebsiteLanguage());
   return url.toString();
 }
 

@@ -66,7 +66,21 @@ function buildDashboardCallbackUrl(code: string, redirectPath: string): string {
   const url = new URL('/auth/callback', DASHBOARD_URL);
   url.searchParams.set('code', code);
   url.searchParams.set('redirect', redirectPath);
+  url.searchParams.set('lang', getCurrentWebsiteLanguage());
   return url.toString();
+}
+
+/**
+ * Infers website language for auth handoffs created outside route pages.
+ * Input: current route, saved language preference, and browser language.
+ * Output: "he" when Hebrew is preferred, otherwise "en".
+ */
+function getCurrentWebsiteLanguage(): 'he' | 'en' {
+  if (window.location.pathname.startsWith('/he')) return 'he';
+  const saved = localStorage.getItem(LANG_PREF_KEY);
+  if (saved === 'he' || saved === 'en') return saved;
+  const browserLang = navigator.language ?? '';
+  return browserLang.toLowerCase().startsWith('he') ? 'he' : 'en';
 }
 
 /**
