@@ -15,6 +15,7 @@ import {
   getOnboardingCollections,
 } from '../models/onboarding.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
+import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 
 export interface UserContext {
   isTenant: boolean;
@@ -174,6 +175,7 @@ export async function getOnboardingStatus(userId: string): Promise<{ context: Us
  */
 export async function getMe(userId: string): Promise<MeResponse> {
   const [user, status] = await Promise.all([getPrismaUser(userId), getOnboardingStatus(userId)]);
+  await syncOnboardingMemberEmail(user.id, user.email);
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
     context: status.context,
