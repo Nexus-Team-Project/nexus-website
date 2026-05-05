@@ -77,6 +77,7 @@ export interface TenantMemberDocument {
   _id?: ObjectId;
   tenantId: ObjectId;
   userId: string;
+  email?: string;
   role: TenantRole;
   status: MemberStatus;
   joinedAt: Date;
@@ -87,6 +88,7 @@ export interface TenantMemberDocument {
 export interface MemberDocument {
   _id?: ObjectId;
   userId: string;
+  email?: string;
   status: MemberStatus;
   onboardingSource: 'skipped_workspace_setup' | 'invited' | 'self_registration';
   createdAt: Date;
@@ -149,8 +151,10 @@ export async function ensureOnboardingIndexes(db: Db): Promise<void> {
   await Promise.all([
     collections.tenants.createIndex({ createdByUserId: 1 }),
     collections.tenantMembers.createIndex({ userId: 1, status: 1 }),
+    collections.tenantMembers.createIndex({ email: 1, status: 1 }),
     collections.tenantMembers.createIndex({ tenantId: 1, userId: 1 }, { unique: true }),
     collections.members.createIndex({ userId: 1 }, { unique: true }),
+    collections.members.createIndex({ email: 1, status: 1 }),
     collections.onboardingStates.createIndex({ userId: 1 }, { unique: true }),
     collections.businessSetups.createIndex({ tenantId: 1 }, { unique: true }),
   ]);

@@ -5,6 +5,7 @@
 import { ObjectId } from 'mongodb';
 import { prisma } from '../config/database';
 import { getMongoDb } from '../config/mongo';
+import { PlatformRole, getPlatformRoleForEmail, normalizeEmail } from '../config/platform-admins';
 import { createError } from '../middleware/errorHandler';
 import {
   BusinessSetupDocument,
@@ -29,6 +30,13 @@ export interface OnboardingInfo {
   step: 'workspace_setup' | 'workspace_setup_deferred' | 'business_setup' | null;
 }
 
+export interface DashboardAuthorization {
+  tenantRole: string | null;
+  platformRole: PlatformRole | null;
+  canSeeDevMode: boolean;
+  canUseDevPlayground: boolean;
+}
+
 export interface MeResponse {
   user: {
     id: string;
@@ -36,6 +44,7 @@ export interface MeResponse {
     name: string;
   };
   context: UserContext;
+  authorization: DashboardAuthorization;
   onboarding: OnboardingInfo;
 }
 
@@ -60,6 +69,23 @@ async function getPrismaUser(userId: string): Promise<{ id: string; email: strin
   });
   if (!user) throw createError('User not found', 404);
   return user;
+}
+
+/**
+ * Builds dashboard authorization from trusted backend identity and context.
+ * Input: current Prisma email and Mongo-derived user context.
+ * Output: flags the dashboard can use for UX gating without exposing raw admin config.
+ */
+function getDashboardAuthorization(email: string, context: UserContext): DashboardAuthorization {
+  const platformRole = getPlatformRoleForEmail(email);
+  const canSeeDevMode = context.role === 'admin';
+
+  return {
+    tenantRole: context.role,
+    platformRole,
+    canSeeDevMode,
+    canUseDevPlayground: canSeeDevMode && platformRole === 'nexusAdmin',
+  };
 }
 
 /**
@@ -151,6 +177,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
     context: status.context,
+    authorization: getDashboardAuthorization(user.email, status.context),
     onboarding: status.onboarding,
   };
 }
@@ -163,6 +190,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
 export async function createWorkspace(userId: string, input: WorkspaceSetupInput) {
   const existing = await getUserContext(userId);
   if (existing.isTenant || existing.isMember) throw createError('User already has onboarding context', 409);
+  const user = await getPrismaUser(userId);
 
   const db = await getMongoDb();
   const collections = getOnboardingCollections(db);
@@ -186,6 +214,7 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
   const membership: TenantMemberDocument = {
     tenantId: tenantInsert.insertedId,
     userId,
+    email: normalizeEmail(user.email),
     role: 'admin',
     status: 'active',
     joinedAt: now,
@@ -239,6 +268,7 @@ export async function skipWorkspaceSetup(userId: string, input: SkipWorkspaceInp
   const db = await getMongoDb();
   const collections = getOnboardingCollections(db);
   const now = new Date();
+  const user = await getPrismaUser(userId);
 
   if (input.skipReason === 'complete_later') {
     await collections.onboardingStates.updateOne(
@@ -268,6 +298,7 @@ export async function skipWorkspaceSetup(userId: string, input: SkipWorkspaceInp
 
   const member: MemberDocument = {
     userId,
+    email: normalizeEmail(user.email),
     status: 'active',
     onboardingSource: 'skipped_workspace_setup',
     createdAt: now,

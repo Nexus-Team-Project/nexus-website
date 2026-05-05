@@ -13,6 +13,7 @@ const envSchema = z.object({
   BACKEND_URL: z.string().trim().url().optional(),
   DASHBOARD_URL: z.string().trim().url().optional(),
   USER_MGMT_URL: z.string().trim().url().optional(),
+  NEXUS_ADMIN_EMAILS: z.string().optional(),
 
   // Database
   DATABASE_URL: z.string().min(1),
