@@ -33,6 +33,7 @@ import orgsRoutes from './routes/orgs.routes';
 import invitesRoutes from './routes/invites.routes';
 import pushRoutes from './routes/push.routes';
 import onboardingRoutes from './routes/onboarding.routes';
+import domainTenantRoutes from './routes/domain-tenant.routes';
 import { prisma } from './config/database';
 const app = express();
 app.set('trust proxy', 1);
@@ -95,6 +96,7 @@ app.get('/api/health', async (_req, res) => {
 // ─── API Routes ───────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api', onboardingRoutes);
+app.use('/api/tenant', domainTenantRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
