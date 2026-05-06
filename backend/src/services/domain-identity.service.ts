@@ -97,9 +97,7 @@ export async function syncDomainIdentityForLoginUser(user: LoginUserIdentityInpu
     {
       $setOnInsert: {
         contactProfileId: `contact_${randomUUID()}`,
-        nexusIdentityId: identity.nexusIdentityId,
         channel: 'email',
-        identifier: user.email,
         normalizedIdentifier: normalizedEmail,
         verified: false,
         status: 'active',
@@ -167,9 +165,7 @@ export async function syncDomainIdentityForMemberInvite(input: {
     {
       $setOnInsert: {
         contactProfileId: `contact_${randomUUID()}`,
-        nexusIdentityId: identity.nexusIdentityId,
         channel: 'email',
-        identifier: input.email,
         normalizedIdentifier: normalizedEmail,
         verified: false,
         status: 'active',
