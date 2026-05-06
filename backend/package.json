@@ -13,6 +13,7 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "db:embed": "tsx scripts/embed-knowledge.ts",
+    "domain:backfill": "tsx scripts/backfill-domain-model.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

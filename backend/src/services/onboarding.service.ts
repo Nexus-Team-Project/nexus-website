@@ -16,6 +16,7 @@ import {
 } from '../models/onboarding.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
+import { syncDomainTenantMembership } from './domain-tenant-sync.service';
 import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 
 export interface UserContext {
@@ -176,14 +177,15 @@ export async function getOnboardingStatus(userId: string): Promise<{ context: Us
  */
 export async function getMe(userId: string): Promise<MeResponse> {
   const [user, status] = await Promise.all([getPrismaUser(userId), getOnboardingStatus(userId)]);
+  const domainIdentity = await syncDomainIdentityForLoginUser({
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    provider: user.provider,
+  });
   await Promise.all([
     syncOnboardingMemberEmail(user.id, user.email),
-    syncDomainIdentityForLoginUser({
-      id: user.id,
-      email: user.email,
-      fullName: user.fullName,
-      provider: user.provider,
-    }),
+    syncLegacyTenantContextForDomain(user.id, domainIdentity.nexusIdentityId, status.context),
   ]);
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
@@ -191,6 +193,36 @@ export async function getMe(userId: string): Promise<MeResponse> {
     authorization: getDashboardAuthorization(user.email, status.context),
     onboarding: status.onboarding,
   };
+}
+
+/**
+ * Mirrors current legacy tenant context into the domain tenant model.
+ * Input: Prisma user id, synced domain identity id, and current dashboard context.
+ * Output: domain tenant/member/role records exist when the user is a tenant member.
+ */
+async function syncLegacyTenantContextForDomain(
+  userId: string,
+  nexusIdentityId: string,
+  context: UserContext,
+): Promise<void> {
+  if (!context.isTenant || !context.tenantId) return;
+
+  const db = await getMongoDb();
+  const collections = getOnboardingCollections(db);
+  const tenantId = new ObjectId(context.tenantId);
+  const [tenant, tenantMembership] = await Promise.all([
+    collections.tenants.findOne({ _id: tenantId }),
+    collections.tenantMembers.findOne({ tenantId, userId }),
+  ]);
+
+  if (!tenant || !tenantMembership?._id) return;
+  await syncDomainTenantMembership({
+    tenantId,
+    tenant,
+    tenantMembershipId: tenantMembership._id,
+    tenantMembership,
+    nexusIdentityId,
+  });
 }
 
 /**
@@ -222,6 +254,12 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
   };
 
   const tenantInsert = await collections.tenants.insertOne(tenant);
+  const domainIdentity = await syncDomainIdentityForLoginUser({
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    provider: user.provider,
+  });
   const membership: TenantMemberDocument = {
     tenantId: tenantInsert.insertedId,
     userId,
@@ -232,7 +270,14 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
     createdAt: now,
     updatedAt: now,
   };
-  await collections.tenantMembers.insertOne(membership);
+  const membershipInsert = await collections.tenantMembers.insertOne(membership);
+  await syncDomainTenantMembership({
+    tenantId: tenantInsert.insertedId,
+    tenant: { ...tenant, _id: tenantInsert.insertedId },
+    tenantMembershipId: membershipInsert.insertedId,
+    tenantMembership: { ...membership, _id: membershipInsert.insertedId },
+    nexusIdentityId: domainIdentity.nexusIdentityId,
+  });
 
   await collections.onboardingStates.updateOne(
     { userId },
