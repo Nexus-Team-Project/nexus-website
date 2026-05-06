@@ -67,7 +67,12 @@ export async function syncDomainIdentityForLoginUser(user: LoginUserIdentityInpu
   await collections.nexusIdentities.updateOne(
     { normalizedEmail },
     {
-      $setOnInsert: identityOnInsert,
+      $setOnInsert: {
+        nexusIdentityId: identityOnInsert.nexusIdentityId,
+        normalizedEmail: identityOnInsert.normalizedEmail,
+        locale: identityOnInsert.locale,
+        createdAt: identityOnInsert.createdAt,
+      },
       $set: {
         displayName: user.fullName,
         authProvider: mapAuthProvider(user.provider),
@@ -136,7 +141,6 @@ export async function syncDomainIdentityForMemberInvite(input: {
       $setOnInsert: {
         nexusIdentityId: `identity_${randomUUID()}`,
         normalizedEmail,
-        displayName: input.displayName,
         authProvider: 'email_passwordless',
         status: 'invited',
         locale: 'he',
