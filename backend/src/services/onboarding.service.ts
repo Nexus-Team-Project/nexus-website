@@ -15,6 +15,7 @@ import {
   getOnboardingCollections,
 } from '../models/onboarding.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
+import { syncDomainIdentityForLoginUser } from './domain-identity.service';
 import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 
 export interface UserContext {
@@ -63,10 +64,10 @@ function toId(value: ObjectId | undefined): string | null {
  * Input: Prisma user id from a verified access token.
  * Output: public user identity or a 404 error.
  */
-async function getPrismaUser(userId: string): Promise<{ id: string; email: string; fullName: string }> {
+async function getPrismaUser(userId: string): Promise<{ id: string; email: string; fullName: string; provider: string }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, fullName: true },
+    select: { id: true, email: true, fullName: true, provider: true },
   });
   if (!user) throw createError('User not found', 404);
   return user;
@@ -175,7 +176,15 @@ export async function getOnboardingStatus(userId: string): Promise<{ context: Us
  */
 export async function getMe(userId: string): Promise<MeResponse> {
   const [user, status] = await Promise.all([getPrismaUser(userId), getOnboardingStatus(userId)]);
-  await syncOnboardingMemberEmail(user.id, user.email);
+  await Promise.all([
+    syncOnboardingMemberEmail(user.id, user.email),
+    syncDomainIdentityForLoginUser({
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      provider: user.provider,
+    }),
+  ]);
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
     context: status.context,
