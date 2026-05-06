@@ -15,10 +15,11 @@ import {
   getOnboardingCollections,
 } from '../models/onboarding.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
-import { getDomainAuthorizationContext, getPrimaryTenantRole } from './domain-authorization.service';
+import { getDomainAuthorizationContext, getPrimaryTenantRole, hasDomainPermission } from './domain-authorization.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
 import { syncDomainTenantMembership } from './domain-tenant-sync.service';
 import { syncOnboardingMemberEmail } from './onboarding-identity.service';
+import type { DomainPermission } from './domain-permissions.service';
 
 export interface UserContext {
   isTenant: boolean;
@@ -416,6 +417,30 @@ async function requireTenantId(userId: string): Promise<ObjectId> {
 }
 
 /**
+ * Requires a tenant context plus a domain permission derived from backend state.
+ * Input: Prisma user id and required permission.
+ * Output: tenant ObjectId when the user's domain role grants the permission.
+ */
+async function requireTenantPermission(userId: string, permission: DomainPermission): Promise<ObjectId> {
+  const user = await getPrismaUser(userId);
+  const context = await getUserContext(userId);
+  if (!context.isTenant || !context.tenantId) throw createError('Tenant access required', 403);
+
+  const domainIdentity = await syncDomainIdentityForLoginUser({
+    id: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    provider: user.provider,
+  });
+  await syncLegacyTenantContextForDomain(user.id, domainIdentity.nexusIdentityId, context);
+
+  const authorization = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, context.tenantId);
+  if (!hasDomainPermission(authorization, permission)) throw createError('Forbidden', 403);
+
+  return new ObjectId(context.tenantId);
+}
+
+/**
  * Loads the tenant's business setup draft or submission.
  * Input: Prisma user id.
  * Output: stored setup data or an empty draft response.
@@ -440,7 +465,7 @@ export async function getBusinessSetup(userId: string) {
  * Output: updated draft setup response.
  */
 export async function saveBusinessSetupDraft(userId: string, data: BusinessSetupInput) {
-  return upsertBusinessSetup(userId, data, 'draft');
+  return upsertBusinessSetup(userId, data, 'draft', 'tenant.go_live');
 }
 
 /**
@@ -449,7 +474,7 @@ export async function saveBusinessSetupDraft(userId: string, data: BusinessSetup
  * Output: submitted setup response.
  */
 export async function submitBusinessSetup(userId: string, data: BusinessSetupInput) {
-  return upsertBusinessSetup(userId, data, 'submitted');
+  return upsertBusinessSetup(userId, data, 'submitted', 'tenant.go_live');
 }
 
 /**
@@ -457,8 +482,13 @@ export async function submitBusinessSetup(userId: string, data: BusinessSetupInp
  * Input: Prisma user id, validated setup data, and desired status.
  * Output: saved setup response.
  */
-async function upsertBusinessSetup(userId: string, data: BusinessSetupInput, status: BusinessSetupDocument['status']) {
-  const tenantId = await requireTenantId(userId);
+async function upsertBusinessSetup(
+  userId: string,
+  data: BusinessSetupInput,
+  status: BusinessSetupDocument['status'],
+  permission: DomainPermission,
+) {
+  const tenantId = await requireTenantPermission(userId, permission);
   const db = await getMongoDb();
   const collections = getOnboardingCollections(db);
   const now = new Date();
