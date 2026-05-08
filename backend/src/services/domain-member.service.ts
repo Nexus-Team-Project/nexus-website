@@ -20,6 +20,7 @@ import { getOnboardingCollections } from '../models/onboarding.models';
 import { ObjectId } from 'mongodb';
 import { buildMemberInviteLoginUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
 import { generateToken, hashToken } from '../utils/crypto';
+import type { DomainPermission } from './domain-permissions.service';
 
 export interface InviteTenantMemberResponse {
   tenantId: string;
@@ -62,11 +63,11 @@ async function getMemberManagerLoginUser(userId: string): Promise<{
 }
 
 /**
- * Requires tenant member management permission from Mongo domain roles.
- * Input: Prisma user id from the authenticated request.
+ * Requires one tenant member permission from Mongo domain roles.
+ * Input: Prisma user id from the authenticated request and required permission.
  * Output: tenant id and manager identity id when permission is granted.
  */
-export async function requireMemberManagementAccess(userId: string): Promise<{
+export async function requireTenantMemberPermission(userId: string, permission: DomainPermission): Promise<{
   tenantId: string;
   managerIdentityId: string;
 }> {
@@ -101,12 +102,24 @@ export async function requireMemberManagementAccess(userId: string): Promise<{
   }
 
   const authorization = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, context.tenantId);
-  if (!hasDomainPermission(authorization, 'member.manage')) throw createError('Forbidden', 403);
+  if (!hasDomainPermission(authorization, permission)) throw createError('Forbidden', 403);
 
   return {
     tenantId: context.tenantId,
     managerIdentityId: domainIdentity.nexusIdentityId,
   };
+}
+
+/**
+ * Requires tenant admin-level member management permission.
+ * Input: Prisma user id from the authenticated request.
+ * Output: tenant id and manager identity id when invite/manage access is granted.
+ */
+export async function requireMemberManagementAccess(userId: string): Promise<{
+  tenantId: string;
+  managerIdentityId: string;
+}> {
+  return requireTenantMemberPermission(userId, 'member.invite');
 }
 
 /**

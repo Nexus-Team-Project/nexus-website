@@ -42,6 +42,7 @@ export interface DashboardAuthorization {
   platformRole: PlatformRole | null;
   canSeeDevMode: boolean;
   canUseDevPlayground: boolean;
+  canViewMembers: boolean;
   canManageMembers: boolean;
 }
 
@@ -97,7 +98,8 @@ function getDashboardAuthorization(
     platformRole,
     canSeeDevMode,
     canUseDevPlayground: canSeeDevMode && platformRole === 'nexusAdmin',
-    canManageMembers: permissions.includes('member.manage'),
+    canViewMembers: permissions.includes('member.view') || permissions.includes('member.manage'),
+    canManageMembers: permissions.includes('member.invite') || permissions.includes('member.manage'),
   };
 }
 

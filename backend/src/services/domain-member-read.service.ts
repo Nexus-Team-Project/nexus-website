@@ -8,7 +8,7 @@ import {
   getTenantDomainCollections,
   type TenantUserRoleName,
 } from '../models/domain';
-import { requireMemberManagementAccess } from './domain-member.service';
+import { requireTenantMemberPermission } from './domain-member.service';
 import { DOMAIN_PERMISSIONS, type DomainPermission } from './domain-permissions.service';
 
 export interface TenantMemberListItem {
@@ -38,7 +38,7 @@ export async function listTenantMembersForManager(userId: string): Promise<{
   tenantId: string;
   members: TenantMemberListItem[];
 }> {
-  const access = await requireMemberManagementAccess(userId);
+  const access = await requireTenantMemberPermission(userId, 'member.view');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
@@ -146,13 +146,13 @@ export async function listTenantMembersForManager(userId: string): Promise<{
 
 /**
  * Lists roles and permissions from Mongo RolePermissionMap records.
- * Input: authenticated Prisma user id with member-management access.
+ * Input: authenticated Prisma user id with member-view access.
  * Output: tenant-scoped roles and their permission strings.
  */
 export async function listTenantRolesForManager(userId: string): Promise<{
   roles: TenantRoleListItem[];
 }> {
-  await requireMemberManagementAccess(userId);
+  await requireTenantMemberPermission(userId, 'member.view');
   const db = await getMongoDb();
   const identityCollections = getIdentityDomainCollections(db);
   const roleRecords = await identityCollections.rolePermissionMaps
