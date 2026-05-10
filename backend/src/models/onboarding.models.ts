@@ -15,7 +15,7 @@ export const USE_CASES = [
   'sms_marketing',
   'employee_gifts',
   'loyalty',
-  'prepaid_card',
+  'branded_card',
   'payment',
   'not_sure',
 ] as const;
