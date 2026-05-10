@@ -98,4 +98,31 @@ router.post(
   },
 );
 
+router.get('/onboarding/wizard-draft', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const draft = await onboardingService.loadWizardDraft(req.user!.sub);
+    res.json({ draft });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/onboarding/wizard-draft', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await onboardingService.saveWizardDraft(req.user!.sub, req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.delete('/onboarding/wizard-draft', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await onboardingService.clearWizardDraft(req.user!.sub);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 export default router;

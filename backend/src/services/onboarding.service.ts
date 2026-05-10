@@ -579,3 +579,71 @@ async function upsertBusinessSetup(
 
   return getBusinessSetup(userId);
 }
+
+// ── Wizard draft persistence ────────────────────────────────────────────────
+
+export interface WizardDraftInput {
+  step?: number;
+  orgName?: string;
+  website?: string;
+  businessDesc?: string;
+  primarySelected?: string[];
+  primarySuggested?: string[];
+  phone?: string;
+  role?: string;
+}
+
+/**
+ * Saves wizard progress to the user's onboardingState document in MongoDB.
+ * Called during "complete later" skip or periodically while the wizard is open.
+ * Input: Prisma user id and current wizard field values.
+ * Output: resolves when the draft is persisted.
+ */
+export async function saveWizardDraft(userId: string, draft: WizardDraftInput): Promise<void> {
+  const db = await getMongoDb();
+  const collections = getOnboardingCollections(db);
+  const now = new Date();
+  await collections.onboardingStates.updateOne(
+    { userId },
+    {
+      $setOnInsert: { createdAt: now },
+      $set: {
+        userId,
+        wizardDraft: { ...draft, savedAt: now },
+        updatedAt: now,
+      },
+    },
+    { upsert: true },
+  );
+}
+
+/**
+ * Loads the saved wizard draft for the authenticated user.
+ * Input: Prisma user id.
+ * Output: saved draft or null when none exists.
+ */
+export async function loadWizardDraft(userId: string): Promise<WizardDraftInput | null> {
+  const db = await getMongoDb();
+  const collections = getOnboardingCollections(db);
+  const doc = await collections.onboardingStates.findOne(
+    { userId },
+    { projection: { wizardDraft: 1 } },
+  );
+  if (!doc?.wizardDraft) return null;
+  const { savedAt: _savedAt, ...fields } = doc.wizardDraft;
+  return fields;
+}
+
+/**
+ * Clears the wizard draft after successful workspace creation.
+ * Input: Prisma user id.
+ * Output: resolves when the draft field is removed.
+ */
+export async function clearWizardDraft(userId: string): Promise<void> {
+  const db = await getMongoDb();
+  const collections = getOnboardingCollections(db);
+  await collections.onboardingStates.updateOne(
+    { userId },
+    { $unset: { wizardDraft: '' }, $set: { updatedAt: new Date() } },
+  );
+}

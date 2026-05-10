@@ -12,8 +12,7 @@ export const BUSINESS_SETUPS_COLLECTION = 'businessSetups';
 
 export const USE_CASES = [
   'benefits_club',
-  'digital_wallet',
-  'vouchers',
+  'sms_marketing',
   'employee_gifts',
   'loyalty',
   'prepaid_card',
@@ -95,6 +94,18 @@ export interface MemberDocument {
   updatedAt: Date;
 }
 
+export interface WizardDraft {
+  step?: number;
+  orgName?: string;
+  website?: string;
+  businessDesc?: string;
+  primarySelected?: string[];
+  primarySuggested?: string[];
+  phone?: string;
+  role?: string;
+  savedAt: Date;
+}
+
 export interface OnboardingStateDocument {
   _id?: ObjectId;
   userId: string;
@@ -103,6 +114,7 @@ export interface OnboardingStateDocument {
   skipReason?: SkipReason;
   tenantId?: ObjectId;
   memberId?: ObjectId;
+  wizardDraft?: WizardDraft;
   createdAt: Date;
   updatedAt: Date;
 }
