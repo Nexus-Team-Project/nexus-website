@@ -70,13 +70,7 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
 
-  // WhatsApp — Green API (optional)
-  GREEN_API_URL: z.string().url().optional().default('https://api.green-api.com'),
-  GREEN_API_ID_INSTANCE: z.string().min(1).optional(),
-  GREEN_API_TOKEN: z.string().min(1).optional(),
-
-  // WhatsApp provider switch + agent number
-  WHATSAPP_PROVIDER: z.enum(['meta', 'green_api']).default('meta'),
+  // WhatsApp — Meta only
   AGENT_WHATSAPP_NUMBER: z.string().min(1).optional(),
 
   // Payments
