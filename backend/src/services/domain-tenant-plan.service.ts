@@ -30,16 +30,22 @@ export interface TenantPlanSummary {
 
 /**
  * Counts distinct identities holding at least one non-member role for the tenant.
- * Input: tenant id string.
+ * The tenant creator is excluded — they don't consume a billable seat.
+ * Input: tenant id, optional creator identity id to exclude.
  * Output: number of occupied non-member seats (each identity counts once).
  */
-async function countNonMemberSeatsUsed(tenantId: string): Promise<number> {
+async function countNonMemberSeatsUsed(tenantId: string, excludeIdentityId?: string): Promise<number> {
   const db = await getMongoDb();
   const identityCollections = getIdentityDomainCollections(db);
 
+  const matchStage: Record<string, unknown> = { tenantId, role: { $ne: 'member' } };
+  if (excludeIdentityId) {
+    matchStage.nexusIdentityId = { $ne: excludeIdentityId };
+  }
+
   const result = await identityCollections.tenantUserRoles
     .aggregate<{ count: number }>([
-      { $match: { tenantId, role: { $ne: 'member' } } },
+      { $match: matchStage },
       { $group: { _id: '$nexusIdentityId' } },
       { $count: 'count' },
     ])
@@ -50,6 +56,8 @@ async function countNonMemberSeatsUsed(tenantId: string): Promise<number> {
 
 /**
  * Returns the current plan and seat usage for a tenant.
+ * The tenant creator (createdByIdentityId) is excluded from the seat count
+ * so they don't consume one of the billable non-member slots.
  * Input: tenant id string.
  * Output: plan tier, seats used, seat limit, remaining seats, and at-limit flag.
  */
@@ -57,13 +65,13 @@ export async function getTenantPlanSummary(tenantId: string): Promise<TenantPlan
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
 
-  const [tenant, seatsUsed] = await Promise.all([
-    tenantCollections.domainTenants.findOne(
-      { tenantId },
-      { projection: { plan: 1 } },
-    ),
-    countNonMemberSeatsUsed(tenantId),
-  ]);
+  // Fetch tenant first to get plan + creator id before counting seats.
+  const tenant = await tenantCollections.domainTenants.findOne(
+    { tenantId },
+    { projection: { plan: 1, createdByIdentityId: 1 } },
+  );
+
+  const seatsUsed = await countNonMemberSeatsUsed(tenantId, tenant?.createdByIdentityId);
 
   const plan: TenantPlan = (tenant?.plan ?? 'basic') as TenantPlan;
   const seatLimit = PLAN_SEAT_LIMITS[plan];
