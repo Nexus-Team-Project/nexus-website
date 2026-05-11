@@ -6,6 +6,9 @@ import type { Collection, Db, ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { DOMAIN_COLLECTIONS } from './collections';
 
+export const TENANT_CONTACT_STATUSES = ['active', 'inactive', 'pending'] as const;
+export type TenantContactStatus = typeof TENANT_CONTACT_STATUSES[number];
+
 export const TENANT_STATUSES = ['build_mode', 'active', 'suspended', 'archived'] as const;
 export const TENANT_ONBOARDING_STATES = [
   'onboarding_initiated',
@@ -127,6 +130,21 @@ export const tenantMemberInvitationSchema = z.object({
   updatedAt: z.date(),
 });
 
+/** Tenant-owned contact record — does not require Nexus registration or invite acceptance. */
+export const tenantContactSchema = z.object({
+  tenantContactId: z.string().min(1),
+  tenantId: z.string().min(1),
+  email: z.string().email(),
+  normalizedEmail: z.string().email(),
+  displayName: z.string().min(1).max(255),
+  status: z.enum(TENANT_CONTACT_STATUSES),
+  address: z.string().max(500).optional(),
+  lastActivityAt: z.date().optional(),
+  nexusIdentityId: z.string().optional(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
 export const tenantCatalogPolicySchema = z.object({
   tenantCatalogPolicyId: z.string().min(1),
   tenantId: z.string().min(1),
@@ -147,6 +165,7 @@ export type TenantMemberDomainDocument = z.infer<typeof tenantMemberDomainSchema
 export type MemberGroupDocument = z.infer<typeof memberGroupSchema> & { _id?: ObjectId };
 export type MemberGroupAssignmentDocument = z.infer<typeof memberGroupAssignmentSchema> & { _id?: ObjectId };
 export type TenantMemberInvitationDocument = z.infer<typeof tenantMemberInvitationSchema> & { _id?: ObjectId };
+export type TenantContactDocument = z.infer<typeof tenantContactSchema> & { _id?: ObjectId };
 export type TenantCatalogPolicyDocument = z.infer<typeof tenantCatalogPolicySchema> & { _id?: ObjectId };
 
 export interface TenantDomainCollections {
@@ -159,6 +178,7 @@ export interface TenantDomainCollections {
   memberGroups: Collection<MemberGroupDocument>;
   memberGroupAssignments: Collection<MemberGroupAssignmentDocument>;
   tenantCatalogPolicies: Collection<TenantCatalogPolicyDocument>;
+  tenantContacts: Collection<TenantContactDocument>;
 }
 
 /**
@@ -179,5 +199,6 @@ export function getTenantDomainCollections(db: Db): TenantDomainCollections {
     memberGroups: db.collection<MemberGroupDocument>(DOMAIN_COLLECTIONS.memberGroups),
     memberGroupAssignments: db.collection<MemberGroupAssignmentDocument>(DOMAIN_COLLECTIONS.memberGroupAssignments),
     tenantCatalogPolicies: db.collection<TenantCatalogPolicyDocument>(DOMAIN_COLLECTIONS.tenantCatalogPolicies),
+    tenantContacts: db.collection<TenantContactDocument>(DOMAIN_COLLECTIONS.tenantContacts),
   };
 }

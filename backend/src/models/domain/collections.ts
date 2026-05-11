@@ -16,6 +16,7 @@ export const DOMAIN_COLLECTIONS = {
   memberGroups: 'memberGroups',
   memberGroupAssignments: 'memberGroupAssignments',
   tenantCatalogPolicies: 'tenantCatalogPolicies',
+  tenantContacts: 'tenantContacts',
   platformEvents: 'platformEvents',
   sagaInstances: 'sagaInstances',
   processedSteps: 'processedSteps',
