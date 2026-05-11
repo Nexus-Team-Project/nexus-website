@@ -907,7 +907,7 @@ export const translations = {
       seeDocumentation: 'ראה תיעוד',
       tryDemo: 'נסה דמו',
       watchVideo: 'צפה בסרטון',
-      signUpWithGoogle: 'הרשמה עם Google',
+      signUpWithGoogle: 'התחברות עם Google',
     },
     liveChat: {
       salesTeam: 'צוות מכירות',

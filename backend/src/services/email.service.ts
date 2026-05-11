@@ -1,14 +1,25 @@
-import nodemailer from 'nodemailer';
+/**
+ * Sends transactional emails for account, password, chat, and digest flows.
+ * Email links use the app URL, while email images use a public asset URL so
+ * inbox providers can load images even when the app runs locally.
+ */
+import type nodemailer from 'nodemailer';
 import { env } from '../config/env';
 
 const FROM_EMAIL = env.EMAIL_FROM ?? 'hello@nexus-payment.com';
 const FROM_NAME = 'Nexus';
 const FRONTEND = env.FRONTEND_URL;
+const EMAIL_ASSET_BASE_URL = env.EMAIL_ASSET_BASE_URL ?? FRONTEND;
+const AUTH_EMAIL_BANNER_PATH = '/nexus-logo-black.png';
 
 // ─── SMTP transport (Nodemailer) — preferred for threading ──
 
-let _smtpTransport: nodemailer.Transporter | null = null;
-
+/**
+ * Return the SMTP transport when SMTP is enabled.
+ *
+ * Inputs: none.
+ * Output: a Nodemailer transporter, or null when email should use SendPulse.
+ */
 function getSmtpTransport(): nodemailer.Transporter | null {
   // SMTP disabled — causes connection hangs on Railway.
   // Using SendPulse REST API only for now.
@@ -20,6 +31,12 @@ function getSmtpTransport(): nodemailer.Transporter | null {
 
 let cachedToken: { value: string; expiresAt: number } | null = null;
 
+/**
+ * Get a SendPulse API access token and cache it until shortly before expiry.
+ *
+ * Inputs: none.
+ * Output: a bearer token string for SendPulse REST calls.
+ */
 async function getAccessToken(): Promise<string> {
   if (cachedToken && cachedToken.expiresAt > Date.now() + 60_000) {
     return cachedToken.value;
@@ -45,9 +62,48 @@ async function getAccessToken(): Promise<string> {
   return cachedToken.value;
 }
 
+/**
+ * Escape text before it is inserted into email HTML.
+ *
+ * Inputs: untrusted text from a user or external system.
+ * Output: HTML-safe text that cannot create markup.
+ */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Build a public URL for an email image or static file.
+ *
+ * Inputs: an absolute public path such as "/nexus-logo-black.png".
+ * Output: a full URL based on EMAIL_ASSET_BASE_URL.
+ */
+function buildPublicAssetUrl(path: string): string {
+  return new URL(path, EMAIL_ASSET_BASE_URL).toString();
+}
+
+/**
+ * Build the branded image banner used at the top of auth emails.
+ *
+ * Inputs: none.
+ * Output: an email-client-friendly HTML banner with an absolute image URL.
+ */
+export function buildAuthEmailBannerHtml(): string {
+  const bannerUrl = buildPublicAssetUrl(AUTH_EMAIL_BANNER_PATH);
+
+  return `<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:22px 20px;margin-bottom:30px;text-align:center;">
+<img src="${bannerUrl}" width="220" style="display:block;margin:0 auto;max-width:220px;width:100%;height:auto;border:0;outline:none;text-decoration:none;" alt="Nexus">
+</div>`;
+}
+
 // ─── Unified send interface ──────────────────────────────────
 
-interface SendMailOptions {
+export interface SendMailOptions {
   to: string;
   toName?: string;
   fromName?: string;
@@ -60,7 +116,13 @@ interface SendMailOptions {
   _label?: string;
 }
 
-async function sendMail(options: SendMailOptions): Promise<string | null> {
+/**
+ * Send an email through SMTP when available, otherwise through SendPulse.
+ *
+ * Inputs: normalized email metadata, HTML body, optional text body, and headers.
+ * Output: provider message ID when available, otherwise null.
+ */
+export async function sendMail(options: SendMailOptions): Promise<string | null> {
   const label = options._label ?? 'GENERIC';
   const smtp = getSmtpTransport();
 
@@ -100,8 +162,9 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
 
       console.log(`✅  [${label}] SMTP sent — messageId: ${info.messageId ?? 'none'}`);
       return info.messageId ?? null;
-    } catch (err: any) {
-      console.error(`❌  [${label}] SMTP FAILED to ${options.to}:`, err?.message ?? err);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`❌  [${label}] SMTP FAILED to ${options.to}:`, message);
       console.log(`🔄  [${label}] Falling back to SendPulse REST API...`);
       // Fall through to SendPulse REST API below
     }
@@ -142,22 +205,32 @@ async function sendMail(options: SendMailOptions): Promise<string | null> {
     }
     console.log(`✅  [${label}] SendPulse sent to ${options.to} — id: ${data.id ?? 'none'}`);
     return data.id ?? null;
-  } catch (err: any) {
-    console.error(`❌  [${label}] SendPulse FAILED to ${options.to}:`, err?.message ?? err);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`❌  [${label}] SendPulse FAILED to ${options.to}:`, message);
     throw err;
   }
 }
 
 // ─── Welcome email ─────────────────────────────────────────
 
+/**
+ * Send a basic welcome email after account creation.
+ *
+ * Inputs: recipient email address and display name.
+ * Output: resolves after the provider accepts or skips the email.
+ */
 export async function sendWelcomeEmail(email: string, fullName: string) {
+  const displayName = escapeHtml(fullName);
+
   await sendMail({
     to: email,
     toName: fullName,
     subject: 'ברוכים הבאים ל-Nexus! 🎉',
     html: `
       <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #6366f1;">שלום ${fullName},</h1>
+        ${buildAuthEmailBannerHtml()}
+        <h1 style="color: #6366f1;">שלום ${displayName},</h1>
         <p>ברוכים הבאים ל-Nexus — פלטפורמת התשלומים המובילה לעסקים.</p>
         <p>החשבון שלך נוצר בהצלחה. אנחנו שמחים שאתה איתנו!</p>
         <a href="${FRONTEND}/dashboard" style="
@@ -179,6 +252,12 @@ export async function sendWelcomeEmail(email: string, fullName: string) {
 
 // ─── Email verification ─────────────────────────────────────
 
+/**
+ * Send an email verification link in the requested language.
+ *
+ * Inputs: recipient email, display name, verification token, and language.
+ * Output: resolves after the provider accepts or skips the email.
+ */
 export async function sendVerificationEmail(
   email: string,
   fullName: string,
@@ -187,7 +266,7 @@ export async function sendVerificationEmail(
 ) {
   const prefix = language === 'he' ? '/he' : '';
   const verifyUrl = `${FRONTEND}${prefix}/verify-email?token=${rawToken}`;
-  const logoUrl = `${FRONTEND}/nexus-logo-black.png`;
+  const bannerHtml = buildAuthEmailBannerHtml();
 
   const isHe = language === 'he';
 
@@ -210,7 +289,7 @@ export async function sendVerificationEmail(
 <table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr>
 <td align="center">
-<img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus">
+${bannerHtml}
 <h1 style="margin:0;color:#111;font-size:26px;">ברוכים הבאים לנקסוס</h1>
 <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
 עוד רגע מתחילים.<br>
@@ -255,7 +334,7 @@ ${verifyUrl}
 <table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr>
 <td align="center">
-<img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus">
+${bannerHtml}
 <h1 style="margin:0;color:#111;font-size:26px;">Welcome to Nexus</h1>
 <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
 Almost there.<br>
@@ -296,6 +375,12 @@ ${verifyUrl}
 
 // ─── Password reset ────────────────────────────────────────
 
+/**
+ * Send a password reset link in the requested language.
+ *
+ * Inputs: recipient email, display name, reset token, and language.
+ * Output: resolves after the provider accepts or skips the email.
+ */
 export async function sendPasswordResetEmail(
   email: string,
   fullName: string,
@@ -304,7 +389,8 @@ export async function sendPasswordResetEmail(
 ) {
   const prefix = language === 'he' ? '/he' : '';
   const resetUrl = `${FRONTEND}${prefix}/reset-password?token=${rawToken}`;
-  const logoUrl = `${FRONTEND}/nexus-logo-black.png`;
+  const bannerHtml = buildAuthEmailBannerHtml();
+  const displayName = escapeHtml(fullName);
 
   const isHe = language === 'he';
 
@@ -323,10 +409,10 @@ export async function sendPasswordResetEmail(
 <tr><td align="center" style="padding:40px 20px;">
 <table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr><td align="center">
-  <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus">
+  ${bannerHtml}
   <h1 style="margin:0;color:#111;font-size:26px;">איפוס סיסמה</h1>
   <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
-    שלום ${fullName},<br>קיבלנו בקשה לאיפוס הסיסמה שלך.
+    שלום ${displayName},<br>קיבלנו בקשה לאיפוס הסיסמה שלך.
   </p>
 </td></tr>
 <tr><td align="center" style="padding:30px 0;">
@@ -352,10 +438,10 @@ export async function sendPasswordResetEmail(
 <tr><td align="center" style="padding:40px 20px;">
 <table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr><td align="center">
-  <img src="${logoUrl}" width="120" style="margin-bottom:30px;" alt="Nexus">
+  ${bannerHtml}
   <h1 style="margin:0;color:#111;font-size:26px;">Password Reset</h1>
   <p style="margin:18px 0 0 0;color:#555;font-size:16px;line-height:1.6;">
-    Hi ${fullName},<br>We received a request to reset your password.
+    Hi ${displayName},<br>We received a request to reset your password.
   </p>
 </td></tr>
 <tr><td align="center" style="padding:30px 0;">

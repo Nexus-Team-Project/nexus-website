@@ -1,15 +1,17 @@
+/**
+ * Configures the Socket.io server used by chat and admin inbox features.
+ * The CORS policy is shared with the standalone API service configuration.
+ */
 import { Server as HttpServer } from 'http';
 import { Server as SocketServer } from 'socket.io';
-import { env } from './config/env';
+import { socketCorsOptions } from './config/cors';
 
 let io: SocketServer;
 
+/** Creates Socket.io, attaches it to the HTTP server, and registers chat events. */
 export function initSocket(httpServer: HttpServer): SocketServer {
   io = new SocketServer(httpServer, {
-    cors: {
-      origin: env.FRONTEND_URL,
-      credentials: true,
-    },
+    cors: socketCorsOptions,
     pingTimeout: 60000,
   });
 

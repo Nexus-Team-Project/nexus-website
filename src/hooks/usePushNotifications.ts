@@ -1,7 +1,8 @@
+// This hook manages browser push subscriptions against the configured backend API.
 import { useState, useEffect, useCallback } from 'react';
+import { API_URL } from '../lib/api';
 
-const API = import.meta.env.VITE_API_URL || '';
-
+/** Converts a VAPID public key from base64url text into bytes for PushManager. */
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -11,6 +12,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return arr;
 }
 
+/** Registers, subscribes, and unsubscribes the current browser for web push. */
 export function usePushNotifications() {
   const [isSupported, setIsSupported] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
@@ -44,7 +46,7 @@ export function usePushNotifications() {
       await navigator.serviceWorker.ready;
 
       // 2. Get VAPID public key from server
-      const keyRes = await fetch(`${API}/api/push/vapid-public-key`);
+      const keyRes = await fetch(`${API_URL}/api/push/vapid-public-key`);
       if (!keyRes.ok) throw new Error('Push not configured on server');
       const { publicKey } = await keyRes.json();
 
@@ -63,7 +65,7 @@ export function usePushNotifications() {
 
       // 5. Send subscription to server
       const token = localStorage.getItem('nexus_access_token');
-      await fetch(`${API}/api/push/subscribe`, {
+      await fetch(`${API_URL}/api/push/subscribe`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,7 +91,7 @@ export function usePushNotifications() {
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
         const token = localStorage.getItem('nexus_access_token');
-        await fetch(`${API}/api/push/unsubscribe`, {
+        await fetch(`${API_URL}/api/push/unsubscribe`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

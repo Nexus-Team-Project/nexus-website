@@ -197,18 +197,22 @@ model User {
 }
 
 model RefreshToken {
-  id        String    @id @default(cuid())
-  tokenHash String    @unique
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expiresAt DateTime
-  revokedAt DateTime?
-  userAgent String?
-  ipAddress String?
-  createdAt DateTime  @default(now())
+  id                   String    @id @default(cuid())
+  tokenHash            String    @unique
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt            DateTime
+  revokedAt            DateTime?
+  // When this token is rotated, holds the hash of the replacement token so a
+  // racing second request can follow the chain instead of triggering bulk-revoke.
+  replacedByTokenHash  String?
+  userAgent            String?
+  ipAddress            String?
+  createdAt            DateTime  @default(now())
 
   @@index([userId])
   @@index([tokenHash])
+  @@index([replacedByTokenHash])
 }
 
 model PasswordReset {
@@ -223,15 +227,16 @@ model PasswordReset {
 }
 
 model PendingRegistration {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  fullName     String
-  country      String   @default("IL")
-  emailUpdates Boolean  @default(true)
-  tokenHash    String   @unique
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
+  id                String   @id @default(cuid())
+  email             String   @unique
+  passwordHash      String
+  fullName          String
+  country           String   @default("IL")
+  emailUpdates      Boolean  @default(true)
+  tokenHash         String   @unique
+  dashboardRedirect String?
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
 
   @@index([tokenHash])
   @@index([email])

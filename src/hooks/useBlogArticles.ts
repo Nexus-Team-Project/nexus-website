@@ -1,8 +1,29 @@
+// This hook loads published blog content from the standalone backend API.
 import { useEffect, useState } from 'react';
 import type { Article, ArticleSection, ArticleFAQ } from '../data/blog/types';
+import { API_URL } from '../lib/api';
 
-/** Transform a DB-shaped article (camelCase, author fields flat) to the Article type */
-function toArticle(raw: any): Article {
+interface BlogArticleDto {
+  slug: string;
+  title: string;
+  subtitle?: string | null;
+  excerpt?: string | null;
+  metaTitle?: string | null;
+  metaDescription?: string | null;
+  category?: string | null;
+  heroImage?: string | null;
+  authorName?: string | null;
+  authorRole?: string | null;
+  authorAvatar?: string | null;
+  publishDate?: string | null;
+  createdAt?: string | null;
+  readTime?: number | null;
+  sectionsJson?: ArticleSection[] | null;
+  faqJson?: ArticleFAQ[] | null;
+}
+
+/** Transform a DB-shaped article response into the Article type used by pages. */
+function toArticle(raw: BlogArticleDto): Article {
   return {
     slug: raw.slug,
     title: raw.title,
@@ -44,9 +65,9 @@ export function useBlogArticles(lang: string): UseBlogArticlesResult {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/blog?lang=${lang}&status=published&limit=100`)
+    fetch(`${API_URL}/api/blog?lang=${lang}&status=published&limit=100`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
-      .then((data) => {
+      .then((data: { articles?: BlogArticleDto[] }) => {
         if (!cancelled) {
           setArticles((data.articles ?? []).map(toArticle));
           setLoading(false);
@@ -82,9 +103,9 @@ export function useBlogArticle(slug: string | undefined, lang: string): UseBlogA
     setLoading(true);
     setError(null);
 
-    fetch(`/api/blog/${slug}?lang=${lang}`)
+    fetch(`${API_URL}/api/blog/${slug}?lang=${lang}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status === 404 ? 'not_found' : r.statusText)))
-      .then((data) => {
+      .then((data: { article: BlogArticleDto }) => {
         if (!cancelled) {
           setArticle(toArticle(data.article));
           setLoading(false);

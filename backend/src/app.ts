@@ -1,12 +1,16 @@
+/**
+ * Builds the standalone Nexus API Express application.
+ * This file registers security middleware, CORS, API routes, health checks,
+ * and the global API error handler. It does not serve frontend static files.
+ */
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
-import path from 'path';
-import { existsSync } from 'fs';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import { httpCorsOptions } from './config/cors';
 
 // Routes
 import authRoutes from './routes/auth.routes';
@@ -28,6 +32,9 @@ import adminUsersRoutes from './routes/admin.users.routes';
 import orgsRoutes from './routes/orgs.routes';
 import invitesRoutes from './routes/invites.routes';
 import pushRoutes from './routes/push.routes';
+import onboardingRoutes from './routes/onboarding.routes';
+import domainTenantRoutes from './routes/domain-tenant.routes';
+import v1Routes from './routes/v1.routes';
 import { prisma } from './config/database';
 const app = express();
 app.set('trust proxy', 1);
@@ -42,7 +49,9 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'img-src': ["'self'", 'data:', 'https://flagcdn.com', 'https://lh3.googleusercontent.com', 'https://*.googleusercontent.com', 'https://*.google.com', 'https://static.wixstatic.com', 'https://images.unsplash.com'],
-        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'", 'https://accounts.google.com', 'https://cdn.jsdelivr.net', 'https://apis.google.com', 'https://assets.apollo.io', 'https://www.googletagmanager.com', 'https://www.google-analytics.com'],
+        // 'unsafe-inline' retained for Google Tag Manager (injected inline scripts).
+        // TODO: migrate to nonce-based CSP to eliminate 'unsafe-inline'.
+        'script-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://cdn.jsdelivr.net', 'https://apis.google.com', 'https://assets.apollo.io', 'https://www.googletagmanager.com', 'https://www.google-analytics.com'],
         'connect-src': ["'self'", 'https://nexus-website-production.up.railway.app', 'https://accounts.google.com', 'https://oauth2.googleapis.com', 'https://*.googleapis.com', 'https://*.apollo.io', 'https://aplo-evnt.com', 'https://*.aplo-evnt.com', 'https://api.github.com', 'https://www.google-analytics.com', 'https://analytics.google.com', 'https://www.googletagmanager.com'],
         'frame-src': ["'self'", 'https://accounts.google.com'],
         'style-src': ["'self'", "'unsafe-inline'", 'https://accounts.google.com', 'https://fonts.googleapis.com'],
@@ -53,19 +62,7 @@ app.use(
 );
 
 // ─── CORS ────────────────────────────────────────────────
-const allowedOrigins = [env.FRONTEND_URL, env.DASHBOARD_URL, env.USER_MGMT_URL].filter(Boolean) as string[];
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      // Allow requests with no origin (e.g. curl, mobile apps) in dev
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      cb(new Error(`CORS: origin ${origin} not allowed`));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-anonymous-id', 'x-agent-key'],
-  }),
-);
+app.use(cors(httpCorsOptions));
 
 // ─── Webhook routes FIRST with raw body ──────────────────
 app.use('/api/webhooks', express.raw({ type: 'application/json' }), webhookRoutes);
@@ -75,32 +72,27 @@ app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// ─── Health check ─────────────────────────────────────────
-app.get('/api/health', async (_req, res) => {
-  // Quick agent connectivity check
-  let agentOk = false;
-  if (env.AGENT_API_URL) {
-    try {
-      const r = await fetch(`${env.AGENT_API_URL}/health`, { signal: AbortSignal.timeout(3000) });
-      agentOk = r.ok;
-    } catch { /* ignore */ }
-  }
-
+/**
+ * Sends minimal health status for deploy checks.
+ * Intentionally returns no internal service details — those belong behind auth.
+ * Input: Express request and response.
+ * Output: { status: 'ok', timestamp: string }
+ */
+function sendHealthStatus(_req: express.Request, res: express.Response): void {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    env: env.NODE_ENV,
-    build: '2026-03-25f',
-    emailConfigured: !!(env.SENDPULSE_CLIENT_ID && env.SENDPULSE_CLIENT_SECRET),
-    agentProxy: {
-      configured: !!(env.AGENT_API_URL && env.AGENT_API_KEY),
-      reachable: agentOk,
-    },
   });
-});
+}
+
+// ─── Health check ─────────────────────────────────────────
+app.get(['/api/health', '/api/v1/health'], sendHealthStatus);
 
 // ─── API Routes ───────────────────────────────────────────
+app.use('/api/v1', v1Routes);
 app.use('/api/auth', authRoutes);
+app.use('/api', onboardingRoutes);
+app.use('/api/tenant', domainTenantRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
@@ -186,57 +178,6 @@ ${articleUrls.join('\n')}
     next(err);
   }
 });
-
-// ─── Serve frontend (SPA) ─────────────────────────────────
-const frontendDist = path.resolve(__dirname, '../public');
-
-// On docs.nexus-payment.com we serve nexus-api-favicon.png for ALL favicon
-// requests (including /favicon.ico auto-requests and any old cached paths).
-// This route MUST be registered before express.static so it wins.
-const isDocsDomain = (req: express.Request) =>
-  req.hostname === 'docs.nexus-payment.com' ||
-  req.headers['x-forwarded-host'] === 'docs.nexus-payment.com' ||
-  req.get('host') === 'docs.nexus-payment.com';
-
-app.get(['/nexus-favicon.svg', '/nexus-favicon.png', '/favicon.ico'], (req, res, next) => {
-  if (!isDocsDomain(req)) return next();
-  const apiFaviconPath = path.join(frontendDist, 'nexus-api-favicon.png');
-  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-  if (existsSync(apiFaviconPath)) return res.sendFile(apiFaviconPath);
-  // Fallback if file missing (dev / fresh clone)
-  res.setHeader('Content-Type', 'image/png');
-  res.send(Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-    'base64',
-  ));
-});
-
-if (existsSync(frontendDist)) {
-  app.use(
-    '/assets',
-    express.static(path.join(frontendDist, 'assets'), {
-      redirect: false,
-      maxAge: '1y',
-      immutable: true,
-    }),
-  );
-  // Return 404 for missing assets (e.g. stale chunk hashes after deploy)
-  // instead of falling through to the SPA catch-all which would serve index.html as JS
-  app.use('/assets', (_req, res) => {
-    res.status(404).end();
-  });
-  app.use(
-    express.static(frontendDist, {
-      redirect: false,
-      maxAge: '1h',
-      index: false, // Don't serve index.html from static — SPA handler below does it with no-cache
-    }),
-  );
-  app.get(/^(?!\/api).*/, (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.sendFile(path.join(frontendDist, 'index.html'));
-  });
-}
 
 // ─── 404 for unknown API routes ───────────────────────────
 app.use((_req, res) => {

@@ -8,7 +8,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { createPortal } from 'react-dom';
 
-const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5174';
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
 // Function to get nav items with translations
 const getNavItems = (t: any, lang: 'en' | 'he') => [

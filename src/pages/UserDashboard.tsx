@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
-const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5174';
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
 // ─── Types ────────────────────────────────────────────────
 

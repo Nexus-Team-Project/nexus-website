@@ -1,0 +1,8 @@
+*.md
+
+# Database backups and restore artifacts
+backups/
+*.dump
+*.archive
+*.bson
+*.sql.gz

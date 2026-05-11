@@ -1,3 +1,8 @@
+/**
+ * Validates and exports backend environment variables at process startup.
+ * Required values fail fast so a Railway deployment cannot boot with broken
+ * secrets, database settings, or public service URLs.
+ */
 import { z } from 'zod';
 
 const envSchema = z.object({
@@ -5,15 +10,24 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3001),
   FRONTEND_URL: z.string().trim().url(),
+  BACKEND_URL: z.string().trim().url().optional(),
   DASHBOARD_URL: z.string().trim().url().optional(),
   USER_MGMT_URL: z.string().trim().url().optional(),
+  NEXUS_ADMIN_EMAILS: z.string().optional(),
 
   // Database
   DATABASE_URL: z.string().min(1),
+  MONGODB_URI: z.string().min(1),
+  MONGODB_DB: z.string().min(1).default('nexus'),
 
   // JWT — always required
   ACCESS_TOKEN_SECRET: z.string().min(32),
   REFRESH_TOKEN_SECRET: z.string().min(32),
+
+  // Cookie domain — set to e.g. .nexus-payment.com in production so the
+  // httpOnly refresh cookie is shared across website, dashboard, and api subdomains.
+  // Leave unset in development.
+  COOKIE_DOMAIN: z.string().min(1).optional(),
 
   // Google OAuth — client ID required, secret optional (OAuth code flow disabled when absent)
   GOOGLE_CLIENT_ID: z.string().min(1),
@@ -27,7 +41,7 @@ const envSchema = z.object({
 
   // Notifications
   AGENT_EMAIL: z.string().email().optional(), // Email for chat escalation alerts
-  INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Secret for inbound email webhook
+  INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Required to use email-inbound webhook — route rejects all requests if not set
 
   // Microsoft Graph API — for reading Outlook inbox replies
   MS_TENANT_ID: z.string().min(1).optional(),
@@ -43,6 +57,7 @@ const envSchema = z.object({
   SENDPULSE_CLIENT_ID: z.string().min(1).optional(),
   SENDPULSE_CLIENT_SECRET: z.string().min(1).optional(),
   EMAIL_FROM: z.string().email().optional(),
+  EMAIL_ASSET_BASE_URL: z.string().trim().url().optional(),
 
   // Monday.com CRM — optional (CRM disabled when absent)
   MONDAY_API_TOKEN: z.string().min(1).optional(),
@@ -55,13 +70,7 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
 
-  // WhatsApp — Green API (optional)
-  GREEN_API_URL: z.string().url().optional().default('https://api.green-api.com'),
-  GREEN_API_ID_INSTANCE: z.string().min(1).optional(),
-  GREEN_API_TOKEN: z.string().min(1).optional(),
-
-  // WhatsApp provider switch + agent number
-  WHATSAPP_PROVIDER: z.enum(['meta', 'green_api']).default('meta'),
+  // WhatsApp — Meta only
   AGENT_WHATSAPP_NUMBER: z.string().min(1).optional(),
 
   // Payments

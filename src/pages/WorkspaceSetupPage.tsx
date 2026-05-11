@@ -19,7 +19,7 @@ export interface OnboardingData {
   role: string;
 }
 
-const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5174';
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
 export default function WorkspaceSetupPage() {
   const [phase, setPhase] = useState<Phase>('wizard');

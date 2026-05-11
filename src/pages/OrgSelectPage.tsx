@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import NexusLogo from '../components/NexusLogo';
 
-const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? 'http://localhost:5174';
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
 const ROLE_LABELS: Record<string, { label: string; color: string }> = {
   OWNER:  { label: 'Owner',  color: '#0D9488' },

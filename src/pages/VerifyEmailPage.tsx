@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { api, setAccessToken } from '../lib/api';
 import NexusLogo from '../components/NexusLogo';
 import AnimatedGradient from '../components/AnimatedGradient';
@@ -7,9 +7,36 @@ import { useLanguage } from '../i18n/LanguageContext';
 
 type Status = 'verifying' | 'success' | 'error' | 'expired';
 
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
+
+/**
+ * Builds the dashboard callback URL after email verification.
+ * Input: one-time dashboard code and local dashboard redirect path.
+ * Output: absolute dashboard callback URL.
+ */
+function buildDashboardCallbackUrl(code: string, redirectPath: string, language: 'he' | 'en'): string {
+  const url = new URL('/auth/callback', DASHBOARD_URL);
+  url.searchParams.set('code', code);
+  url.searchParams.set('redirect', redirectPath);
+  url.searchParams.set('lang', language);
+  return url.toString();
+}
+
+/**
+ * Reads and clears the invite redirect saved during signup.
+ * Input: session storage state from the same browser session.
+ * Output: safe local dashboard path or null.
+ */
+function consumeSavedDashboardRedirect(): string | null {
+  const saved = sessionStorage.getItem('nexus_dashboard_redirect_after_verify');
+  sessionStorage.removeItem('nexus_dashboard_redirect_after_verify');
+  if (!saved || !saved.startsWith('/') || saved.startsWith('//')) return null;
+  return saved;
+}
+
 export default function VerifyEmailPage() {
-  const [status, setStatus] = useState<Status>('verifying');
-  const navigate = useNavigate();
+  const initialToken = new URLSearchParams(window.location.search).get('token');
+  const [status, setStatus] = useState<Status>(initialToken ? 'verifying' : 'error');
   const { language, direction } = useLanguage();
   const isHe = language === 'he';
   const signupPath = isHe ? '/he/signup' : '/signup';
@@ -19,11 +46,10 @@ export default function VerifyEmailPage() {
     const token = params.get('token');
 
     if (!token) {
-      setStatus('error');
       return;
     }
 
-    api.post<{ accessToken: string }>('/api/auth/verify-email', { token })
+    api.post<{ accessToken: string; dashboardRedirect?: string | null }>('/api/auth/verify-email', { token })
       .then(async (data) => {
         setAccessToken(data.accessToken);
         const profile = await api.get<{ fullName?: string }>('/api/auth/me').catch(() => null);
@@ -31,6 +57,16 @@ export default function VerifyEmailPage() {
           sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
         }
         setStatus('success');
+        const dashboardRedirect = consumeSavedDashboardRedirect() ?? (
+          data.dashboardRedirect && data.dashboardRedirect.startsWith('/') && !data.dashboardRedirect.startsWith('//')
+            ? data.dashboardRedirect
+            : null
+        );
+        if (dashboardRedirect) {
+          const { code } = await api.post<{ code: string }>('/api/auth/create-code');
+          setTimeout(() => window.location.replace(buildDashboardCallbackUrl(code, dashboardRedirect, language)), 1200);
+          return;
+        }
         const dest = window.location.pathname.startsWith('/he') ? '/he/workspace' : '/workspace';
         setTimeout(() => window.location.replace(dest), 2500);
       })
@@ -41,7 +77,7 @@ export default function VerifyEmailPage() {
           setStatus('error');
         }
       });
-  }, [navigate]);
+  }, [language]);
 
   return (
     <div className="relative h-screen bg-white flex flex-col overflow-hidden">

@@ -9,6 +9,20 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
 
+interface SignupPageError {
+  field?: string;
+  error?: string;
+}
+
+/**
+ * Narrows unknown API errors for signup form rendering.
+ * Input: unknown value caught from API helpers.
+ * Output: structured error fields when available.
+ */
+function toSignupPageError(error: unknown): SignupPageError {
+  return typeof error === 'object' && error !== null ? error as SignupPageError : {};
+}
+
 const countries = [
   { code: 'US', name: 'United States', nameHe: 'ארצות הברית' },
   { code: 'IL', name: 'Israel', nameHe: 'ישראל' },
@@ -60,11 +74,24 @@ export default function Signup() {
   const { t, language, direction } = useLanguage();
   const { register } = useAuth();
   const navigate = useNavigate();
-  const { identify, track } = useAnalytics();
+  const { track } = useAnalytics();
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
   const loginPath = isHe ? '/he/login' : '/login';
   const workspacePath = isHe ? '/he/workspace' : '/workspace';
+  const dashboardRedirect = new URLSearchParams(window.location.search).get('dashboardRedirect');
+  const loginPathWithRedirect = dashboardRedirect
+    ? `${loginPath}?dashboardRedirect=${encodeURIComponent(dashboardRedirect)}`
+    : loginPath;
+  const googleDashboardRedirect = dashboardRedirect && dashboardRedirect.startsWith('/') && !dashboardRedirect.startsWith('//')
+    ? dashboardRedirect
+    : workspacePath;
+
+  useEffect(() => {
+    if (dashboardRedirect && dashboardRedirect.startsWith('/') && !dashboardRedirect.startsWith('//')) {
+      sessionStorage.setItem('nexus_dashboard_redirect_after_verify', dashboardRedirect);
+    }
+  }, [dashboardRedirect]);
 
   const features = [
     {
@@ -146,6 +173,10 @@ export default function Signup() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const resendEmail = params.get('resend');
+    const invitedEmail = params.get('email');
+    if (invitedEmail && !resendEmail) {
+      setEmail(invitedEmail);
+    }
     if (resendEmail) {
       window.history.replaceState({}, document.title, window.location.pathname);
       setVerificationEmail(resendEmail);
@@ -196,14 +227,24 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      const result = await register({ email, fullName, password, country, emailUpdates, language });
+      const result = await register({
+        email,
+        fullName,
+        password,
+        country,
+        emailUpdates,
+        dashboardRedirect: dashboardRedirect && dashboardRedirect.startsWith('/') && !dashboardRedirect.startsWith('//')
+          ? dashboardRedirect
+          : undefined,
+      });
       if (result?.requiresVerification) {
         setVerificationEmail(result.email);
         setStep('verify');
       } else {
         navigate(workspacePath);
       }
-    } catch (err: any) {
+    } catch (error: unknown) {
+      const err = toSignupPageError(error);
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 900);
       if (err?.field === 'email') {
@@ -226,7 +267,7 @@ export default function Signup() {
         return s - 1;
       });
     }, 1000);
-  }, [verificationEmail, resendCooldown]);
+  }, [language, verificationEmail, resendCooldown]);
 
   const getCountryName = (c: typeof countries[0]) => isHe ? c.nameHe : c.name;
 
@@ -546,14 +587,14 @@ export default function Signup() {
                   </div>
 
                   {/* Google sign up */}
-                  <GoogleSignIn redirectTo={workspacePath} />
+                  <GoogleSignIn redirectTo={googleDashboardRedirect} />
                 </div>
 
                 {/* Already have account */}
                 <div className="text-center mt-4 pt-3 -mx-6 -mb-6 px-6 pb-3 bg-cyan-900/5 rounded-b-xl">
                   <p className="text-xs text-nx-gray">
                     {t.auth.alreadyHaveAccount}{' '}
-                    <Link to={loginPath} className="text-nx-primary hover:underline font-medium">{t.auth.signIn}</Link>
+                    <Link to={loginPathWithRedirect} className="text-nx-primary hover:underline font-medium">{t.auth.signIn}</Link>
                   </p>
                 </div>
               </div>

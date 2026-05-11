@@ -1,3 +1,6 @@
+/**
+ * Renders the Google OAuth button and preserves the intended post-login path.
+ */
 import { useLanguage } from '../i18n/LanguageContext';
 import { useState } from 'react';
 

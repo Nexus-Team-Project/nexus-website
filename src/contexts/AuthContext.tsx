@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components */
+/**
+ * Owns the website authentication state and bridges successful user login
+ * into the dashboard app with a short-lived backend-issued SSO code.
+ */
 import {
   createContext,
   useContext,
@@ -8,6 +13,8 @@ import {
 } from 'react';
 import { api, setAccessToken, refreshAccessToken } from '../lib/api';
 import { getVisitorId } from '../lib/visitorId';
+
+const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
 export interface AuthUser {
   id: string;
@@ -26,6 +33,7 @@ interface RegisterData {
   password: string;
   country?: string;
   emailUpdates?: boolean;
+  dashboardRedirect?: string;
 }
 
 interface AuthContextType {
@@ -38,14 +46,102 @@ interface AuthContextType {
   updateUser: (partial: Partial<AuthUser>) => void;
 }
 
+interface GoogleAuthResponse {
+  accessToken: string;
+  dashboardCode?: string;
+  dashboardUrl?: string;
+  isNew?: boolean;
+}
+
 export const AuthContext = createContext<AuthContextType | null>(null);
+
+const googleCodeRequests = new Map<string, Promise<GoogleAuthResponse>>();
+
+/**
+ * Infers the active website language without depending on React context.
+ * Input: current route, saved preference, and document language.
+ * Output: "he" for Hebrew context, otherwise "en".
+ */
+function getCurrentWebsiteLanguage(): 'he' | 'en' {
+  if (window.location.pathname.startsWith('/he')) return 'he';
+  const saved = localStorage.getItem('nexus-lang-preference');
+  if (saved === 'he' || saved === 'en') return saved;
+  return document.documentElement.lang === 'he' ? 'he' : 'en';
+}
+
+/**
+ * Returns a safe dashboard path saved before a full-page Google redirect.
+ * Input: value from sessionStorage.
+ * Output: local dashboard path, or "/" when the saved value is unsafe.
+ */
+function getSavedGoogleDashboardRedirect(): string {
+  const saved = sessionStorage.getItem('google_oauth_redirect');
+  if (!saved || !saved.startsWith('/') || saved.startsWith('//')) return '/';
+  return saved;
+}
+
+/**
+ * Exchanges a Google OAuth code exactly once in dev StrictMode.
+ * Input: Google code from the browser URL.
+ * Output: backend auth response containing website tokens and dashboard handoff data.
+ */
+function exchangeGoogleCodeOnce(code: string): Promise<GoogleAuthResponse> {
+  const existingRequest = googleCodeRequests.get(code);
+  if (existingRequest) return existingRequest;
+
+  const request = api.post<GoogleAuthResponse>('/api/auth/google', {
+    code,
+    redirectUri: window.location.origin,
+    language: getCurrentWebsiteLanguage(),
+    dashboardRedirect: getSavedGoogleDashboardRedirect(),
+  });
+
+  googleCodeRequests.set(code, request);
+  return request;
+}
+
+/**
+ * Logs auth handoff details only in local development.
+ * Input: message and optional metadata safe for browser console.
+ * Output: no value; writes to console only during Vite dev mode.
+ */
+function logAuthHandoff(message: string, data?: Record<string, unknown>): void {
+  if (!import.meta.env.DEV) return;
+  console.info(`[Nexus auth] ${message}`, data ?? {});
+}
+
+/**
+ * Builds a dashboard callback URL for a one-time SSO code.
+ * Input: backend-issued code and dashboard path to open after exchange.
+ * Output: absolute dashboard URL containing the code and redirect path.
+ */
+function buildDashboardCallbackUrl(code: string, redirectPath: string): string {
+  const url = new URL('/auth/callback', DASHBOARD_URL);
+  url.searchParams.set('code', code);
+  url.searchParams.set('redirect', redirectPath);
+  url.searchParams.set('lang', getCurrentWebsiteLanguage());
+  return url.toString();
+}
+
+/**
+ * Redirects normal users from the website app into the dashboard app.
+ * Input: authenticated user profile from the website backend.
+ * Output: true when a full-page dashboard redirect was started.
+ */
+async function redirectDashboardUser(profile: AuthUser, existingCode?: string): Promise<void> {
+  const orgs = profile.orgMemberships ?? [];
+  const savedRedirect = getSavedGoogleDashboardRedirect();
+  const redirectPath = savedRedirect !== '/' ? savedRedirect : orgs.length === 1 ? `/organizations/${orgs[0].org.slug}` : '/';
+  const code = existingCode ?? (await api.post<{ code: string }>('/api/auth/create-code')).code;
+  window.location.replace(buildDashboardCallbackUrl(code, redirectPath));
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const googleLogin = useCallback(async (accessToken: string): Promise<AuthUser> => {
-    const data = await api.post<{ accessToken: string; isNew?: boolean }>('/api/auth/google', { accessToken });
+    const data = await api.post<GoogleAuthResponse>('/api/auth/google', { accessToken });
     setAccessToken(data.accessToken);
     const profile = await api.get<AuthUser>('/api/auth/me');
     setUser(profile);
@@ -71,12 +167,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (code) {
       // Clean the URL immediately so a refresh doesn't re-submit the code
       window.history.replaceState({}, document.title, window.location.pathname);
-      setIsLoading(true);
-      api.post<{ accessToken: string }>('/api/auth/google', {
-        code,
-        redirectUri: window.location.origin,
-      })
+      logAuthHandoff('Google callback detected; exchanging code');
+      exchangeGoogleCodeOnce(code)
         .then(async (data) => {
+          const dashboardRedirect = getSavedGoogleDashboardRedirect();
+          sessionStorage.removeItem('google_oauth_redirect');
+          logAuthHandoff('Google exchange succeeded', {
+            hasDashboardUrl: Boolean(data.dashboardUrl),
+            hasDashboardCode: Boolean(data.dashboardCode),
+          });
+
+          if (data.dashboardUrl) {
+            logAuthHandoff('Redirecting to dashboard callback', { dashboardUrl: data.dashboardUrl });
+            window.location.replace(data.dashboardUrl);
+            return;
+          }
+
+          if (data.dashboardCode) {
+            const fallbackDashboardUrl = buildDashboardCallbackUrl(data.dashboardCode, dashboardRedirect);
+            logAuthHandoff('Redirecting to dashboard callback from code fallback', {
+              dashboardUrl: fallbackDashboardUrl,
+            });
+            window.location.replace(fallbackDashboardUrl);
+            return;
+          }
+
+          logAuthHandoff('Dashboard URL missing; using profile fallback');
           setAccessToken(data.accessToken);
           const profile = await api.get<AuthUser>('/api/auth/me');
           setUser(profile);
@@ -85,14 +201,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (profile.fullName) {
             sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
           }
-          // Navigate to the destination that was saved before the Google redirect.
-          // window.location.replace is used because useNavigate isn't available here
-          // (AuthContext lives outside the Router boundary).
-          const redirect = sessionStorage.getItem('google_oauth_redirect');
-          sessionStorage.removeItem('google_oauth_redirect');
-          window.location.replace(redirect ?? '/');
+          await redirectDashboardUser(profile, data.dashboardCode);
         })
-        .catch(console.error)
+        .catch((error: unknown) => {
+          console.error('[Nexus auth] Google dashboard handoff failed', error);
+        })
         .finally(() => setIsLoading(false));
       return;
     }

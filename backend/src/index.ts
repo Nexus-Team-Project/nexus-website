@@ -17,13 +17,17 @@ import app from './app';
 import { initSocket } from './socket';
 import { env } from './config/env';
 import { prisma } from './config/database';
+import { closeMongoConnection, getMongoDb, verifyMongoConnection } from './config/mongo';
+import { ensureDomainIndexes } from './models/domain';
+import { ensureOnboardingIndexes } from './models/onboarding.models';
+import { ensureDefaultRolePermissions } from './services/domain-permissions.service';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
 import { embedText } from './services/ai.service';
 import { scheduleBiRefresh } from './jobs/biRefresh';
 import { pollInbox } from './services/outlook-inbound.service';
-import * as GreenApi from './services/greenapi.service';
 
 const PORT = env.PORT;
+const BACKEND_URL = env.BACKEND_URL ?? env.FRONTEND_URL;
 
 // ─── Auto-seed knowledge base on first run ────────────────
 async function seedKnowledgeIfEmpty() {
@@ -179,6 +183,19 @@ async function bootstrap() {
     process.exit(1);
   }
 
+  // 1b. Test MongoDB connection and prepare product-domain indexes.
+  try {
+    await verifyMongoConnection();
+    const mongoDb = await getMongoDb();
+    await ensureOnboardingIndexes(mongoDb);
+    await ensureDomainIndexes(mongoDb);
+    await ensureDefaultRolePermissions();
+    console.log('✅ MongoDB connected');
+  } catch (err) {
+    console.error('❌ MongoDB connection failed:', err);
+    process.exit(1);
+  }
+
   // 2. Auto-seed knowledge base on first boot
   try {
     await seedKnowledgeIfEmpty();
@@ -196,24 +213,7 @@ async function bootstrap() {
   scheduleDailyDigest();
   scheduleBiRefresh();
 
-  // 6. Green API — auto-fix outgoing webhook settings on startup
-  if (env.GREEN_API_ID_INSTANCE && env.GREEN_API_TOKEN) {
-    const webhookUrl = `${env.FRONTEND_URL}/api/webhooks/greenapi`;
-    GreenApi.ensureOutgoingWebhooksEnabled(webhookUrl)
-      .then(({ changed, settings }) => {
-        if (changed) {
-          console.log('✅ Green API settings auto-fixed (outgoing webhooks enabled)');
-        } else {
-          console.log('✅ Green API settings OK');
-        }
-        console.log(`   webhookUrl=${settings?.webhookUrl ?? 'N/A'} outgoing=${settings?.outgoingWebhook ?? 'N/A'} outgoingMsg=${settings?.outgoingMessageWebhook ?? 'N/A'}`);
-      })
-      .catch((err: Error) => {
-        console.warn('⚠️  Green API settings check failed (non-fatal):', err.message);
-      });
-  }
-
-  // 7. Outlook inbox polling (every 30s)
+  // 6. Outlook inbox polling (every 30s)
   if (env.MS_TENANT_ID && env.MS_CLIENT_ID && env.MS_CLIENT_SECRET && env.MS_MAILBOX) {
     setInterval(() => pollInbox().catch(console.error), 30_000);
     // Run immediately on startup
@@ -235,6 +235,7 @@ async function bootstrap() {
     console.log('SIGTERM received — shutting down gracefully');
     httpServer.close(async () => {
       await prisma.$disconnect();
+      await closeMongoConnection();
       console.log('Server closed');
       process.exit(0);
     });

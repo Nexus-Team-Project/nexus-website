@@ -1,25 +1,28 @@
 // ─── Shared API client ────────────────────────────────────────────────────────
+// This file centralizes browser API calls so the standalone frontend can call
+// the standalone backend service through one configured base URL.
 // Access token is stored in memory (never localStorage) for XSS protection.
 // The httpOnly refresh token cookie is sent automatically via `credentials: 'include'`.
 // x-anonymous-id is always forwarded so server-side events can resolve identity.
 
-// Use the explicit VITE_API_URL when set (local dev: http://localhost:3001).
-// In production the SPA is served by the same Express server, so relative paths work —
-// .env.production sets VITE_API_URL='' which collapses to empty string via ??.
-const API_URL = import.meta.env.VITE_API_URL ?? '';
+// VITE_API_URL comes from the current environment file or Railway variables.
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 // ─── Anonymous ID ─────────────────────────────────────────────────────────────
 // Lazy-read from localStorage so we don't import visitorId.ts at module level.
+/** Reads the anonymous visitor ID used to connect browser events to server state. */
 function getAnonymousId(): string | null {
   try { return localStorage.getItem('nexus_vid'); } catch { return null; }
 }
 
 let _accessToken: string | null = null;
 
+/** Stores the short-lived access token in memory and returns no value. */
 export function setAccessToken(token: string | null) {
   _accessToken = token;
 }
 
+/** Returns the current in-memory access token, or null when the user is anonymous. */
 export function getAccessToken(): string | null {
   return _accessToken;
 }
@@ -29,6 +32,7 @@ export function getAccessToken(): string | null {
 interface RefreshResult { user?: unknown }
 let _refreshPromise: Promise<RefreshResult | null> | null = null;
 
+/** Refreshes the access token once and deduplicates concurrent refresh requests. */
 export async function refreshAccessToken(): Promise<RefreshResult | null> {
   // Deduplicate concurrent refresh calls
   if (_refreshPromise) return _refreshPromise;
@@ -38,6 +42,7 @@ export async function refreshAccessToken(): Promise<RefreshResult | null> {
   return result;
 }
 
+/** Calls the backend refresh endpoint and updates the in-memory access token. */
 async function _doRefresh(): Promise<RefreshResult | null> {
   try {
     const res = await fetch(`${API_URL}/api/auth/refresh`, {
@@ -60,6 +65,7 @@ async function _doRefresh(): Promise<RefreshResult | null> {
 
 // ─── Core request helper ─────────────────────────────────────────────────────
 
+/** Sends a JSON API request and returns the parsed response typed by the caller. */
 async function request<T>(
   method: string,
   path: string,

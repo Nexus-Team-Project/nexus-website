@@ -1,3 +1,7 @@
+/**
+ * Provides authentication services for local email login, Google login,
+ * refresh-token rotation, password reset, and dashboard SSO code exchange.
+ */
 import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
@@ -6,6 +10,135 @@ import { signAccessToken } from '../utils/jwt';
 import { createError } from '../middleware/errorHandler';
 
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET);
+const DASHBOARD_AUTH_CODE_TTL_MS = 30 * 1000;
+// When a racing second refresh call sees a revoked-but-replaced token, treat
+// it as a benign race if the replacement was issued within this window.
+const REPLACEMENT_GRACE_MS = 30_000;
+const dashboardAuthCodes = new Map<string, { userId: string; expiresAt: number }>();
+
+export interface AuthUserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  role: string;
+  country?: string;
+  avatarUrl?: string | null;
+  emailVerified: boolean;
+  emailUpdates?: boolean;
+  provider?: string;
+  lastLoginAt?: Date | null;
+  createdAt?: Date;
+  onboardingDone: boolean;
+  orgMemberships: {
+    role: string;
+    org: { id: string; slug: string; name: string; logoUrl?: string | null; primaryColor?: string | null };
+  }[];
+}
+
+/**
+ * Removes expired dashboard auth codes so the in-memory store stays small.
+ * Input: none.
+ * Output: expired entries are deleted from module memory.
+ */
+function pruneExpiredDashboardAuthCodes(): void {
+  const now = Date.now();
+  for (const [code, entry] of dashboardAuthCodes.entries()) {
+    if (entry.expiresAt <= now) dashboardAuthCodes.delete(code);
+  }
+}
+
+/**
+ * Loads the safe user profile that frontend apps are allowed to see.
+ * Input: user ID from a verified access token or one-time auth code.
+ * Output: public profile data, or null when the user no longer exists.
+ */
+export async function getUserProfile(userId: string): Promise<AuthUserProfile | null> {
+  try {
+    return await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        country: true,
+        avatarUrl: true,
+        emailVerified: true,
+        emailUpdates: true,
+        provider: true,
+        lastLoginAt: true,
+        createdAt: true,
+        onboardingDone: true,
+        orgMemberships: {
+          select: {
+            role: true,
+            org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
+          },
+        },
+      },
+    });
+  } catch {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        country: true,
+        avatarUrl: true,
+        emailVerified: true,
+        emailUpdates: true,
+        provider: true,
+        lastLoginAt: true,
+        createdAt: true,
+        onboardingDone: true,
+      },
+    });
+    return user ? { ...user, orgMemberships: [] } : null;
+  }
+}
+
+/**
+ * Creates a short-lived, single-use code for logging into the dashboard.
+ * Input: authenticated website user ID.
+ * Output: random URL-safe code that can be exchanged once within 30 seconds.
+ */
+export function createDashboardAuthCode(userId: string): string {
+  pruneExpiredDashboardAuthCodes();
+  const code = generateToken(48);
+  dashboardAuthCodes.set(code, {
+    userId,
+    expiresAt: Date.now() + DASHBOARD_AUTH_CODE_TTL_MS,
+  });
+  return code;
+}
+
+/**
+ * Exchanges a dashboard auth code for fresh access and refresh tokens.
+ * Input: one-time code from the dashboard callback URL and request metadata.
+ * Output: tokens plus the public user profile, or a 401 error for invalid codes.
+ */
+export async function exchangeDashboardAuthCode(
+  code: string,
+  meta: { userAgent?: string; ipAddress?: string } = {},
+) {
+  const entry = dashboardAuthCodes.get(code);
+  dashboardAuthCodes.delete(code);
+
+  if (!entry || entry.expiresAt <= Date.now()) {
+    throw createError('Invalid or expired auth code', 401);
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: entry.userId } });
+  if (!user) throw createError('User not found', 401);
+
+  const profile = await getUserProfile(user.id);
+  if (!profile) throw createError('User not found', 401);
+
+  const tokens = await issueTokens(user.id, user.email, user.role, meta);
+  return { ...tokens, user: profile };
+}
 
 export async function register(
   data: {
@@ -14,8 +147,8 @@ export async function register(
     password: string;
     country?: string;
     emailUpdates?: boolean;
+    dashboardRedirect?: string;
   },
-  meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
   const email = data.email.toLowerCase().trim();
   const fullName = data.fullName.trim();
@@ -28,12 +161,30 @@ export async function register(
   const rawVerificationToken = generateToken(48);
   const tokenHash = hashToken(rawVerificationToken);
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+  const dashboardRedirect = getSafeDashboardRedirect(data.dashboardRedirect);
 
   // Store as a pending registration — user row is NOT created until email is confirmed
   await prisma.pendingRegistration.upsert({
     where: { email },
-    update: { passwordHash, fullName, country: data.country ?? 'IL', emailUpdates: data.emailUpdates ?? true, tokenHash, expiresAt },
-    create: { email, passwordHash, fullName, country: data.country ?? 'IL', emailUpdates: data.emailUpdates ?? true, tokenHash, expiresAt },
+    update: {
+      passwordHash,
+      fullName,
+      country: data.country ?? 'IL',
+      emailUpdates: data.emailUpdates ?? true,
+      tokenHash,
+      dashboardRedirect,
+      expiresAt,
+    },
+    create: {
+      email,
+      passwordHash,
+      fullName,
+      country: data.country ?? 'IL',
+      emailUpdates: data.emailUpdates ?? true,
+      tokenHash,
+      dashboardRedirect,
+      expiresAt,
+    },
   });
 
   return { email, fullName, rawVerificationToken };
@@ -68,7 +219,20 @@ export async function verifyEmail(
     return newUser;
   });
 
-  return issueTokens(user.id, user.email, user.role, false, meta);
+  return {
+    ...(await issueTokens(user.id, user.email, user.role, meta)),
+    dashboardRedirect: pending.dashboardRedirect,
+  };
+}
+
+/**
+ * Accepts only local dashboard paths for stored auth continuations.
+ * Input: raw redirect path from the website signup request.
+ * Output: safe local path, or null when no safe path was supplied.
+ */
+function getSafeDashboardRedirect(redirectPath: string | undefined): string | null {
+  if (!redirectPath || !redirectPath.startsWith('/') || redirectPath.startsWith('//')) return null;
+  return redirectPath;
 }
 
 export async function resendVerification(email: string) {
@@ -92,7 +256,6 @@ export async function resendVerification(email: string) {
 export async function login(
   email: string,
   password: string,
-  rememberMe = false,
   meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
   const normalizedEmail = email.toLowerCase().trim();
@@ -112,7 +275,7 @@ export async function login(
     data: { lastLoginAt: new Date() },
   });
 
-  return issueTokens(user.id, user.email, user.role, rememberMe, meta);
+  return issueTokens(user.id, user.email, user.role, meta);
 }
 
 export async function googleAuth(
@@ -157,7 +320,7 @@ export async function googleAuth(
     data: { lastLoginAt: new Date() },
   });
 
-  const tokens = await issueTokens(user.id, user.email, user.role, false, meta);
+  const tokens = await issueTokens(user.id, user.email, user.role, meta);
   return { ...tokens, isNew };
 }
 
@@ -219,36 +382,108 @@ export async function googleAuthFromAccessToken(
     data: { lastLoginAt: new Date() },
   });
 
-  const tokens = await issueTokens(user.id, user.email, user.role, false, meta);
+  const tokens = await issueTokens(user.id, user.email, user.role, meta);
   return { ...tokens, isNew };
 }
 
+/**
+ * Rotates a refresh token and returns new tokens.
+ * Handles benign concurrent-refresh races via a replacement chain + grace window:
+ * if two tabs call /refresh at the same time, the second call finds the first
+ * token already revoked but chains through replacedByTokenHash to issue fresh
+ * tokens rather than triggering a destructive bulk-revoke.
+ * Real token-reuse (outside the grace window or no replacement chain) still
+ * bulk-revokes all user tokens as a security response.
+ * Input: raw token from the httpOnly refresh cookie and request metadata.
+ * Output: fresh access token, new raw refresh token, and the user ID.
+ */
 export async function refreshTokens(
   rawToken: string,
   meta: { userAgent?: string; ipAddress?: string } = {},
 ) {
   const tokenHash = hashToken(rawToken);
-  const stored = await prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-  if (!stored || stored.revokedAt || stored.expiresAt < new Date()) {
-    if (stored?.revokedAt) {
-      await prisma.refreshToken.updateMany({
-        where: { userId: stored.userId },
-        data: { revokedAt: new Date() },
+  return prisma.$transaction(async (tx) => {
+    const stored = await tx.refreshToken.findUnique({ where: { tokenHash } });
+
+    // Token not found or expired — straightforward rejection, no cascade.
+    if (!stored) throw createError('Invalid refresh token', 401);
+    if (stored.expiresAt < new Date()) throw createError('Refresh token expired', 401);
+
+    if (!stored.revokedAt) {
+      // Happy path: token is valid. Rotate it — mark revoked, point to new token.
+      const newRawToken = generateToken(64);
+      const newTokenHash = hashToken(newRawToken);
+
+      await tx.refreshToken.update({
+        where: { id: stored.id },
+        data: { revokedAt: new Date(), replacedByTokenHash: newTokenHash },
       });
+
+      const user = await tx.user.findUnique({ where: { id: stored.userId } });
+      if (!user) throw createError('User not found', 401);
+
+      const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
+      await tx.refreshToken.create({
+        data: {
+          tokenHash: newTokenHash,
+          userId: user.id,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          userAgent: meta.userAgent,
+          ipAddress: meta.ipAddress,
+        },
+      });
+
+      return { accessToken, rawRefreshToken: newRawToken, userId: user.id };
     }
+
+    // Token is revoked. Check if this is a benign race via the replacement chain.
+    if (stored.replacedByTokenHash) {
+      const replacement = await tx.refreshToken.findUnique({
+        where: { tokenHash: stored.replacedByTokenHash },
+      });
+
+      const withinGrace =
+        replacement &&
+        !replacement.revokedAt &&
+        replacement.createdAt.getTime() > Date.now() - REPLACEMENT_GRACE_MS;
+
+      if (withinGrace && replacement) {
+        // Benign race: rotate the replacement and return fresh tokens.
+        const newRawToken = generateToken(64);
+        const newTokenHash = hashToken(newRawToken);
+
+        await tx.refreshToken.update({
+          where: { id: replacement.id },
+          data: { revokedAt: new Date(), replacedByTokenHash: newTokenHash },
+        });
+
+        const user = await tx.user.findUnique({ where: { id: stored.userId } });
+        if (!user) throw createError('User not found', 401);
+
+        const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
+        await tx.refreshToken.create({
+          data: {
+            tokenHash: newTokenHash,
+            userId: user.id,
+            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            userAgent: meta.userAgent,
+            ipAddress: meta.ipAddress,
+          },
+        });
+
+        return { accessToken, rawRefreshToken: newRawToken, userId: user.id };
+      }
+    }
+
+    // Revoked token outside the grace window — treat as token theft.
+    // Bulk-revoke all tokens for this user to force re-login everywhere.
+    await tx.refreshToken.updateMany({
+      where: { userId: stored.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
     throw createError('Invalid refresh token', 401);
-  }
-
-  await prisma.refreshToken.update({
-    where: { id: stored.id },
-    data: { revokedAt: new Date() },
   });
-
-  const user = await prisma.user.findUnique({ where: { id: stored.userId } });
-  if (!user) throw createError('User not found', 401);
-
-  return issueTokens(user.id, user.email, user.role, false, meta);
 }
 
 export async function logout(rawToken: string) {
@@ -261,7 +496,7 @@ export async function logout(rawToken: string) {
 
 export async function forgotPassword(email: string): Promise<string | null> {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user || user.provider !== 'EMAIL') return null;
+  if (!user || !user.passwordHash) return null;
 
   await prisma.passwordReset.updateMany({
     where: { userId: user.id, used: false },
@@ -299,33 +534,30 @@ export async function resetPassword(rawToken: string, newPassword: string) {
   ]);
 }
 
+/**
+ * Issues a fresh access token and a 30-day refresh token for the given user.
+ * Input: user identity, role, and request metadata for audit logging.
+ * Output: signed access token, raw refresh token, and user ID.
+ */
 async function issueTokens(
   userId: string,
   email: string,
   role: string,
-  rememberMe: boolean,
   meta: { userAgent?: string; ipAddress?: string },
 ) {
   const accessToken = signAccessToken({ sub: userId, email, role });
   const rawRefresh = generateToken(64);
   const tokenHash = hashToken(rawRefresh);
 
-  const ttlDays = rememberMe ? 30 : 7;
-  const refreshRecord = await prisma.refreshToken.create({
+  await prisma.refreshToken.create({
     data: {
       tokenHash,
       userId,
-      expiresAt: new Date(Date.now() + ttlDays * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
       userAgent: meta.userAgent,
       ipAddress: meta.ipAddress,
     },
   });
 
-  return {
-    accessToken,
-    rawRefreshToken: rawRefresh,
-    refreshTokenId: refreshRecord.id,
-    ttlDays,
-    userId,
-  };
+  return { accessToken, rawRefreshToken: rawRefresh, userId };
 }

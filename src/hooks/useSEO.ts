@@ -1,7 +1,9 @@
 // ─── Page-meta override cache ─────────────────────────────────────────────────
-// Fetched once per browser session from /api/seo/pages.
+// Fetched once per browser session from the configured backend API.
 // The agent (Tier 1) writes overrides to the DB; this cache picks them up on
 // next page load so changes are live within ~1 hour (Cache-Control max-age).
+import { useEffect } from 'react';
+import { API_URL } from '../lib/api';
 
 type PageMetaMap = Record<
   string,
@@ -15,7 +17,7 @@ function ensurePageMetaLoaded(): Promise<void> {
   if (_metaCache !== null) return Promise.resolve();
   if (_fetchPromise) return _fetchPromise;
 
-  _fetchPromise = fetch('/api/seo/pages')
+  _fetchPromise = fetch(`${API_URL}/api/seo/pages`)
     .then((r) => (r.ok ? r.json() : {}))
     .then((data: PageMetaMap) => {
       _metaCache = data ?? {};
@@ -109,13 +111,11 @@ interface SEOProps {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-import { useEffect } from 'react';
-
 /**
  * Sets document title, meta description, canonical URL, OG tags,
  * and hreflang alternate links for bilingual pages.
  *
- * Also checks /api/seo/pages for agent-written overrides and applies them
+ * Also checks the backend SEO endpoint for agent-written overrides and applies them
  * on top of the component's hardcoded defaults — no deploy needed.
  */
 export function useSEO({ title, description, canonical, alternates }: SEOProps) {

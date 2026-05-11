@@ -1,3 +1,7 @@
+/**
+ * Defines public and authenticated auth HTTP routes for the website backend.
+ * These routes also act as the identity provider for the dashboard app.
+ */
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
@@ -12,13 +16,56 @@ import { signEmailVerificationToken, verifyEmailVerificationToken } from '../uti
 const router = Router();
 
 const REFRESH_COOKIE = 'nexus_refresh';
-const COOKIE_OPTS = (maxAge: number) => ({
+// 30-day refresh cookie — same regardless of rememberMe choice.
+const REFRESH_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Builds consistent cookie options for the httpOnly refresh token.
+ * SameSite=Lax is safe for same-registrable-domain cross-subdomain XHR
+ * (dashboard.nexus-payment.com → api.nexus-payment.com) without needing
+ * SameSite=None+Secure for same-site requests.
+ * COOKIE_DOMAIN (e.g. .nexus-payment.com) is set in production so the cookie
+ * is shared across all subdomains.
+ */
+const COOKIE_OPTS = () => ({
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: 'strict' as const,
-  maxAge,
+  sameSite: 'lax' as const,
+  maxAge: REFRESH_MAX_AGE,
   path: '/',
+  ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
 });
+
+const authCodeSchema = z.object({
+  body: z.object({
+    code: z.string().min(32).max(128).regex(/^[A-Za-z0-9_-]+$/),
+  }),
+});
+
+/**
+ * Builds the dashboard callback URL that exchanges a one-time auth code.
+ * Input: backend-issued dashboard code and requested dashboard path.
+ * Output: absolute dashboard callback URL, or undefined when no dashboard URL is configured.
+ */
+function buildDashboardCallbackUrl(code: string, language: 'he' | 'en' = 'en', redirectPath = '/'): string | undefined {
+  if (!env.DASHBOARD_URL) return undefined;
+
+  const url = new URL('/auth/callback', env.DASHBOARD_URL);
+  url.searchParams.set('code', code);
+  url.searchParams.set('redirect', getSafeDashboardRedirect(redirectPath));
+  url.searchParams.set('lang', language);
+  return url.toString();
+}
+
+/**
+ * Accepts only local dashboard paths for auth redirects.
+ * Input: raw redirect value from the browser.
+ * Output: safe local dashboard path.
+ */
+function getSafeDashboardRedirect(redirectPath: string | undefined): string {
+  if (!redirectPath || !redirectPath.startsWith('/') || redirectPath.startsWith('//')) return '/';
+  return redirectPath;
+}
 
 const registerSchema = z.object({
   body: z.object({
@@ -27,6 +74,7 @@ const registerSchema = z.object({
     password: z.string().min(8).max(128),
     country: z.string().length(2).optional(),
     emailUpdates: z.boolean().optional(),
+    dashboardRedirect: z.string().min(1).max(500).optional(),
   }),
 });
 
@@ -36,10 +84,7 @@ router.post(
   validate(registerSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await AuthService.register(req.body, {
-        userAgent: req.headers['user-agent'],
-        ipAddress: req.ip,
-      });
+      const result = await AuthService.register(req.body);
       // Send verification email instead of welcome email — account is not active until verified
       EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken).catch(console.error);
       res.status(201).json({ requiresVerification: true, email: result.email });
@@ -63,13 +108,12 @@ router.post(
   validate(loginSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email, password, rememberMe } = req.body;
-      const result = await AuthService.login(email, password, rememberMe, {
+      const { email, password } = req.body;
+      const result = await AuthService.login(email, password, {
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
       });
-      const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
       res.json({ accessToken: result.accessToken });
     } catch (err) {
       next(err);
@@ -84,6 +128,8 @@ const googleSchema = z.object({
       code: z.string().min(1).optional(),
       accessToken: z.string().min(1).optional(),
       redirectUri: z.string().url().optional(),
+      language: z.enum(['he', 'en']).optional(),
+      dashboardRedirect: z.string().min(1).max(500).optional(),
     })
     .refine((d) => d.idToken || d.code || d.accessToken, {
       message: 'idToken, code, or accessToken is required',
@@ -105,8 +151,14 @@ router.post(
       } else {
         result = await AuthService.googleAuth(req.body.idToken, meta);
       }
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
-      res.json({ accessToken: result.accessToken, isNew: result.isNew ?? false });
+      const dashboardCode = AuthService.createDashboardAuthCode(result.userId);
+      const dashboardUrl = buildDashboardCallbackUrl(
+        dashboardCode,
+        req.body.language ?? 'en',
+        req.body.dashboardRedirect,
+      );
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
+      res.json({ accessToken: result.accessToken, dashboardCode, dashboardUrl, isNew: result.isNew ?? false });
     } catch (err) {
       next(err);
     }
@@ -127,8 +179,8 @@ router.post(
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
       });
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(7 * 24 * 60 * 60 * 1000));
-      res.json({ accessToken: result.accessToken });
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
+      res.json({ accessToken: result.accessToken, dashboardRedirect: result.dashboardRedirect });
     } catch (err) {
       next(err);
     }
@@ -168,48 +220,40 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip,
     });
-    let user: any = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: result.userId },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          avatarUrl: true,
-          emailVerified: true,
-          onboardingDone: true,
-          orgMemberships: {
-            select: {
-              role: true,
-              org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
-            },
-          },
-        },
-      });
-    } catch {
-      user = await prisma.user.findUnique({
-        where: { id: result.userId },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          avatarUrl: true,
-          emailVerified: true,
-          onboardingDone: true,
-        },
-      });
-      if (user) user.orgMemberships = [];
-    }
-    const maxAge = result.ttlDays * 24 * 60 * 60 * 1000;
-    res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS(maxAge));
+    const user = await AuthService.getUserProfile(result.userId);
+    res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
     res.json({ accessToken: result.accessToken, user });
   } catch (err) {
     next(err);
   }
 });
+
+router.post('/create-code', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const code = AuthService.createDashboardAuthCode(req.user!.sub);
+    res.json({ code });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/code-exchange',
+  authLimiter,
+  validate(authCodeSchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const result = await AuthService.exchangeDashboardAuthCode(req.body.code, {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      });
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
+      res.json({ accessToken: result.accessToken, user: result.user });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.post('/logout', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -223,7 +267,10 @@ router.post('/logout', async (req: Request, res: Response, next: NextFunction) =
 });
 
 const forgotSchema = z.object({
-  body: z.object({ email: z.string().email() }),
+  body: z.object({
+    email: z.string().email(),
+    language: z.enum(['en', 'he']).optional(),
+  }),
 });
 
 router.post(
@@ -232,11 +279,12 @@ router.post(
   validate(forgotSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const rawToken = await AuthService.forgotPassword(req.body.email);
+      const email = req.body.email.toLowerCase().trim();
+      const rawToken = await AuthService.forgotPassword(email);
       if (rawToken) {
-        const user = await prisma.user.findUnique({ where: { email: req.body.email } });
+        const user = await prisma.user.findUnique({ where: { email } });
         if (user) {
-          EmailService.sendPasswordResetEmail(user.email, user.fullName, rawToken).catch(console.error);
+          EmailService.sendPasswordResetEmail(user.email, user.fullName, rawToken, req.body.language ?? 'en').catch(console.error);
         }
       }
       res.json({ message: 'If the email exists, a reset link has been sent.' });
@@ -337,53 +385,7 @@ router.post(
 
 router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Try full query with orgMemberships first; fall back without if table missing
-    let user: any = null;
-    try {
-      user = await prisma.user.findUnique({
-        where: { id: req.user!.sub },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          country: true,
-          avatarUrl: true,
-          emailVerified: true,
-          emailUpdates: true,
-          provider: true,
-          lastLoginAt: true,
-          createdAt: true,
-          onboardingDone: true,
-          orgMemberships: {
-            select: {
-              role: true,
-              org: { select: { id: true, slug: true, name: true, logoUrl: true, primaryColor: true } },
-            },
-          },
-        },
-      });
-    } catch {
-      // orgMemberships table may not exist yet — query without it
-      user = await prisma.user.findUnique({
-        where: { id: req.user!.sub },
-        select: {
-          id: true,
-          email: true,
-          fullName: true,
-          role: true,
-          country: true,
-          avatarUrl: true,
-          emailVerified: true,
-          emailUpdates: true,
-          provider: true,
-          lastLoginAt: true,
-          createdAt: true,
-          onboardingDone: true,
-        },
-      });
-      if (user) (user as any).orgMemberships = [];
-    }
+    const user = await AuthService.getUserProfile(req.user!.sub);
     if (!user) {
       res.status(404).json({ error: 'User not found' });
       return;

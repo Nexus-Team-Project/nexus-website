@@ -12,6 +12,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Database backups and restore artifacts
+backups/
+*.dump
+*.archive
+*.bson
+*.sql.gz
+
 node_modules
 dist
 dist-ssr
@@ -34,6 +41,14 @@ backend/public/
 # Claude Code
 .claude/
 
+# MCP server config (may contain database credentials)
+.mcp.json
+*.mcp.json
+
 # Windows artifacts
 nul
 extglob*
+
+AGENTS.md
+
+CLAUDE.MD
