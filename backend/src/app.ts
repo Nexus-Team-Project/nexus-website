@@ -73,30 +73,15 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 /**
- * Sends backend health status for unversioned and v1 health checks.
+ * Sends minimal health status for deploy checks.
+ * Intentionally returns no internal service details — those belong behind auth.
  * Input: Express request and response.
- * Output: JSON health payload used by deploy checks and operators.
+ * Output: { status: 'ok', timestamp: string }
  */
-async function sendHealthStatus(_req: express.Request, res: express.Response): Promise<void> {
-  // Quick agent connectivity check
-  let agentOk = false;
-  if (env.AGENT_API_URL) {
-    try {
-      const r = await fetch(`${env.AGENT_API_URL}/health`, { signal: AbortSignal.timeout(3000) });
-      agentOk = r.ok;
-    } catch { /* ignore */ }
-  }
-
+function sendHealthStatus(_req: express.Request, res: express.Response): void {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
-    env: env.NODE_ENV,
-    build: '2026-03-25f',
-    emailConfigured: !!(env.SENDPULSE_CLIENT_ID && env.SENDPULSE_CLIENT_SECRET),
-    agentProxy: {
-      configured: !!(env.AGENT_API_URL && env.AGENT_API_KEY),
-      reachable: agentOk,
-    },
   });
 }
 
