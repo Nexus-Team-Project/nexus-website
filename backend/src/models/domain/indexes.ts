@@ -43,6 +43,9 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     tenants.memberGroups.createIndex({ tenantId: 1, name: 1 }, { unique: true }),
     tenants.memberGroupAssignments.createIndex({ memberGroupId: 1, tenantMemberId: 1 }, { unique: true }),
     tenants.tenantCatalogPolicies.createIndex({ tenantId: 1 }, { unique: true }),
+    // Unique contact per tenant per email; sorted list by creation time.
+    tenants.tenantContacts.createIndex({ tenantId: 1, normalizedEmail: 1 }, { unique: true }),
+    tenants.tenantContacts.createIndex({ tenantId: 1, createdAt: -1 }),
 
     orchestration.platformEvents.createIndex({ eventType: 1, createdAt: -1 }),
     orchestration.sagaInstances.createIndex(

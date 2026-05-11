@@ -42,6 +42,11 @@ export async function getTenantMemberInvitationPreview(token: string): Promise<T
       { $set: { status: 'expired', updatedAt: now } },
     );
     invite.status = 'expired';
+    // Reflect expiry on the contact record if one exists.
+    void tenantCollections.tenantContacts.updateOne(
+      { tenantId: invite.tenantId, normalizedEmail: invite.normalizedEmail },
+      { $set: { status: 'expired', updatedAt: now } },
+    ).catch(() => undefined);
   }
 
   const tenant = await tenantCollections.domainTenants.findOne(
@@ -79,10 +84,26 @@ export async function listMyPendingTenantMemberInvitations(userId: string): Prom
   const now = new Date();
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
+
+  // Find which tenant+email pairs are about to be expired before updating them.
+  const expiredInvites = await tenantCollections.tenantMemberInvitations
+    .find({ normalizedEmail, status: 'pending', expiresAt: { $lte: now } })
+    .project<{ tenantId: string }>({ tenantId: 1 })
+    .toArray();
+
   await tenantCollections.tenantMemberInvitations.updateMany(
     { normalizedEmail, status: 'pending', expiresAt: { $lte: now } },
     { $set: { status: 'expired', updatedAt: now } },
   );
+
+  // Reflect expiry on matching contact records (fire-and-forget).
+  if (expiredInvites.length > 0) {
+    const expiredTenantIds = expiredInvites.map((inv) => inv.tenantId);
+    void tenantCollections.tenantContacts.updateMany(
+      { normalizedEmail, tenantId: { $in: expiredTenantIds }, status: 'pending' },
+      { $set: { status: 'expired', updatedAt: now } },
+    ).catch(() => undefined);
+  }
 
   const invitations = await tenantCollections.tenantMemberInvitations
     .find(
@@ -164,6 +185,13 @@ async function markTenantMemberInvitationAccepted(
     { $set: { status: 'accepted', acceptedByIdentityId, acceptedAt: now, updatedAt: now } },
   );
   if (updateResult.matchedCount !== 1) throw createError('Invitation could not be accepted', 409);
+
+  // Advance contact to active and record acceptance time.
+  // Fire-and-forget — a missing contact record is not an error.
+  void tenantCollections.tenantContacts.updateOne(
+    { tenantId: invite.tenantId, normalizedEmail: invite.normalizedEmail },
+    { $set: { status: 'active', lastActivityAt: now, updatedAt: now } },
+  ).catch(() => undefined);
 
   return { tenantId: invite.tenantId, roles, alreadyAccepted: false };
 }

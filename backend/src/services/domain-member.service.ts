@@ -303,6 +303,12 @@ export async function inviteTenantMemberByEmail(
     updatedAt: now,
   });
 
+  // Advance contact status to pending if a contact record exists for this email+tenant.
+  void tenantCollections.tenantContacts.updateOne(
+    { tenantId: access.tenantId, normalizedEmail: invitedIdentity.normalizedEmail },
+    { $set: { status: 'pending', updatedAt: now } },
+  ).catch(() => undefined);
+
   const emailSent = await sendAndTrackInvitationEmail({
     invitationId,
     email: invitedIdentity.normalizedEmail,

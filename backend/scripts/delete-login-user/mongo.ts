@@ -71,6 +71,7 @@ export async function collectMongoCounts(
     tenantServiceActivations,
     memberGroups,
     tenantCatalogPolicies,
+    tenantContacts,
     legacyTenants,
     legacyTenantMembersByPerson,
     legacyTenantMembersForOwnedTenants,
@@ -124,6 +125,12 @@ export async function collectMongoCounts(
     tenants.tenantServiceActivations.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
     tenants.memberGroups.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
     tenants.tenantCatalogPolicies.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
+    tenants.tenantContacts.countDocuments({
+      $or: [
+        { normalizedEmail: email },
+        ...(targets.domainOwnedTenantIds.length ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }] : []),
+      ],
+    }),
     onboarding.tenants.countDocuments({ _id: { $in: targets.legacyOwnedTenantIds } }),
     onboarding.tenantMembers.countDocuments({
       $or: [
@@ -176,6 +183,7 @@ export async function collectMongoCounts(
     tenantServiceActivations,
     memberGroups,
     tenantCatalogPolicies,
+    tenantContacts,
     legacyTenants,
     legacyTenantMembersByPerson,
     legacyTenantMembersForOwnedTenants,
@@ -246,6 +254,13 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   await tenants.tenantServiceActivations.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.tenantProfiles.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.tenantOnboardingStates.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
+  // Delete contacts by person email (across all tenants) and all contacts for tenants the person owned.
+  await tenants.tenantContacts.deleteMany({
+    $or: [
+      { normalizedEmail: email },
+      ...(targets.domainOwnedTenantIds.length ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }] : []),
+    ],
+  });
   await tenants.domainTenants.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
 
   await onboarding.businessSetups.deleteMany({ tenantId: { $in: targets.legacyOwnedTenantIds } });
