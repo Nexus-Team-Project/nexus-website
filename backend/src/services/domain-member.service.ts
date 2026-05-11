@@ -15,6 +15,7 @@ import type { InviteTenantMemberInput } from '../schemas/domain-member.schemas';
 import { getDomainAuthorizationContext, hasDomainPermission } from './domain-authorization.service';
 import { syncDomainIdentityForLoginUser, syncDomainIdentityForMemberInvite } from './domain-identity.service';
 import { syncDomainTenantMembership } from './domain-tenant-sync.service';
+import { assertSeatAvailable, identityAlreadyHoldsNonMemberSeat } from './domain-tenant-plan.service';
 import { getUserContext } from './onboarding.service';
 import { getOnboardingCollections } from '../models/onboarding.models';
 import { ObjectId } from 'mongodb';
@@ -224,6 +225,19 @@ export async function inviteTenantMemberByEmail(
   });
   if (existingMembership) throw createError('membership_exists', 409);
 
+  // Seat-limit check: only needed when the invite includes at least one non-member role
+  // AND the identity doesn't already occupy a non-member seat for this tenant.
+  const inviteHasNonMemberRole = input.roles.some((r) => r !== 'member');
+  if (inviteHasNonMemberRole) {
+    const alreadySeated = await identityAlreadyHoldsNonMemberSeat(
+      access.tenantId,
+      invitedIdentity.nexusIdentityId,
+    );
+    if (!alreadySeated) {
+      await assertSeatAvailable(access.tenantId, 1);
+    }
+  }
+
   const tenantMemberId = `tenant_member_${randomUUID()}`;
   await tenantCollections.tenantMembers.insertOne({
     tenantMemberId,
@@ -338,6 +352,9 @@ export async function inviteTenantMemberByEmail(
 
 /**
  * Invites many tenant members independently from one dashboard submit.
+ * Performs an up-front seat-capacity check before processing any rows:
+ * counts how many rows would require a new non-member seat, then rejects the
+ * whole batch if it would exceed the plan limit.
  * Input: manager user id and validated invite rows.
  * Output: per-email success or failure results; one bad row does not stop all.
  */
@@ -345,6 +362,17 @@ export async function bulkInviteTenantMembersByEmail(
   managerUserId: string,
   invitations: InviteTenantMemberInput[],
 ): Promise<{ results: BulkInviteTenantMemberResult[] }> {
+  // Up-front seat check: count rows that ask for at least one non-member role.
+  // Each unique email that isn't already a non-member on the tenant needs a seat.
+  // We approximate by counting distinct non-member-role rows (emails are unique per invite).
+  const access = await requireMemberManagementAccess(managerUserId);
+  const newNonMemberRows = invitations.filter((inv) =>
+    inv.roles.some((r) => r !== 'member'),
+  ).length;
+  if (newNonMemberRows > 0) {
+    await assertSeatAvailable(access.tenantId, newNonMemberRows);
+  }
+
   const results: BulkInviteTenantMemberResult[] = [];
 
   for (const invitation of invitations) {

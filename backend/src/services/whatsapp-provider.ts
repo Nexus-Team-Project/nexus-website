@@ -1,28 +1,24 @@
+/**
+ * WhatsApp provider abstraction.
+ * Uses Meta's WhatsApp Business API exclusively.
+ * Outbound messages, agent notifications, and contact info lookups all go through this module.
+ */
 import * as MetaWhatsApp from './whatsapp.service';
-import * as GreenApi from './greenapi.service';
-import { env } from '../config/env';
-
-function provider() {
-  return env.WHATSAPP_PROVIDER === 'green_api' ? GreenApi : MetaWhatsApp;
-}
 
 export async function sendText(to: string, text: string): Promise<string | null> {
-  return provider().sendText(to, text);
+  return MetaWhatsApp.sendText(to, text);
 }
 
 export async function notifyAgent(message: string): Promise<void> {
-  return provider().notifyAgent(message);
+  return MetaWhatsApp.notifyAgent(message);
 }
 
-export async function getContactInfo(chatId: string): Promise<{
+export async function getContactInfo(_chatId: string): Promise<{
   name: string | null;
   avatar: string | null;
 } | null> {
-  if (env.WHATSAPP_PROVIDER === 'green_api') {
-    return GreenApi.getContactInfo(chatId);
-  }
   return null;
 }
 
-// Format helpers are provider-agnostic — re-export from Meta service
+// Format helpers — re-export from Meta service
 export { formatVisitorAlert, formatChatOpenedAlert, formatLeadAlert } from './whatsapp.service';

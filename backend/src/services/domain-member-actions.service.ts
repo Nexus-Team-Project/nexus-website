@@ -17,6 +17,7 @@ import { syncDomainIdentityForMemberInvite } from './domain-identity.service';
 import { buildMemberInviteLoginUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
 import { sendTenantMemberRemovedEmail, sendTenantInviteRevokedEmail } from './domain-member-remove-email.service';
 import { requireTenantMemberPermission } from './domain-member.service';
+import { assertSeatAvailable, identityAlreadyHoldsNonMemberSeat } from './domain-tenant-plan.service';
 import { generateToken, hashToken } from '../utils/crypto';
 
 /**
@@ -81,6 +82,19 @@ export async function updateTenantMemberRoles(
     const otherAdmins = await countOtherActiveAdmins(access.tenantId, member.nexusIdentityId);
     if (otherAdmins === 0) {
       throw createError('Cannot remove the last admin from the tenant', 409);
+    }
+  }
+
+  // Seat-limit check: only needed when the new role set includes a non-member role
+  // AND the identity doesn't already hold a non-member seat (i.e., a member→non-member promotion).
+  const newSetHasNonMember = uniqueRoles.some((r) => r !== 'member');
+  if (newSetHasNonMember) {
+    const alreadySeated = await identityAlreadyHoldsNonMemberSeat(
+      access.tenantId,
+      member.nexusIdentityId,
+    );
+    if (!alreadySeated) {
+      await assertSeatAvailable(access.tenantId, 1);
     }
   }
 

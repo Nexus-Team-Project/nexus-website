@@ -70,6 +70,8 @@ export async function syncDomainTenantMembership(input: LegacyTenantMembershipSy
         $setOnInsert: {
           tenantId,
           createdByIdentityId: input.nexusIdentityId,
+          // New tenants start on the basic plan. Upgrade via MongoDB or PayMe billing.
+          plan: 'basic' as const,
           createdAt: input.tenant.createdAt,
         },
         $set: {

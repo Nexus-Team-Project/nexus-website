@@ -41,7 +41,7 @@ const envSchema = z.object({
 
   // Notifications
   AGENT_EMAIL: z.string().email().optional(), // Email for chat escalation alerts
-  INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Secret for inbound email webhook
+  INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Required to use email-inbound webhook — route rejects all requests if not set
 
   // Microsoft Graph API — for reading Outlook inbox replies
   MS_TENANT_ID: z.string().min(1).optional(),
@@ -70,13 +70,7 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string().min(1).optional(),
   WHATSAPP_APP_SECRET: z.string().min(1).optional(),
 
-  // WhatsApp — Green API (optional)
-  GREEN_API_URL: z.string().url().optional().default('https://api.green-api.com'),
-  GREEN_API_ID_INSTANCE: z.string().min(1).optional(),
-  GREEN_API_TOKEN: z.string().min(1).optional(),
-
-  // WhatsApp provider switch + agent number
-  WHATSAPP_PROVIDER: z.enum(['meta', 'green_api']).default('meta'),
+  // WhatsApp — Meta only
   AGENT_WHATSAPP_NUMBER: z.string().min(1).optional(),
 
   // Payments

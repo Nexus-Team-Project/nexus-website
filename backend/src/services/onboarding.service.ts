@@ -21,6 +21,7 @@ import { syncDomainIdentityForLoginUser } from './domain-identity.service';
 import { syncDomainTenantMembership } from './domain-tenant-sync.service';
 import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 import type { DomainPermission } from './domain-permissions.service';
+import { getTenantPlanSummary, type TenantPlanSummary } from './domain-tenant-plan.service';
 
 export interface UserContext {
   isTenant: boolean;
@@ -46,13 +47,23 @@ export interface DashboardAuthorization {
   canManageMembers: boolean;
 }
 
+export interface TenantSeats {
+  used: number;
+  limit: number;
+  remaining: number;
+  isAtLimit: boolean;
+}
+
 export interface MeResponse {
   user: {
     id: string;
     email: string;
     name: string;
   };
-  context: UserContext;
+  context: UserContext & {
+    plan?: string;
+    seats?: TenantSeats;
+  };
   authorization: DashboardAuthorization;
   onboarding: OnboardingInfo;
 }
@@ -270,9 +281,27 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const domainAuthorization = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, status.context.tenantId);
   const context = applyDomainRoleToContext(status.context, getPrimaryTenantRole(domainAuthorization.roles));
 
+  // Fetch plan + seat summary for tenant users so the dashboard can enforce
+  // and display the plan tier and remaining non-member seats.
+  let planSummary: TenantPlanSummary | undefined;
+  if (context.isTenant && context.tenantId) {
+    planSummary = await getTenantPlanSummary(context.tenantId).catch(() => undefined);
+  }
+
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
-    context,
+    context: {
+      ...context,
+      ...(planSummary && {
+        plan: planSummary.plan,
+        seats: {
+          used: planSummary.seatsUsed,
+          limit: planSummary.seatLimit,
+          remaining: planSummary.remainingSeats,
+          isAtLimit: planSummary.isAtLimit,
+        },
+      }),
+    },
     authorization: getDashboardAuthorization(user.email, context, domainAuthorization.permissions),
     onboarding: status.onboarding,
   };

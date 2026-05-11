@@ -41,6 +41,10 @@ backend/public/
 # Claude Code
 .claude/
 
+# MCP server config (may contain database credentials)
+.mcp.json
+*.mcp.json
+
 # Windows artifacts
 nul
 extglob*

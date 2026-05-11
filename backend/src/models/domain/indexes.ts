@@ -24,6 +24,8 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     identity.contactProfiles.createIndex({ channel: 1, normalizedIdentifier: 1 }, { unique: true }),
     identity.tenantUserRoles.createIndex({ nexusIdentityId: 1, tenantId: 1 }),
     identity.tenantUserRoles.createIndex({ nexusIdentityId: 1, tenantId: 1, role: 1 }, { unique: true }),
+    // Supports fast seat-count aggregation: count distinct identities by tenant + non-member role.
+    identity.tenantUserRoles.createIndex({ tenantId: 1, role: 1 }),
     identity.rolePermissionMaps.createIndex({ role: 1, permission: 1 }, { unique: true }),
 
     tenants.domainTenants.createIndex({ tenantId: 1 }, { unique: true }),

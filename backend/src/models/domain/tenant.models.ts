@@ -9,6 +9,16 @@ import { DOMAIN_COLLECTIONS } from './collections';
 export const TENANT_CONTACT_STATUSES = ['active', 'inactive', 'pending', 'expired'] as const;
 export type TenantContactStatus = typeof TENANT_CONTACT_STATUSES[number];
 
+export const TENANT_PLANS = ['basic', 'advanced', 'premium'] as const;
+export type TenantPlan = typeof TENANT_PLANS[number];
+
+/** Seat limits per billing plan for non-member roles. */
+export const PLAN_SEAT_LIMITS: Record<TenantPlan, number> = {
+  basic: 3,
+  advanced: 5,
+  premium: 10,
+};
+
 export const TENANT_STATUSES = ['build_mode', 'active', 'suspended', 'archived'] as const;
 export const TENANT_ONBOARDING_STATES = [
   'onboarding_initiated',
@@ -42,6 +52,9 @@ export const domainTenantSchema = z.object({
   tenantId: z.string().min(1),
   organizationName: z.string().min(1).max(255),
   status: z.enum(TENANT_STATUSES),
+  // Billing plan that controls how many non-member seats this tenant has.
+  // Defaults to 'basic'. Updated manually in MongoDB until PayMe billing lands.
+  plan: z.enum(TENANT_PLANS).default('basic'),
   createdByIdentityId: z.string().min(1),
   goLiveCompletedAt: z.date().optional(),
   createdAt: z.date(),
