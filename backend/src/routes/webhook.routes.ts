@@ -140,9 +140,9 @@ router.post('/email-inbound', async (req: Request, res: Response) => {
     return;
   }
 
-  // Verify secret
-  if (env.INBOUND_EMAIL_SECRET && payload.secret !== env.INBOUND_EMAIL_SECRET) {
-    res.status(403).json({ error: 'Invalid secret' });
+  // Verify secret — fail closed: reject if secret is not configured or doesn't match.
+  if (!env.INBOUND_EMAIL_SECRET || payload.secret !== env.INBOUND_EMAIL_SECRET) {
+    res.status(403).json({ error: 'Forbidden' });
     return;
   }
 

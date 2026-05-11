@@ -41,7 +41,7 @@ const envSchema = z.object({
 
   // Notifications
   AGENT_EMAIL: z.string().email().optional(), // Email for chat escalation alerts
-  INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Secret for inbound email webhook
+  INBOUND_EMAIL_SECRET: z.string().min(1).optional(), // Required to use email-inbound webhook — route rejects all requests if not set
 
   // Microsoft Graph API — for reading Outlook inbox replies
   MS_TENANT_ID: z.string().min(1).optional(),
