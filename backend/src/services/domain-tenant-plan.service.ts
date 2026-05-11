@@ -12,6 +12,7 @@
  */
 import { getMongoDb } from '../config/mongo';
 import { createError } from '../middleware/errorHandler';
+import { DOMAIN_COLLECTIONS } from '../models/domain/collections';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
 import { PLAN_SEAT_LIMITS, type TenantPlan } from '../models/domain/tenant.models';
 
@@ -29,10 +30,17 @@ export interface TenantPlanSummary {
 }
 
 /**
- * Counts distinct identities holding at least one non-member role for the tenant.
- * The tenant creator is excluded — they don't consume a billable seat.
- * Input: tenant id, optional creator identity id to exclude.
- * Output: number of occupied non-member seats (each identity counts once).
+ * Counts distinct identities occupying a non-member seat for the tenant.
+ * Rules:
+ * - Seats used by identities with accepted invitations always count.
+ * - Seats used by identities with pending, non-expired invitations count
+ *   (invite sent but not yet accepted still reserves a seat).
+ * - Seats are freed when the latest invitation expires or is revoked and the
+ *   person never accepted (i.e. TenantUserRole exists but invite is dead).
+ * - Directly added members with no invitation record always count.
+ * - The tenant creator is excluded via excludeIdentityId.
+ * Input: tenant id, optional creator identity id to exclude from the count.
+ * Output: number of occupied non-member seats (each identity counted once).
  */
 async function countNonMemberSeatsUsed(tenantId: string, excludeIdentityId?: string): Promise<number> {
   const db = await getMongoDb();
@@ -43,10 +51,55 @@ async function countNonMemberSeatsUsed(tenantId: string, excludeIdentityId?: str
     matchStage.nexusIdentityId = { $ne: excludeIdentityId };
   }
 
+  const now = new Date();
+
   const result = await identityCollections.tenantUserRoles
     .aggregate<{ count: number }>([
       { $match: matchStage },
+      // Deduplicate by identity (one non-member seat per person regardless of how many roles).
       { $group: { _id: '$nexusIdentityId' } },
+      // Join with the most recent invitation for this identity in this tenant.
+      {
+        $lookup: {
+          from: DOMAIN_COLLECTIONS.tenantMemberInvitations,
+          let: { identityId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$tenantId', tenantId] },
+                    { $eq: ['$nexusIdentityId', '$$identityId'] },
+                  ],
+                },
+              },
+            },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+          ],
+          as: 'latestInvitation',
+        },
+      },
+      // Keep the identity if:
+      // - No invitation exists (directly added member, always counts).
+      // - Invitation is accepted (real member, always counts).
+      // - Invitation is pending AND not yet expired (seat reserved until expiry).
+      // Exclude if invitation is revoked, or pending but past expiresAt.
+      {
+        $match: {
+          $or: [
+            // No invitation record - direct add
+            { latestInvitation: { $size: 0 } },
+            // Accepted - confirmed member
+            { 'latestInvitation.0.status': 'accepted' },
+            // Pending and still within expiry window
+            {
+              'latestInvitation.0.status': 'pending',
+              'latestInvitation.0.expiresAt': { $gte: now },
+            },
+          ],
+        },
+      },
       { $count: 'count' },
     ])
     .toArray();

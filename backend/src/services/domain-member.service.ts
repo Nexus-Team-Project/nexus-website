@@ -317,10 +317,23 @@ export async function inviteTenantMemberByEmail(
     updatedAt: now,
   });
 
-  // Advance contact status to pending if a contact record exists for this email+tenant.
+  // Upsert a contact record so the invited person appears in the Contacts tab.
+  // Creates a new contact if one doesn't exist; advances status to 'pending' if it does.
   void tenantCollections.tenantContacts.updateOne(
     { tenantId: access.tenantId, normalizedEmail: invitedIdentity.normalizedEmail },
-    { $set: { status: 'pending', updatedAt: now } },
+    {
+      $setOnInsert: {
+        tenantContactId: `tenant_contact_${randomUUID()}`,
+        tenantId: access.tenantId,
+        email: invitedIdentity.normalizedEmail,
+        normalizedEmail: invitedIdentity.normalizedEmail,
+        displayName: input.displayName ?? invitedIdentity.normalizedEmail.split('@')[0],
+        nexusIdentityId: invitedIdentity.nexusIdentityId,
+        createdAt: now,
+      },
+      $set: { status: 'pending', updatedAt: now },
+    },
+    { upsert: true },
   ).catch(() => undefined);
 
   const emailSent = await sendAndTrackInvitationEmail({
