@@ -18,17 +18,29 @@ export interface TenantMemberInviteEmailInput {
 }
 
 const ROLE_LABELS: Record<TenantUserRoleName, { he: string; en: string }> = {
-  admin: { he: 'מנהל', en: 'Admin' },
-  finance: { he: 'כספים', en: 'Finance' },
-  operator: { he: 'תפעול', en: 'Operator' },
-  analyst: { he: 'אנליסט', en: 'Analyst' },
-  developer: { he: 'מפתח', en: 'Developer' },
-  supply_manager: { he: 'ניהול ספקים', en: 'Supply manager' },
-  member: { he: 'חבר', en: 'Member' },
-  platform_admin: { he: 'מנהל פלטפורמה', en: 'Platform admin' },
-  platform_operator: { he: 'תפעול פלטפורמה', en: 'Platform operator' },
-  platform_support: { he: 'תמיכה', en: 'Platform support' },
-  platform_finance: { he: 'כספי פלטפורמה', en: 'Platform finance' },
+  // Tenant roles
+  owner:                { he: 'בעלים',          en: 'Owner' },
+  admin:                { he: 'מנהל',            en: 'Admin' },
+  back_office_manager:  { he: 'ניהול תפעולי',   en: 'Back-office manager' },
+  hr_manager:           { he: 'משאבי אנוש',      en: 'HR manager' },
+  finance:              { he: 'כספים',           en: 'Finance' },
+  billing_manager:      { he: 'ניהול חיוב',      en: 'Billing manager' },
+  payments_manager:     { he: 'ניהול תשלומים',   en: 'Payments manager' },
+  support_agent:        { he: 'נציג תמיכה',      en: 'Support agent' },
+  developer:            { he: 'מפתח',            en: 'Developer' },
+  supply_manager:       { he: 'ניהול ספקים',     en: 'Supply manager' },
+  member:               { he: 'חבר',             en: 'Member' },
+  // Deprecated tenant roles
+  operator:             { he: 'תפעול',           en: 'Operator' },
+  analyst:              { he: 'אנליסט',          en: 'Analyst' },
+  // Platform roles
+  platform_admin:       { he: 'מנהל פלטפורמה',  en: 'Platform admin' },
+  platform_operator:    { he: 'תפעול פלטפורמה', en: 'Platform operator' },
+  platform_back_office: { he: 'בק-אופיס פלטפורמה', en: 'Platform back-office' },
+  platform_marketing:   { he: 'שיווק פלטפורמה', en: 'Platform marketing' },
+  platform_commerce:    { he: 'מסחר פלטפורמה',  en: 'Platform commerce' },
+  platform_support:     { he: 'תמיכה',           en: 'Platform support' },
+  platform_finance:     { he: 'כספי פלטפורמה',  en: 'Platform finance' },
 };
 
 /**

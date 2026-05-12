@@ -118,7 +118,7 @@ async function requireServiceActivationAccess(userId: string): Promise<{
   }
 
   const authorization = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, context.tenantId);
-  if (!hasDomainPermission(authorization, 'tenant.activate_services')) throw createError('Forbidden', 403);
+  if (!hasDomainPermission(authorization, 'workspace.activate_service')) throw createError('Forbidden', 403);
 
   return {
     tenantObjectId,

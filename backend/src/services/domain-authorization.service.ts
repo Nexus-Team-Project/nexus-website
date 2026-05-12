@@ -19,13 +19,20 @@ export interface DomainAuthorizationContext {
 }
 
 const TENANT_ROLE_PRIORITY: readonly TenantUserRoleName[] = [
+  'owner',
   'admin',
+  'back_office_manager',
+  'hr_manager',
   'finance',
-  'operator',
-  'supply_manager',
+  'billing_manager',
+  'payments_manager',
+  'support_agent',
   'developer',
-  'analyst',
+  'supply_manager',
   'member',
+  // Deprecated - kept at end so they resolve last for any existing DB rows
+  'operator',
+  'analyst',
 ] as const;
 
 /**

@@ -102,15 +102,15 @@ function getDashboardAuthorization(
   permissions: DomainPermission[],
 ): DashboardAuthorization {
   const platformRole = getPlatformRoleForEmail(email);
-  const canSeeDevMode = context.role === 'admin';
+  const canSeeDevMode = context.role === 'admin' || context.role === 'owner';
 
   return {
     tenantRole: context.role,
     platformRole,
     canSeeDevMode,
     canUseDevPlayground: canSeeDevMode && platformRole === 'nexusAdmin',
-    canViewMembers: permissions.includes('member.view') || permissions.includes('member.manage'),
-    canManageMembers: permissions.includes('member.invite') || permissions.includes('member.manage'),
+    canViewMembers: permissions.includes('members.view') || permissions.includes('team.view_members'),
+    canManageMembers: permissions.includes('team.invite_member') && permissions.includes('roles.assign'),
   };
 }
 
@@ -250,7 +250,7 @@ export async function getOnboardingStatus(userId: string): Promise<{ context: Us
   if (!context.isTenant && !context.isMember) {
     return { context, onboarding: { required: true, step: 'workspace_setup' } };
   }
-  if (context.isTenant && context.role === 'admin') {
+  if (context.isTenant && (context.role === 'admin' || context.role === 'owner')) {
     const db = await getMongoDb();
     const collections = getOnboardingCollections(db);
     const tenant = await collections.tenants.findOne({ _id: new ObjectId(context.tenantId!) });
@@ -389,6 +389,7 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
     tenantMembershipId: membershipInsert.insertedId,
     tenantMembership: { ...membership, _id: membershipInsert.insertedId },
     nexusIdentityId: domainIdentity.nexusIdentityId,
+    isWorkspaceCreator: true,
   });
 
   await collections.onboardingStates.updateOne(
@@ -559,7 +560,7 @@ export async function getBusinessSetup(userId: string) {
  * Output: updated draft setup response.
  */
 export async function saveBusinessSetupDraft(userId: string, data: BusinessSetupInput) {
-  return upsertBusinessSetup(userId, data, 'draft', 'tenant.go_live');
+  return upsertBusinessSetup(userId, data, 'draft', 'workspace.trigger_go_live');
 }
 
 /**
@@ -568,7 +569,7 @@ export async function saveBusinessSetupDraft(userId: string, data: BusinessSetup
  * Output: submitted setup response.
  */
 export async function submitBusinessSetup(userId: string, data: BusinessSetupInput) {
-  return upsertBusinessSetup(userId, data, 'submitted', 'tenant.go_live');
+  return upsertBusinessSetup(userId, data, 'submitted', 'workspace.trigger_go_live');
 }
 
 /**

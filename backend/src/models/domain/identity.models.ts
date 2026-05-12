@@ -11,15 +11,27 @@ export const IDENTITY_STATUSES = ['invited', 'active', 'suspended', 'deactivated
 export const CONTACT_CHANNELS = ['email', 'sms', 'whatsapp', 'push', 'meta'] as const;
 export const CONTACT_STATUSES = ['active', 'disabled', 'bounced', 'unsubscribed'] as const;
 export const TENANT_ROLE_NAMES = [
+  // Tenant-side roles
+  'owner',               // workspace creator - unique per workspace, assigned at creation only
   'admin',
+  'back_office_manager', // renamed from 'operator'
+  'hr_manager',
   'finance',
-  'operator',
-  'analyst',
+  'billing_manager',
+  'payments_manager',
+  'support_agent',
   'developer',
   'supply_manager',
   'member',
+  // Deprecated tenant roles - kept for backward compat, hidden from invite UI
+  'operator',            // migrated to back_office_manager - do not use for new assignments
+  'analyst',             // replaced by finance + viewer modifier (Phase 2) - do not use for new assignments
+  // Platform-side roles
   'platform_admin',
   'platform_operator',
+  'platform_back_office',
+  'platform_marketing',
+  'platform_commerce',
   'platform_support',
   'platform_finance',
 ] as const;

@@ -62,7 +62,7 @@ export async function updateTenantMemberRoles(
   tenantMemberId: string,
   newRoles: TenantUserRoleName[],
 ): Promise<{ roles: TenantUserRoleName[] }> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
@@ -143,7 +143,7 @@ export async function updateTenantMemberEmail(
   tenantMemberId: string,
   newEmail: string,
 ): Promise<{ tenantMemberId: string; invitationId: string }> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
@@ -346,7 +346,7 @@ export async function removeTenantMemberFromTenant(
   tenantMemberId: string,
   opts: { suppressEmail?: boolean } = {},
 ): Promise<void> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
@@ -430,7 +430,7 @@ export async function removeTenantContact(
   managerUserId: string,
   tenantContactId: string,
 ): Promise<void> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
 
@@ -480,7 +480,7 @@ export async function updateTenantContactEmail(
   tenantContactId: string,
   newEmail: string,
 ): Promise<void> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const now = new Date();

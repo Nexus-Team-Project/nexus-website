@@ -2,7 +2,7 @@
  * Manages tenant-scoped contact records in MongoDB.
  * Contacts are the tenant's own address book — people who do not need to
  * have accepted a Nexus invite or created a Nexus account.
- * All mutations require member.manage permission; reads require member.view.
+ * All mutations require members.update permission; reads require members.view.
  */
 import { randomUUID } from 'crypto';
 import { getMongoDb } from '../config/mongo';
@@ -76,7 +76,7 @@ export async function listTenantContacts(
   userId: string,
   query: ListContactsQuery,
 ): Promise<{ tenantId: string; contacts: TenantContactListItem[]; pagination: ContactPaginationMeta }> {
-  const access = await requireTenantMemberPermission(userId, 'member.view');
+  const access = await requireTenantMemberPermission(userId, 'members.view');
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContacts;
 
@@ -114,7 +114,7 @@ export async function createTenantContact(
   userId: string,
   data: CreateContactInput,
 ): Promise<TenantContactListItem> {
-  const access = await requireTenantMemberPermission(userId, 'member.manage');
+  const access = await requireTenantMemberPermission(userId, 'members.update');
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContacts;
 
@@ -155,7 +155,7 @@ export async function updateTenantContact(
   contactId: string,
   data: UpdateContactInput,
 ): Promise<TenantContactListItem> {
-  const access = await requireTenantMemberPermission(userId, 'member.manage');
+  const access = await requireTenantMemberPermission(userId, 'members.update');
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContacts;
 
@@ -180,7 +180,7 @@ export async function importTenantContacts(
   userId: string,
   rows: ImportContactRow[],
 ): Promise<{ imported: number; skipped: number; errors: string[] }> {
-  const access = await requireTenantMemberPermission(userId, 'member.manage');
+  const access = await requireTenantMemberPermission(userId, 'members.update');
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContacts;
 

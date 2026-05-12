@@ -17,6 +17,8 @@ export interface LegacyTenantMembershipSyncInput {
   tenantMembershipId: ObjectId;
   tenantMembership: TenantMemberDocument;
   nexusIdentityId: string;
+  /** When true, writes 'owner' to the domain TenantUserRole regardless of the legacy role. */
+  isWorkspaceCreator?: boolean;
 }
 
 /**
@@ -61,7 +63,8 @@ export async function syncDomainTenantMembership(input: LegacyTenantMembershipSy
   const tenantId = input.tenantId.toHexString();
   const tenantMemberId = input.tenantMembershipId.toHexString();
   const now = new Date();
-  const role = mapLegacyTenantRole(input.tenantMembership.role);
+  // Workspace creators get the 'owner' role in the domain model regardless of the legacy role.
+  const role = input.isWorkspaceCreator ? 'owner' : mapLegacyTenantRole(input.tenantMembership.role);
 
   await Promise.all([
     tenantCollections.domainTenants.updateOne(

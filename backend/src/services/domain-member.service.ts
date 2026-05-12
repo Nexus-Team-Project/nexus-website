@@ -120,7 +120,7 @@ export async function requireMemberManagementAccess(userId: string): Promise<{
   tenantId: string;
   managerIdentityId: string;
 }> {
-  return requireTenantMemberPermission(userId, 'member.invite');
+  return requireTenantMemberPermission(userId, 'team.invite_member');
 }
 
 /**
