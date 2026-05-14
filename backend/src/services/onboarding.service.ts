@@ -354,7 +354,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   // Run all four tenant-scoped lookups in parallel to avoid serial latency on
   // every /api/me call. domainTenantStatus feeds resolveCatalogMode, which is
   // called after Promise.all resolves.
-  const [domainTenantDoc, userRoles, domainMemberDoc, tenantOnboardingState] = await Promise.all([
+  const [domainTenantDoc, userRoles, domainMemberDoc] = await Promise.all([
     // Look up the domain tenant's live status (separate from the legacy onboarding tenant).
     context.tenantId
       ? tenantCollections.domainTenants.findOne(
@@ -380,14 +380,6 @@ export async function getMe(userId: string): Promise<MeResponse> {
           { projection: { services: 1 } },
         )
       : Promise.resolve(null),
-    // Fetch the domain onboarding state to determine whether business setup is complete.
-    // The same ready states are used by triggerGoLive to validate readiness.
-    context.tenantId
-      ? tenantCollections.tenantOnboardingStates.findOne(
-          { tenantId: context.tenantId },
-          { projection: { state: 1 } },
-        )
-      : Promise.resolve(null),
   ]);
 
   const domainTenantStatus: string | null = domainTenantDoc?.status ?? null;
@@ -395,13 +387,11 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const memberServices: string[] =
     domainMemberDoc != null ? (domainMemberDoc.services ?? [...DEFAULT_MEMBER_SERVICES]) : [];
 
-  // Business setup is complete when the domain onboarding state is past the setup phase.
-  // The same states are used by triggerGoLive to validate readiness.
-  const READY_FOR_GO_LIVE = ['build_mode', 'wizard_completed', 'go_live_pending', 'active'] as const;
-  const businessSetupComplete =
-    tenantOnboardingState !== null &&
-    tenantOnboardingState !== undefined &&
-    READY_FOR_GO_LIVE.includes(tenantOnboardingState.state as typeof READY_FOR_GO_LIVE[number]);
+  // Business setup is complete when getOnboardingStatus() does not require it as the next
+  // step. That function checks the legacy tenant.businessSetupStatus field which is the
+  // authoritative source (the domain tenantOnboardingStates.state is set to 'build_mode'
+  // immediately after workspace creation and cannot be used to detect incomplete setup).
+  const businessSetupComplete = status.onboarding.step !== 'business_setup';
 
   const catalogMode = await resolveCatalogMode(
     context.tenantId ?? null,
