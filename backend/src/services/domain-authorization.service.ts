@@ -116,3 +116,12 @@ export function hasDomainPermission(
 export function getPrimaryTenantRole(roles: TenantUserRoleName[]): TenantUserRoleName | null {
   return TENANT_ROLE_PRIORITY.find((role) => roles.includes(role)) ?? null;
 }
+
+/**
+ * Extracts the tenant id from a domain authorization context.
+ * Input: DomainAuthorizationContext resolved for a user.
+ * Output: tenantId string or null if user has no active tenant membership.
+ */
+export function getTenantIdForIdentity(auth: DomainAuthorizationContext): string | null {
+  return auth.tenantId ?? null;
+}

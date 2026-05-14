@@ -6,6 +6,7 @@ import { ObjectId } from 'mongodb';
 import { prisma } from '../config/database';
 import { getMongoDb } from '../config/mongo';
 import { PlatformRole, getPlatformRoleForEmail, normalizeEmail } from '../config/platform-admins';
+import { isPlatformAdminEmail } from '../utils/platform-admin';
 import { createError } from '../middleware/errorHandler';
 import {
   BusinessSetupDocument,
@@ -41,10 +42,14 @@ export interface OnboardingInfo {
 export interface DashboardAuthorization {
   tenantRole: string | null;
   platformRole: PlatformRole | null;
+  /** True when the user is a NEXUS platform admin (NEXUS_ADMIN_EMAILS). */
+  isPlatformAdmin: boolean;
   canSeeDevMode: boolean;
   canUseDevPlayground: boolean;
   canViewMembers: boolean;
   canManageMembers: boolean;
+  /** True when the user can create or manage supply catalog offers. */
+  canManageSupply: boolean;
 }
 
 export interface TenantSeats {
@@ -102,15 +107,19 @@ function getDashboardAuthorization(
   permissions: DomainPermission[],
 ): DashboardAuthorization {
   const platformRole = getPlatformRoleForEmail(email);
+  const adminByEmail = isPlatformAdminEmail(email);
   const canSeeDevMode = context.role === 'admin' || context.role === 'owner';
 
   return {
     tenantRole: context.role,
     platformRole,
+    isPlatformAdmin: adminByEmail,
     canSeeDevMode,
     canUseDevPlayground: canSeeDevMode && platformRole === 'nexusAdmin',
     canViewMembers: permissions.includes('members.view') || permissions.includes('team.view_members'),
     canManageMembers: permissions.includes('team.invite_member') && permissions.includes('roles.assign'),
+    // Platform admins can always manage supply; tenant supply_managers get it via domain permissions.
+    canManageSupply: adminByEmail || permissions.includes('supply.ingest') || permissions.includes('supply.manage_offers'),
   };
 }
 

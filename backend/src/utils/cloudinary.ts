@@ -152,3 +152,49 @@ export async function uploadOfferImage(buffer: Buffer, filename: string): Promis
 export function defaultOfferImageUrl(): string {
   return 'https://res.cloudinary.com/nexus/image/upload/v1/nexus/offers/default-offer.png';
 }
+
+/**
+ * Deletes an offer image from Cloudinary by its secure URL.
+ *
+ * Extracts the public_id from the URL and calls the Cloudinary signed destroy
+ * API. Errors are intentionally swallowed - offer deletion must succeed even
+ * when Cloudinary is unavailable or the image has already been removed.
+ *
+ * Input:  imageUrl - secure_url returned by Cloudinary at upload time.
+ * Output: Promise<void>. Never rejects.
+ */
+export async function deleteOfferImage(imageUrl: string): Promise<void> {
+  // Skip when Cloudinary is not configured or the URL is not a Cloudinary URL.
+  if (!env.CLOUDINARY_URL) return;
+  if (!imageUrl.includes('res.cloudinary.com')) return;
+
+  const { apiKey, apiSecret, cloudName } = parseCloudinaryUrl(env.CLOUDINARY_URL);
+
+  // Extract public_id: everything between /upload/(v{version}/)? and the extension.
+  // Example: https://res.cloudinary.com/cloud/image/upload/v123/nexus/offers/foo.jpg
+  //          -> public_id = nexus/offers/foo
+  const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+?)(?:\.[^.]+)?$/);
+  if (!match) return;
+
+  const publicId = match[1];
+  const timestamp = Math.round(Date.now() / 1000);
+
+  // Cloudinary signed destroy requires: public_id + timestamp + api_secret concatenated.
+  const signatureBase = `public_id=${publicId}&timestamp=${timestamp}${apiSecret}`;
+  const signature = createHash('sha1').update(signatureBase).digest('hex');
+
+  const form = new FormData();
+  form.append('public_id', publicId);
+  form.append('api_key', apiKey);
+  form.append('timestamp', String(timestamp));
+  form.append('signature', signature);
+
+  try {
+    await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/destroy`, {
+      method: 'POST',
+      body: form,
+    });
+  } catch {
+    // Swallow - offer deletion must succeed even if Cloudinary is unreachable.
+  }
+}

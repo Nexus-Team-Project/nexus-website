@@ -20,7 +20,7 @@ import {
   type OfferCategory,
   type OfferVisibility,
 } from '../models/domain/supply.models';
-import { uploadOfferImage, defaultOfferImageUrl } from '../utils/cloudinary';
+import { uploadOfferImage, defaultOfferImageUrl, deleteOfferImage } from '../utils/cloudinary';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -245,4 +245,61 @@ export async function listPlatformOffers(
   }
 
   return nexusOffers.find(filter).sort({ createdAt: -1 }).toArray();
+}
+
+// ---------------------------------------------------------------------------
+// Delete operations
+// ---------------------------------------------------------------------------
+
+/**
+ * Soft-deletes an offer and cascades removal from all tenant catalogs.
+ *
+ * - Sets offer.status = 'inactive' so purchase history references remain intact.
+ * - Deletes all TenantOfferConfig adoption records for this offer so it
+ *   disappears from every tenant's member-facing catalog immediately.
+ * - Attempts to remove the image from Cloudinary; errors are swallowed so that
+ *   a Cloudinary failure can never block the offer from being deleted.
+ * - Does NOT touch any transaction or purchase records.
+ *
+ * Authorization:
+ *   - Tenant admins may only delete offers they created (createdByTenantId match).
+ *   - Platform admins (isPlatformAdmin = true) may delete any offer.
+ *
+ * Input:
+ *   offerId         - UUID of the offer to delete.
+ *   tenantId        - MongoDB tenantId of the requester (derived from server-side auth).
+ *   isPlatformAdmin - When true, ownership check is skipped.
+ * Output: Promise<void>.
+ * Throws: Error with status 404 when the offer is not found or the requester
+ *         does not own it (and is not a platform admin).
+ */
+export async function deleteOffer(
+  offerId: string,
+  tenantId: string,
+  isPlatformAdmin: boolean,
+): Promise<void> {
+  const db = await getMongoDb();
+  const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
+
+  // Platform admins can delete any offer; tenant admins only their own.
+  const ownerFilter = isPlatformAdmin
+    ? { offerId }
+    : { offerId, createdByTenantId: tenantId };
+
+  const offer = await nexusOffers.findOne(ownerFilter);
+  if (!offer) throw Object.assign(new Error('Offer not found'), { status: 404 });
+
+  // Attempt Cloudinary image removal. Errors are swallowed inside deleteOfferImage.
+  if (offer.imageUrl) {
+    await deleteOfferImage(offer.imageUrl);
+  }
+
+  // Soft delete - keeps the document so transaction/purchase history stays intact.
+  await nexusOffers.updateOne(
+    { offerId },
+    { $set: { status: 'inactive', updatedAt: new Date() } },
+  );
+
+  // Cascade - remove every tenant's adoption record for this offer immediately.
+  await tenantOfferConfigs.deleteMany({ offerId });
 }
