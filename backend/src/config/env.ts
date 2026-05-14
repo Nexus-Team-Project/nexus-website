@@ -78,6 +78,10 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
+  // Cloudinary — backend-only media storage (offer images). Never expose to frontend.
+  // Format: cloudinary://api_key:api_secret@cloud_name
+  CLOUDINARY_URL: z.string().min(1).optional(),
+
   // Nexus Agents — proxy to agent service (optional)
   AGENT_API_URL: z.string().url().optional(),  // e.g. https://nexus-agents-production-ed8b.up.railway.app
   AGENT_API_KEY: z.string().min(1).optional(), // must match SEO_AGENT_API_KEY on the agent service
@@ -110,6 +114,7 @@ const optional = {
   'Email (SMTP)': env.SMTP_HOST,
   'Email (SendPulse API fallback)': env.SENDPULSE_CLIENT_ID,
   'Web Push Notifications': env.VAPID_PUBLIC_KEY,
+  'Cloudinary (offer image uploads)': env.CLOUDINARY_URL,
 };
 for (const [feature, key] of Object.entries(optional)) {
   if (!key) console.warn(`⚠️  ${feature} disabled — env var not set`);
