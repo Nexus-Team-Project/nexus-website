@@ -69,6 +69,16 @@ export interface CreateOfferInput {
   executionType?: OfferExecutionType;
   /** Maximum total units available across all tenants. null = unlimited. */
   stockLimit?: number | null;
+  /** Direct URL where the offer can be redeemed. */
+  implementationLink?: string | null;
+  /** Human-readable redemption instructions. */
+  implementationInstructions?: string;
+  /** Offer expiry date. null means no expiry. */
+  validUntil?: Date | null;
+  /** Terms and conditions text. */
+  terms?: string;
+  /** Display tags set by the offer creator (max 10, each max 50 chars). */
+  tags?: string[];
   /** Raw image bytes to upload to Cloudinary. Optional - falls back to placeholder. */
   imageBuffer?: Buffer;
   /** Original filename used to derive a readable Cloudinary public_id. */
@@ -99,6 +109,16 @@ export interface UpdateOfferInput {
   executionType?: OfferExecutionType;
   /** Updated stock cap. Set to null to make unlimited; omit to leave unchanged. */
   stockLimit?: number | null;
+  /** Updated direct URL where the offer can be redeemed. */
+  implementationLink?: string | null;
+  /** Updated human-readable redemption instructions. */
+  implementationInstructions?: string;
+  /** Updated offer expiry date. null clears the expiry. */
+  validUntil?: Date | null;
+  /** Updated terms and conditions text. */
+  terms?: string;
+  /** Updated display tags. */
+  tags?: string[];
   /** Replacement image bytes to upload to Cloudinary. */
   imageBuffer?: Buffer;
   /** Filename for the replacement image. */
@@ -148,6 +168,11 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     executionType: input.executionType ?? 'voucher',
     stockLimit: input.stockLimit ?? null,
     stockUsed: 0,
+    implementationLink: input.implementationLink ?? null,
+    implementationInstructions: input.implementationInstructions ?? '',
+    validUntil: input.validUntil ?? null,
+    terms: input.terms ?? '',
+    tags: input.tags ?? [],
     createdByTenantId: input.createdByTenantId,
     createdByIdentityId: input.createdByIdentityId,
     // For tenant_only offers, restrict visibility to the creating tenant.
@@ -206,6 +231,11 @@ export async function updateOffer(
     ...(input.status !== undefined && { status: input.status }),
     ...(input.executionType !== undefined && { executionType: input.executionType }),
     ...(input.stockLimit !== undefined && { stockLimit: input.stockLimit }),
+    ...(input.implementationLink !== undefined && { implementationLink: input.implementationLink }),
+    ...(input.implementationInstructions !== undefined && { implementationInstructions: input.implementationInstructions }),
+    ...(input.validUntil !== undefined && { validUntil: input.validUntil }),
+    ...(input.terms !== undefined && { terms: input.terms }),
+    ...(input.tags !== undefined && { tags: input.tags }),
     ...(imageUrl !== undefined && { imageUrl }),
   };
 

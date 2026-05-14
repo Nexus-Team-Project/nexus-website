@@ -63,6 +63,24 @@ const createOfferSchema = z.object({
   visibility: z.enum(OFFER_VISIBILITY).default('ecosystem'),
   executionType: z.enum(OFFER_EXECUTION_TYPES).default('voucher'),
   stockLimit: z.coerce.number().int().positive().nullable().optional().default(null),
+  implementationLink: z.string().url().nullable().optional(),
+  implementationInstructions: z.string().max(1000).optional(),
+  // ISO string from multipart form; convert to Date in handler.
+  // Must be a future date on create - updating an existing expiry is allowed in updateOfferSchema.
+  validUntil: z.string().optional().nullable().refine(
+    (v) => !v || new Date(v) > new Date(),
+    { message: 'validUntil must be a future date' }
+  ),
+  terms: z.string().max(2000).optional(),
+  // JSON-encoded array string from multipart form.
+  // Invalid JSON falls back to null so Zod fails array validation and returns 400.
+  tags: z.preprocess(
+    (v) => {
+      if (typeof v !== 'string') return v;
+      try { return JSON.parse(v); } catch { return null; }
+    },
+    z.array(z.string().max(50)).max(10).optional().default([])
+  ),
 });
 
 /**
@@ -77,6 +95,18 @@ const updateOfferSchema = z.object({
   status: z.enum(['active', 'inactive']).optional(),
   executionType: z.enum(OFFER_EXECUTION_TYPES).optional(),
   stockLimit: z.coerce.number().int().positive().nullable().optional(),
+  implementationLink: z.string().url().nullable().optional(),
+  implementationInstructions: z.string().max(1000).optional(),
+  validUntil: z.string().optional().nullable(),
+  terms: z.string().max(2000).optional(),
+  // Invalid JSON falls back to null so Zod fails array validation and returns 400.
+  tags: z.preprocess(
+    (v) => {
+      if (typeof v !== 'string') return v;
+      try { return JSON.parse(v); } catch { return null; }
+    },
+    z.array(z.string().max(50)).max(10).optional()
+  ),
 });
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
@@ -194,9 +224,12 @@ router.post(
       // the client sends. This prevents accidentally scoping supply to a single tenant.
       const finalVisibility = ctx.isPlatformAdmin ? 'ecosystem' : parsed.data.visibility;
 
+      // Convert validUntil ISO string (from multipart form) to a Date object.
+      const { validUntil: validUntilStr, ...restParsed } = parsed.data;
       const offer = await createOffer({
-        ...parsed.data,
+        ...restParsed,
         visibility: finalVisibility,
+        validUntil: validUntilStr ? new Date(validUntilStr) : null,
         imageBuffer: req.file?.buffer,
         imageFilename: req.file?.originalname,
         createdByTenantId: ctx.tenantId,
@@ -239,8 +272,13 @@ router.patch(
         'supply.manage_offers',
       );
 
+      // Convert validUntil ISO string (from multipart form) to a Date object.
+      const { validUntil: validUntilStr, ...restParsed } = parsed.data;
       const offer = await updateOffer(req.params.offerId, tenantId, {
-        ...parsed.data,
+        ...restParsed,
+        ...(validUntilStr !== undefined && {
+          validUntil: validUntilStr ? new Date(validUntilStr) : null,
+        }),
         imageBuffer: req.file?.buffer,
         imageFilename: req.file?.originalname,
       });

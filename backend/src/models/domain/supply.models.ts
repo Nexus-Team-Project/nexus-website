@@ -60,6 +60,16 @@ export const nexusOfferSchema = z.object({
   stockLimit: z.number().int().positive().nullable().default(null),
   /** Running count of units that have been purchased/redeemed. */
   stockUsed: z.number().int().nonnegative().default(0),
+  /** Direct URL where the offer can be redeemed. */
+  implementationLink: z.string().url().nullable().optional(),
+  /** Human-readable redemption instructions. */
+  implementationInstructions: z.string().max(1000).optional().default(''),
+  /** Offer expiry date. null means no expiry. */
+  validUntil: z.date().nullable().optional(),
+  /** Terms and conditions text. */
+  terms: z.string().max(2000).optional().default(''),
+  /** Display tags set by the offer creator (max 10, each max 50 chars). */
+  tags: z.array(z.string().max(50)).max(10).default([]),
   createdByTenantId: z.string().min(1),
   createdByIdentityId: z.string().min(1),
   invitedByTenantId: z.string().min(1).optional(),

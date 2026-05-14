@@ -62,6 +62,16 @@ export interface CatalogItem {
   stockAvailable: number | null;
   /** True when all units have been claimed. Always false for unlimited offers. */
   isSoldOut: boolean;
+  /** Direct URL where the offer can be redeemed. null when not set. */
+  implementationLink?: string | null;
+  /** Human-readable redemption instructions. */
+  implementationInstructions?: string;
+  /** Offer expiry date. null means no expiry. */
+  validUntil?: Date | null;
+  /** Terms and conditions text. */
+  terms?: string;
+  /** Display tags set by the offer creator. */
+  tags: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +113,11 @@ function toItem(offer: NexusOffer, config: TenantOfferConfig | undefined): Catal
     // isSoldOut is only true when a cap exists and has been fully consumed.
     isSoldOut: offer.stockLimit !== null
       && (offer.stockUsed ?? 0) >= offer.stockLimit,
+    implementationLink: offer.implementationLink ?? null,
+    implementationInstructions: offer.implementationInstructions ?? '',
+    validUntil: offer.validUntil ?? null,
+    terms: offer.terms ?? '',
+    tags: offer.tags ?? [],
   };
 }
 
