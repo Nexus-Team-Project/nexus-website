@@ -6,6 +6,7 @@ import type { Db } from 'mongodb';
 import { getIdentityDomainCollections } from './identity.models';
 import { getOrchestrationDomainCollections } from './orchestration.models';
 import { getTenantDomainCollections } from './tenant.models';
+import { getSupplyDomainCollections } from './supply.models';
 
 /**
  * Creates idempotent indexes for identity, tenant, member, event, and saga data.
@@ -56,5 +57,15 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     ),
     orchestration.processedSteps.createIndex({ sagaInstanceId: 1, step: 1 }, { unique: true }),
     orchestration.consumedEvents.createIndex({ platformEventId: 1, consumerName: 1 }, { unique: true }),
+  ]);
+
+  const supply = getSupplyDomainCollections(db);
+  await Promise.all([
+    supply.nexusOffers.createIndex({ offerId: 1 }, { unique: true }),
+    supply.nexusOffers.createIndex({ status: 1, visibility: 1 }),
+    supply.nexusOffers.createIndex({ createdByTenantId: 1, status: 1 }),
+    supply.nexusOffers.createIndex({ category: 1, status: 1 }),
+    supply.tenantOfferConfigs.createIndex({ tenantId: 1, offerId: 1 }, { unique: true }),
+    supply.tenantOfferConfigs.createIndex({ tenantId: 1, adoptionStatus: 1 }),
   ]);
 }
