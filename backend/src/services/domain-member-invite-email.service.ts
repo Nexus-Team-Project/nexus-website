@@ -12,10 +12,17 @@ export interface TenantMemberInviteEmailInput {
   displayName?: string;
   tenantName: string;
   roles: TenantUserRoleName[];
+  /** Service keys granted to this member (e.g. benefits_catalog). */
+  services?: string[];
   inviteUrl: string;
   expiresAt: Date;
   language: 'he' | 'en';
 }
+
+/** Human-readable labels for known service keys in both supported languages. */
+const SERVICE_LABELS: Record<string, { he: string; en: string }> = {
+  benefits_catalog: { he: 'קטלוג הטבות', en: 'Benefits Catalog' },
+};
 
 const ROLE_LABELS: Record<TenantUserRoleName, { he: string; en: string }> = {
   // Tenant roles
@@ -96,6 +103,28 @@ function buildRoleBadgesHtml(roles: TenantUserRoleName[], language: 'he' | 'en')
 }
 
 /**
+ * Builds service access badge HTML for the email card.
+ * Only renders when the services array is non-empty.
+ * Input: service key strings and language.
+ * Output: section HTML, or empty string when no services are present.
+ */
+function buildServicesBadgesHtml(services: string[] | undefined, language: 'he' | 'en'): string {
+  if (!services || services.length === 0) return '';
+  const sectionLabel = language === 'he' ? 'גישה לשירותים:' : 'Service access:';
+  const badges = services
+    .map((key) => {
+      const label = escapeHtml(SERVICE_LABELS[key]?.[language] ?? key);
+      return `<span style="display:inline-block;background:#eef2ff;border:1px solid #c7d2fe;border-radius:20px;padding:4px 14px;font-size:13px;font-weight:600;color:#3730a3;margin:3px 4px;">${label}</span>`;
+    })
+    .join('');
+  return `
+<tr><td align="center" style="padding-top:8px;">
+  <p style="margin:0 0 8px 0;color:#666;font-size:13px;">${sectionLabel}</p>
+  <div style="margin:0;">${badges}</div>
+</td></tr>`;
+}
+
+/**
  * Creates the website URL that starts auth before dashboard invite acceptance.
  * Input: raw invite token and target email language.
  * Output: absolute login URL with a safe dashboard redirect query.
@@ -122,6 +151,7 @@ export async function sendTenantMemberInviteEmail(
   const tenantName = escapeHtml(input.tenantName);
   const roleList = formatRoleList(input.roles, input.language);
   const roleBadges = buildRoleBadgesHtml(input.roles, input.language);
+  const servicesBadges = buildServicesBadgesHtml(input.services, input.language);
   const expiry = escapeHtml(formatExpiryDate(input.expiresAt, input.language));
   const escapedUrl = escapeHtml(input.inviteUrl);
   const bannerHtml = buildAuthEmailBannerHtml();
@@ -165,6 +195,7 @@ export async function sendTenantMemberInviteEmail(
   <p style="margin:18px 0 8px 0;color:#555;font-size:15px;line-height:1.6;">${copy.intro}</p>
   ${roleBadges}
 </td></tr>
+${servicesBadges}
 <tr><td align="center" style="padding:24px 0 8px 0;">
   <a href="${escapedUrl}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
     ${copy.action}

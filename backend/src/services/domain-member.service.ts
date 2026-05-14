@@ -155,6 +155,8 @@ async function sendAndTrackInvitationEmail(input: {
   displayName?: string;
   tenantName: string;
   roles: TenantUserRoleName[];
+  /** Service keys granted to this member - forwarded into the email body. */
+  services?: string[];
   token: string;
   expiresAt: Date;
   language: 'he' | 'en';
@@ -172,6 +174,7 @@ async function sendAndTrackInvitationEmail(input: {
       displayName: input.displayName,
       tenantName: input.tenantName,
       roles: input.roles,
+      services: input.services,
       inviteUrl,
       expiresAt: input.expiresAt,
       language: input.language,
@@ -347,6 +350,7 @@ export async function inviteTenantMemberByEmail(
     displayName: input.displayName,
     tenantName: tenant?.organizationName ?? 'Nexus',
     roles: uniqueRoles,
+    services: input.services,
     token: rawToken,
     expiresAt,
     language: input.language,
