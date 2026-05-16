@@ -8,6 +8,7 @@ import { ObjectId } from 'mongodb';
 import { getMongoDb } from '../../src/config/mongo';
 import { getIdentityDomainCollections } from '../../src/models/domain/identity.models';
 import { getOrchestrationDomainCollections } from '../../src/models/domain/orchestration.models';
+import { getSupplyDomainCollections } from '../../src/models/domain/supply.models';
 import { getTenantDomainCollections } from '../../src/models/domain/tenant.models';
 import { getOnboardingCollections } from '../../src/models/onboarding.models';
 import {
@@ -49,6 +50,7 @@ export async function collectMongoCounts(
   const db = await getMongoDb();
   const identity = getIdentityDomainCollections(db);
   const tenants = getTenantDomainCollections(db);
+  const supply = getSupplyDomainCollections(db);
   const orchestration = getOrchestrationDomainCollections(db);
   const onboarding = getOnboardingCollections(db);
   const targets = await resolveMongoDeletionTargets(email, prismaUser);
@@ -82,6 +84,8 @@ export async function collectMongoCounts(
     consumedEvents,
     sagaInstances,
     processedSteps,
+    nexusOffers,
+    tenantOfferConfigs,
   ] = await Promise.all([
     identity.nexusIdentities.countDocuments({
       $or: [
@@ -165,6 +169,14 @@ export async function collectMongoCounts(
     orchestration.processedSteps.countDocuments({
       sagaInstanceId: { $in: orchestrationTargets.sagaInstanceIds },
     }),
+    // Offers created by the tenant (platform offers uploaded by this admin/owner).
+    supply.nexusOffers.countDocuments({
+      createdByTenantId: { $in: targets.domainOwnedTenantIds },
+    }),
+    // Adoption records for the tenant (offers this tenant adopted from the platform catalog).
+    supply.tenantOfferConfigs.countDocuments({
+      tenantId: { $in: targets.domainOwnedTenantIds },
+    }),
   ]);
 
   return {
@@ -194,6 +206,8 @@ export async function collectMongoCounts(
     consumedEvents,
     sagaInstances,
     processedSteps,
+    nexusOffers,
+    tenantOfferConfigs,
   };
 }
 
@@ -211,6 +225,7 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   const db = await getMongoDb();
   const identity = getIdentityDomainCollections(db);
   const tenants = getTenantDomainCollections(db);
+  const supply = getSupplyDomainCollections(db);
   const orchestration = getOrchestrationDomainCollections(db);
   const onboarding = getOnboardingCollections(db);
   const targets = await resolveMongoDeletionTargets(email, prismaUser);
@@ -249,6 +264,10 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
       { tenantId: { $in: targets.domainOwnedTenantIds } },
     ],
   });
+  // Delete adoption records (tenant chose to show these platform offers to members).
+  await supply.tenantOfferConfigs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
+  // Delete offers the tenant created/uploaded to the platform catalog.
+  await supply.nexusOffers.deleteMany({ createdByTenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.tenantCatalogPolicies.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.memberGroups.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.tenantServiceActivations.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
