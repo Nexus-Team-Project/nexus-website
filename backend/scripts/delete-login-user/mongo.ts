@@ -11,6 +11,7 @@ import { getOrchestrationDomainCollections } from '../../src/models/domain/orche
 import { getSupplyDomainCollections } from '../../src/models/domain/supply.models';
 import { getTenantDomainCollections } from '../../src/models/domain/tenant.models';
 import { getOnboardingCollections } from '../../src/models/onboarding.models';
+import { deleteOfferImage } from '../../src/utils/cloudinary';
 import {
   resolveMongoDeletionTargets,
   resolveOrchestrationDeletionTargets,
@@ -266,8 +267,20 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   });
   // Delete adoption records (tenant chose to show these platform offers to members).
   await supply.tenantOfferConfigs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
-  // Delete offers the tenant created/uploaded to the platform catalog.
+  // Collect image URLs before deleting offer documents so we can clean up Cloudinary.
+  const offersToDelete = await supply.nexusOffers
+    .find(
+      { createdByTenantId: { $in: targets.domainOwnedTenantIds } },
+      { projection: { imageUrl: 1 } },
+    )
+    .toArray();
   await supply.nexusOffers.deleteMany({ createdByTenantId: { $in: targets.domainOwnedTenantIds } });
+  // Delete Cloudinary images after DB rows are gone. Errors are swallowed per deleteOfferImage contract.
+  await Promise.all(
+    offersToDelete
+      .filter((o) => o.imageUrl)
+      .map((o) => deleteOfferImage(o.imageUrl as string)),
+  );
   await tenants.tenantCatalogPolicies.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.memberGroups.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.tenantServiceActivations.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
