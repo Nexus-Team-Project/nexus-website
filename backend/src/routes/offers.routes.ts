@@ -79,6 +79,11 @@ const createOfferSchema = z.object({
   implementationLink: z.string().url().nullable().optional(),
   implementationInstructions: z.string().max(1000).optional(),
   // ISO string from multipart form; convert to Date in handler.
+  // validFrom is optional - null/undefined means the offer goes live as soon as approved.
+  // No future-date refinement on validFrom: setting it to today (or the past) is valid
+  // and equivalent to "available now".
+  validFrom: z.string().optional().nullable(),
+  // ISO string from multipart form; convert to Date in handler.
   // Must be a future date on create - updating an existing expiry is allowed in updateOfferSchema.
   validUntil: z.string().optional().nullable().refine(
     (v) => !v || new Date(v) > new Date(),
@@ -108,11 +113,17 @@ const updateOfferSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(10000).optional(),
   market_price: z.coerce.number().positive().optional(),
-  status: z.enum(['active', 'inactive']).optional(),
+  // Mirrors the spec OFFER_STATUSES enum. supply.service enforces that
+  // 'disabled' and 'archived' transitions carry a non-empty statusReason.
+  status: z
+    .enum(['draft', 'active', 'inactive', 'pending_approval', 'denied', 'disabled', 'expired', 'archived'])
+    .optional(),
+  statusReason: z.string().min(1).max(1000).optional(),
   executionType: z.enum(OFFER_EXECUTION_TYPES).optional(),
   stockLimit: z.coerce.number().int().positive().nullable().optional(),
   implementationLink: z.string().url().nullable().optional(),
   implementationInstructions: z.string().max(1000).optional(),
+  validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
   terms: z.string().max(2000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -269,12 +280,20 @@ router.post(
         }
       }
 
-      // Convert validUntil ISO string (from multipart form) to a Date object.
-      const { validUntil: validUntilStr, ...restParsed } = parsed.data;
+      // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
+      const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
+      const validFromDate = validFromStr ? new Date(validFromStr) : null;
+      const validUntilDate = validUntilStr ? new Date(validUntilStr) : null;
+      // Spec rule: a scheduled-release date must be before the expiry date.
+      if (validFromDate && validUntilDate && validFromDate >= validUntilDate) {
+        res.status(400).json({ error: 'validFrom must be before validUntil' });
+        return;
+      }
       const offer = await createOffer({
         ...restParsed,
         visibility: finalVisibility,
-        validUntil: validUntilStr ? new Date(validUntilStr) : null,
+        validFrom: validFromDate,
+        validUntil: validUntilDate,
         imageBuffer: req.file?.buffer,
         imageFilename: req.file?.originalname,
         createdByTenantId: ctx.tenantId,
@@ -349,13 +368,23 @@ router.patch(
         'supply.manage_offers',
       );
 
-      // Convert validUntil ISO string (from multipart form) to a Date object.
-      const { validUntil: validUntilStr, ...restParsed } = parsed.data;
+      // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
+      const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
+      const validFromDate = validFromStr !== undefined
+        ? (validFromStr ? new Date(validFromStr) : null)
+        : undefined;
+      const validUntilDate = validUntilStr !== undefined
+        ? (validUntilStr ? new Date(validUntilStr) : null)
+        : undefined;
+      // Cross-field guard: when BOTH are present and non-null, validFrom < validUntil.
+      if (validFromDate && validUntilDate && validFromDate >= validUntilDate) {
+        res.status(400).json({ error: 'validFrom must be before validUntil' });
+        return;
+      }
       const result = await updateOffer(req.params.offerId, ctx.tenantId, {
         ...restParsed,
-        ...(validUntilStr !== undefined && {
-          validUntil: validUntilStr ? new Date(validUntilStr) : null,
-        }),
+        ...(validFromDate !== undefined && { validFrom: validFromDate }),
+        ...(validUntilDate !== undefined && { validUntil: validUntilDate }),
         imageBuffer: req.file?.buffer,
         imageFilename: req.file?.originalname,
       });

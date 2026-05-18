@@ -12,12 +12,19 @@ import { randomUUID } from 'node:crypto';
 import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
+  deriveValueTypeFromExecutionType,
   type NexusOffer,
   type OfferCategory,
   type OfferVisibility,
   type OfferExecutionType,
+  type OfferVariantType,
+  type OfferStatus,
 } from '../models/domain/supply.models';
 import { uploadOfferImage, defaultOfferImageUrl, deleteOfferImage } from '../utils/cloudinary';
+import {
+  assertStatusReasonProvided,
+  resolveStatusReasonValue,
+} from './supply-status.helper';
 
 // ---------------------------------------------------------------------------
 // Public input/output interfaces
@@ -45,6 +52,8 @@ export interface CreateOfferInput {
   implementationLink?: string | null;
   /** Human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Offer goes live on this date. null means immediately available after approval. */
+  validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. */
   validUntil?: Date | null;
   /** Terms and conditions text. */
@@ -57,6 +66,8 @@ export interface CreateOfferInput {
   nexus_cost?: number;
   /** Price end customers pay. Must satisfy: nexus_cost <= member_price <= face_value. */
   member_price?: number;
+  /** Variant pricing shape; only 'fixed' exposed in v1 UI. Defaults to 'fixed'. */
+  variantType?: OfferVariantType;
   /** Raw image bytes to upload to Cloudinary. Optional - falls back to placeholder. */
   imageBuffer?: Buffer;
   /** Original filename used to derive a readable Cloudinary public_id. */
@@ -78,8 +89,14 @@ export interface UpdateOfferInput {
   description?: string;
   /** Updated recommended retail price. */
   market_price?: number;
-  /** Lifecycle status change. */
-  status?: 'active' | 'inactive';
+  /**
+   * Lifecycle status change.
+   * Transitions to 'disabled' or 'archived' require a non-empty statusReason
+   * (enforced server-side in updateOffer).
+   */
+  status?: OfferStatus;
+  /** Required when transitioning to 'disabled' or 'archived'. */
+  statusReason?: string;
   /** Updated fulfillment/redemption type. */
   executionType?: OfferExecutionType;
   /** Updated stock cap. Set to null to make unlimited; omit to leave unchanged. */
@@ -88,6 +105,8 @@ export interface UpdateOfferInput {
   implementationLink?: string | null;
   /** Updated human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Updated offer go-live date. null clears the gate (immediately live). */
+  validFrom?: Date | null;
   /** Updated offer expiry date. null clears the expiry. */
   validUntil?: Date | null;
   /** Updated terms and conditions text. */
@@ -100,6 +119,8 @@ export interface UpdateOfferInput {
   nexus_cost?: number;
   /** Updated end customer price. */
   member_price?: number;
+  /** Updated variant type. Only 'fixed' is exposed in v1 UI. */
+  variantType?: OfferVariantType;
   /** Replacement image bytes to upload to Cloudinary. */
   imageBuffer?: Buffer;
   /** Filename for the replacement image. */
@@ -157,13 +178,25 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     status,
     visibility: input.visibility,
     executionType,
+    // Spec value_type is auto-derived; v1 UI never sets it explicitly.
+    valueType: deriveValueTypeFromExecutionType(executionType),
+    // Provider entity lands in Phase 6; default to L1 for build-mode catalog math.
+    financialModel: 'L1',
+    // Only 'fixed' is exposed in v1 UI; flexible/subscription/bundle reserved.
+    variantType: input.variantType ?? 'fixed',
+    // ILS is the default v1 currency. Stored so transactions can lock it later.
+    currency: 'ILS',
     stockLimit: input.stockLimit ?? null,
     stockUsed: 0,
     implementationLink: input.implementationLink ?? null,
     implementationInstructions: input.implementationInstructions ?? '',
+    validFrom: input.validFrom ?? null,
     validUntil: input.validUntil ?? null,
     terms: input.terms ?? '',
     tags: input.tags ?? [],
+    // Status reason / changedAt are set when a future PATCH transitions to disabled/archived.
+    statusReason: null,
+    statusChangedAt: now,
     createdByTenantId: input.createdByTenantId,
     createdByIdentityId: input.createdByIdentityId,
     // For tenant_only offers, restrict visibility to the creating tenant.
@@ -215,24 +248,40 @@ export async function updateOffer(
   // Routes use this to re-notify admins with the latest offer details.
   const wasUpdatedWhilePending = currentOffer.status === 'pending_approval';
 
+  // Spec rule: 'disabled' / 'archived' transitions must carry a non-empty reason.
+  // Fail fast before any Cloudinary upload or DB write.
+  assertStatusReasonProvided(input.status, input.statusReason);
+
   // Upload replacement image only when both buffer and filename are supplied.
   let imageUrl: string | undefined;
   if (input.imageBuffer && input.imageFilename) {
     imageUrl = await uploadOfferImage(input.imageBuffer, input.imageFilename);
   }
 
-  // Build a partial update, conditionally including only provided fields.
-  // TypeScript partial spread keeps the update object strongly typed.
+  const now = new Date();
+  const statusActuallyChanged =
+    input.status !== undefined && input.status !== currentOffer.status;
+  // executionType change re-derives valueType so the spec field stays in sync.
+  const derivedValueType = input.executionType !== undefined
+    ? deriveValueTypeFromExecutionType(input.executionType)
+    : undefined;
+  const resolvedStatusReason = resolveStatusReasonValue(
+    input.status, statusActuallyChanged, input.statusReason,
+  );
+
   const update: Partial<NexusOffer> = {
-    updatedAt: new Date(),
+    updatedAt: now,
     ...(input.title !== undefined && { title: input.title }),
     ...(input.description !== undefined && { description: input.description }),
     ...(input.market_price !== undefined && { market_price: input.market_price }),
     ...(input.status !== undefined && { status: input.status }),
     ...(input.executionType !== undefined && { executionType: input.executionType }),
+    ...(derivedValueType !== undefined && { valueType: derivedValueType }),
+    ...(input.variantType !== undefined && { variantType: input.variantType }),
     ...(input.stockLimit !== undefined && { stockLimit: input.stockLimit }),
     ...(input.implementationLink !== undefined && { implementationLink: input.implementationLink }),
     ...(input.implementationInstructions !== undefined && { implementationInstructions: input.implementationInstructions }),
+    ...(input.validFrom !== undefined && { validFrom: input.validFrom }),
     ...(input.validUntil !== undefined && { validUntil: input.validUntil }),
     ...(input.terms !== undefined && { terms: input.terms }),
     ...(input.tags !== undefined && { tags: input.tags }),
@@ -240,6 +289,8 @@ export async function updateOffer(
     ...(input.nexus_cost !== undefined && { nexus_cost: input.nexus_cost }),
     ...(input.member_price !== undefined && { member_price: input.member_price }),
     ...(imageUrl !== undefined && { imageUrl }),
+    ...(statusActuallyChanged && { statusChangedAt: now }),
+    ...(resolvedStatusReason !== undefined && { statusReason: resolvedStatusReason }),
     // Resubmit: clear denial and move back to approval queue.
     ...(wasResubmitted && { status: 'pending_approval', denial_reason: '' }),
   };

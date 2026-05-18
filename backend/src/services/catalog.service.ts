@@ -74,6 +74,8 @@ export interface CatalogItem {
   implementationLink?: string | null;
   /** Human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Date the offer goes live. null = live immediately on approval. */
+  validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. */
   validUntil?: Date | null;
   /** Terms and conditions text. */
@@ -108,6 +110,17 @@ function toItem(
   config: TenantOfferConfig | undefined,
   context: { isOwnOffer: boolean; isPlatformAdmin: boolean }
 ): CatalogItem {
+  // Spec rule: when validUntil < now() and the offer is still nominally 'active',
+  // surface it as 'expired' to readers without mutating the document. A cron
+  // sweeper can later persist this, but the read path must never show a stale
+  // offer as active.
+  const now = Date.now();
+  const isExpired =
+    offer.status === 'active'
+    && offer.validUntil != null
+    && new Date(offer.validUntil).getTime() < now;
+  const effectiveStatus = isExpired ? 'expired' : offer.status;
+
   return {
     offerId: offer.offerId,
     title: offer.title,
@@ -123,8 +136,8 @@ function toItem(
       (context.isOwnOffer || context.isPlatformAdmin) &&
       offer.nexus_cost !== undefined && { nexus_cost: offer.nexus_cost }
     ),
-    // approval_status shows the offer's current lifecycle state (always returned).
-    approval_status: offer.status,
+    // approval_status reflects the EFFECTIVE status (with expired-on-read applied).
+    approval_status: effectiveStatus,
     // denial_reason is only shown to the supplier so they can address feedback.
     ...(context.isOwnOffer && offer.denial_reason && { denial_reason: offer.denial_reason }),
     isAdopted: config?.adoptionStatus === 'active',
@@ -141,6 +154,7 @@ function toItem(
       && (offer.stockUsed ?? 0) >= offer.stockLimit,
     implementationLink: offer.implementationLink ?? null,
     implementationInstructions: offer.implementationInstructions ?? '',
+    validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
     terms: offer.terms ?? '',
     tags: offer.tags ?? [],
@@ -254,18 +268,22 @@ export async function getMemberCatalogView(
 
   if (adoptedConfigs.length === 0) return [];
 
+  // Member catalog filter rules:
+  //   - status must be 'active' (excludes draft / disabled / archived / denied / pending).
+  //   - validFrom (when set) must already be in the past - schedules are admin-only.
+  //   - validUntil (when set) must still be in the future - expired offers are hidden.
+  //   - stock cap must not be reached.
+  const nowDate = new Date();
   const offerFilter: Record<string, unknown> = {
     offerId: { $in: adoptedConfigs.map((c) => c.offerId) },
     status: 'active',
-    // Exclude offers that have hit their stock cap.
-    // Unlimited offers (stockLimit: null) always pass this guard.
     $and: [
-      {
-        $or: [
-          { stockLimit: null },
-          { $expr: { $lt: ['$stockUsed', '$stockLimit'] } },
-        ],
-      },
+      // Scheduled-release gate: hide offers whose validFrom is in the future.
+      { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
+      // Expiry gate: hide offers whose validUntil is in the past.
+      { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
+      // Stock gate: unlimited offers always pass; capped offers must have units left.
+      { $or: [{ stockLimit: null }, { $expr: { $lt: ['$stockUsed', '$stockLimit'] } }] },
     ],
   };
   if (category && category !== 'all') {
