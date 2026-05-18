@@ -63,6 +63,23 @@ const upload = multer({
 // ─── Zod schemas ─────────────────────────────────────────────────────────────
 
 /**
+ * Validates the query string for both list endpoints (admin /platform and
+ * member /:tenantId). Coerces numeric strings from URL params, hard-caps the
+ * page size at 100 so a malicious client can not request the whole catalog.
+ *
+ * Member view ignores approvalStatus/adoptionStatus (its read service
+ * dis-regards them) but it is harmless to accept them in the same schema.
+ */
+const catalogListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  search: z.string().max(200).optional(),
+  category: z.enum(OFFER_CATEGORIES).optional(),
+  approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
+  adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
+});
+
+/**
  * Validates the body for creating a new offer.
  * Numeric fields use coerce to handle multipart/form-data string values.
  * face_value, nexus_cost, member_price are required for voucher offers
@@ -155,13 +172,25 @@ router.get(
   authenticate,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const parsed = catalogListQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.flatten() });
+        return;
+      }
       const ctx = await resolveTenantContextWithPermission(req, 'catalog.view');
-      const category =
-        typeof req.query.category === 'string' ? req.query.category : undefined;
-      const items = await getTenantCatalogView(ctx.tenantId, category, {
+      const result = await getTenantCatalogView(ctx.tenantId, parsed.data, {
         isPlatformAdmin: ctx.isPlatformAdmin,
       });
-      res.json({ items });
+      const pages = Math.max(1, Math.ceil(result.total / parsed.data.limit));
+      res.json({
+        items: result.items,
+        pagination: {
+          page: parsed.data.page,
+          limit: parsed.data.limit,
+          total: result.total,
+          pages,
+        },
+      });
     } catch (err) {
       next(err);
     }
@@ -698,8 +727,12 @@ router.get(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { tenantId } = await resolveTenantContext(req);
-      const items = await getTenantCatalogView(tenantId);
-      const offer = items.find((i) => i.offerId === req.params.offerId);
+      // Detail view: fetch a single page large enough that the target offer
+      // will be on it for typical catalogs. We pass page=1, limit=100 so the
+      // existing in-memory find works without changing the contract. Once we
+      // have a dedicated single-offer endpoint we can drop this.
+      const result = await getTenantCatalogView(tenantId, { page: 1, limit: 100 });
+      const offer = result.items.find((i) => i.offerId === req.params.offerId);
       if (!offer) {
         res.status(404).json({ error: 'Offer not found' });
         return;
@@ -775,10 +808,28 @@ router.get(
         }
       }
 
-      const category =
-        typeof req.query.category === 'string' ? req.query.category : undefined;
-      const items = await getMemberCatalogView(tenantId, category);
-      res.json({ offers: items });
+      const parsed = catalogListQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.flatten() });
+        return;
+      }
+      // Member view ignores approval/adoption filters even if passed - the
+      // service silently discards them. We return the paginated envelope
+      // under `items` for consistency with the admin endpoint; the legacy
+      // `offers` key is kept as an alias so older clients keep working until
+      // we decommission them.
+      const result = await getMemberCatalogView(tenantId, parsed.data);
+      const pages = Math.max(1, Math.ceil(result.total / parsed.data.limit));
+      res.json({
+        items: result.items,
+        offers: result.items,
+        pagination: {
+          page: parsed.data.page,
+          limit: parsed.data.limit,
+          total: result.total,
+          pages,
+        },
+      });
     } catch (err) {
       next(err);
     }

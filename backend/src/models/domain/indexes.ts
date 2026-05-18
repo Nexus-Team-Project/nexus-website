@@ -65,7 +65,19 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     supply.nexusOffers.createIndex({ status: 1, visibility: 1 }),
     supply.nexusOffers.createIndex({ createdByTenantId: 1, status: 1 }),
     supply.nexusOffers.createIndex({ category: 1, status: 1 }),
+    // Supports the paginated platform-catalog view: filter by status + visibility,
+    // sort newest-first. Required once GET /api/v1/offers/platform is paginated.
+    supply.nexusOffers.createIndex(
+      { status: 1, visibility: 1, createdAt: -1 },
+      { name: 'status_visibility_createdAt' },
+    ),
     supply.tenantOfferConfigs.createIndex({ tenantId: 1, offerId: 1 }, { unique: true }),
     supply.tenantOfferConfigs.createIndex({ tenantId: 1, adoptionStatus: 1 }),
+    // Supports the paginated member catalog: list a tenant's adopted offers
+    // sorted by adoption time. Required once GET /api/v1/offers/:tenantId is paginated.
+    supply.tenantOfferConfigs.createIndex(
+      { tenantId: 1, adoptionStatus: 1, adoptedAt: -1 },
+      { name: 'tenant_adoption_adoptedAt' },
+    ),
   ]);
 }

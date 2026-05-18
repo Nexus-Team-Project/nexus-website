@@ -1,16 +1,20 @@
 /**
- * Catalog Service - read-only projection of the platform supply.
+ * Catalog Service - read-only projection of the platform supply, with
+ * server-side pagination + filtering.
  *
- * Resolves what offers a tenant has adopted and what members can see.
- * Never writes to NexusOffer directly.
+ * Owns the queries that back GET /api/v1/offers/platform (admin) and
+ * GET /api/v1/offers/:tenantId (member). Both endpoints accept a CatalogQuery
+ * and return a CatalogPage; client-side filtering of the full list is no
+ * longer supported because the catalog can grow into the tens of thousands.
  *
  * Security note: nexus_cost is a sensitive pricing field that must NEVER be
  * exposed to adopting tenants or members. It is only included in CatalogItem
- * when the requesting tenant is the offer creator, or when they are a platform admin.
+ * when the requesting tenant is the offer creator, or when they are a
+ * platform admin.
  *
  * Exports:
- *   getTenantCatalogView  - all visible offers with per-tenant adoption status (admin use)
- *   getMemberCatalogView  - only adopted offers for a tenant's members
+ *   getTenantCatalogView  - paginated admin/supply-manager catalog
+ *   getMemberCatalogView  - paginated member-facing catalog (adopted offers)
  *   adoptOffer            - mark an offer as active for a tenant
  *   excludeOffer          - remove an offer from a tenant's catalog
  */
@@ -22,10 +26,33 @@ import {
   type NexusOffer,
   type TenantOfferConfig,
 } from '../models/domain/supply.models';
+import { buildSearchFilter } from './catalog-query.helper';
 
 // ---------------------------------------------------------------------------
 // Public contract
 // ---------------------------------------------------------------------------
+
+/**
+ * Server-side filter + paging input shared by both catalog endpoints.
+ * Empty/undefined filter fields mean "no constraint".
+ *
+ * Member view ignores approvalStatus and adoptionStatus (their access is
+ * narrower); admin view honors all fields.
+ */
+export interface CatalogQuery {
+  page: number;
+  limit: number;
+  search?: string;
+  category?: string;
+  approvalStatus?: 'active' | 'pending_approval' | 'denied' | 'expired';
+  adoptionStatus?: 'adopted' | 'not_adopted';
+}
+
+/** Page result returned by both catalog views. Total drives UI page count. */
+export interface CatalogPage {
+  items: CatalogItem[];
+  total: number;
+}
 
 /**
  * Shape returned to any caller of this service.
@@ -52,7 +79,7 @@ export interface CatalogItem {
    * Must never be returned to adopting tenants or members.
    */
   nexus_cost?: number;
-  /** Current lifecycle status of the offer (e.g. active, pending_approval, denied). */
+  /** Current lifecycle status of the offer (e.g. active, pending_approval, denied, expired). */
   approval_status?: string;
   /** Denial reason from the platform admin. Only populated for the creating tenant. */
   denial_reason?: string;
@@ -92,28 +119,17 @@ export interface CatalogItem {
  * Maps a NexusOffer document and an optional TenantOfferConfig into a CatalogItem.
  *
  * Security note: nexus_cost is only populated when the caller is the offer's
- * creating tenant OR a platform admin. It is never returned to adopting tenants
- * or members to protect supplier margin information.
+ * creating tenant OR a platform admin.
  *
- * Input:
- *   offer   - the NexusOffer document from MongoDB.
- *   config  - the matching TenantOfferConfig for this tenant, or undefined when
- *             the tenant has never interacted with this offer.
- *   context - caller context flags that control sensitive field visibility.
- *     isOwnOffer     - true when the requesting tenant created this offer.
- *     isPlatformAdmin - true when the caller is a NEXUS platform admin.
- *
- * Output: CatalogItem with resolved adoption state and context-sensitive pricing.
+ * Computes 'expired' at read time when validUntil is past - we never mutate
+ * the underlying document, so the same offer can appear as 'active' to admins
+ * paginating without an expiry filter and 'expired' once it crosses validUntil.
  */
 function toItem(
   offer: NexusOffer,
   config: TenantOfferConfig | undefined,
-  context: { isOwnOffer: boolean; isPlatformAdmin: boolean }
+  context: { isOwnOffer: boolean; isPlatformAdmin: boolean },
 ): CatalogItem {
-  // Spec rule: when validUntil < now() and the offer is still nominally 'active',
-  // surface it as 'expired' to readers without mutating the document. A cron
-  // sweeper can later persist this, but the read path must never show a stale
-  // offer as active.
   const now = Date.now();
   const isExpired =
     offer.status === 'active'
@@ -128,28 +144,22 @@ function toItem(
     imageUrl: offer.imageUrl,
     category: offer.category,
     market_price: offer.market_price,
-    // Voucher pricing - face_value and member_price are public; nexus_cost is restricted.
     face_value: offer.face_value,
     member_price: offer.member_price,
-    // nexus_cost is only revealed to the offer creator and platform admins.
     ...(
       (context.isOwnOffer || context.isPlatformAdmin) &&
       offer.nexus_cost !== undefined && { nexus_cost: offer.nexus_cost }
     ),
-    // approval_status reflects the EFFECTIVE status (with expired-on-read applied).
     approval_status: effectiveStatus,
-    // denial_reason is only shown to the supplier so they can address feedback.
     ...(context.isOwnOffer && offer.denial_reason && { denial_reason: offer.denial_reason }),
     isAdopted: config?.adoptionStatus === 'active',
     adoptedAt: config?.adoptedAt,
     createdByTenantId: offer.createdByTenantId,
     executionType: offer.executionType ?? 'voucher',
     stockLimit: offer.stockLimit ?? null,
-    // stockAvailable is null for unlimited offers; otherwise remaining units.
     stockAvailable: offer.stockLimit === null
       ? null
       : Math.max(0, offer.stockLimit - (offer.stockUsed ?? 0)),
-    // isSoldOut is only true when a cap exists and has been fully consumed.
     isSoldOut: offer.stockLimit !== null
       && (offer.stockUsed ?? 0) >= offer.stockLimit,
     implementationLink: offer.implementationLink ?? null,
@@ -166,139 +176,146 @@ function toItem(
 // ---------------------------------------------------------------------------
 
 /**
- * Returns all platform offers visible to a tenant, together with their
- * per-tenant adoption status.
+ * Returns one page of platform offers visible to a tenant, with their
+ * per-tenant adoption status. Honors search, category, approval, and adoption
+ * filters server-side.
  *
- * Visibility rules:
- *   - ecosystem  : visible to every tenant.
- *   - tenant_only: visible only to the specific invitedByTenantId.
+ * Visibility rules: ecosystem offers visible to everyone; tenant_only offers
+ * visible only to the matching invitedByTenantId.
  *
- * Offer status rules:
- *   - active offers are always included.
- *   - pending_approval / denied offers are only included when the requesting
- *     tenant created them, or when the caller is a platform admin.
+ * Status rules: 'active' offers always visible. 'pending_approval' / 'denied'
+ * visible to their creator and to platform admins.
  *
- * Used by: GET /api/v1/offers/platform (admin Benefits & Partnerships page).
- *
- * Input:
- *   tenantId - the requesting tenant's Mongo string id.
- *   category - optional filter; pass "all" or omit to return all categories.
- *   options.isPlatformAdmin - when true, all pending_approval offers are included.
- *
- * Output: CatalogItem[] sorted newest-first, with isAdopted reflecting this
- *         tenant's current adoption state and context-sensitive pricing fields.
+ * Adoption filter is evaluated by pre-fetching the tenant's adoption offerId
+ * set and using $in / $nin against the offers filter. This keeps the existing
+ * two-query merge pattern instead of switching to $lookup.
  */
 export async function getTenantCatalogView(
   tenantId: string,
-  category?: string,
+  query: CatalogQuery,
   options?: { isPlatformAdmin?: boolean },
-): Promise<CatalogItem[]> {
+): Promise<CatalogPage> {
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  const offerFilter: Record<string, unknown> = {
-    $and: [
-      {
-        $or: [
-          { visibility: 'ecosystem' },
-          { visibility: 'tenant_only', invitedByTenantId: tenantId },
-        ],
-      },
-      {
-        $or: [
-          { status: 'active' },
-          // Creator always sees their own pending/denied offers for status tracking.
-          { status: { $in: ['pending_approval', 'denied'] }, createdByTenantId: tenantId },
-          // Platform admins see all pending_approval offers to perform approve/deny.
-          ...(options?.isPlatformAdmin ? [{ status: 'pending_approval' }] : []),
-        ],
-      },
-    ],
-  };
+  const visibilityClause = { $or: [
+    { visibility: 'ecosystem' },
+    { visibility: 'tenant_only', invitedByTenantId: tenantId },
+  ]};
+  const baseStatusClause = { $or: [
+    { status: 'active' },
+    { status: { $in: ['pending_approval', 'denied'] }, createdByTenantId: tenantId },
+    ...(options?.isPlatformAdmin ? [{ status: 'pending_approval' }] : []),
+  ]};
 
-  if (category && category !== 'all') {
-    offerFilter['category'] = category;
+  const andClauses: Array<Record<string, unknown>> = [visibilityClause, baseStatusClause];
+
+  if (query.category) andClauses.push({ category: query.category });
+  const searchFilter = buildSearchFilter(query.search);
+  if (searchFilter) andClauses.push(searchFilter);
+
+  // 'expired' is computed (validUntil<now, still status=active). Other approval
+  // statuses are exact matches.
+  if (query.approvalStatus === 'expired') {
+    andClauses.push({ status: 'active', validUntil: { $lt: new Date() } });
+  } else if (query.approvalStatus) {
+    andClauses.push({ status: query.approvalStatus });
   }
 
-  // Fetch offers and this tenant's configs in parallel for efficiency.
-  const [offers, configs] = await Promise.all([
-    nexusOffers.find(offerFilter).sort({ createdAt: -1 }).toArray(),
-    tenantOfferConfigs.find({ tenantId }).toArray(),
+  // Adoption filter requires a configs pre-fetch since the adoption state lives
+  // on TenantOfferConfig, not on NexusOffer.
+  if (query.adoptionStatus === 'adopted') {
+    const adopted = await tenantOfferConfigs
+      .find({ tenantId, adoptionStatus: 'active' }, { projection: { offerId: 1 } })
+      .toArray();
+    const ids = adopted.map((c) => c.offerId);
+    if (ids.length === 0) return { items: [], total: 0 };
+    andClauses.push({ offerId: { $in: ids } });
+  } else if (query.adoptionStatus === 'not_adopted') {
+    const adopted = await tenantOfferConfigs
+      .find({ tenantId, adoptionStatus: 'active' }, { projection: { offerId: 1 } })
+      .toArray();
+    const ids = adopted.map((c) => c.offerId);
+    if (ids.length > 0) andClauses.push({ offerId: { $nin: ids } });
+  }
+
+  const offerFilter = { $and: andClauses };
+  const skip = (query.page - 1) * query.limit;
+
+  // Count + page query in parallel for latency.
+  const [total, offers] = await Promise.all([
+    nexusOffers.countDocuments(offerFilter),
+    nexusOffers.find(offerFilter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).toArray(),
   ]);
 
-  const configMap = new Map<string, TenantOfferConfig>(
-    configs.map((c) => [c.offerId, c]),
-  );
+  // Enrich just the page (not the whole adoption set) with config status.
+  const pageOfferIds = offers.map((o) => o.offerId);
+  const configs = pageOfferIds.length === 0
+    ? []
+    : await tenantOfferConfigs.find({ tenantId, offerId: { $in: pageOfferIds } }).toArray();
+  const configMap = new Map<string, TenantOfferConfig>(configs.map((c) => [c.offerId, c]));
 
-  return offers.map((o) =>
-    toItem(o, configMap.get(o.offerId), {
-      isOwnOffer: o.createdByTenantId === tenantId,
-      isPlatformAdmin: options?.isPlatformAdmin ?? false,
-    })
-  );
+  const items = offers.map((o) => toItem(o, configMap.get(o.offerId), {
+    isOwnOffer: o.createdByTenantId === tenantId,
+    isPlatformAdmin: options?.isPlatformAdmin ?? false,
+  }));
+
+  return { items, total };
 }
 
 /**
- * Returns only the offers a tenant has actively adopted, for rendering the
- * member-facing benefits catalog.
+ * Returns one page of offers a tenant has actively adopted, for the
+ * member-facing benefits catalog. Honors search + category filters only —
+ * approval and adoption filters are admin concepts and not exposed to members.
  *
- * Only offers with adoptionStatus = 'active' are included; 'excluded' configs
- * and offers never adopted by this tenant are filtered out.
- *
- * Used by: GET /api/v1/offers/:tenantId (member catalog page).
- *
- * Input:
- *   tenantId - the tenant whose adopted catalog should be returned.
- *   category - optional category filter; pass "all" or omit to return all.
- *
- * Output: CatalogItem[] of adopted active offers sorted newest-first.
- *         Returns an empty array if the tenant has adopted nothing yet.
+ * Filter gates applied (in addition to the user filters):
+ *   - status must be 'active' (excludes draft / disabled / archived / denied / pending).
+ *   - validFrom (when set) must already be in the past.
+ *   - validUntil (when set) must still be in the future.
+ *   - stock cap must not be reached.
  */
 export async function getMemberCatalogView(
   tenantId: string,
-  category?: string,
-): Promise<CatalogItem[]> {
+  query: CatalogQuery,
+): Promise<CatalogPage> {
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  // First fetch active adoptions; bail early to avoid a needless offer query.
+  // Pre-fetch the adopted set; bail early when the tenant has adopted nothing.
   const adoptedConfigs = await tenantOfferConfigs
     .find({ tenantId, adoptionStatus: 'active' })
     .toArray();
+  if (adoptedConfigs.length === 0) return { items: [], total: 0 };
 
-  if (adoptedConfigs.length === 0) return [];
-
-  // Member catalog filter rules:
-  //   - status must be 'active' (excludes draft / disabled / archived / denied / pending).
-  //   - validFrom (when set) must already be in the past - schedules are admin-only.
-  //   - validUntil (when set) must still be in the future - expired offers are hidden.
-  //   - stock cap must not be reached.
   const nowDate = new Date();
-  const offerFilter: Record<string, unknown> = {
-    offerId: { $in: adoptedConfigs.map((c) => c.offerId) },
-    status: 'active',
-    $and: [
-      // Scheduled-release gate: hide offers whose validFrom is in the future.
-      { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
-      // Expiry gate: hide offers whose validUntil is in the past.
-      { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
-      // Stock gate: unlimited offers always pass; capped offers must have units left.
-      { $or: [{ stockLimit: null }, { $expr: { $lt: ['$stockUsed', '$stockLimit'] } }] },
-    ],
-  };
-  if (category && category !== 'all') {
-    offerFilter['category'] = category;
-  }
+  const andClauses: Array<Record<string, unknown>> = [
+    { offerId: { $in: adoptedConfigs.map((c) => c.offerId) } },
+    { status: 'active' },
+    { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
+    { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
+    { $or: [{ stockLimit: null }, { $expr: { $lt: ['$stockUsed', '$stockLimit'] } }] },
+  ];
 
-  const offers = await nexusOffers.find(offerFilter).sort({ createdAt: -1 }).toArray();
+  if (query.category) andClauses.push({ category: query.category });
+  const searchFilter = buildSearchFilter(query.search);
+  if (searchFilter) andClauses.push(searchFilter);
+
+  const offerFilter = { $and: andClauses };
+  const skip = (query.page - 1) * query.limit;
+
+  const [total, offers] = await Promise.all([
+    nexusOffers.countDocuments(offerFilter),
+    nexusOffers.find(offerFilter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).toArray(),
+  ]);
+
   const configMap = new Map<string, TenantOfferConfig>(
     adoptedConfigs.map((c) => [c.offerId, c]),
   );
-
-  // Member catalog view: members never see nexus_cost or approval_status details.
-  return offers.map((o) =>
-    toItem(o, configMap.get(o.offerId), { isOwnOffer: false, isPlatformAdmin: false })
+  const items = offers.map((o) =>
+    toItem(o, configMap.get(o.offerId), { isOwnOffer: false, isPlatformAdmin: false }),
   );
+
+  return { items, total };
 }
 
 // ---------------------------------------------------------------------------
@@ -306,26 +323,14 @@ export async function getMemberCatalogView(
 // ---------------------------------------------------------------------------
 
 /**
- * Adopts a platform offer for a tenant.
+ * Adopts a platform offer for a tenant. Uses upsert so re-adopting a previously
+ * excluded offer reactivates it without losing the original adoption metadata.
  *
- * Uses an upsert so that:
- *   - A first-time adoption creates a new TenantOfferConfig document.
- *   - Re-adopting a previously excluded offer re-activates it without
- *     creating a duplicate document or losing the original adoptedAt timestamp.
+ * Authorization is enforced upstream (the route must verify catalog:adopt
+ * permission before calling).
  *
- * Authorization is enforced upstream (the route must verify
- * catalog:adopt permission before calling this function).
- *
- * Used by: POST /api/v1/offers/:offerId/adopt.
- *
- * Input:
- *   tenantId   - the tenant adopting the offer.
- *   offerId    - the UUID of the offer to adopt.
- *   identityId - NexusIdentity id of the admin taking the action (for audit).
- *
- * Output: void on success.
- * Throws: Error with .status = 404 if the offer does not exist or is not
- *         visible to this tenant (ecosystem or explicitly invited).
+ * Throws Error with .status = 404 when the offer does not exist or is not
+ * visible to this tenant.
  */
 export async function adoptOffer(
   tenantId: string,
@@ -335,7 +340,6 @@ export async function adoptOffer(
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  // Verify the offer exists and is accessible to this tenant before writing.
   const offer = await nexusOffers.findOne({
     offerId,
     status: 'active',
@@ -344,7 +348,6 @@ export async function adoptOffer(
       { visibility: 'tenant_only', invitedByTenantId: tenantId },
     ],
   });
-
   if (!offer) {
     throw Object.assign(
       new Error('Offer not found or not accessible to this tenant'),
@@ -353,11 +356,9 @@ export async function adoptOffer(
   }
 
   const now = new Date();
-
   await tenantOfferConfigs.updateOne(
     { tenantId, offerId },
     {
-      // $setOnInsert preserves the original adoption metadata on re-activate.
       $setOnInsert: {
         configId: randomUUID(),
         tenantId,
@@ -365,7 +366,6 @@ export async function adoptOffer(
         adoptedByIdentityId: identityId,
         adoptedAt: now,
       },
-      // $set ensures re-adoption flips the status regardless of previous state.
       $set: { adoptionStatus: 'active' },
     },
     { upsert: true },
@@ -373,26 +373,13 @@ export async function adoptOffer(
 }
 
 /**
- * Removes an offer from a tenant's member-facing catalog.
- *
- * Sets adoptionStatus to 'excluded' rather than deleting the document so that
- * the audit trail (original adoptedAt, adoptedByIdentityId) is preserved.
- * The offer can be re-adopted later via adoptOffer.
- *
- * Authorization is enforced upstream (route must verify catalog:adopt permission).
- *
- * Used by: DELETE /api/v1/offers/:offerId/adopt.
- *
- * Input:
- *   tenantId - the tenant removing the offer.
- *   offerId  - the UUID of the offer to exclude.
- *
- * Output: void. No-op when the tenant never adopted this offer.
+ * Removes an offer from a tenant's member-facing catalog by flipping
+ * adoptionStatus to 'excluded'. Does not delete the row so audit history
+ * (adoptedAt / adoptedByIdentityId) is preserved.
  */
 export async function excludeOffer(tenantId: string, offerId: string): Promise<void> {
   const db = await getMongoDb();
   const { tenantOfferConfigs } = getSupplyDomainCollections(db);
-
   await tenantOfferConfigs.updateOne(
     { tenantId, offerId },
     { $set: { adoptionStatus: 'excluded' } },
