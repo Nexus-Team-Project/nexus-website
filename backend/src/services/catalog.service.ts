@@ -67,6 +67,12 @@ export interface CatalogItem {
   imageUrl?: string;
   /** Top-level offer category (e.g. "health", "food"). */
   category: string;
+  /**
+   * 'ecosystem' (visible to every tenant) or 'tenant_only' (visible only to
+   * the creating tenant). Already public information by the time a caller
+   * sees the offer at all - exposed so the admin table can display it.
+   */
+  visibility: string;
   /** Optional retail market price for display purposes. */
   market_price?: number;
   /** Voucher face value (e.g. ₪100). Exposed to everyone when present. */
@@ -143,6 +149,7 @@ function toItem(
     description: offer.description,
     imageUrl: offer.imageUrl,
     category: offer.category,
+    visibility: offer.visibility,
     market_price: offer.market_price,
     face_value: offer.face_value,
     member_price: offer.member_price,
