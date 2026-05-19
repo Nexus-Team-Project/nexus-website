@@ -35,7 +35,7 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, getSupplyDomainCollections } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, getSupplyDomainCollections } from '../models/domain/supply.models';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
 import {
@@ -57,10 +57,42 @@ const router = Router();
  */
 const upload = multer({
   storage: multer.memoryStorage(),
+  // Each individual image file is capped at 5 MB. The route handler then
+  // caps total per-request count at OFFER_IMAGES_MAX via `upload.array(...)`.
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+/**
+ * Preprocessor for the multipart `keptImageUrls` field. The dashboard sends it
+ * as a JSON-encoded string of URL strings. Invalid JSON falls back to null so
+ * downstream Zod validation produces a clean 400 instead of a runtime crash.
+ *
+ * Input:  whatever value multer parsed (string for multipart, array for JSON).
+ * Output: the parsed array, the original value if already an array, or null.
+ */
+function parseKeptImageUrlsField(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch { return null; }
+}
+
 // ─── Zod schemas ─────────────────────────────────────────────────────────────
+
+/**
+ * Validates the query string for both list endpoints (admin /platform and
+ * member /:tenantId). Coerces numeric strings from URL params, hard-caps the
+ * page size at 100 so a malicious client can not request the whole catalog.
+ *
+ * Member view ignores approvalStatus/adoptionStatus (its read service
+ * dis-regards them) but it is harmless to accept them in the same schema.
+ */
+const catalogListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(25),
+  search: z.string().max(200).optional(),
+  category: z.enum(OFFER_CATEGORIES).optional(),
+  approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
+  adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
+});
 
 /**
  * Validates the body for creating a new offer.
@@ -78,6 +110,11 @@ const createOfferSchema = z.object({
   stockLimit: z.coerce.number().int().positive().nullable().optional().default(null),
   implementationLink: z.string().url().nullable().optional(),
   implementationInstructions: z.string().max(1000).optional(),
+  // ISO string from multipart form; convert to Date in handler.
+  // validFrom is optional - null/undefined means the offer goes live as soon as approved.
+  // No future-date refinement on validFrom: setting it to today (or the past) is valid
+  // and equivalent to "available now".
+  validFrom: z.string().optional().nullable(),
   // ISO string from multipart form; convert to Date in handler.
   // Must be a future date on create - updating an existing expiry is allowed in updateOfferSchema.
   validUntil: z.string().optional().nullable().refine(
@@ -98,6 +135,12 @@ const createOfferSchema = z.object({
   face_value: z.coerce.number().positive().optional(),
   nexus_cost: z.coerce.number().positive().optional(),
   member_price: z.coerce.number().positive().optional(),
+  // Gallery support: create never keeps any prior URLs, but accept the field
+  // for symmetry with update so a single client codepath can build FormData.
+  keptImageUrls: z.preprocess(
+    parseKeptImageUrlsField,
+    z.array(z.string().url()).max(OFFER_IMAGES_MAX).optional(),
+  ),
 });
 
 /**
@@ -108,11 +151,17 @@ const updateOfferSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(10000).optional(),
   market_price: z.coerce.number().positive().optional(),
-  status: z.enum(['active', 'inactive']).optional(),
+  // Mirrors the spec OFFER_STATUSES enum. supply.service enforces that
+  // 'disabled' and 'archived' transitions carry a non-empty statusReason.
+  status: z
+    .enum(['draft', 'active', 'inactive', 'pending_approval', 'denied', 'disabled', 'expired', 'archived'])
+    .optional(),
+  statusReason: z.string().min(1).max(1000).optional(),
   executionType: z.enum(OFFER_EXECUTION_TYPES).optional(),
   stockLimit: z.coerce.number().int().positive().nullable().optional(),
   implementationLink: z.string().url().nullable().optional(),
   implementationInstructions: z.string().max(1000).optional(),
+  validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
   terms: z.string().max(2000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -127,6 +176,14 @@ const updateOfferSchema = z.object({
   face_value: z.coerce.number().positive().optional(),
   nexus_cost: z.coerce.number().positive().optional(),
   member_price: z.coerce.number().positive().optional(),
+  // Gallery reconciliation: ordered list of URLs the user kept from the
+  // previous gallery. The service appends any newly-uploaded files after them.
+  // Foreign URLs are dropped server-side by `reconcileImageUrls` so injection
+  // is impossible. Undefined = gallery untouched.
+  keptImageUrls: z.preprocess(
+    parseKeptImageUrlsField,
+    z.array(z.string().url()).max(OFFER_IMAGES_MAX).optional(),
+  ),
 });
 
 // ─── Static paths first ───────────────────────────────────────────────────────
@@ -144,13 +201,25 @@ router.get(
   authenticate,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const parsed = catalogListQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.flatten() });
+        return;
+      }
       const ctx = await resolveTenantContextWithPermission(req, 'catalog.view');
-      const category =
-        typeof req.query.category === 'string' ? req.query.category : undefined;
-      const items = await getTenantCatalogView(ctx.tenantId, category, {
+      const result = await getTenantCatalogView(ctx.tenantId, parsed.data, {
         isPlatformAdmin: ctx.isPlatformAdmin,
       });
-      res.json({ items });
+      const pages = Math.max(1, Math.ceil(result.total / parsed.data.limit));
+      res.json({
+        items: result.items,
+        pagination: {
+          page: parsed.data.page,
+          limit: parsed.data.limit,
+          total: result.total,
+          pages,
+        },
+      });
     } catch (err) {
       next(err);
     }
@@ -222,7 +291,11 @@ router.get(
 router.post(
   '/',
   authenticate,
-  upload.single('image'),
+  // Accept up to OFFER_IMAGES_MAX files under field name `images`. The single
+  // legacy `image` field is no longer used by the dashboard; older clients
+  // that still send it will simply ship 0 files here, which is treated as
+  // "no images uploaded" and falls back to the placeholder.
+  upload.array('images', OFFER_IMAGES_MAX),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = createOfferSchema.safeParse(req.body);
@@ -269,14 +342,32 @@ router.post(
         }
       }
 
-      // Convert validUntil ISO string (from multipart form) to a Date object.
-      const { validUntil: validUntilStr, ...restParsed } = parsed.data;
+      // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
+      const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
+      const validFromDate = validFromStr ? new Date(validFromStr) : null;
+      const validUntilDate = validUntilStr ? new Date(validUntilStr) : null;
+      // Spec rule: a scheduled-release date must be before the expiry date.
+      if (validFromDate && validUntilDate && validFromDate >= validUntilDate) {
+        res.status(400).json({ error: 'validFrom must be before validUntil' });
+        return;
+      }
+      // Multer with `.array(...)` populates req.files (array). We strip
+      // `keptImageUrls` from the payload because create never reconciles a
+      // prior gallery — the service treats `imageFiles` as the whole gallery.
+      const imageFiles = Array.isArray(req.files)
+        ? (req.files as Express.Multer.File[]).map((f) => ({
+            buffer: f.buffer,
+            originalname: f.originalname,
+            mimetype: f.mimetype,
+          }))
+        : [];
+      const { keptImageUrls: _ignoredKept, ...createPayload } = restParsed;
       const offer = await createOffer({
-        ...restParsed,
+        ...createPayload,
         visibility: finalVisibility,
-        validUntil: validUntilStr ? new Date(validUntilStr) : null,
-        imageBuffer: req.file?.buffer,
-        imageFilename: req.file?.originalname,
+        validFrom: validFromDate,
+        validUntil: validUntilDate,
+        imageFiles,
         createdByTenantId: ctx.tenantId,
         createdByIdentityId: ctx.identityId,
       });
@@ -335,7 +426,7 @@ router.post(
 router.patch(
   '/:offerId',
   authenticate,
-  upload.single('image'),
+  upload.array('images', OFFER_IMAGES_MAX),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = updateOfferSchema.safeParse(req.body);
@@ -349,15 +440,42 @@ router.patch(
         'supply.manage_offers',
       );
 
-      // Convert validUntil ISO string (from multipart form) to a Date object.
-      const { validUntil: validUntilStr, ...restParsed } = parsed.data;
+      // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
+      const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
+      const validFromDate = validFromStr !== undefined
+        ? (validFromStr ? new Date(validFromStr) : null)
+        : undefined;
+      const validUntilDate = validUntilStr !== undefined
+        ? (validUntilStr ? new Date(validUntilStr) : null)
+        : undefined;
+      // Cross-field guard: when BOTH are present and non-null, validFrom < validUntil.
+      if (validFromDate && validUntilDate && validFromDate >= validUntilDate) {
+        res.status(400).json({ error: 'validFrom must be before validUntil' });
+        return;
+      }
+      const imageFiles = Array.isArray(req.files)
+        ? (req.files as Express.Multer.File[]).map((f) => ({
+            buffer: f.buffer,
+            originalname: f.originalname,
+            mimetype: f.mimetype,
+          }))
+        : [];
+      // Belt+suspenders cap: kept + new uploaded must not exceed OFFER_IMAGES_MAX.
+      // multer already caps file count, but kept can be sent without files.
+      const keptCount = restParsed.keptImageUrls?.length ?? 0;
+      if (keptCount + imageFiles.length > OFFER_IMAGES_MAX) {
+        res.status(400).json({
+          error: `An offer can have at most ${OFFER_IMAGES_MAX} images.`,
+        });
+        return;
+      }
+      const { keptImageUrls, ...restNoKept } = restParsed;
       const result = await updateOffer(req.params.offerId, ctx.tenantId, {
-        ...restParsed,
-        ...(validUntilStr !== undefined && {
-          validUntil: validUntilStr ? new Date(validUntilStr) : null,
-        }),
-        imageBuffer: req.file?.buffer,
-        imageFilename: req.file?.originalname,
+        ...restNoKept,
+        ...(validFromDate !== undefined && { validFrom: validFromDate }),
+        ...(validUntilDate !== undefined && { validUntil: validUntilDate }),
+        imageFiles,
+        ...(keptImageUrls !== undefined && { keptImageUrls }),
       });
 
       if (!result) {
@@ -669,8 +787,12 @@ router.get(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { tenantId } = await resolveTenantContext(req);
-      const items = await getTenantCatalogView(tenantId);
-      const offer = items.find((i) => i.offerId === req.params.offerId);
+      // Detail view: fetch a single page large enough that the target offer
+      // will be on it for typical catalogs. We pass page=1, limit=100 so the
+      // existing in-memory find works without changing the contract. Once we
+      // have a dedicated single-offer endpoint we can drop this.
+      const result = await getTenantCatalogView(tenantId, { page: 1, limit: 100 });
+      const offer = result.items.find((i) => i.offerId === req.params.offerId);
       if (!offer) {
         res.status(404).json({ error: 'Offer not found' });
         return;
@@ -746,10 +868,28 @@ router.get(
         }
       }
 
-      const category =
-        typeof req.query.category === 'string' ? req.query.category : undefined;
-      const items = await getMemberCatalogView(tenantId, category);
-      res.json({ offers: items });
+      const parsed = catalogListQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.flatten() });
+        return;
+      }
+      // Member view ignores approval/adoption filters even if passed - the
+      // service silently discards them. We return the paginated envelope
+      // under `items` for consistency with the admin endpoint; the legacy
+      // `offers` key is kept as an alias so older clients keep working until
+      // we decommission them.
+      const result = await getMemberCatalogView(tenantId, parsed.data);
+      const pages = Math.max(1, Math.ceil(result.total / parsed.data.limit));
+      res.json({
+        items: result.items,
+        offers: result.items,
+        pagination: {
+          page: parsed.data.page,
+          limit: parsed.data.limit,
+          total: result.total,
+          pages,
+        },
+      });
     } catch (err) {
       next(err);
     }
