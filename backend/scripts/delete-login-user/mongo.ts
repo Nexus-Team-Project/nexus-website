@@ -268,18 +268,23 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   // Delete adoption records (tenant chose to show these platform offers to members).
   await supply.tenantOfferConfigs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   // Collect image URLs before deleting offer documents so we can clean up Cloudinary.
+  // Project both the legacy single `imageUrl` and the multi-image `imageUrls` gallery so
+  // every uploaded image gets deleted, not just the cover.
   const offersToDelete = await supply.nexusOffers
     .find(
       { createdByTenantId: { $in: targets.domainOwnedTenantIds } },
-      { projection: { imageUrl: 1 } },
+      { projection: { imageUrl: 1, imageUrls: 1 } },
     )
     .toArray();
   await supply.nexusOffers.deleteMany({ createdByTenantId: { $in: targets.domainOwnedTenantIds } });
   // Delete Cloudinary images after DB rows are gone. Errors are swallowed per deleteOfferImage contract.
+  // Each offer can have a gallery (imageUrls) plus a legacy cover (imageUrl) that may not be in the gallery.
   await Promise.all(
-    offersToDelete
-      .filter((o) => o.imageUrl)
-      .map((o) => deleteOfferImage(o.imageUrl as string)),
+    offersToDelete.flatMap((o) => {
+      const gallery = o.imageUrls ?? [];
+      const legacy = o.imageUrl && !gallery.includes(o.imageUrl) ? [o.imageUrl] : [];
+      return [...gallery, ...legacy].map((url) => deleteOfferImage(url));
+    }),
   );
   await tenants.tenantCatalogPolicies.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.memberGroups.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
