@@ -21,6 +21,7 @@ import { closeMongoConnection, getMongoDb, verifyMongoConnection } from './confi
 import { ensureDomainIndexes } from './models/domain';
 import { ensureOnboardingIndexes } from './models/onboarding.models';
 import { ensureDefaultRolePermissions } from './services/domain-permissions.service';
+import { getSupplyDomainCollections } from './models/domain/supply.models';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
 import { embedText } from './services/ai.service';
 import { scheduleBiRefresh } from './jobs/biRefresh';
@@ -190,6 +191,25 @@ async function bootstrap() {
     await ensureOnboardingIndexes(mongoDb);
     await ensureDomainIndexes(mongoDb);
     await ensureDefaultRolePermissions();
+    // One-shot idempotent backfill: legacy offers carry only `imageUrl`. Copy
+    // that into `imageUrls` so the new gallery field is consistent with the
+    // cover for every existing doc. The filter intentionally excludes docs
+    // that already have a non-empty gallery so re-runs are safe and cheap.
+    try {
+      const supply = getSupplyDomainCollections(mongoDb);
+      const backfill = await supply.nexusOffers.updateMany(
+        {
+          imageUrl: { $exists: true },
+          $or: [{ imageUrls: { $exists: false } }, { imageUrls: { $size: 0 } }],
+        },
+        [{ $set: { imageUrls: ['$imageUrl'] } }],
+      );
+      if (backfill.modifiedCount > 0) {
+        console.log(`🖼️  Backfilled imageUrls on ${backfill.modifiedCount} offers`);
+      }
+    } catch (err) {
+      console.error('⚠️  imageUrls backfill failed (non-fatal):', (err as Error).message);
+    }
     console.log('✅ MongoDB connected');
   } catch (err) {
     console.error('❌ MongoDB connection failed:', err);

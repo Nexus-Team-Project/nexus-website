@@ -35,7 +35,7 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, getSupplyDomainCollections } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, getSupplyDomainCollections } from '../models/domain/supply.models';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
 import {
@@ -57,8 +57,23 @@ const router = Router();
  */
 const upload = multer({
   storage: multer.memoryStorage(),
+  // Each individual image file is capped at 5 MB. The route handler then
+  // caps total per-request count at OFFER_IMAGES_MAX via `upload.array(...)`.
   limits: { fileSize: 5 * 1024 * 1024 },
 });
+
+/**
+ * Preprocessor for the multipart `keptImageUrls` field. The dashboard sends it
+ * as a JSON-encoded string of URL strings. Invalid JSON falls back to null so
+ * downstream Zod validation produces a clean 400 instead of a runtime crash.
+ *
+ * Input:  whatever value multer parsed (string for multipart, array for JSON).
+ * Output: the parsed array, the original value if already an array, or null.
+ */
+function parseKeptImageUrlsField(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch { return null; }
+}
 
 // ─── Zod schemas ─────────────────────────────────────────────────────────────
 
@@ -120,6 +135,12 @@ const createOfferSchema = z.object({
   face_value: z.coerce.number().positive().optional(),
   nexus_cost: z.coerce.number().positive().optional(),
   member_price: z.coerce.number().positive().optional(),
+  // Gallery support: create never keeps any prior URLs, but accept the field
+  // for symmetry with update so a single client codepath can build FormData.
+  keptImageUrls: z.preprocess(
+    parseKeptImageUrlsField,
+    z.array(z.string().url()).max(OFFER_IMAGES_MAX).optional(),
+  ),
 });
 
 /**
@@ -155,6 +176,14 @@ const updateOfferSchema = z.object({
   face_value: z.coerce.number().positive().optional(),
   nexus_cost: z.coerce.number().positive().optional(),
   member_price: z.coerce.number().positive().optional(),
+  // Gallery reconciliation: ordered list of URLs the user kept from the
+  // previous gallery. The service appends any newly-uploaded files after them.
+  // Foreign URLs are dropped server-side by `reconcileImageUrls` so injection
+  // is impossible. Undefined = gallery untouched.
+  keptImageUrls: z.preprocess(
+    parseKeptImageUrlsField,
+    z.array(z.string().url()).max(OFFER_IMAGES_MAX).optional(),
+  ),
 });
 
 // ─── Static paths first ───────────────────────────────────────────────────────
@@ -262,7 +291,11 @@ router.get(
 router.post(
   '/',
   authenticate,
-  upload.single('image'),
+  // Accept up to OFFER_IMAGES_MAX files under field name `images`. The single
+  // legacy `image` field is no longer used by the dashboard; older clients
+  // that still send it will simply ship 0 files here, which is treated as
+  // "no images uploaded" and falls back to the placeholder.
+  upload.array('images', OFFER_IMAGES_MAX),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = createOfferSchema.safeParse(req.body);
@@ -318,13 +351,23 @@ router.post(
         res.status(400).json({ error: 'validFrom must be before validUntil' });
         return;
       }
+      // Multer with `.array(...)` populates req.files (array). We strip
+      // `keptImageUrls` from the payload because create never reconciles a
+      // prior gallery — the service treats `imageFiles` as the whole gallery.
+      const imageFiles = Array.isArray(req.files)
+        ? (req.files as Express.Multer.File[]).map((f) => ({
+            buffer: f.buffer,
+            originalname: f.originalname,
+            mimetype: f.mimetype,
+          }))
+        : [];
+      const { keptImageUrls: _ignoredKept, ...createPayload } = restParsed;
       const offer = await createOffer({
-        ...restParsed,
+        ...createPayload,
         visibility: finalVisibility,
         validFrom: validFromDate,
         validUntil: validUntilDate,
-        imageBuffer: req.file?.buffer,
-        imageFilename: req.file?.originalname,
+        imageFiles,
         createdByTenantId: ctx.tenantId,
         createdByIdentityId: ctx.identityId,
       });
@@ -383,7 +426,7 @@ router.post(
 router.patch(
   '/:offerId',
   authenticate,
-  upload.single('image'),
+  upload.array('images', OFFER_IMAGES_MAX),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const parsed = updateOfferSchema.safeParse(req.body);
@@ -410,12 +453,29 @@ router.patch(
         res.status(400).json({ error: 'validFrom must be before validUntil' });
         return;
       }
+      const imageFiles = Array.isArray(req.files)
+        ? (req.files as Express.Multer.File[]).map((f) => ({
+            buffer: f.buffer,
+            originalname: f.originalname,
+            mimetype: f.mimetype,
+          }))
+        : [];
+      // Belt+suspenders cap: kept + new uploaded must not exceed OFFER_IMAGES_MAX.
+      // multer already caps file count, but kept can be sent without files.
+      const keptCount = restParsed.keptImageUrls?.length ?? 0;
+      if (keptCount + imageFiles.length > OFFER_IMAGES_MAX) {
+        res.status(400).json({
+          error: `An offer can have at most ${OFFER_IMAGES_MAX} images.`,
+        });
+        return;
+      }
+      const { keptImageUrls, ...restNoKept } = restParsed;
       const result = await updateOffer(req.params.offerId, ctx.tenantId, {
-        ...restParsed,
+        ...restNoKept,
         ...(validFromDate !== undefined && { validFrom: validFromDate }),
         ...(validUntilDate !== undefined && { validUntil: validUntilDate }),
-        imageBuffer: req.file?.buffer,
-        imageFilename: req.file?.originalname,
+        imageFiles,
+        ...(keptImageUrls !== undefined && { keptImageUrls }),
       });
 
       if (!result) {

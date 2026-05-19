@@ -63,8 +63,10 @@ export interface CatalogItem {
   offerId: string;
   title: string;
   description: string;
-  /** Absolute public image URL resolved by Cloudinary helper on upload. */
+  /** Legacy single cover image URL. Equals `imageUrls[0]` when a gallery exists. */
   imageUrl?: string;
+  /** Ordered gallery of public image URLs. Index 0 is the cover. */
+  imageUrls?: string[];
   /** Top-level offer category (e.g. "health", "food"). */
   category: string;
   /**
@@ -148,6 +150,9 @@ function toItem(
     title: offer.title,
     description: offer.description,
     imageUrl: offer.imageUrl,
+    imageUrls: offer.imageUrls && offer.imageUrls.length > 0
+      ? offer.imageUrls
+      : (offer.imageUrl ? [offer.imageUrl] : []),
     category: offer.category,
     visibility: offer.visibility,
     market_price: offer.market_price,

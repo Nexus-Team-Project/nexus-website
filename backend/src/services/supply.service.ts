@@ -20,11 +20,17 @@ import {
   type OfferVariantType,
   type OfferStatus,
 } from '../models/domain/supply.models';
-import { uploadOfferImage, defaultOfferImageUrl, deleteOfferImage } from '../utils/cloudinary';
+import { defaultOfferImageUrl } from '../utils/cloudinary';
 import {
   assertStatusReasonProvided,
   resolveStatusReasonValue,
 } from './supply-status.helper';
+import {
+  uploadOfferImages,
+  reconcileImageUrls,
+  deleteOrphanedImages,
+  type ImageUploadFile,
+} from './supply-images.helper';
 
 // ---------------------------------------------------------------------------
 // Public input/output interfaces
@@ -68,10 +74,11 @@ export interface CreateOfferInput {
   member_price?: number;
   /** Variant pricing shape; only 'fixed' exposed in v1 UI. Defaults to 'fixed'. */
   variantType?: OfferVariantType;
-  /** Raw image bytes to upload to Cloudinary. Optional - falls back to placeholder. */
-  imageBuffer?: Buffer;
-  /** Original filename used to derive a readable Cloudinary public_id. */
-  imageFilename?: string;
+  /**
+   * Up to OFFER_IMAGES_MAX in-memory image files (from multer). Index 0 becomes
+   * the cover. Empty/omitted = the default placeholder URL is used.
+   */
+  imageFiles?: ImageUploadFile[];
   /** MongoDB tenantId of the creator (derived from server-side auth, not browser). */
   createdByTenantId: string;
   /** MongoDB identityId of the authenticated user creating the offer. */
@@ -121,10 +128,17 @@ export interface UpdateOfferInput {
   member_price?: number;
   /** Updated variant type. Only 'fixed' is exposed in v1 UI. */
   variantType?: OfferVariantType;
-  /** Replacement image bytes to upload to Cloudinary. */
-  imageBuffer?: Buffer;
-  /** Filename for the replacement image. */
-  imageFilename?: string;
+  /**
+   * Brand-new image files to append to the gallery. Combined with
+   * `keptImageUrls` they form the final ordered gallery.
+   */
+  imageFiles?: ImageUploadFile[];
+  /**
+   * Existing image URLs the client chose to keep, in the desired order.
+   * Foreign URLs (not in the current `imageUrls`) are silently dropped to
+   * prevent cross-offer URL injection. Omit/undefined = keep all existing.
+   */
+  keptImageUrls?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -147,11 +161,12 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   const db = await getMongoDb();
   const { nexusOffers } = getSupplyDomainCollections(db);
 
-  // Resolve image URL - prefer uploaded image, fall back to placeholder.
-  let imageUrl = defaultOfferImageUrl();
-  if (input.imageBuffer && input.imageFilename) {
-    imageUrl = await uploadOfferImage(input.imageBuffer, input.imageFilename);
-  }
+  // Resolve gallery: upload every supplied file to Cloudinary in parallel.
+  // When no files are sent we fall back to the static placeholder so existing
+  // catalog cards still render correctly.
+  const uploaded = await uploadOfferImages(input.imageFiles ?? []);
+  const imageUrls = uploaded.length > 0 ? uploaded : [defaultOfferImageUrl()];
+  const imageUrl = imageUrls[0];
 
   const now = new Date();
 
@@ -169,6 +184,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     title: input.title,
     description: input.description,
     imageUrl,
+    imageUrls,
     category: input.category,
     market_price: input.market_price,
     // Voucher pricing fields - only populated when executionType === 'voucher'.
@@ -252,10 +268,27 @@ export async function updateOffer(
   // Fail fast before any Cloudinary upload or DB write.
   assertStatusReasonProvided(input.status, input.statusReason);
 
-  // Upload replacement image only when both buffer and filename are supplied.
-  let imageUrl: string | undefined;
-  if (input.imageBuffer && input.imageFilename) {
-    imageUrl = await uploadOfferImage(input.imageBuffer, input.imageFilename);
+  // Reconcile gallery. Only touched when the client signals a change by
+  // sending `keptImageUrls` (even if empty) or new `imageFiles`. Otherwise the
+  // existing imageUrls + imageUrl are left intact.
+  let nextImageUrls: string[] | undefined;
+  let nextImageUrl: string | undefined;
+  const galleryTouched = input.keptImageUrls !== undefined
+    || (input.imageFiles && input.imageFiles.length > 0);
+  if (galleryTouched) {
+    const uploaded = await uploadOfferImages(input.imageFiles ?? []);
+    const kept = input.keptImageUrls ?? currentOffer.imageUrls ?? [];
+    const { finalUrls, orphanedUrls } = reconcileImageUrls(
+      currentOffer.imageUrls,
+      kept,
+      uploaded,
+    );
+    // Fire-and-forget orphan deletion: failure must not block the save.
+    deleteOrphanedImages(orphanedUrls).catch((err) =>
+      console.error('[SUPPLY] Orphan image cleanup failed:', err),
+    );
+    nextImageUrls = finalUrls;
+    nextImageUrl = finalUrls[0] ?? defaultOfferImageUrl();
   }
 
   const now = new Date();
@@ -288,7 +321,8 @@ export async function updateOffer(
     ...(input.face_value !== undefined && { face_value: input.face_value }),
     ...(input.nexus_cost !== undefined && { nexus_cost: input.nexus_cost }),
     ...(input.member_price !== undefined && { member_price: input.member_price }),
-    ...(imageUrl !== undefined && { imageUrl }),
+    ...(nextImageUrls !== undefined && { imageUrls: nextImageUrls }),
+    ...(nextImageUrl !== undefined && { imageUrl: nextImageUrl }),
     ...(statusActuallyChanged && { statusChangedAt: now }),
     ...(resolvedStatusReason !== undefined && { statusReason: resolvedStatusReason }),
     // Resubmit: clear denial and move back to approval queue.
@@ -353,10 +387,14 @@ export async function deleteOffer(
   const offer = await nexusOffers.findOne(ownerFilter);
   if (!offer) throw Object.assign(new Error('Offer not found'), { status: 404 });
 
-  // Attempt Cloudinary image removal. Errors are swallowed inside deleteOfferImage.
-  if (offer.imageUrl) {
-    await deleteOfferImage(offer.imageUrl);
-  }
+  // Attempt Cloudinary cleanup for every image in the gallery (plus the legacy
+  // cover when not already in the array). Errors are swallowed in
+  // deleteOrphanedImages so deletion is never blocked by Cloudinary.
+  const gallery = offer.imageUrls ?? [];
+  const legacyCover = offer.imageUrl && !gallery.includes(offer.imageUrl)
+    ? [offer.imageUrl]
+    : [];
+  await deleteOrphanedImages([...gallery, ...legacyCover]);
 
   // Soft delete - keeps the document so transaction/purchase history stays intact.
   await nexusOffers.updateOne(

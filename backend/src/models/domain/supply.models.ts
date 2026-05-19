@@ -108,6 +108,13 @@ export const OFFER_VARIANT_TYPES = ['fixed', 'flexible', 'subscription', 'bundle
  */
 export const OFFER_FINANCIAL_MODELS = ['L1', 'L2', 'L3'] as const;
 
+/**
+ * Maximum number of images allowed per offer.
+ * Enforced in supply.service.createOffer / updateOffer and in routes (multer cap).
+ * Keep this in sync with `OFFER_IMAGES_MAX` in the dashboard (`OfferImageGallery`).
+ */
+export const OFFER_IMAGES_MAX = 6;
+
 export type OfferStatus = typeof OFFER_STATUSES[number];
 export type OfferCategory = typeof OFFER_CATEGORIES[number];
 export type OfferAdoptionStatus = typeof OFFER_ADOPTION_STATUSES[number];
@@ -152,7 +159,18 @@ export const nexusOfferSchema = z.object({
   offerId: z.string().min(1),
   title: z.string().min(1).max(200),
   description: z.string().max(10000).default(''),
+  /**
+   * Legacy single cover image URL. Kept for backward compatibility with existing
+   * read sites; new code should prefer `imageUrls[0]`. Always written as
+   * `imageUrls[0] ?? null` whenever the document is saved.
+   */
   imageUrl: z.string().url().optional(),
+  /**
+   * Ordered gallery of public image URLs. Index 0 is the cover used by catalog
+   * thumbnails. Limited to `OFFER_IMAGES_MAX` entries (6 in v1). Empty/missing
+   * means the offer falls back to the default placeholder URL.
+   */
+  imageUrls: z.array(z.string().url()).max(OFFER_IMAGES_MAX).default([]).optional(),
   category: z.enum(OFFER_CATEGORIES),
   market_price: z.number().positive().optional(),
   /** Voucher face value (e.g. ₪100). Only applicable when executionType === 'voucher'. */
