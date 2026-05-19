@@ -92,6 +92,25 @@ const catalogListQuerySchema = z.object({
   category: z.enum(OFFER_CATEGORIES).optional(),
   approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
   adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
+  offerTypes: z.preprocess(
+    (val) => typeof val === 'string' ? val.split(',').map((s) => s.trim()).filter(Boolean) : val,
+    z.array(z.enum(OFFER_EXECUTION_TYPES)).max(10).optional(),
+  ),
+  priceMin: z.coerce.number().nonnegative().finite().optional(),
+  priceMax: z.coerce.number().nonnegative().finite().optional(),
+  validFromAfter: z.coerce.date().optional(),
+  validUntilBefore: z.coerce.date().optional(),
+  tags: z.preprocess(
+    (val) => typeof val === 'string'
+      ? val.split(',').map((s) => s.trim()).filter(Boolean)
+      : val,
+    z.array(z.string().min(1).max(40)).max(20).optional(),
+  ),
+  inStockOnly: z.preprocess(
+    (val) => val === 'true' || val === true ? true : val === 'false' || val === false ? false : val,
+    z.boolean().optional(),
+  ),
+  sort: z.enum(['newest', 'price_asc', 'price_desc', 'expiry_soon', 'expiry_far']).optional(),
 });
 
 /**
