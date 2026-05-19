@@ -26,7 +26,7 @@ import {
   type NexusOffer,
   type TenantOfferConfig,
 } from '../models/domain/supply.models';
-import { buildSearchFilter } from './catalog-query.helper';
+import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
 
 // ---------------------------------------------------------------------------
 // Public contract
@@ -46,6 +46,23 @@ export interface CatalogQuery {
   category?: string;
   approvalStatus?: 'active' | 'pending_approval' | 'denied' | 'expired';
   adoptionStatus?: 'adopted' | 'not_adopted';
+
+  /** ANY-of match against NexusOffer.executionType. Empty array = no filter. */
+  offerTypes?: string[];
+  /** Inclusive lower bound against denormalized displayPrice. */
+  priceMin?: number;
+  /** Inclusive upper bound against denormalized displayPrice. */
+  priceMax?: number;
+  /** Offer.validFrom >= this date. */
+  validFromAfter?: Date;
+  /** Offer.validUntil <= this date. */
+  validUntilBefore?: Date;
+  /** ANY-of match against NexusOffer.tags (multikey index). */
+  tags?: string[];
+  /** Hide sold-out offers (stockUsed >= stockLimit). */
+  inStockOnly?: boolean;
+  /** Sort mode. Default 'newest' (createdAt desc). */
+  sort?: 'newest' | 'price_asc' | 'price_desc' | 'expiry_soon' | 'expiry_far';
 }
 
 /** Page result returned by both catalog views. Total drives UI page count. */
@@ -225,6 +242,7 @@ export async function getTenantCatalogView(
   if (query.category) andClauses.push({ category: query.category });
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
+  andClauses.push(...buildFilterClauses(query));
 
   // 'expired' is computed (validUntil<now, still status=active). Other approval
   // statuses are exact matches.
@@ -257,7 +275,7 @@ export async function getTenantCatalogView(
   // Count + page query in parallel for latency.
   const [total, offers] = await Promise.all([
     nexusOffers.countDocuments(offerFilter),
-    nexusOffers.find(offerFilter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).toArray(),
+    nexusOffers.find(offerFilter).sort(buildSortMap(query.sort)).skip(skip).limit(query.limit).toArray(),
   ]);
 
   // Enrich just the page (not the whole adoption set) with config status.
@@ -305,19 +323,19 @@ export async function getMemberCatalogView(
     { status: 'active' },
     { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
     { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
-    { $or: [{ stockLimit: null }, { $expr: { $lt: ['$stockUsed', '$stockLimit'] } }] },
   ];
 
   if (query.category) andClauses.push({ category: query.category });
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
+  andClauses.push(...buildFilterClauses(query));
 
   const offerFilter = { $and: andClauses };
   const skip = (query.page - 1) * query.limit;
 
   const [total, offers] = await Promise.all([
     nexusOffers.countDocuments(offerFilter),
-    nexusOffers.find(offerFilter).sort({ createdAt: -1 }).skip(skip).limit(query.limit).toArray(),
+    nexusOffers.find(offerFilter).sort(buildSortMap(query.sort)).skip(skip).limit(query.limit).toArray(),
   ]);
 
   const configMap = new Map<string, TenantOfferConfig>(

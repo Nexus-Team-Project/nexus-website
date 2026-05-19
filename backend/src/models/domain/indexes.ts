@@ -71,6 +71,27 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
       { status: 1, visibility: 1, createdAt: -1 },
       { name: 'status_visibility_createdAt' },
     ),
+    // Backs filter+sort by price for the catalog views. displayPrice is the
+    // denormalized voucher→member_price / other→market_price?:member_price.
+    supply.nexusOffers.createIndex(
+      { status: 1, visibility: 1, displayPrice: 1, createdAt: -1 },
+      { name: 'status_visibility_displayPrice_createdAt' },
+    ),
+    // Backs category-narrowed price range.
+    supply.nexusOffers.createIndex(
+      { status: 1, category: 1, displayPrice: 1 },
+      { name: 'status_category_displayPrice' },
+    ),
+    // Backs expiry_soon / expiry_far sort and validUntilBefore filter.
+    supply.nexusOffers.createIndex(
+      { status: 1, validUntil: 1 },
+      { name: 'status_validUntil' },
+    ),
+    // Backs tags ANY-of filter ($in). Multikey index.
+    supply.nexusOffers.createIndex(
+      { tags: 1 },
+      { name: 'tags' },
+    ),
     supply.tenantOfferConfigs.createIndex({ tenantId: 1, offerId: 1 }, { unique: true }),
     supply.tenantOfferConfigs.createIndex({ tenantId: 1, adoptionStatus: 1 }),
     // Supports the paginated member catalog: list a tenant's adopted offers

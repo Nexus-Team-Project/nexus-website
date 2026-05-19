@@ -31,6 +31,7 @@ import {
   deleteOrphanedImages,
   type ImageUploadFile,
 } from './supply-images.helper';
+import { computeDisplayPrice } from './supply-price.helper';
 
 // ---------------------------------------------------------------------------
 // Public input/output interfaces
@@ -172,6 +173,12 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
 
   const executionType = input.executionType ?? 'voucher';
 
+  const displayPrice = computeDisplayPrice(
+    executionType,
+    input.member_price,
+    input.market_price,
+  );
+
   // Voucher ecosystem offers enter pending_approval so a platform admin can review
   // pricing (especially nexus_cost) before the offer goes live to all tenants.
   const status =
@@ -187,6 +194,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     imageUrls,
     category: input.category,
     market_price: input.market_price,
+    ...(displayPrice !== undefined && { displayPrice }),
     // Voucher pricing fields - only populated when executionType === 'voucher'.
     ...(input.face_value !== undefined && { face_value: input.face_value }),
     ...(input.nexus_cost !== undefined && { nexus_cost: input.nexus_cost }),
@@ -302,6 +310,20 @@ export async function updateOffer(
     input.status, statusActuallyChanged, input.statusReason,
   );
 
+  // Recompute displayPrice from the merged (existing + patch) values so the
+  // denormalized column stays correct even when the caller only sends one of
+  // the three inputs.
+  const mergedExecutionType = input.executionType ?? currentOffer.executionType;
+  const mergedMemberPrice =
+    input.member_price !== undefined ? input.member_price : currentOffer.member_price;
+  const mergedMarketPrice =
+    input.market_price !== undefined ? input.market_price : currentOffer.market_price;
+  const nextDisplayPrice = computeDisplayPrice(
+    mergedExecutionType,
+    mergedMemberPrice,
+    mergedMarketPrice,
+  );
+
   const update: Partial<NexusOffer> = {
     updatedAt: now,
     ...(input.title !== undefined && { title: input.title }),
@@ -321,6 +343,7 @@ export async function updateOffer(
     ...(input.face_value !== undefined && { face_value: input.face_value }),
     ...(input.nexus_cost !== undefined && { nexus_cost: input.nexus_cost }),
     ...(input.member_price !== undefined && { member_price: input.member_price }),
+    ...(nextDisplayPrice !== undefined && { displayPrice: nextDisplayPrice }),
     ...(nextImageUrls !== undefined && { imageUrls: nextImageUrls }),
     ...(nextImageUrl !== undefined && { imageUrl: nextImageUrl }),
     ...(statusActuallyChanged && { statusChangedAt: now }),

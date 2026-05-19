@@ -15,6 +15,7 @@
     "db:embed": "tsx scripts/embed-knowledge.ts",
     "db:delete-login-user": "tsx scripts/delete-login-user.ts",
     "domain:backfill": "tsx scripts/backfill-domain-model.ts",
+    "smoke:catalog-filters": "tsx scripts/smoke-catalog-filters.ts",
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {

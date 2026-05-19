@@ -173,6 +173,14 @@ export const nexusOfferSchema = z.object({
   imageUrls: z.array(z.string().url()).max(OFFER_IMAGES_MAX).default([]).optional(),
   category: z.enum(OFFER_CATEGORIES),
   market_price: z.number().positive().optional(),
+  /**
+   * Denormalized price used for member-facing range filtering and sort.
+   * Vouchers: equals member_price. Others: market_price ?? member_price.
+   * Recomputed on every write that touches member_price, market_price, or
+   * executionType. Backfilled once for existing docs via
+   * `scripts/backfill-display-price.ts`.
+   */
+  displayPrice: z.number().nonnegative().optional(),
   /** Voucher face value (e.g. ₪100). Only applicable when executionType === 'voucher'. */
   face_value: z.number().positive().optional(),
   /** What the supplier charges Nexus. Stored only - never returned to adopting tenants or members. */
