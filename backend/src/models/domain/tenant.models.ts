@@ -112,6 +112,9 @@ export const tenantMemberDomainSchema = z.object({
    * Defaults to DEFAULT_MEMBER_SERVICES for backwards compatibility with pre-Task-08 records.
    */
   services: z.array(z.string()).default([...DEFAULT_MEMBER_SERVICES]),
+  // Optional canonical Israeli mobile ("05XXXXXXXX"). Set from the invite
+  // payload at invite time so it is already present when the invitee accepts.
+  phone: z.string().regex(/^05\d{8}$/).optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -149,6 +152,9 @@ export const tenantMemberInvitationSchema = z.object({
    * Defaults to DEFAULT_MEMBER_SERVICES for backwards compatibility.
    */
   services: z.array(z.string()).default([...DEFAULT_MEMBER_SERVICES]),
+  // Optional canonical Israeli mobile ("05XXXXXXXX") captured at invite time.
+  // Forwarded onto the tenant member and contact documents.
+  phone: z.string().regex(/^05\d{8}$/).optional(),
   tokenHash: z.string().min(64).max(64),
   status: z.enum(TENANT_MEMBER_INVITATION_STATUSES),
   invitedByIdentityId: z.string().min(1),
@@ -170,6 +176,9 @@ export const tenantContactSchema = z.object({
   displayName: z.string().min(1).max(255),
   status: z.enum(TENANT_CONTACT_STATUSES),
   address: z.string().max(500).optional(),
+  // Canonical Israeli mobile number "05XXXXXXXX". Always stored in the local
+  // 10-digit form; the API layer accepts +972 input and normalizes before save.
+  phone: z.string().regex(/^05\d{8}$/).optional(),
   lastActivityAt: z.date().optional(),
   nexusIdentityId: z.string().optional(),
   createdAt: z.date(),

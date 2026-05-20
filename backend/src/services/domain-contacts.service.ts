@@ -18,6 +18,8 @@ export interface TenantContactListItem {
   displayName: string;
   status: string;
   address: string | null;
+  /** Canonical Israeli mobile number ("05XXXXXXXX") or null when not provided. */
+  phone: string | null;
   lastActivityAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +63,7 @@ function toListItem(doc: TenantContactDocument): TenantContactListItem {
     displayName: doc.displayName,
     status: doc.status,
     address: doc.address ?? null,
+    phone: doc.phone ?? null,
     lastActivityAt: doc.lastActivityAt ? doc.lastActivityAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -135,6 +138,7 @@ export async function createTenantContact(
         displayName: data.displayName,
         status: 'inactive', // all contacts start inactive; status advances via invite lifecycle
         ...(data.address !== undefined && { address: data.address }),
+        ...(data.phone !== undefined && { phone: data.phone }),
         updatedAt: now,
       },
     },
@@ -212,6 +216,7 @@ export async function importTenantContacts(
             displayName: row.displayName ?? '',
             status: 'inactive', // all imported contacts start inactive
             ...(row.address !== undefined && { address: row.address }),
+            ...(row.phone !== undefined && { phone: row.phone }),
             updatedAt: now,
           },
         },

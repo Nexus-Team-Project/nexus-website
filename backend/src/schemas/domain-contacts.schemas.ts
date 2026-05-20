@@ -4,6 +4,30 @@
  */
 import { z } from 'zod';
 import { TENANT_CONTACT_STATUSES } from '../models/domain/tenant.models';
+import { normalizeIsraeliPhone } from '../utils/israeliPhone';
+
+/**
+ * Zod transform that normalizes optional Israeli phone input to the
+ * canonical "05XXXXXXXX" form, or rejects when the value cannot be parsed.
+ * Treats undefined and blank strings as "no phone provided".
+ */
+const israeliPhoneInput = z
+  .string()
+  .trim()
+  .max(32)
+  .optional()
+  .transform((val, ctx) => {
+    if (val === undefined || val === '') return undefined;
+    const normalized = normalizeIsraeliPhone(val);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid Israeli phone number. Use 05XXXXXXXX or +972XXXXXXXX.',
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 /**
  * Validates GET /api/v1/tenant/contacts query parameters.
@@ -27,6 +51,7 @@ export const createContactSchema = z.object({
   email: z.string().email().max(255),
   displayName: z.string().trim().min(1).max(255).default(''),
   address: z.string().trim().max(500).optional(),
+  phone: israeliPhoneInput,
 });
 
 export type CreateContactInput = z.infer<typeof createContactSchema>;
@@ -40,6 +65,7 @@ export const updateContactSchema = z
     displayName: z.string().trim().min(1).max(255).optional(),
     status: z.enum(TENANT_CONTACT_STATUSES).optional(),
     address: z.string().trim().max(500).optional(),
+    phone: israeliPhoneInput,
   })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided for update',
@@ -55,6 +81,7 @@ const importContactRowSchema = z.object({
   email: z.string().email().max(255),
   displayName: z.string().trim().max(255).optional(),
   address: z.string().trim().max(500).optional(),
+  phone: israeliPhoneInput,
 });
 
 /**

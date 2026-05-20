@@ -228,6 +228,21 @@ export async function inviteTenantMemberByEmail(
   });
   if (existingMembership) throw createError('membership_exists', 409);
 
+  // If the caller did not supply a phone, fall back to the phone stored on
+  // the tenant contact (set when the user was added manually via the
+  // Contacts page). This way a phone captured at "Add contact" time still
+  // lands on the invitation, member, and downstream documents.
+  let invitePhone: string | undefined = input.phone;
+  if (invitePhone === undefined) {
+    const existingContact = await tenantCollections.tenantContacts.findOne(
+      { tenantId: access.tenantId, normalizedEmail: invitedIdentity.normalizedEmail },
+      { projection: { phone: 1 } },
+    );
+    if (existingContact && typeof existingContact.phone === 'string' && existingContact.phone) {
+      invitePhone = existingContact.phone;
+    }
+  }
+
   // Seat-limit check: only needed when the invite includes at least one non-member role
   // AND the identity doesn't already occupy a non-member seat for this tenant.
   const inviteHasNonMemberRole = input.roles.some((r) => r !== 'member');
@@ -252,6 +267,9 @@ export async function inviteTenantMemberByEmail(
     customFields: input.customFields,
     // Copy service grants from the invite input so members only access features they were invited with.
     services: input.services ?? ['benefits_catalog'],
+    // Carry the canonical phone (already normalized by the schema) onto the
+    // member doc so it is present immediately, including on accept.
+    ...(invitePhone !== undefined && { phone: invitePhone }),
     createdAt: now,
     updatedAt: now,
   });
@@ -317,6 +335,9 @@ export async function inviteTenantMemberByEmail(
     // Persist the service grants so the invitation record is self-contained and
     // the accept flow can read them without re-reading the member document.
     services: input.services ?? ['benefits_catalog'],
+    // Persist the phone on the invitation as well, so the accept flow can
+    // re-apply it if a future migration ever rebuilds the member from it.
+    ...(invitePhone !== undefined && { phone: invitePhone }),
     tokenHash: hashToken(rawToken),
     status: 'pending',
     invitedByIdentityId: access.managerIdentityId,
@@ -337,6 +358,9 @@ export async function inviteTenantMemberByEmail(
         normalizedEmail: invitedIdentity.normalizedEmail,
         displayName: input.displayName ?? invitedIdentity.normalizedEmail.split('@')[0],
         nexusIdentityId: invitedIdentity.nexusIdentityId,
+        // Seed phone on first insert only; never overwrite a phone the
+        // tenant may have curated on an existing contact row.
+        ...(invitePhone !== undefined && { phone: invitePhone }),
         createdAt: now,
       },
       $set: { status: 'pending', updatedAt: now },

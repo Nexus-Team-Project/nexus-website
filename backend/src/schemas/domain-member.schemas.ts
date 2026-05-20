@@ -3,8 +3,33 @@
  * These schemas validate member management input from the dashboard.
  */
 import { z } from 'zod';
+import { normalizeIsraeliPhone } from '../utils/israeliPhone';
 
 const inviteLanguageSchema = z.enum(['he', 'en']).default('he');
+
+/**
+ * Optional Israeli phone input for invite payloads.
+ * Accepts "0508465858", "+972508465858", "972...", and common separators.
+ * Normalizes to the canonical "05XXXXXXXX" form or rejects with 400.
+ * Blank / undefined input is silently dropped (treated as "no phone").
+ */
+const inviteIsraeliPhoneSchema = z
+  .string()
+  .trim()
+  .max(32)
+  .optional()
+  .transform((val, ctx) => {
+    if (val === undefined || val === '') return undefined;
+    const normalized = normalizeIsraeliPhone(val);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Invalid Israeli phone number. Use 05XXXXXXXX or +972XXXXXXXX.',
+      });
+      return z.NEVER;
+    }
+    return normalized;
+  });
 
 export const inviteTenantMemberSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
@@ -21,6 +46,8 @@ export const inviteTenantMemberSchema = z.object({
    * Defaults to benefits_catalog so existing callers that omit this field keep catalog access.
    */
   services: z.array(z.string()).default(['benefits_catalog']),
+  // Optional Israeli mobile to carry from invite to the new tenant member.
+  phone: inviteIsraeliPhoneSchema,
   language: inviteLanguageSchema,
   sendEmail: z.boolean().default(true),
 });
