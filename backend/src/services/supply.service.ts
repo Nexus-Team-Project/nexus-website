@@ -173,9 +173,16 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
 
   const executionType = input.executionType ?? 'voucher';
 
+  // Voucher offers default member_price to nexus_cost when not provided.
+  // Each adopting tenant later sets their own price via TenantOfferConfig.
+  const resolvedMemberPrice =
+    executionType === 'voucher' && input.member_price === undefined
+      ? input.nexus_cost
+      : input.member_price;
+
   const displayPrice = computeDisplayPrice(
     executionType,
-    input.member_price,
+    resolvedMemberPrice,
     input.market_price,
   );
 
@@ -198,7 +205,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     // Voucher pricing fields - only populated when executionType === 'voucher'.
     ...(input.face_value !== undefined && { face_value: input.face_value }),
     ...(input.nexus_cost !== undefined && { nexus_cost: input.nexus_cost }),
-    ...(input.member_price !== undefined && { member_price: input.member_price }),
+    ...(resolvedMemberPrice !== undefined && { member_price: resolvedMemberPrice }),
     status,
     visibility: input.visibility,
     executionType,
