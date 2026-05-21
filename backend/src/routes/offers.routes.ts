@@ -470,6 +470,17 @@ router.patch(
         'supply.manage_offers',
       );
 
+      // Voucher pricing lock: face_value + nexus_cost reflect the deal agreed
+      // between Nexus and the supplier. Only a platform admin may change them
+      // post-creation. Non-admin callers attempting to send either field on a
+      // voucher offer get rejected here (frontend already disables the inputs;
+      // this is the defense-in-depth gate).
+      if (!ctx.isPlatformAdmin
+          && (parsed.data.face_value !== undefined || parsed.data.nexus_cost !== undefined)) {
+        res.status(403).json({ error: 'voucher_pricing_locked' });
+        return;
+      }
+
       // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
       const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
       const validFromDate = validFromStr !== undefined
