@@ -26,6 +26,7 @@ import { scheduleDailyDigest } from './jobs/dailyDigest';
 import { embedText } from './services/ai.service';
 import { scheduleBiRefresh } from './jobs/biRefresh';
 import { pollInbox } from './services/outlook-inbound.service';
+import { startMemberInviteWorker } from './jobs/member-invite-worker';
 
 const PORT = env.PORT;
 const BACKEND_URL = env.BACKEND_URL ?? env.FRONTEND_URL;
@@ -232,6 +233,7 @@ async function bootstrap() {
   // 5. Schedule cron jobs
   scheduleDailyDigest();
   scheduleBiRefresh();
+  startMemberInviteWorker();
 
   // 6. Outlook inbox polling (every 30s)
   if (env.MS_TENANT_ID && env.MS_CLIENT_ID && env.MS_CLIENT_SECRET && env.MS_MAILBOX) {
