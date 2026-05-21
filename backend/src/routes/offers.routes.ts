@@ -28,6 +28,7 @@ import {
   resolveTenantContextWithPermission,
 } from '../utils/resolve-tenant-context';
 import { createOffer, updateOffer, deleteOffer } from '../services/supply.service';
+import { setTenantVoucherPrice } from '../services/tenant-pricing.service';
 import { approveOffer, denyOffer } from '../services/supply-approval.service';
 import {
   getTenantCatalogView,
@@ -116,8 +117,8 @@ const catalogListQuerySchema = z.object({
 /**
  * Validates the body for creating a new offer.
  * Numeric fields use coerce to handle multipart/form-data string values.
- * face_value, nexus_cost, member_price are required for voucher offers
- * (enforced in the handler after type-level parse).
+ * face_value, nexus_cost  (required for voucher)
+ * member_price            (optional for voucher; defaults to nexus_cost when omitted)
  */
 const createOfferSchema = z.object({
   title: z.string().min(1).max(200),
@@ -203,6 +204,15 @@ const updateOfferSchema = z.object({
     parseKeptImageUrlsField,
     z.array(z.string().url()).max(OFFER_IMAGES_MAX).optional(),
   ),
+});
+
+/**
+ * Validates the body for setting a tenant's per-offer voucher member price.
+ * memberPrice is coerced from string to support form-data submissions while
+ * the dominant client (dashboard) sends JSON.
+ */
+const setTenantVoucherPriceSchema = z.object({
+  memberPrice: z.coerce.number().positive(),
 });
 
 // ─── Static paths first ───────────────────────────────────────────────────────
@@ -303,7 +313,8 @@ router.get(
  *
  * Input body (multipart or JSON):
  *   title, description, category, market_price (optional), visibility
- *   face_value, nexus_cost, member_price (required when executionType === 'voucher')
+ *   face_value, nexus_cost  (required for voucher)
+ *   member_price            (optional for voucher; defaults to nexus_cost when omitted)
  * Input file (optional): image field, max 5 MB.
  * Output: created offer document (includes nexus_cost for creator).
  */
@@ -347,15 +358,15 @@ router.post(
       // These checks cannot be expressed in Zod without knowing the final visibility.
       const d = parsed.data;
       if (d.executionType === 'voucher') {
-        if (!d.face_value || !d.nexus_cost || !d.member_price) {
-          res.status(400).json({ error: 'Voucher offers require face_value, nexus_cost, and member_price' });
+        if (!d.face_value || !d.nexus_cost) {
+          res.status(400).json({ error: 'Voucher offers require face_value and nexus_cost' });
           return;
         }
         if (d.nexus_cost >= d.face_value) {
           res.status(400).json({ error: 'nexus_cost must be less than face_value' });
           return;
         }
-        if (d.member_price < d.nexus_cost || d.member_price > d.face_value) {
+        if (d.member_price !== undefined && (d.member_price < d.nexus_cost || d.member_price > d.face_value)) {
           res.status(400).json({ error: 'member_price must be between nexus_cost and face_value (inclusive)' });
           return;
         }
@@ -784,6 +795,62 @@ router.delete(
       );
       await excludeOffer(tenantId, req.params.offerId);
       res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/offers/:offerId/tenant-price
+ *
+ * Sets the caller-tenant's per-offer voucher member price. The caller's
+ * tenantId is derived from the authenticated session via
+ * resolveTenantContextWithPermission; the browser never supplies it. Service
+ * layer enforces voucher-only, adopted-only, and [nexus_cost, face_value]
+ * bounds.
+ *
+ * Requires: catalog.adopt_offer permission (same surface as adopt/unadopt -
+ * pricing is part of the per-tenant catalog configuration).
+ *
+ * Input body: { memberPrice: number } (positive).
+ * Output: { config: TenantOfferConfig } on 200; error JSON otherwise.
+ *   404 - offer_not_found
+ *   403 - not_adopted
+ *   400 - validation failure, not_voucher, or out_of_bounds
+ */
+router.patch(
+  '/:offerId/tenant-price',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = setTenantVoucherPriceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'memberPrice required and must be positive' });
+        return;
+      }
+
+      const { tenantId } = await resolveTenantContextWithPermission(
+        req,
+        'catalog.adopt_offer',
+      );
+
+      const result = await setTenantVoucherPrice({
+        tenantId,
+        offerId: req.params.offerId,
+        memberPrice: parsed.data.memberPrice,
+      });
+
+      if (!result.ok) {
+        const code =
+          result.reason === 'offer_not_found' ? 404 :
+          result.reason === 'not_adopted' ? 403 :
+          400;
+        res.status(code).json({ error: result.reason });
+        return;
+      }
+
+      res.json({ config: result.config });
     } catch (err) {
       next(err);
     }

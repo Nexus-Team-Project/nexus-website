@@ -22,6 +22,9 @@
  *
  *   "expired" is derived at read time when validUntil < now() rather than stored, so the
  *   document does not need a cron sweeper to keep status in sync.
+ *
+ *   - TenantOfferConfig now carries an optional per-tenant voucher memberPrice
+ *     and a denormalized displayPrice used by catalog sort/filter.
  */
 import type { Db } from 'mongodb';
 import { z } from 'zod';
@@ -266,6 +269,16 @@ export const tenantOfferConfigSchema = z.object({
   adoptionStatus: z.enum(OFFER_ADOPTION_STATUSES).default('active'),
   adoptedAt: z.date(),
   adoptedByIdentityId: z.string().min(1),
+  /**
+   * Per-tenant voucher member price. Bounded by [offer.nexus_cost, offer.face_value].
+   * Optional: when undefined, members see offer.member_price as a fallback.
+   */
+  memberPrice: z.number().positive().optional(),
+  /**
+   * Denormalized effective display price for catalog server-side sort + filter.
+   * Mirrors NexusOffer.displayPrice but scoped to this specific tenant.
+   */
+  displayPrice: z.number().positive().optional(),
 });
 
 export type TenantOfferConfig = z.infer<typeof tenantOfferConfigSchema>;

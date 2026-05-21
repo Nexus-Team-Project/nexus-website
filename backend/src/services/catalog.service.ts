@@ -7,10 +7,9 @@
  * and return a CatalogPage; client-side filtering of the full list is no
  * longer supported because the catalog can grow into the tens of thousands.
  *
- * Security note: nexus_cost is a sensitive pricing field that must NEVER be
- * exposed to adopting tenants or members. It is only included in CatalogItem
- * when the requesting tenant is the offer creator, or when they are a
- * platform admin.
+ * Security note: nexus_cost is only exposed to the offer creator OR to a
+ * tenant whose TenantOfferConfig.adoptionStatus === 'active' for that
+ * offer. Members never see it.
  *
  * Exports:
  *   getTenantCatalogView  - paginated admin/supply-manager catalog
@@ -27,6 +26,7 @@ import {
   type TenantOfferConfig,
 } from '../models/domain/supply.models';
 import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
+import { computeTenantDisplayPrice } from './supply-price.helper';
 
 // ---------------------------------------------------------------------------
 // Public contract
@@ -98,6 +98,10 @@ export interface CatalogItem {
   face_value?: number;
   /** Price end customers pay. Exposed to everyone when present. */
   member_price?: number;
+  /** Per-tenant override of voucher member price; undefined when tenant has no override. */
+  tenantMemberPrice?: number;
+  /** Per-tenant denormalized display price; undefined when tenant has no override. */
+  tenantDisplayPrice?: number;
   /**
    * Cost the supplier charges Nexus.
    * SECURITY: only populated for the creating tenant or platform admin.
@@ -143,8 +147,14 @@ export interface CatalogItem {
 /**
  * Maps a NexusOffer document and an optional TenantOfferConfig into a CatalogItem.
  *
- * Security note: nexus_cost is only populated when the caller is the offer's
- * creating tenant OR a platform admin.
+ * Security note: nexus_cost is exposed only when context.canSeeNexusCost is
+ * true. Callers must compute that from: (a) caller is offer creator, OR
+ * (b) caller is a platform admin, OR (c) caller's tenant has an active
+ * TenantOfferConfig for this offer. Members must always pass false.
+ *
+ * The effectiveMemberPrice override lets the member view substitute the
+ * per-tenant TenantOfferConfig.memberPrice for the global offer.member_price
+ * without mutating the underlying NexusOffer.
  *
  * Computes 'expired' at read time when validUntil is past - we never mutate
  * the underlying document, so the same offer can appear as 'active' to admins
@@ -153,7 +163,12 @@ export interface CatalogItem {
 function toItem(
   offer: NexusOffer,
   config: TenantOfferConfig | undefined,
-  context: { isOwnOffer: boolean; isPlatformAdmin: boolean },
+  context: {
+    isOwnOffer: boolean;
+    isPlatformAdmin: boolean;
+    canSeeNexusCost: boolean;
+    effectiveMemberPrice?: number;
+  },
 ): CatalogItem {
   const now = Date.now();
   const isExpired =
@@ -161,6 +176,10 @@ function toItem(
     && offer.validUntil != null
     && new Date(offer.validUntil).getTime() < now;
   const effectiveStatus = isExpired ? 'expired' : offer.status;
+
+  const resolvedMemberPrice = context.effectiveMemberPrice !== undefined
+    ? context.effectiveMemberPrice
+    : offer.member_price;
 
   return {
     offerId: offer.offerId,
@@ -174,9 +193,9 @@ function toItem(
     visibility: offer.visibility,
     market_price: offer.market_price,
     face_value: offer.face_value,
-    member_price: offer.member_price,
+    member_price: resolvedMemberPrice,
     ...(
-      (context.isOwnOffer || context.isPlatformAdmin) &&
+      context.canSeeNexusCost &&
       offer.nexus_cost !== undefined && { nexus_cost: offer.nexus_cost }
     ),
     approval_status: effectiveStatus,
@@ -285,10 +304,25 @@ export async function getTenantCatalogView(
     : await tenantOfferConfigs.find({ tenantId, offerId: { $in: pageOfferIds } }).toArray();
   const configMap = new Map<string, TenantOfferConfig>(configs.map((c) => [c.offerId, c]));
 
-  const items = offers.map((o) => toItem(o, configMap.get(o.offerId), {
-    isOwnOffer: o.createdByTenantId === tenantId,
-    isPlatformAdmin: options?.isPlatformAdmin ?? false,
-  }));
+  const items = offers.map((o) => {
+    const toc = configMap.get(o.offerId);
+    const isOwnOffer = o.createdByTenantId === tenantId;
+    const isPlatformAdmin = options?.isPlatformAdmin ?? false;
+    const hasActiveToc = toc?.adoptionStatus === 'active';
+    const canSeeNexusCost = isOwnOffer || isPlatformAdmin || hasActiveToc;
+
+    const base = toItem(o, toc, {
+      isOwnOffer,
+      isPlatformAdmin,
+      canSeeNexusCost,
+    });
+
+    return {
+      ...base,
+      ...(toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
+      ...(toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
+    };
+  });
 
   return { items, total };
 }
@@ -333,17 +367,58 @@ export async function getMemberCatalogView(
   const offerFilter = { $and: andClauses };
   const skip = (query.page - 1) * query.limit;
 
-  const [total, offers] = await Promise.all([
-    nexusOffers.countDocuments(offerFilter),
-    nexusOffers.find(offerFilter).sort(buildSortMap(query.sort)).skip(skip).limit(query.limit).toArray(),
-  ]);
-
+  // Build the configMap up-front so the price-sort branch can resolve the
+  // effective per-tenant displayPrice without an additional fetch.
   const configMap = new Map<string, TenantOfferConfig>(
     adoptedConfigs.map((c) => [c.offerId, c]),
   );
-  const items = offers.map((o) =>
-    toItem(o, configMap.get(o.offerId), { isOwnOffer: false, isPlatformAdmin: false }),
-  );
+
+  // When the member sort is by price, we must rank by the EFFECTIVE price -
+  // TenantOfferConfig.displayPrice when present, else NexusOffer.displayPrice.
+  // Mongo cannot sort by that without a $lookup, and the project rule is to
+  // preserve the two-query + JS-map join pattern. So for price sorts only,
+  // fetch the full filtered set (bounded by this tenant's adopted offers,
+  // already in memory), JS-sort by effective price, then paginate in memory.
+  // Non-price sorts keep the cheap Mongo-side sort + skip/limit path so the
+  // catalog stays fast for the common "newest" / expiry sorts.
+  const isPriceSort = query.sort === 'price_asc' || query.sort === 'price_desc';
+
+  let total: number;
+  let offers: NexusOffer[];
+
+  if (isPriceSort) {
+    const all = await nexusOffers.find(offerFilter).toArray();
+    total = all.length;
+    const direction = query.sort === 'price_asc' ? 1 : -1;
+    all.sort((a, b) => {
+      const aEff = configMap.get(a.offerId)?.displayPrice ?? a.displayPrice ?? 0;
+      const bEff = configMap.get(b.offerId)?.displayPrice ?? b.displayPrice ?? 0;
+      if (aEff !== bEff) return (aEff - bEff) * direction;
+      // Stable tie-breaker matches the Mongo-side sort: newest first.
+      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bTime - aTime;
+    });
+    offers = all.slice(skip, skip + query.limit);
+  } else {
+    const [count, page] = await Promise.all([
+      nexusOffers.countDocuments(offerFilter),
+      nexusOffers.find(offerFilter).sort(buildSortMap(query.sort)).skip(skip).limit(query.limit).toArray(),
+    ]);
+    total = count;
+    offers = page;
+  }
+
+  const items = offers.map((o) => {
+    const toc = configMap.get(o.offerId);
+    const effectiveMemberPrice = toc?.memberPrice ?? o.member_price;
+    return toItem(o, toc, {
+      isOwnOffer: false,
+      isPlatformAdmin: false,
+      canSeeNexusCost: false,
+      effectiveMemberPrice,
+    });
+  });
 
   return { items, total };
 }
@@ -385,6 +460,20 @@ export async function adoptOffer(
     );
   }
 
+  // Seed per-tenant pricing on adoption. Adopting tenant starts at the
+  // offer-level member_price (zero-margin baseline for vouchers since
+  // createOffer defaults member_price = nexus_cost when omitted).
+  // displayPrice is denormalized so the catalog server-side sort/filter
+  // can resolve effective per-tenant price without an extra join lookup.
+  const tocMemberPrice = offer.member_price;
+  const tocDisplayPrice = computeTenantDisplayPrice(
+    offer.executionType,
+    tocMemberPrice,
+    offer.displayPrice,
+    offer.member_price,
+    offer.market_price,
+  );
+
   const now = new Date();
   await tenantOfferConfigs.updateOne(
     { tenantId, offerId },
@@ -396,7 +485,11 @@ export async function adoptOffer(
         adoptedByIdentityId: identityId,
         adoptedAt: now,
       },
-      $set: { adoptionStatus: 'active' },
+      $set: {
+        adoptionStatus: 'active',
+        ...(tocMemberPrice !== undefined && { memberPrice: tocMemberPrice }),
+        ...(tocDisplayPrice !== undefined && { displayPrice: tocDisplayPrice }),
+      },
     },
     { upsert: true },
   );
