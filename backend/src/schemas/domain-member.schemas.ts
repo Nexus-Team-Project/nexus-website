@@ -57,6 +57,17 @@ export const bulkInviteTenantMembersSchema = z.object({
   language: inviteLanguageSchema,
 });
 
+// The async bulk route raises the per-request cap to 1000. Larger submits
+// are chunked client-side and the worker handles delivery in the background.
+export const bulkInviteTenantMembersAsyncSchema = z.object({
+  invitations: z.array(inviteTenantMemberSchema).min(1).max(1000),
+  language: inviteLanguageSchema,
+});
+
+export const inviteJobIdParamsSchema = z.object({
+  jobId: z.string().trim().min(1).max(150).regex(/^member_invite_job_[A-Za-z0-9-]+$/),
+});
+
 export const inviteTokenParamsSchema = z.object({
   token: z.string().trim().min(24).max(512),
 });
@@ -67,3 +78,4 @@ export const invitationIdParamsSchema = z.object({
 
 export type InviteTenantMemberInput = z.infer<typeof inviteTenantMemberSchema>;
 export type BulkInviteTenantMembersInput = z.infer<typeof bulkInviteTenantMembersSchema>;
+export type BulkInviteTenantMembersAsyncInput = z.infer<typeof bulkInviteTenantMembersAsyncSchema>;

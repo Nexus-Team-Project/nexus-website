@@ -91,6 +91,12 @@ const envSchema = z.object({
   VAPID_PUBLIC_KEY: z.string().min(1).optional(),
   VAPID_PRIVATE_KEY: z.string().min(1).optional(),
 
+  // Member invite worker — bulk-async delivery tuning.
+  // Concurrency: in-flight SendPulse calls per backend process.
+  // Rate: global send token-bucket refill rate (per second).
+  INVITE_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
+  INVITE_SEND_RATE_PER_SEC: z.coerce.number().int().min(1).max(100).default(10),
+
 });
 
 // Validate on startup — crash fast if core vars missing

@@ -5,10 +5,21 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
-import { bulkInviteTenantMembersSchema, inviteTenantMemberSchema } from '../schemas/domain-member.schemas';
+import {
+  bulkInviteTenantMembersAsyncSchema,
+  bulkInviteTenantMembersSchema,
+  inviteJobIdParamsSchema,
+  inviteTenantMemberSchema,
+} from '../schemas/domain-member.schemas';
 import { listMembersQuerySchema } from '../schemas/domain-member-read.schemas';
 import { benefitsCatalogActivationSchema } from '../schemas/domain-service-activation.schemas';
 import { bulkInviteTenantMembersByEmail, inviteTenantMemberByEmail } from '../services/domain-member.service';
+import {
+  enqueueBulkInviteAsync,
+  getInviteJobStatus,
+  retryFailedInviteJobItems,
+} from '../services/member-invite-bulk-async.service';
+import { requireMemberManagementAccess } from '../services/domain-member.service';
 import {
   listTenantMembersPaginated,
   listPendingInvitationsForTenant,
@@ -140,6 +151,80 @@ router.post(
       }));
       const result = await bulkInviteTenantMembersByEmail(req.user!.sub, invitations);
       res.status(207).json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/tenant/members/invitations/bulk-async
+ *
+ * Production-scale bulk invite: writes invitation records inside the request
+ * and hands email delivery off to a background worker. Returns immediately
+ * with a jobId so the dashboard can show progress without blocking on SMTP.
+ *
+ * Auth: requires team.invite_member (enforced inside the service).
+ * Returns: 202 { jobId, totalQueued, totalSkipped, totalFailed, results[] }.
+ */
+router.post(
+  '/members/invitations/bulk-async',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const input = bulkInviteTenantMembersAsyncSchema.parse(req.body);
+      const invitations = input.invitations.map((invitation) => ({
+        ...invitation,
+        language: invitation.language ?? input.language,
+      }));
+      const result = await enqueueBulkInviteAsync(req.user!.sub, invitations, input.language);
+      res.status(202).json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/tenant/members/invitations/jobs/:jobId
+ *
+ * Returns aggregate progress for a bulk-async invite job. The job's tenant
+ * is enforced from the caller's resolved membership so one tenant cannot
+ * read another tenant's job state.
+ */
+router.get(
+  '/members/invitations/jobs/:jobId',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = inviteJobIdParamsSchema.parse(req.params);
+      const access = await requireMemberManagementAccess(req.user!.sub);
+      const result = await getInviteJobStatus(access.tenantId, jobId);
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/tenant/members/invitations/jobs/:jobId/retry-failed
+ *
+ * Re-queues every failed item on the job so the worker re-sends them. Useful
+ * after a transient SendPulse outage. Tenant scope is enforced server-side.
+ */
+router.post(
+  '/members/invitations/jobs/:jobId/retry-failed',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = inviteJobIdParamsSchema.parse(req.params);
+      const access = await requireMemberManagementAccess(req.user!.sub);
+      const result = await retryFailedInviteJobItems(access.tenantId, jobId);
+      res.json(result);
     } catch (error) {
       next(error);
     }
