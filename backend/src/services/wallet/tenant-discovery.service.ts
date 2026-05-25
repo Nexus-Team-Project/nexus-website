@@ -1,8 +1,14 @@
 /**
- * Tenant discovery for wallet join-request flow. A tenant is
- * discoverable when it has an active `tenantServiceActivations` row
- * for `serviceKey='benefits_catalog'`. No new admin flag - the
- * activation IS the implicit "we want members" signal (spec section 7).
+ * Tenant discovery for wallet join-request flow. Returns every tenant
+ * that exists in `domainTenants`, minus tenants the caller is already
+ * a member of. Tenant logos are not in the onboarding schema yet, so
+ * `logoUrl` is omitted and the wallet renders a placeholder for now.
+ *
+ * Originally this filtered by `tenantServiceActivations(benefits_catalog,
+ * active)` as a soft "we want members" signal, but that gated discovery
+ * on a flag tenants do not yet know to flip. Product call: show every
+ * tenant; the join request still requires admin approval, so there is
+ * no exposure risk in listing them.
  *
  * Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md section 6
  */
@@ -16,9 +22,9 @@ export interface DiscoverableTenant {
 }
 
 /**
- * Returns tenants that have activated Benefits Catalog. Optional
- * case-insensitive text filter on displayName. Excludes tenants the
- * caller is already a member of (no point joining what you already have).
+ * Returns every tenant in domainTenants (excluding the caller's own
+ * memberships), optionally narrowed by a case-insensitive substring
+ * match on organizationName. Sorted alphabetically for stable UI.
  */
 export async function discoverTenants(
   db: Db,
@@ -30,24 +36,12 @@ export async function discoverTenants(
     .collection<{ tenantId: string }>(DOMAIN_COLLECTIONS.tenantUserRoles)
     .distinct('tenantId', { nexusIdentityId: args.nexusIdentityId });
 
-  // Active benefits_catalog activations -> tenant ids.
-  const activations = await db
-    .collection<{ tenantId: string; serviceKey: string; status: string }>(
-      DOMAIN_COLLECTIONS.tenantServiceActivations,
-    )
-    .find({ serviceKey: 'benefits_catalog', status: 'active' })
-    .project<{ tenantId: string }>({ tenantId: 1 })
-    .toArray();
-
-  const discoverableIds = activations
-    .map((a) => a.tenantId)
-    .filter((id) => !ownTenantIds.includes(id));
-  if (discoverableIds.length === 0) return [];
-
-  const tenantFilter: Record<string, unknown> = { tenantId: { $in: discoverableIds } };
+  const tenantFilter: Record<string, unknown> = {};
+  if (ownTenantIds.length > 0) {
+    tenantFilter.tenantId = { $nin: ownTenantIds };
+  }
   if (args.query?.trim()) {
     const escaped = args.query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    // domainTenants stores the human-readable name under organizationName.
     tenantFilter.organizationName = { $regex: escaped, $options: 'i' };
   }
 
@@ -61,13 +55,18 @@ export async function discoverTenants(
       organizationName: 1,
       logoUrl: 1,
     })
+    .sort({ organizationName: 1 })
     .limit(cap)
     .toArray();
 
-  return docs.map((d) => ({
-    tenantId: d.tenantId,
-    // Never expose the raw Mongo tenantId hex as a display name.
-    tenantName: d.organizationName?.trim() || 'Tenant',
-    ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
-  }));
+  return docs
+    // Drop anonymous / unnamed workspaces - they would render as
+    // 'Tenant' with no way to disambiguate. Once tenants must always
+    // have an organizationName at create-time this filter is a no-op.
+    .filter((d) => (d.organizationName ?? '').trim().length > 0)
+    .map((d) => ({
+      tenantId: d.tenantId,
+      tenantName: d.organizationName!.trim(),
+      ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
+    }));
 }
