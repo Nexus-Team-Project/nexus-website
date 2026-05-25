@@ -95,7 +95,31 @@ router.post('/verify', async (req: Request, res: Response) => {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
-    res.json({ mode: 'logged_in', accessToken });
+    // Plan #1.5: best-effort auto-accept of pending invitations. A
+    // reconcile hiccup must never break a working session; the next
+    // login retries.
+    let acceptedTenantIds: string[] = [];
+    try {
+      const { reconcilePendingInvitations } = await import(
+        '../services/auth/wallet-invitation-reconcile.service'
+      );
+      const { getIdentityDomainCollections } = await import('../models/domain');
+      const { nexusIdentities } = getIdentityDomainCollections(db);
+      const identity = await nexusIdentities.findOne(
+        { prismaUserId: user.id },
+        { projection: { nexusIdentityId: 1, normalizedEmail: 1 } },
+      );
+      if (identity) {
+        const reconciled = await reconcilePendingInvitations(db, {
+          nexusIdentityId: identity.nexusIdentityId,
+          email: identity.normalizedEmail,
+        });
+        acceptedTenantIds = reconciled.acceptedTenantIds;
+      }
+    } catch (reconcileErr) {
+      console.error('[wallet-auth] reconcile failed (non-fatal):', reconcileErr);
+    }
+    res.json({ mode: 'logged_in', accessToken, acceptedTenantIds });
   } catch (e) {
     const { status, code } = clientError(e);
     res.status(status).json({ error: code });
