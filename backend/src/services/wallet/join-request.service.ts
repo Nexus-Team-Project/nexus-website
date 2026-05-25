@@ -117,12 +117,18 @@ export async function listMyJoinRequests(
     .toArray();
   if (rows.length === 0) return [];
   const tenantIds = Array.from(new Set(rows.map((r) => r.tenantId)));
+  // domainTenants stores the human-readable name under organizationName.
   const tenants = await db
-    .collection<{ tenantId: string; displayName: string }>(DOMAIN_COLLECTIONS.domainTenants)
+    .collection<{ tenantId: string; organizationName?: string }>(DOMAIN_COLLECTIONS.domainTenants)
     .find({ tenantId: { $in: tenantIds } })
-    .project<{ tenantId: string; displayName: string }>({ tenantId: 1, displayName: 1 })
+    .project<{ tenantId: string; organizationName?: string }>({
+      tenantId: 1,
+      organizationName: 1,
+    })
     .toArray();
-  const nameById = new Map(tenants.map((t) => [t.tenantId, t.displayName]));
+  const nameById = new Map(
+    tenants.map((t) => [t.tenantId, t.organizationName?.trim() || 'Tenant']),
+  );
   return rows.map((r) => ({
     id: (r._id as ObjectId).toHexString(),
     tenantId: r.tenantId,
