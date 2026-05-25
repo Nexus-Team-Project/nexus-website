@@ -12,11 +12,18 @@ import { getSupplyDomainCollections } from '../../src/models/domain/supply.model
 import { getTenantDomainCollections } from '../../src/models/domain/tenant.models';
 import { getOnboardingCollections } from '../../src/models/onboarding.models';
 import { deleteOfferImage } from '../../src/utils/cloudinary';
+import { PHONE_OTP_COLLECTION } from '../../src/models/auth/phone-otp.models';
+import { EMAIL_OTP_COLLECTION } from '../../src/models/auth/email-otp.models';
+import { PHONE_SIGNUP_TICKET_COLLECTION } from '../../src/models/auth/phone-signup-ticket.models';
+import { TENANT_JOIN_REQUEST_COLLECTION } from '../../src/models/auth/tenant-join-request.models';
 import {
   resolveMongoDeletionTargets,
   resolveOrchestrationDeletionTargets,
 } from './targets';
 import type { DeletionCounts, MongoDeletionTargets, PrismaUserSnapshot } from './types';
+
+/** Collection name for the wallet rate-limit token-bucket markers. */
+const WALLET_RATE_LIMIT_COLLECTION = 'walletRateLimits';
 
 /**
  * Returns legacy member tenant ids that are not owned by the deleted user.
@@ -87,6 +94,12 @@ export async function collectMongoCounts(
     processedSteps,
     nexusOffers,
     tenantOfferConfigs,
+    phoneOtpChallenges,
+    emailOtpChallenges,
+    phoneSignupTickets,
+    walletRateLimits,
+    tenantJoinRequestsByUser,
+    tenantJoinRequestsForOwnedTenants,
   ] = await Promise.all([
     identity.nexusIdentities.countDocuments({
       $or: [
@@ -178,6 +191,36 @@ export async function collectMongoCounts(
     supply.tenantOfferConfigs.countDocuments({
       tenantId: { $in: targets.domainOwnedTenantIds },
     }),
+    // Plan #1: phone-OTP challenges keyed by the user's phone.
+    db.collection(PHONE_OTP_COLLECTION).countDocuments({
+      phone: { $in: targets.walletPhones },
+    }),
+    // Plan #1: email-OTP challenges keyed by email.
+    db.collection(EMAIL_OTP_COLLECTION).countDocuments({ email }),
+    // Plan #1: phone signup tickets keyed by phone (short-lived).
+    db.collection(PHONE_SIGNUP_TICKET_COLLECTION).countDocuments({
+      phone: { $in: targets.walletPhones },
+    }),
+    // Plan #1: wallet rate-limit markers keyed by phone or email.
+    db.collection(WALLET_RATE_LIMIT_COLLECTION).countDocuments({
+      $or: [
+        ...(targets.walletPhones.length ? [{ key: { $in: targets.walletPhones } }] : []),
+        { key: email },
+      ],
+    }),
+    // Plan #4: tenant join requests submitted by the user.
+    db.collection(TENANT_JOIN_REQUEST_COLLECTION).countDocuments({
+      $or: [
+        ...(targets.nexusIdentityIds.length
+          ? [{ nexusIdentityId: { $in: targets.nexusIdentityIds } }]
+          : []),
+        { email },
+      ],
+    }),
+    // Plan #4: tenant join requests TO tenants the user owns.
+    db.collection(TENANT_JOIN_REQUEST_COLLECTION).countDocuments({
+      tenantId: { $in: targets.domainOwnedTenantIds },
+    }),
   ]);
 
   return {
@@ -209,6 +252,12 @@ export async function collectMongoCounts(
     processedSteps,
     nexusOffers,
     tenantOfferConfigs,
+    phoneOtpChallenges,
+    emailOtpChallenges,
+    phoneSignupTickets,
+    walletRateLimits,
+    tenantJoinRequestsByUser,
+    tenantJoinRequestsForOwnedTenants,
   };
 }
 
@@ -232,6 +281,36 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   const targets = await resolveMongoDeletionTargets(email, prismaUser);
   const orchestrationTargets = await resolveOrchestrationDeletionTargets(targets);
   const legacyMemberOnlyTenantIds = getLegacyMemberOnlyTenantIds(targets);
+
+  // Plan #1 / #4: wallet auth ephemeral collections + join requests.
+  // Done first so a freshly verified phone or in-flight challenge can't
+  // leak after the identity goes away.
+  if (targets.walletPhones.length > 0) {
+    await db.collection(PHONE_OTP_COLLECTION).deleteMany({
+      phone: { $in: targets.walletPhones },
+    });
+    await db.collection(PHONE_SIGNUP_TICKET_COLLECTION).deleteMany({
+      phone: { $in: targets.walletPhones },
+    });
+  }
+  await db.collection(EMAIL_OTP_COLLECTION).deleteMany({ email });
+  await db.collection(WALLET_RATE_LIMIT_COLLECTION).deleteMany({
+    $or: [
+      ...(targets.walletPhones.length ? [{ key: { $in: targets.walletPhones } }] : []),
+      { key: email },
+    ],
+  });
+  await db.collection(TENANT_JOIN_REQUEST_COLLECTION).deleteMany({
+    $or: [
+      ...(targets.nexusIdentityIds.length
+        ? [{ nexusIdentityId: { $in: targets.nexusIdentityIds } }]
+        : []),
+      { email },
+      ...(targets.domainOwnedTenantIds.length
+        ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }]
+        : []),
+    ],
+  });
 
   await orchestration.consumedEvents.deleteMany({ platformEventId: { $in: orchestrationTargets.platformEventIds } });
   await orchestration.platformEvents.deleteMany({ platformEventId: { $in: orchestrationTargets.platformEventIds } });

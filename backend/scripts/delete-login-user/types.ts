@@ -26,6 +26,12 @@ export type MongoDeletionTargets = {
   domainMemberTenantIds: string[];
   legacyOwnedTenantIds: ObjectId[];
   legacyMemberTenantIds: string[];
+  /**
+   * Canonical 05XXXXXXXX phone numbers harvested from the user's
+   * NexusIdentity rows. Used to clean wallet auth challenges and
+   * rate-limit markers keyed by phone.
+   */
+  walletPhones: string[];
 };
 
 export type OrchestrationDeletionTargets = {
