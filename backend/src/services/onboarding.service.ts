@@ -94,6 +94,12 @@ export interface MeResponse {
   isPlatformAdmin?: boolean;
   canOpenDashboard?: boolean;
   router?: import('./auth/wallet-me-router.service').WalletMeRouter['router'];
+  /**
+   * Wallet profile sub-doc (Plan #3). completedAt is the gate the
+   * wallet LoginSheet checks - if set, returning user skips the
+   * slide chain and goes straight to RouterScreen.
+   */
+  profile?: import('./wallet/wallet-profile.service').WalletProfileView | null;
 }
 
 /**
@@ -419,6 +425,14 @@ export async function getMe(userId: string): Promise<MeResponse> {
     email: user.email,
   });
 
+  // Plan #3: wallet profile sub-doc so the LoginSheet can gate the
+  // slide chain on completedAt.
+  const { getWalletProfile } = await import('./wallet/wallet-profile.service');
+  const walletProfile = await getWalletProfile(db, {
+    prismaUserId: user.id,
+    email: user.email,
+  });
+
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
     context: {
@@ -446,6 +460,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
     isPlatformAdmin: walletRouter.isPlatformAdmin,
     canOpenDashboard: walletRouter.canOpenDashboard,
     router: walletRouter.router,
+    profile: walletProfile,
   };
 }
 

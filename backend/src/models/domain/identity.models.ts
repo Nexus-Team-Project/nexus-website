@@ -55,6 +55,29 @@ export const marketingConsentSchema = z.object({
   ipAtGrant: z.string().min(1).max(64).optional(),
 });
 
+/**
+ * Wallet onboarding profile. Collected via the wallet's registration
+ * slide chain (Plan #3) and flushed in one PATCH at
+ * RegistrationCompletePage. completedAt gates whether the slide chain
+ * is re-shown to returning users (set => skip, route to RouterScreen).
+ *
+ * Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md section 4.1
+ */
+export const walletProfileSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
+  birthday: z.date().optional(),
+  gender: z.enum(['male', 'female', 'other', 'prefer_not_to_say']).optional(),
+  lifeStage: z.string().min(1).max(100).optional(),
+  motivation: z.string().min(1).max(200).optional(),
+  purpose: z.array(z.string().min(1).max(100)).max(20).optional(),
+  benefitCategories: z.array(z.string().min(1).max(100)).max(50).optional(),
+  inviteFriendsSent: z.number().int().min(0).optional(),
+  completedAt: z.date().optional(),
+  updatedAt: z.date(),
+});
+export type WalletProfileDocument = z.infer<typeof walletProfileSchema>;
+
 export const nexusIdentitySchema = z.object({
   nexusIdentityId: z.string().min(1),
   normalizedEmail: z.string().email(),
@@ -77,6 +100,12 @@ export const nexusIdentitySchema = z.object({
    */
   emailVerifiedAt: z.date().optional(),
   marketingConsent: marketingConsentSchema.optional(),
+  /**
+   * Wallet onboarding profile (Plan #3). Optional - new identities
+   * created via Google or email-OTP start without a profile and fill
+   * it through the wallet slide chain.
+   */
+  profile: walletProfileSchema.optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
