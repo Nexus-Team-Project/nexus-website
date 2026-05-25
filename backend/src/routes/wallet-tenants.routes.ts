@@ -25,6 +25,10 @@ import {
 import { getIdentityDomainCollections } from '../models/domain';
 import { resolveTenantContextWithPermission } from '../utils/resolve-tenant-context';
 import {
+  getDomainAuthorizationContext,
+  hasDomainPermission,
+} from '../services/domain-authorization.service';
+import {
   sendJoinRequestAdminNotification,
   sendJoinRequestDecision,
 } from '../services/email/join-request-email.service';
@@ -44,6 +48,75 @@ async function getCallingNexusIdentity(req: Request): Promise<{ nexusIdentityId:
   );
   if (!doc) return null;
   return { nexusIdentityId: doc.nexusIdentityId, email, displayName: doc.displayName };
+}
+
+/**
+ * Resolves the caller's real tenant id for join-request admin actions.
+ *
+ * `resolveTenantContextWithPermission` has a platform-admin fast-path:
+ * if the caller's email is listed in NEXUS_ADMIN_EMAILS, it returns
+ * the `nexus_platform` sentinel tenant id and skips the actual
+ * `tenantMembersV2` lookup. That is correct for catalog/supply
+ * routes (platform admins write platform-origin offers), but it is
+ * WRONG for tenant-scoped admin endpoints like this one: a platform
+ * admin who also owns a real tenant must still see the join requests
+ * for that real tenant, not for the `nexus_platform` sentinel which
+ * has none. Without this helper the wallet's admin saw an empty
+ * panel even when MongoDB clearly had a pending request for them.
+ *
+ * The helper looks up the caller's active `tenantMembersV2` row
+ * directly. If found, it returns that real tenant context. If the
+ * caller has no active membership, it falls back to
+ * `resolveTenantContextWithPermission` so non-platform-admin
+ * callers still get the standard 403 path.
+ *
+ * Inputs:
+ *   req         - Express request, authenticated.
+ *   permission  - Domain permission required for this admin action.
+ * Output: { tenantId, identityId } for the caller's real tenant.
+ * Throws: Forbidden (403) when the caller has no tenant admin context.
+ */
+async function resolveAdminTenantForJoinRequests(
+  req: Request,
+  permission: 'team.view_members' | 'team.invite_member',
+): Promise<{ tenantId: string; identityId: string }> {
+  const email = req.user!.email.toLowerCase().trim();
+  const db = await getMongoDb();
+  const { nexusIdentities } = getIdentityDomainCollections(db);
+  const identity = await nexusIdentities.findOne(
+    { normalizedEmail: email },
+    { projection: { nexusIdentityId: 1 } },
+  );
+  if (identity) {
+    const tenantMember = await db
+      .collection<{ tenantId: string; nexusIdentityId: string; status: string; createdAt: Date }>(
+        DOMAIN_COLLECTIONS.tenantMembers,
+      )
+      .findOne(
+        { nexusIdentityId: identity.nexusIdentityId, status: 'active' },
+        { sort: { createdAt: 1 }, projection: { tenantId: 1 } },
+      );
+    if (tenantMember) {
+      // Real-tenant path: enforce the requested permission on this
+      // specific tenant + identity pair before returning.
+      const auth = await getDomainAuthorizationContext(
+        identity.nexusIdentityId,
+        tenantMember.tenantId,
+      );
+      if (!hasDomainPermission(auth, permission)) {
+        throw Object.assign(new Error('Forbidden'), { status: 403 });
+      }
+      return {
+        tenantId: tenantMember.tenantId,
+        identityId: identity.nexusIdentityId,
+      };
+    }
+  }
+  // No real tenant membership - defer to the standard helper. For a
+  // pure platform admin with no tenant this throws 403, which is the
+  // right behavior: there are no join requests to administer.
+  const ctx = await resolveTenantContextWithPermission(req, permission);
+  return { tenantId: ctx.tenantId, identityId: ctx.identityId };
 }
 
 // ── Wallet user endpoints ───────────────────────────────────────────────────
@@ -150,7 +223,7 @@ export const tenantJoinAdminRouter = Router();
 
 tenantJoinAdminRouter.get('/join-requests', authenticate, async (req: Request, res: Response) => {
   try {
-    const ctx = await resolveTenantContextWithPermission(req, 'team.view_members');
+    const ctx = await resolveAdminTenantForJoinRequests(req, 'team.view_members');
     const db = await getMongoDb();
     const rows = await listTenantPendingJoinRequests(db, { tenantId: ctx.tenantId });
     res.json({
@@ -186,7 +259,7 @@ tenantJoinAdminRouter.patch('/join-requests/:id', authenticate, async (req: Requ
     return;
   }
   try {
-    const ctx = await resolveTenantContextWithPermission(req, 'team.invite_member');
+    const ctx = await resolveAdminTenantForJoinRequests(req, 'team.invite_member');
     const me = await getCallingNexusIdentity(req);
     if (!me) {
       res.status(404).json({ error: 'identity_not_found' });
