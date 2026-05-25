@@ -165,7 +165,13 @@ function resolveInvitationRoles(invite: TenantMemberInvitationDocument): TenantU
   return legacyRole ? [legacyRole as TenantUserRoleName] : [];
 }
 
-async function markTenantMemberInvitationAccepted(
+/**
+ * Marks one invitation accepted. Exported so the wallet-side reconcile
+ * service (services/auth/wallet-invitation-reconcile.service.ts) can
+ * auto-accept pending invites on login without re-implementing the
+ * tenant-contact + member-row side effects.
+ */
+export async function markTenantMemberInvitationAccepted(
   invite: TenantMemberInvitationDocument,
   acceptedByIdentityId: string,
 ): Promise<{ tenantId: string; roles: TenantUserRoleName[]; alreadyAccepted: boolean }> {
