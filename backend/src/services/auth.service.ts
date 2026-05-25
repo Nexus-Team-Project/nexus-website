@@ -538,8 +538,12 @@ export async function resetPassword(rawToken: string, newPassword: string) {
  * Issues a fresh access token and a 30-day refresh token for the given user.
  * Input: user identity, role, and request metadata for audit logging.
  * Output: signed access token, raw refresh token, and user ID.
+ *
+ * Exported for use by wallet auth (services/auth/session-issuer.service.ts)
+ * so phone-OTP, email-OTP, and google/wallet endpoints all issue tokens
+ * via the same path as login/register/refresh.
  */
-async function issueTokens(
+export async function issueTokens(
   userId: string,
   email: string,
   role: string,

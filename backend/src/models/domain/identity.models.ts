@@ -42,6 +42,19 @@ export type ContactChannel = typeof CONTACT_CHANNELS[number];
 export type ContactStatus = typeof CONTACT_STATUSES[number];
 export type TenantUserRoleName = typeof TENANT_ROLE_NAMES[number];
 
+/**
+ * Marketing consent record on NexusIdentity, captured at signup or
+ * settings change. Audit trail: granted flag + timestamps + source +
+ * ip. Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md section 4.1
+ */
+export const marketingConsentSchema = z.object({
+  granted: z.boolean(),
+  grantedAt: z.date(),
+  updatedAt: z.date(),
+  source: z.enum(['wallet_signup', 'wallet_settings']),
+  ipAtGrant: z.string().min(1).max(64).optional(),
+});
+
 export const nexusIdentitySchema = z.object({
   nexusIdentityId: z.string().min(1),
   normalizedEmail: z.string().email(),
@@ -50,6 +63,20 @@ export const nexusIdentitySchema = z.object({
   status: z.enum(IDENTITY_STATUSES),
   locale: z.enum(['he', 'en']).default('he'),
   prismaUserId: z.string().min(1).optional(),
+  /**
+   * Wallet phone login fields. Phone is the canonical 05XXXXXXXX form;
+   * unique-sparse index lets identities without a phone coexist.
+   * Spec sections 4.1 and 10.1.
+   */
+  phone: z.string().regex(/^05\d{8}$/).optional(),
+  phoneVerifiedAt: z.date().optional(),
+  /**
+   * Denormalized email-verified marker for fast /api/me reads.
+   * Source of truth for verification state is the matching
+   * ContactProfile row; this mirrors it for the common case.
+   */
+  emailVerifiedAt: z.date().optional(),
+  marketingConsent: marketingConsentSchema.optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

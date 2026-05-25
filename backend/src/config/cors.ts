@@ -8,8 +8,10 @@ import type { CorsOptions } from 'cors';
 const ALLOWED_BROWSER_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:5174',
+  'http://localhost:8080',
   'https://nexus-payment.com',
   'https://dashboard.nexus-payment.com',
+  'https://wallet.nexus-payment.com',
 ] as const;
 
 const allowedBrowserOrigins = new Set<string>(ALLOWED_BROWSER_ORIGINS);

@@ -8,6 +8,9 @@ import { getOrchestrationDomainCollections } from './orchestration.models';
 import { getTenantDomainCollections } from './tenant.models';
 import { getSupplyDomainCollections } from './supply.models';
 import { ensureInviteJobIndexes } from './invite-jobs.models';
+import { ensurePhoneOtpIndexes } from '../auth/phone-otp.models';
+import { ensureEmailOtpIndexes } from '../auth/email-otp.models';
+import { ensurePhoneSignupTicketIndexes } from '../auth/phone-signup-ticket.models';
 
 /**
  * Creates idempotent indexes for identity, tenant, member, event, and saga data.
@@ -22,6 +25,11 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
   await Promise.all([
     identity.nexusIdentities.createIndex({ normalizedEmail: 1 }, { unique: true }),
     identity.nexusIdentities.createIndex({ prismaUserId: 1 }, { sparse: true }),
+    // Wallet phone login - unique sparse so identities without phone coexist.
+    identity.nexusIdentities.createIndex(
+      { phone: 1 },
+      { name: 'phone_unique', unique: true, sparse: true },
+    ),
     identity.contactProfiles.createIndex({ nexusIdentityId: 1, channel: 1 }),
     identity.contactProfiles.createIndex({ channel: 1, normalizedIdentifier: 1 }, { unique: true }),
     identity.tenantUserRoles.createIndex({ nexusIdentityId: 1, tenantId: 1 }),
@@ -104,4 +112,7 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
   ]);
 
   await ensureInviteJobIndexes(db);
+  await ensurePhoneOtpIndexes(db);
+  await ensureEmailOtpIndexes(db);
+  await ensurePhoneSignupTicketIndexes(db);
 }

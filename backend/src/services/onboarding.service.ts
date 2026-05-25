@@ -85,6 +85,15 @@ export interface MeResponse {
   };
   authorization: DashboardAuthorization;
   onboarding: OnboardingInfo;
+  /**
+   * Wallet RouterScreen payload. Lists the user's member tenants,
+   * platform-admin status, and whether to show the admin-dashboard
+   * card. See services/auth/wallet-me-router.service.ts.
+   */
+  memberships?: import('./auth/wallet-me-router.service').MembershipSummary[];
+  isPlatformAdmin?: boolean;
+  canOpenDashboard?: boolean;
+  router?: import('./auth/wallet-me-router.service').WalletMeRouter['router'];
 }
 
 /**
@@ -401,6 +410,15 @@ export async function getMe(userId: string): Promise<MeResponse> {
 
   const baseAuthorization = getDashboardAuthorization(user.email, context, domainAuthorization.permissions);
 
+  // Wallet RouterScreen payload - cards the user sees right after login.
+  // Lives in its own helper so getMe does not grow further (file is already
+  // at the size cap; new auth logic goes in services/auth/).
+  const { computeWalletMeRouter } = await import('./auth/wallet-me-router.service');
+  const walletRouter = await computeWalletMeRouter(db, {
+    nexusIdentityId: domainIdentity.nexusIdentityId,
+    email: user.email,
+  });
+
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
     context: {
@@ -424,6 +442,10 @@ export async function getMe(userId: string): Promise<MeResponse> {
       businessSetupComplete,
     },
     onboarding: status.onboarding,
+    memberships: walletRouter.memberships,
+    isPlatformAdmin: walletRouter.isPlatformAdmin,
+    canOpenDashboard: walletRouter.canOpenDashboard,
+    router: walletRouter.router,
   };
 }
 

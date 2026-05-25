@@ -82,6 +82,15 @@ const envSchema = z.object({
   // Format: cloudinary://api_key:api_secret@cloud_name
   CLOUDINARY_URL: z.string().min(1).optional(),
 
+  // InforU - SMS OTP provider for wallet phone login. Backend-only.
+  // Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md
+  INFORU_USER: z.string().min(1).optional(),
+  INFORU_TOKEN: z.string().min(1).optional(),
+  INFORU_BASE_URL: z.string().trim().url().default('https://capi.inforu.co.il'),
+
+  // Wallet - public URL for the wallet app (wallet.nexus-payment.com).
+  WALLET_URL: z.string().trim().url().optional(),
+
   // Nexus Agents — proxy to agent service (optional)
   AGENT_API_URL: z.string().url().optional(),  // e.g. https://nexus-agents-production-ed8b.up.railway.app
   AGENT_API_KEY: z.string().min(1).optional(), // must match SEO_AGENT_API_KEY on the agent service
@@ -121,6 +130,7 @@ const optional = {
   'Email (SendPulse API fallback)': env.SENDPULSE_CLIENT_ID,
   'Web Push Notifications': env.VAPID_PUBLIC_KEY,
   'Cloudinary (offer image uploads)': env.CLOUDINARY_URL,
+  'InforU SMS (wallet phone OTP)': env.INFORU_USER,
 };
 for (const [feature, key] of Object.entries(optional)) {
   if (!key) console.warn(`⚠️  ${feature} disabled — env var not set`);
