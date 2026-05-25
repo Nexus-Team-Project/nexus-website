@@ -270,11 +270,16 @@ async function notifyAdminsOfPendingRequests(args: {
   const emailByIdentity = new Map(identities.map((i) => [i.nexusIdentityId, i.normalizedEmail]));
 
   const tenantNames = await args.db
-    .collection<{ tenantId: string; displayName: string }>(DOMAIN_COLLECTIONS.domainTenants)
+    .collection<{ tenantId: string; organizationName?: string }>(DOMAIN_COLLECTIONS.domainTenants)
     .find({ tenantId: { $in: args.tenantIds } })
-    .project<{ tenantId: string; displayName: string }>({ tenantId: 1, displayName: 1 })
+    .project<{ tenantId: string; organizationName?: string }>({
+      tenantId: 1,
+      organizationName: 1,
+    })
     .toArray();
-  const nameByTenant = new Map(tenantNames.map((t) => [t.tenantId, t.displayName]));
+  const nameByTenant = new Map(
+    tenantNames.map((t) => [t.tenantId, t.organizationName?.trim() || 'Tenant']),
+  );
 
   for (const row of adminRoleRows) {
     const email = emailByIdentity.get(row.nexusIdentityId);
@@ -282,7 +287,8 @@ async function notifyAdminsOfPendingRequests(args: {
     try {
       await sendJoinRequestAdminNotification({
         to: email,
-        tenantName: nameByTenant.get(row.tenantId) ?? row.tenantId,
+        // Never expose the raw Mongo tenantId hex in an email.
+        tenantName: nameByTenant.get(row.tenantId) ?? 'Tenant',
         requesterEmail: args.requesterEmail,
         requesterDisplayName: args.requesterDisplayName,
         dashboardUrl,
@@ -322,13 +328,17 @@ async function notifyRequesterOfDecision(args: {
   }
   if (!email) return;
   const tenant = await args.db
-    .collection<{ tenantId: string; displayName: string }>(DOMAIN_COLLECTIONS.domainTenants)
-    .findOne({ tenantId: args.tenantId }, { projection: { displayName: 1 } });
+    .collection<{ tenantId: string; organizationName?: string }>(DOMAIN_COLLECTIONS.domainTenants)
+    .findOne(
+      { tenantId: args.tenantId },
+      { projection: { organizationName: 1 } },
+    );
   void prisma; // future use - currently no Prisma lookup needed for email
   try {
     await sendJoinRequestDecision({
       to: email,
-      tenantName: tenant?.displayName ?? args.tenantId,
+      // Never expose the raw Mongo tenantId hex in an email.
+      tenantName: tenant?.organizationName?.trim() || 'Tenant',
       decision: args.decision,
       reason: args.reason,
       walletUrl,

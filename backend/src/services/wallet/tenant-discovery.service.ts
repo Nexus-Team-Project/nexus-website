@@ -47,17 +47,18 @@ export async function discoverTenants(
   const tenantFilter: Record<string, unknown> = { tenantId: { $in: discoverableIds } };
   if (args.query?.trim()) {
     const escaped = args.query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    tenantFilter.displayName = { $regex: escaped, $options: 'i' };
+    // domainTenants stores the human-readable name under organizationName.
+    tenantFilter.organizationName = { $regex: escaped, $options: 'i' };
   }
 
   const docs = await db
-    .collection<{ tenantId: string; displayName: string; logoUrl?: string }>(
+    .collection<{ tenantId: string; organizationName?: string; logoUrl?: string }>(
       DOMAIN_COLLECTIONS.domainTenants,
     )
     .find(tenantFilter)
-    .project<{ tenantId: string; displayName: string; logoUrl?: string }>({
+    .project<{ tenantId: string; organizationName?: string; logoUrl?: string }>({
       tenantId: 1,
-      displayName: 1,
+      organizationName: 1,
       logoUrl: 1,
     })
     .limit(cap)
@@ -65,7 +66,8 @@ export async function discoverTenants(
 
   return docs.map((d) => ({
     tenantId: d.tenantId,
-    tenantName: d.displayName,
+    // Never expose the raw Mongo tenantId hex as a display name.
+    tenantName: d.organizationName?.trim() || 'Tenant',
     ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
   }));
 }

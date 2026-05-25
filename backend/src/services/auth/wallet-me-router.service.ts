@@ -74,13 +74,19 @@ export async function computeWalletMeRouter(
   const memberships: MembershipSummary[] = [];
   if (allRoles.length > 0) {
     const tenantIds = Array.from(new Set(allRoles.map((r) => r.tenantId).filter((t): t is string => !!t)));
+    // domainTenants stores the human-readable string under
+    // organizationName. Falls back to 'Tenant' (never the raw Mongo
+    // ObjectId tenantId) so the wallet UI never surfaces a hex id.
     const tenantDocs = await domainTenants
-      .find({ tenantId: { $in: tenantIds } }, { projection: { tenantId: 1, displayName: 1 } })
+      .find(
+        { tenantId: { $in: tenantIds } },
+        { projection: { tenantId: 1, organizationName: 1 } },
+      )
       .toArray();
     const nameByTenant = new Map<string, string>();
     for (const t of tenantDocs) {
-      const name = (t as { displayName?: string }).displayName ?? t.tenantId;
-      nameByTenant.set(t.tenantId, name);
+      const raw = (t as { organizationName?: string }).organizationName;
+      nameByTenant.set(t.tenantId, raw && raw.trim() ? raw : 'Tenant');
     }
     // Collapse to one row per tenant - prefer the most privileged role
     // when a user holds multiple roles in the same tenant.
@@ -95,7 +101,8 @@ export async function computeWalletMeRouter(
       const role = pickPrimaryRole(roles);
       memberships.push({
         tenantId,
-        tenantName: nameByTenant.get(tenantId) ?? tenantId,
+        // Never expose a raw Mongo tenantId - prefer a localized fallback.
+        tenantName: nameByTenant.get(tenantId) ?? 'Tenant',
         role,
         isPrivilegedRole: PRIVILEGED_NON_MEMBER(role),
       });
