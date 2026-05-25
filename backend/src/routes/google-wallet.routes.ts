@@ -8,12 +8,15 @@
  */
 import { Router, Request, Response } from 'express';
 import { googleWalletSchema } from '../schemas/google-wallet.schemas';
-import { handleGoogleWalletLogin } from '../services/auth/google-wallet.service';
+import {
+  handleGoogleWalletLogin,
+  handleGoogleWalletCode,
+} from '../services/auth/google-wallet.service';
 import { issueWalletSession } from '../services/auth/session-issuer.service';
 
 const router = Router();
 
-/** POST /api/v1/auth/google/wallet */
+/** POST /api/v1/auth/google/wallet - { idToken } OR { code, redirectUri } */
 router.post('/', async (req: Request, res: Response) => {
   const parsed = googleWalletSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -21,7 +24,12 @@ router.post('/', async (req: Request, res: Response) => {
     return;
   }
   try {
-    const resolved = await handleGoogleWalletLogin({ idToken: parsed.data.idToken });
+    const resolved = parsed.data.idToken
+      ? await handleGoogleWalletLogin({ idToken: parsed.data.idToken })
+      : await handleGoogleWalletCode({
+          code: parsed.data.code as string,
+          redirectUri: parsed.data.redirectUri as string,
+        });
     const { accessToken } = await issueWalletSession(res, {
       userId: resolved.prismaUserId,
       email: resolved.email,
@@ -64,6 +72,11 @@ router.post('/', async (req: Request, res: Response) => {
       res.status(401).json({ error: 'google_token_invalid' });
       return;
     }
+    if (msg === 'google_not_configured') {
+      res.status(503).json({ error: 'google_not_configured' });
+      return;
+    }
+    console.error('[google-wallet] failed:', e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
