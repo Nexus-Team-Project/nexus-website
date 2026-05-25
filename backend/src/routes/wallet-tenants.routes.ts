@@ -281,9 +281,17 @@ async function notifyAdminsOfPendingRequests(args: {
     tenantNames.map((t) => [t.tenantId, t.organizationName?.trim() || 'Tenant']),
   );
 
+  // Dedupe: one admin can hold multiple privileged roles on the same
+  // tenant (e.g. both 'admin' and 'owner' rows after a sync). Without
+  // this, they receive one email per role row - the user reported
+  // seeing duplicate "new join request" emails in their inbox.
+  const seen = new Set<string>();
   for (const row of adminRoleRows) {
     const email = emailByIdentity.get(row.nexusIdentityId);
     if (!email) continue;
+    const key = `${row.tenantId}|${email}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     try {
       await sendJoinRequestAdminNotification({
         to: email,
