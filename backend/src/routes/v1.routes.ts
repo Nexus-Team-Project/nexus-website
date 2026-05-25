@@ -10,6 +10,7 @@ import adminUsersRoutes from './admin.users.routes';
 import agentApprovalsRoutes from './agent-approvals.routes';
 import analyticsRoutes from './analytics.routes';
 import authRoutes from './auth.routes';
+import phoneOtpRoutes from './phone-otp.routes';
 import blogRoutes from './blog.routes';
 import chatRoutes from './chat.routes';
 import dashboardRoutes from './dashboard.routes';
@@ -32,6 +33,7 @@ import userRoutes from './user.routes';
 const router = Router();
 
 router.use('/auth', authRoutes);
+router.use('/auth/phone', phoneOtpRoutes);
 router.use('/', onboardingRoutes);
 router.use('/tenant', domainTenantRoutes);
 router.use('/tenant', domainMemberActionsRoutes);
