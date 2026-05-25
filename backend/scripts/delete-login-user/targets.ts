@@ -37,9 +37,10 @@ export async function resolveMongoPerson(email: string, prismaUser: PrismaUserSn
         ...(prismaUser ? [{ prismaUserId: prismaUser.id }] : []),
       ],
     })
-    .project<{ nexusIdentityId: string; prismaUserId?: string }>({
+    .project<{ nexusIdentityId: string; prismaUserId?: string; phone?: string }>({
       nexusIdentityId: 1,
       prismaUserId: 1,
+      phone: 1,
     })
     .toArray();
 
@@ -50,10 +51,12 @@ export async function resolveMongoPerson(email: string, prismaUser: PrismaUserSn
 
   const nexusIdentityIds = new Set<string>();
   const prismaUserIds = new Set<string>();
+  const walletPhones = new Set<string>();
 
   for (const identity of identityMatches) {
     nexusIdentityIds.add(identity.nexusIdentityId);
     if (identity.prismaUserId) prismaUserIds.add(identity.prismaUserId);
+    if (identity.phone) walletPhones.add(identity.phone);
   }
 
   for (const contact of contactMatches) {
@@ -65,6 +68,7 @@ export async function resolveMongoPerson(email: string, prismaUser: PrismaUserSn
   return {
     nexusIdentityIds: [...nexusIdentityIds],
     prismaUserIds: [...prismaUserIds],
+    walletPhones: [...walletPhones],
   };
 }
 
@@ -119,7 +123,9 @@ export async function resolveMongoDeletionTargets(
     .toArray();
 
   return {
-    ...person,
+    nexusIdentityIds: person.nexusIdentityIds,
+    prismaUserIds: person.prismaUserIds,
+    walletPhones: person.walletPhones,
     domainOwnedTenantIds: [...new Set(domainOwnedTenants.map((tenant) => tenant.tenantId))],
     domainTenantMemberIds: [...new Set(domainMembers.map((member) => member.tenantMemberId))],
     domainMemberTenantIds: [...new Set(domainMembers.map((member) => member.tenantId))],
