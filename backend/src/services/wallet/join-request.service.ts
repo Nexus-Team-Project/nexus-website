@@ -187,11 +187,39 @@ export async function approveJoinRequest(
   await db.collection(DOMAIN_COLLECTIONS.tenantMembers).updateOne(
     { nexusIdentityId: doc.nexusIdentityId, tenantId: doc.tenantId },
     {
-      $setOnInsert: { createdAt: now },
+      $setOnInsert: {
+        tenantMemberId: `tenant_member_${randomUUID()}`,
+        nexusIdentityId: doc.nexusIdentityId,
+        tenantId: doc.tenantId,
+        services: [],
+        createdAt: now,
+      },
       $set: { status: 'active', updatedAt: now, email: doc.email },
     },
     { upsert: true },
   );
+
+  // Mirror the invite-accept flow: an approved member must also appear
+  // in the tenant's Contacts tab. Without this upsert, /api/v1/tenant/
+  // contacts returns the contacts collection unchanged and the new
+  // member is invisible to the admin until they manually add them.
+  await db.collection(DOMAIN_COLLECTIONS.tenantContacts).updateOne(
+    { tenantId: doc.tenantId, normalizedEmail: doc.email },
+    {
+      $setOnInsert: {
+        tenantContactId: `tenant_contact_${randomUUID()}`,
+        tenantId: doc.tenantId,
+        email: doc.email,
+        normalizedEmail: doc.email,
+        displayName: doc.displayName ?? doc.email.split('@')[0],
+        nexusIdentityId: doc.nexusIdentityId,
+        createdAt: now,
+      },
+      $set: { status: 'active', lastActivityAt: now, updatedAt: now },
+    },
+    { upsert: true },
+  );
+
   await col.updateOne(
     { _id: doc._id },
     { $set: { status: 'approved', decidedAt: now, decidedByIdentityId: args.adminIdentityId } },
