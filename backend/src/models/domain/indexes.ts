@@ -25,6 +25,11 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
   await Promise.all([
     identity.nexusIdentities.createIndex({ normalizedEmail: 1 }, { unique: true }),
     identity.nexusIdentities.createIndex({ prismaUserId: 1 }, { sparse: true }),
+    // Wallet phone login - unique sparse so identities without phone coexist.
+    identity.nexusIdentities.createIndex(
+      { phone: 1 },
+      { name: 'phone_unique', unique: true, sparse: true },
+    ),
     identity.contactProfiles.createIndex({ nexusIdentityId: 1, channel: 1 }),
     identity.contactProfiles.createIndex({ channel: 1, normalizedIdentifier: 1 }, { unique: true }),
     identity.tenantUserRoles.createIndex({ nexusIdentityId: 1, tenantId: 1 }),
