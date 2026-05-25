@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
 import { getMongoDb } from '../config/mongo';
 import { discoverTenants } from '../services/wallet/tenant-discovery.service';
+import { getEcosystemCatalogForWallet } from '../services/wallet/ecosystem-catalog.service';
 import {
   createJoinRequests,
   listMyJoinRequests,
@@ -46,6 +47,28 @@ async function getCallingNexusIdentity(req: Request): Promise<{ nexusIdentityId:
 }
 
 // ── Wallet user endpoints ───────────────────────────────────────────────────
+
+router.get('/ecosystem-offers', authenticate, async (req: Request, res: Response) => {
+  try {
+    const me = await getCallingNexusIdentity(req);
+    if (!me) {
+      res.status(404).json({ error: 'identity_not_found' });
+      return;
+    }
+    const db = await getMongoDb();
+    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
+    const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
+    const result = await getEcosystemCatalogForWallet(db, {
+      nexusIdentityId: me.nexusIdentityId,
+      query: q,
+      limit: Number.isFinite(limit) ? (limit as number) : undefined,
+    });
+    res.json(result);
+  } catch (e) {
+    console.error('[wallet-tenants] ecosystem-offers failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
 
 router.get('/tenants/discover', authenticate, async (req: Request, res: Response) => {
   try {
