@@ -11,6 +11,7 @@ import agentApprovalsRoutes from './agent-approvals.routes';
 import analyticsRoutes from './analytics.routes';
 import authRoutes from './auth.routes';
 import phoneOtpRoutes from './phone-otp.routes';
+import emailOtpRoutes from './email-otp.routes';
 import blogRoutes from './blog.routes';
 import chatRoutes from './chat.routes';
 import dashboardRoutes from './dashboard.routes';
@@ -34,6 +35,7 @@ const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/auth/phone', phoneOtpRoutes);
+router.use('/auth/email-otp', emailOtpRoutes);
 router.use('/', onboardingRoutes);
 router.use('/tenant', domainTenantRoutes);
 router.use('/tenant', domainMemberActionsRoutes);
