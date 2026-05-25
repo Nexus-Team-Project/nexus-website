@@ -23,6 +23,13 @@ import {
 } from '../services/wallet/join-request.service';
 import { getIdentityDomainCollections } from '../models/domain';
 import { resolveTenantContextWithPermission } from '../utils/resolve-tenant-context';
+import {
+  sendJoinRequestAdminNotification,
+  sendJoinRequestDecision,
+} from '../services/email/join-request-email.service';
+import { env } from '../config/env';
+import { DOMAIN_COLLECTIONS } from '../models/domain/collections';
+import { prisma } from '../config/database';
 
 const router = Router();
 
@@ -80,6 +87,17 @@ router.post('/join-requests', authenticate, async (req: Request, res: Response) 
       displayName: me.displayName,
       tenantIds: parsed.data.tenantIds,
     });
+    // Best-effort: notify admins of every freshly-pending request.
+    if (out.created.length > 0) {
+      void notifyAdminsOfPendingRequests({
+        db,
+        tenantIds: out.created,
+        requesterEmail: me.email,
+        requesterDisplayName: me.displayName,
+      }).catch((err) =>
+        console.error('[join-request] admin notify failed (non-fatal):', err),
+      );
+    }
     res.json(out);
   } catch (e) {
     console.error('[wallet-tenants] create-join failed:', e);
@@ -157,6 +175,12 @@ tenantJoinAdminRouter.patch('/join-requests/:id', authenticate, async (req: Requ
         requestId: req.params.id,
         adminIdentityId: me.nexusIdentityId,
       });
+      void notifyRequesterOfDecision({
+        db,
+        tenantId: out.tenantId,
+        nexusIdentityId: out.nexusIdentityId,
+        decision: 'approved',
+      }).catch((err) => console.error('[join-request] decision email failed:', err));
       res.json({ status: 'approved', ...out, tenantId: ctx.tenantId });
       return;
     }
@@ -165,6 +189,14 @@ tenantJoinAdminRouter.patch('/join-requests/:id', authenticate, async (req: Requ
       adminIdentityId: me.nexusIdentityId,
       reason: parsed.data.reason,
     });
+    void notifyRequesterOfDecision({
+      db,
+      tenantId: out.tenantId,
+      nexusIdentityId: out.nexusIdentityId,
+      decision: 'denied',
+      reason: parsed.data.reason,
+      requesterEmail: out.email,
+    }).catch((err) => console.error('[join-request] decision email failed:', err));
     res.json({ status: 'denied', ...out, tenantId: ctx.tenantId });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
@@ -177,5 +209,110 @@ tenantJoinAdminRouter.patch('/join-requests/:id', authenticate, async (req: Requ
     res.status(500).json({ error: 'internal_error' });
   }
 });
+
+/**
+ * Find every admin/owner identity for the given tenants and send each
+ * one a "new join request" email. Best-effort: any single send failure
+ * is logged and skipped so a downed mail server can never block a
+ * working /join-requests POST.
+ */
+async function notifyAdminsOfPendingRequests(args: {
+  db: import('mongodb').Db;
+  tenantIds: string[];
+  requesterEmail: string;
+  requesterDisplayName?: string;
+}): Promise<void> {
+  const dashboardUrl = env.DASHBOARD_URL ?? 'http://localhost:5174';
+  const adminRoles = ['admin', 'owner'] as const;
+  // For each tenant, gather admin emails via Prisma user join.
+  const adminRoleRows = await args.db
+    .collection<{ tenantId: string; nexusIdentityId: string; role: string }>(
+      DOMAIN_COLLECTIONS.tenantUserRoles,
+    )
+    .find({ tenantId: { $in: args.tenantIds }, role: { $in: [...adminRoles] } })
+    .toArray();
+  if (adminRoleRows.length === 0) return;
+
+  const identityIds = Array.from(new Set(adminRoleRows.map((r) => r.nexusIdentityId)));
+  const identities = await args.db
+    .collection<{ nexusIdentityId: string; normalizedEmail: string; prismaUserId?: string }>(
+      DOMAIN_COLLECTIONS.nexusIdentities,
+    )
+    .find({ nexusIdentityId: { $in: identityIds } })
+    .project<{ nexusIdentityId: string; normalizedEmail: string }>({
+      nexusIdentityId: 1,
+      normalizedEmail: 1,
+    })
+    .toArray();
+  const emailByIdentity = new Map(identities.map((i) => [i.nexusIdentityId, i.normalizedEmail]));
+
+  const tenantNames = await args.db
+    .collection<{ tenantId: string; displayName: string }>(DOMAIN_COLLECTIONS.domainTenants)
+    .find({ tenantId: { $in: args.tenantIds } })
+    .project<{ tenantId: string; displayName: string }>({ tenantId: 1, displayName: 1 })
+    .toArray();
+  const nameByTenant = new Map(tenantNames.map((t) => [t.tenantId, t.displayName]));
+
+  for (const row of adminRoleRows) {
+    const email = emailByIdentity.get(row.nexusIdentityId);
+    if (!email) continue;
+    try {
+      await sendJoinRequestAdminNotification({
+        to: email,
+        tenantName: nameByTenant.get(row.tenantId) ?? row.tenantId,
+        requesterEmail: args.requesterEmail,
+        requesterDisplayName: args.requesterDisplayName,
+        dashboardUrl,
+      });
+    } catch (e) {
+      console.error('[join-request] admin notify send failed:', email, e);
+    }
+  }
+}
+
+/**
+ * Send the requester their decision email. Looks up their email via
+ * the identity unless one is supplied (denial path passes it through
+ * so we don't lose the row to a TTL race).
+ */
+async function notifyRequesterOfDecision(args: {
+  db: import('mongodb').Db;
+  tenantId: string;
+  nexusIdentityId: string;
+  decision: 'approved' | 'denied';
+  reason?: string;
+  requesterEmail?: string;
+}): Promise<void> {
+  const walletUrl =
+    (env as unknown as { WALLET_URL?: string }).WALLET_URL ?? 'http://localhost:8080';
+  let email = args.requesterEmail;
+  if (!email) {
+    const identity = await args.db
+      .collection<{ nexusIdentityId: string; normalizedEmail: string }>(
+        DOMAIN_COLLECTIONS.nexusIdentities,
+      )
+      .findOne(
+        { nexusIdentityId: args.nexusIdentityId },
+        { projection: { normalizedEmail: 1 } },
+      );
+    email = identity?.normalizedEmail;
+  }
+  if (!email) return;
+  const tenant = await args.db
+    .collection<{ tenantId: string; displayName: string }>(DOMAIN_COLLECTIONS.domainTenants)
+    .findOne({ tenantId: args.tenantId }, { projection: { displayName: 1 } });
+  void prisma; // future use - currently no Prisma lookup needed for email
+  try {
+    await sendJoinRequestDecision({
+      to: email,
+      tenantName: tenant?.displayName ?? args.tenantId,
+      decision: args.decision,
+      reason: args.reason,
+      walletUrl,
+    });
+  } catch (e) {
+    console.error('[join-request] decision email send failed:', email, e);
+  }
+}
 
 export default router;
