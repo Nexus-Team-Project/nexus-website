@@ -29,7 +29,35 @@ router.post('/', async (req: Request, res: Response) => {
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
-    res.json({ accessToken, identityCreated: resolved.identityCreated });
+    // Plan #1.5: auto-accept any pending invitations matching this email.
+    let acceptedTenantIds: string[] = [];
+    try {
+      const { reconcilePendingInvitations } = await import(
+        '../services/auth/wallet-invitation-reconcile.service'
+      );
+      const { getMongoDb } = await import('../config/mongo');
+      const { getIdentityDomainCollections } = await import('../models/domain');
+      const db = await getMongoDb();
+      const { nexusIdentities } = getIdentityDomainCollections(db);
+      const identity = await nexusIdentities.findOne(
+        { normalizedEmail: resolved.email },
+        { projection: { nexusIdentityId: 1 } },
+      );
+      if (identity) {
+        const reconciled = await reconcilePendingInvitations(db, {
+          nexusIdentityId: identity.nexusIdentityId,
+          email: resolved.email,
+        });
+        acceptedTenantIds = reconciled.acceptedTenantIds;
+      }
+    } catch (reconcileErr) {
+      console.error('[wallet-auth] reconcile failed (non-fatal):', reconcileErr);
+    }
+    res.json({
+      accessToken,
+      identityCreated: resolved.identityCreated,
+      acceptedTenantIds,
+    });
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'unknown';
     if (msg === 'google_token_invalid') {
