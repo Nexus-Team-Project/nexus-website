@@ -8,6 +8,7 @@ import { getOrchestrationDomainCollections } from './orchestration.models';
 import { getTenantDomainCollections } from './tenant.models';
 import { getSupplyDomainCollections } from './supply.models';
 import { ensureInviteJobIndexes } from './invite-jobs.models';
+import { ensurePhoneOtpIndexes } from '../auth/phone-otp.models';
 
 /**
  * Creates idempotent indexes for identity, tenant, member, event, and saga data.
@@ -104,4 +105,5 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
   ]);
 
   await ensureInviteJobIndexes(db);
+  await ensurePhoneOtpIndexes(db);
 }
