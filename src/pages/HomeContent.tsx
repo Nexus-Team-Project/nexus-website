@@ -269,11 +269,19 @@ export default function HomeContent() {
       <Hero />
 
       {/* Partner Logos Row.
-          On mobile the section sits flush below the hero with no negative
-          margin or diagonal clip-path — those tricks made the band look like
-          an isolated white panel pasted on top of the page. A simple full-
-          width white band reads as part of the page flow. */}
-      <section className="scroll-reveal relative z-0 bg-white py-12 md:py-40 md:border-b md:border-slate-200 overflow-hidden">
+          Mobile: pulled up under the hero's diagonal with a matching slanted
+          top edge (clipPath). The slanted top exposes the hero's colored
+          gradient above, while the logos sit in the unclipped bottom area —
+          the carousel appears to start exactly at the diagonal line with no
+          visible white-on-color overlap.
+          Desktop layout is unchanged. */}
+      <section
+        className={`scroll-reveal relative z-0 bg-white -mt-[35vh] pt-[30vh] pb-12 md:mt-0 md:pt-40 md:pb-40 md:border-b md:border-slate-200 overflow-hidden md:[clip-path:none] ${
+          direction === 'rtl'
+            ? '[clip-path:polygon(0_0,100%_35vh,100%_100%,0_100%)]'
+            : '[clip-path:polygon(0_35vh,100%_0,100%_100%,0_100%)]'
+        }`}
+      >
         {/* Vertical grid lines — decorative, desktop only so the mobile band
             stays clean. */}
         <div className="absolute inset-0 z-0 hidden md:flex justify-center pointer-events-none opacity-30 overflow-hidden">

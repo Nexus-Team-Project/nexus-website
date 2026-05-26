@@ -16,14 +16,12 @@ export default function Hero() {
   const mockupPng = direction === 'rtl' ? '/hero-mockup-he.png' : '/hero-mockup-en.png';
 
   return (
-    // min-h uses `svh` on mobile so Android Chrome's address bar collapsing
-    // and re-expanding on scroll does not change the section height (using
-    // `vh` here previously caused the hero to overflow its viewport when the
-    // user scrolled down then back up to the top).
-    // `items-start` on mobile keeps the headline anchored to the top of the
-    // section instead of vertically centring content that is taller than the
-    // viewport (which was causing the title to overflow above the fold).
-    <section className="relative min-h-[100svh] md:min-h-screen flex items-start md:items-center overflow-hidden">
+    // Mobile uses `dvh` (dynamic viewport) so the section height tracks the
+    // mobile browser's address-bar collapse/expand smoothly. The text + button
+    // block is absolutely positioned near the diagonal (see inner wrapper)
+    // instead of relying on top padding, so the layout cannot drift when the
+    // bar resizes during scroll. Desktop keeps its original centered layout.
+    <section className="relative min-h-[100dvh] md:min-h-screen flex items-start md:items-center overflow-hidden">
       <AnimatedGradient
         clipPath={direction === 'rtl'
           ? 'polygon(0 0, 100% 0, 100% 100%, 0 65%)'
@@ -48,16 +46,26 @@ export default function Hero() {
         </picture>
       </div>
 
-      <div className="relative z-10 w-full">
-        <div className="max-w-7xl mx-auto px-6 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20">
+      {/*
+        Content wrapper.
+        Mobile: pinned to the bottom of the section. The bottom padding equals
+        the height of the white triangle under the diagonal at the button's
+        x position, so the button row ends exactly on the diagonal line and
+        the headline floats above it with breathing room. Bottom-anchoring
+        (instead of top-padding) keeps the layout stable while the mobile
+        browser's address bar collapses and expands.
+        Desktop (lg+): reverts to normal-flow centered layout.
+      */}
+      <div className="absolute inset-x-0 bottom-0 z-10 pb-[26vh] lg:static lg:inset-auto lg:pb-0 lg:w-full">
+        <div className="max-w-7xl mx-auto px-6 lg:pt-32 lg:pb-20">
           <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             {/* Text content */}
             <div className="lg:order-1">
-              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-5 sm:mb-6 drop-shadow-lg">
+              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-5 sm:mb-6 drop-shadow-lg">
                 {t.hero.title}
               </h1>
 
-              <p className="text-base sm:text-lg text-white/90 leading-relaxed max-w-lg mb-8 sm:mb-10 drop-shadow">
+              <p className="text-lg sm:text-xl text-white/90 leading-relaxed max-w-lg mb-16 lg:mb-10 drop-shadow">
                 {t.hero.subtitle}
               </p>
 
