@@ -268,10 +268,15 @@ export default function HomeContent() {
       <Navbar />
       <Hero />
 
-      {/* Partner Logos Row */}
-      <section className="scroll-reveal relative z-0 bg-white py-10 md:py-40 border-b border-slate-200 overflow-hidden -mt-28 md:mt-0 mobile-logos-clip">
-        {/* Vertical Grid Lines Background */}
-        <div className="absolute inset-0 z-0 flex justify-center pointer-events-none opacity-30 overflow-hidden">
+      {/* Partner Logos Row.
+          On mobile the section sits flush below the hero with no negative
+          margin or diagonal clip-path — those tricks made the band look like
+          an isolated white panel pasted on top of the page. A simple full-
+          width white band reads as part of the page flow. */}
+      <section className="scroll-reveal relative z-0 bg-white py-12 md:py-40 md:border-b md:border-slate-200 overflow-hidden">
+        {/* Vertical grid lines — decorative, desktop only so the mobile band
+            stays clean. */}
+        <div className="absolute inset-0 z-0 hidden md:flex justify-center pointer-events-none opacity-30 overflow-hidden">
           <div className="flex space-x-24 h-full max-w-full">
             {[...Array(8)].map((_, i) => (
               <div
@@ -282,7 +287,7 @@ export default function HomeContent() {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
+        <div className="max-w-7xl mx-auto md:px-6 relative z-10">
           {/* Desktop - static row */}
           <div className="hidden md:flex items-center justify-center gap-10 lg:gap-12">
             <img
@@ -311,9 +316,25 @@ export default function HomeContent() {
             />
           </div>
 
-          {/* Mobile - auto-scrolling slider */}
-          <div className="md:hidden overflow-hidden">
-            <div className={`${direction === 'rtl' ? 'partner-slider' : 'partner-slider-reverse'} flex items-center gap-12 w-max`}>
+          {/* Mobile - infinite marquee.
+              `dir="ltr"` is forced on the track so the strip is anchored to
+              the LEFT edge of the parent in both languages. Without it, an
+              RTL page anchors the strip to the right and the `translate(-50%)`
+              keyframe pushes the entire strip off-screen left, producing a
+              long empty pause between loops. The visual scroll direction is
+              chosen per-language via the `partner-slider` /
+              `partner-slider-reverse` animations.
+              The strip itself contains the 4 logos rendered twice with a
+              consistent `gap-12` between every pair plus a matching `pr-12`
+              trailing pad, so the gap from the last logo of copy A to the
+              first logo of copy B equals the gap inside each copy and the
+              strip's total width is exactly 2× one set's width. That makes
+              `translate(-50%)` land copy B's first logo on copy A's first-
+              logo position with no seam and no empty pause. */}
+          <div className="md:hidden overflow-hidden" dir="ltr">
+            <div
+              className={`${direction === 'rtl' ? 'partner-slider' : 'partner-slider-reverse'} flex items-center gap-12 pr-12 w-max`}
+            >
               {[1, 2, 3, 4, 1, 2, 3, 4].map((num, i) => (
                 <img
                   key={i}
@@ -321,6 +342,7 @@ export default function HomeContent() {
                   alt={`Partner ${num}`}
                   className={`${num === 1 ? 'h-32' : num === 4 ? 'h-14' : 'h-8'} w-auto object-contain flex-shrink-0`}
                   loading="lazy"
+                  aria-hidden={i >= 4}
                 />
               ))}
             </div>

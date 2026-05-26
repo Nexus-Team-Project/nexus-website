@@ -10,8 +10,20 @@ export default function Hero() {
   const { t, direction, language } = useLanguage();
   const { track } = useAnalytics();
 
+  // Mobile mockup uses the same hero image asset as desktop so users
+  // see the chart + phone preview the moment the page loads on a phone.
+  const mockupWebp = direction === 'rtl' ? '/hero-mockup-he.webp' : '/hero-mockup-en.webp';
+  const mockupPng = direction === 'rtl' ? '/hero-mockup-he.png' : '/hero-mockup-en.png';
+
   return (
-    <section className="relative min-h-[85vh] md:min-h-screen flex items-center overflow-visible">
+    // min-h uses `svh` on mobile so Android Chrome's address bar collapsing
+    // and re-expanding on scroll does not change the section height (using
+    // `vh` here previously caused the hero to overflow its viewport when the
+    // user scrolled down then back up to the top).
+    // `items-start` on mobile keeps the headline anchored to the top of the
+    // section instead of vertically centring content that is taller than the
+    // viewport (which was causing the title to overflow above the fold).
+    <section className="relative min-h-[100svh] md:min-h-screen flex items-start md:items-center overflow-hidden">
       <AnimatedGradient
         clipPath={direction === 'rtl'
           ? 'polygon(0 0, 100% 0, 100% 100%, 0 65%)'
@@ -19,38 +31,33 @@ export default function Hero() {
         }
       />
 
-      {/* Hero Mockup - English: right, Hebrew: left */}
+      {/* Desktop hero mockup — English: right, Hebrew: left. Hidden on mobile. */}
       <div
         className={`absolute hidden lg:block z-50 ${direction === 'rtl' ? 'w-4/5 max-w-6xl top-20' : 'w-[90%] max-w-5xl top-28 right-0'}`}
         style={direction === 'rtl' ? { left: '-27%' } : { transform: 'translateX(32%)' }}
       >
         <picture>
-          <source
-            srcSet={direction === 'rtl' ? '/hero-mockup-he.webp' : '/hero-mockup-en.webp'}
-            type="image/webp"
-          />
+          <source srcSet={mockupWebp} type="image/webp" />
           <img
-            src={direction === 'rtl' ? '/hero-mockup-he.png' : '/hero-mockup-en.png'}
+            src={mockupPng}
             alt="Payment Dashboard Interface"
             className="w-full h-auto drop-shadow-2xl"
             loading="eager"
-            style={{
-              imageRendering: '-webkit-optimize-contrast',
-            }}
+            style={{ imageRendering: '-webkit-optimize-contrast' }}
           />
         </picture>
       </div>
 
       <div className="relative z-10 w-full">
-        <div className="max-w-7xl mx-auto px-6 pt-32 pb-20">
-          <div className="grid lg:grid-cols-2 gap-16 items-center">
+        <div className="max-w-7xl mx-auto px-6 pt-24 sm:pt-28 lg:pt-32 pb-16 sm:pb-20">
+          <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
             {/* Text content */}
-            <div className={direction === 'rtl' ? 'lg:order-1' : 'lg:order-1'}>
-              <h1 className="text-5xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-6 drop-shadow-lg">
+            <div className="lg:order-1">
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-bold text-white leading-[1.1] tracking-tight mb-5 sm:mb-6 drop-shadow-lg">
                 {t.hero.title}
               </h1>
 
-              <p className="text-lg text-white/90 leading-relaxed max-w-lg mb-10 drop-shadow">
+              <p className="text-base sm:text-lg text-white/90 leading-relaxed max-w-lg mb-8 sm:mb-10 drop-shadow">
                 {t.hero.subtitle}
               </p>
 
@@ -67,10 +74,30 @@ export default function Hero() {
                 </Link>
                 <GoogleSignIn variant="hero" />
               </div>
+
+              {/* Mobile hero mockup — only shown on small screens so users on
+                  phones see the chart + phone preview without scrolling.
+                  Hidden on lg+ where the absolutely positioned desktop mockup
+                  above takes over.
+                  `-mx-6` cancels the parent's horizontal padding so the image
+                  goes full-bleed at its native resolution — no CSS scaling, so
+                  it stays sharp on high-DPR screens. */}
+              <div className="mt-8 sm:mt-12 lg:hidden -mx-6">
+                <picture>
+                  <source srcSet={mockupWebp} type="image/webp" />
+                  <img
+                    src={mockupPng}
+                    alt="Payment Dashboard Interface"
+                    className="w-full h-auto drop-shadow-2xl"
+                    loading="eager"
+                    decoding="async"
+                  />
+                </picture>
+              </div>
             </div>
 
-            {/* Empty space for image */}
-            <div className={`hidden lg:block ${direction === 'rtl' ? 'lg:order-2' : 'lg:order-2'}`}></div>
+            {/* Spacer column — desktop only; mockup is absolutely positioned above. */}
+            <div className="hidden lg:block lg:order-2" />
           </div>
         </div>
       </div>
