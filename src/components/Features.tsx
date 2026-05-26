@@ -395,64 +395,46 @@ export default function Features() {
               </a>
             </div>
 
-            {/* Mobile: dashboard mockup (collapsed) + animation overlay (expanded) */}
-            <div className="md:hidden relative bg-slate-50 border-t border-slate-200" style={{ height: '200px', overflow: 'hidden' }}>
+            {/* Mobile: SpendingLimits animation, always visible.
+                The animation's panels are absolutely positioned at fixed
+                widths (~360px modal + ~280px card list) and the modal's
+                content runs ~600px tall on its own, so the natural rendering
+                area is ~800px wide × ~640px tall. We size the inner wrapper
+                to exactly that and scale it uniformly so the entire thing
+                fits a phone viewport (~400px wide).
+                Outer container height is set to the post-scale visual height
+                so the whole animation is visible with no clipping at top or
+                bottom — same content the user would see on desktop hover. */}
+            <div className="md:hidden relative bg-slate-50 border-t border-slate-200 overflow-hidden" style={{ height: '380px' }}>
               {/* Background gradient */}
               <div className="absolute top-0 right-0 w-full h-full opacity-10 pointer-events-none overflow-hidden">
                 <div className="absolute -top-1/4 -right-1/4 w-[150%] h-[150%] bg-gradient-to-br from-teal-500 via-sky-500 to-emerald-500 rotate-12"></div>
               </div>
 
-              {/* Dashboard mockup illustration - always visible, fades when animation active */}
-              <div className={`relative p-4 transition-opacity duration-500 ${expandedCard === 'embed' ? 'opacity-30' : 'opacity-100'}`}>
-                <div className="relative bg-white/70 backdrop-blur-md border border-white/50 rounded-2xl shadow-xl p-4 h-full">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded bg-teal-500/20 flex items-center justify-center">
-                        <div className="w-3 h-3 rounded-sm bg-teal-500"></div>
-                      </div>
-                      <span className="font-semibold text-xs text-slate-900">FintechOS</span>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="h-4 w-12 bg-slate-200 rounded"></div>
-                      <div className="h-4 w-4 bg-slate-200 rounded-full"></div>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <div className="h-2 w-20 bg-slate-300 rounded"></div>
-                      <div className="h-7 w-full bg-white border border-slate-200 rounded-lg shadow-sm flex items-center px-2 gap-1">
-                        <Layers className="text-slate-400 w-3 h-3" />
-                        <div className="h-2 w-16 bg-slate-200 rounded"></div>
-                      </div>
-                      <div className="h-7 w-full bg-white border border-slate-200 rounded-lg shadow-sm flex items-center px-2 gap-1">
-                        <Layers className="text-slate-400 w-3 h-3" />
-                        <div className="h-2 w-20 bg-slate-200 rounded"></div>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="h-2 w-16 bg-slate-300 rounded"></div>
-                      <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-slate-100 shadow-sm">
-                        <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center">
-                          <div className="w-3.5 h-3.5 rounded-full border-2 border-emerald-500"></div>
-                        </div>
-                        <div>
-                          <div className="h-2 w-14 bg-slate-200 rounded mb-1"></div>
-                          <div className="h-1.5 w-10 bg-slate-100 rounded"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* SpendingLimits Animation - overlays on top when expanded */}
               <div
-                className={`absolute inset-0 transition-opacity duration-500 pointer-events-none ${expandedCard === 'embed' ? 'opacity-100' : 'opacity-0'}`}
-                style={{ overflow: 'hidden' }}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '50%',
+                  // Natural dimensions chosen so all internal panels fit:
+                  // • SpendingLimits.css has a @media (max-width: 767px) rule
+                  //   that insets the cards list 80px from the right and the
+                  //   modal 80px from the left, so the stage needs ≥ 720px of
+                  //   width (80 + 280 + 80 + 360 with no gap, more for breathing
+                  //   room).
+                  // • The modal's tallest step (step 2 with the map) runs ~580px
+                  //   from `top: 80px`, so the stage needs ~700px of height.
+                  width: '760px',
+                  height: '720px',
+                  // 760 × 0.47 ≈ 357px visual width — fits any phone ≥ 360px.
+                  // 720 × 0.47 ≈ 338px visual height — fits inside the 380px
+                  //   container with a small buffer.
+                  transform: 'translateX(-50%) scale(0.47)',
+                  transformOrigin: 'top center',
+                  pointerEvents: 'none',
+                }}
               >
-                <div style={{ transform: 'scale(0.48)', transformOrigin: 'top center', width: '208%', marginLeft: '-54%', height: '700px', position: 'relative', pointerEvents: 'none' }}>
-                  <SpendingLimitsAnimation />
-                </div>
+                <SpendingLimitsAnimation />
               </div>
             </div>
 
