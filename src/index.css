@@ -362,16 +362,19 @@ video:focus-visible {
     animation: phoneSlideOutRTL 16s ease-in-out infinite;
   }
 
-  /* Embed payments card on mobile */
+  /* Embed payments card on mobile.
+     Previously clamped to 380px with overflow:hidden so the card could
+     "tap to expand". Now that the SpendingLimits animation is always
+     rendered (no tap-to-expand on mobile), the card needs to grow to fit
+     its text section + the full animation area. `height: auto` lets it
+     do that; the inner animation div still uses its own fixed height +
+     `overflow: hidden` to clip the scaled transform. */
   .md\:col-span-12 {
-    height: 380px;
-    overflow: hidden;
-    transition: height 0.5s ease-out, box-shadow 0.5s ease-out;
-    cursor: pointer;
+    height: auto;
+    transition: box-shadow 0.5s ease-out;
   }
 
   .md\:col-span-12.mobile-active {
-    height: 460px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
     z-index: 10;
   }

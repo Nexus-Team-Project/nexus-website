@@ -75,25 +75,6 @@ export default function Hero() {
                 <GoogleSignIn variant="hero" />
               </div>
 
-              {/* Mobile hero mockup — only shown on small screens so users on
-                  phones see the chart + phone preview without scrolling.
-                  Hidden on lg+ where the absolutely positioned desktop mockup
-                  above takes over.
-                  `-mx-6` cancels the parent's horizontal padding so the image
-                  goes full-bleed at its native resolution — no CSS scaling, so
-                  it stays sharp on high-DPR screens. */}
-              <div className="mt-8 sm:mt-12 lg:hidden -mx-6">
-                <picture>
-                  <source srcSet={mockupWebp} type="image/webp" />
-                  <img
-                    src={mockupPng}
-                    alt="Payment Dashboard Interface"
-                    className="w-full h-auto drop-shadow-2xl"
-                    loading="eager"
-                    decoding="async"
-                  />
-                </picture>
-              </div>
             </div>
 
             {/* Spacer column — desktop only; mockup is absolutely positioned above. */}
