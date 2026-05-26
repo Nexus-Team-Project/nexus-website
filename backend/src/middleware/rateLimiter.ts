@@ -38,3 +38,18 @@ export const apiLimiter = rateLimit({
   legacyHeaders: false,
   handler: json429,
 });
+
+/**
+ * Public contact-sales form: 5 submissions / hour per IP.
+ *
+ * The form is unauthenticated and triggers two outbound emails per call,
+ * so the budget needs to be tight enough to neutralise spammers while
+ * still letting a legitimate visitor retry after a typo.
+ */
+export const contactSalesLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: json429,
+});

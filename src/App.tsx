@@ -10,6 +10,7 @@ import { api } from './lib/api';
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
+const ContactSalesModal   = lazy(() => import('./components/contact/ContactSalesModal'));
 
 // ─── Lazy-load every route ────────────────────────────────
 // Each page becomes a separate chunk loaded only when navigated to.
@@ -336,6 +337,7 @@ function PageLoader() {
 function ChatWidget() {
   const { pathname } = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isContactOpen, setIsContactOpen] = useState(false);
   const language = pathname.startsWith('/he') ? 'he' : 'en';
 
   // Hide on admin pages
@@ -346,7 +348,7 @@ function ChatWidget() {
     <LanguageProvider language={language}>
       {!isChatOpen && (
         <Suspense fallback={null}>
-          <ContactSalesButton onClick={() => setIsChatOpen(true)} />
+          <ContactSalesButton onClick={() => setIsContactOpen(true)} />
         </Suspense>
       )}
       {isChatOpen && (
@@ -355,6 +357,11 @@ function ChatWidget() {
             onClose={() => setIsChatOpen(false)}
             onMinimize={() => setIsChatOpen(false)}
           />
+        </Suspense>
+      )}
+      {isContactOpen && (
+        <Suspense fallback={null}>
+          <ContactSalesModal open={isContactOpen} onClose={() => setIsContactOpen(false)} />
         </Suspense>
       )}
     </LanguageProvider>
