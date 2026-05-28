@@ -23,7 +23,6 @@ export interface WalletProfileView {
   lifeStage?: string;
   motivation?: string;
   purpose?: string[];
-  benefitCategories?: string[];
   inviteFriendsSent?: number;
   completedAt?: string;
   updatedAt?: string;
@@ -53,7 +52,6 @@ export async function getWalletProfile(
     lifeStage: p.lifeStage,
     motivation: p.motivation,
     purpose: p.purpose,
-    benefitCategories: p.benefitCategories,
     inviteFriendsSent: p.inviteFriendsSent,
     completedAt: p.completedAt instanceof Date ? p.completedAt.toISOString() : undefined,
     updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : undefined,
@@ -80,7 +78,6 @@ export async function patchWalletProfile(
   if (args.patch.lifeStage !== undefined) set['profile.lifeStage'] = args.patch.lifeStage;
   if (args.patch.motivation !== undefined) set['profile.motivation'] = args.patch.motivation;
   if (args.patch.purpose !== undefined) set['profile.purpose'] = args.patch.purpose;
-  if (args.patch.benefitCategories !== undefined) set['profile.benefitCategories'] = args.patch.benefitCategories;
   if (args.patch.inviteFriendsSent !== undefined) set['profile.inviteFriendsSent'] = args.patch.inviteFriendsSent;
   if (args.patch.complete === true) set['profile.completedAt'] = now;
 

@@ -14,7 +14,6 @@ export const walletProfilePatchSchema = z.object({
   lifeStage: z.string().trim().min(1).max(100).optional(),
   motivation: z.string().trim().min(1).max(200).optional(),
   purpose: z.array(z.string().trim().min(1).max(100)).max(20).optional(),
-  benefitCategories: z.array(z.string().trim().min(1).max(100)).max(50).optional(),
   inviteFriendsSent: z.number().int().min(0).max(10000).optional(),
   /** Set to true to stamp completedAt and gate the slide chain for returning users. */
   complete: z.boolean().optional(),
