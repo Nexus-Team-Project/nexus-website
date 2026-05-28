@@ -46,16 +46,47 @@ const EMPTY_STATE: ContactFormState = {
 /**
  * Lock document body scroll while the modal is open and restore it on close.
  *
+ * Setting `body { overflow: hidden }` alone is enough on desktop and on
+ * Android Chrome, but mobile Safari (iOS) ignores it for finger-drag
+ * scrolling. The cross-platform fix is to pin the body in place with
+ * `position: fixed`, preserve the visitor's scroll offset via a negative
+ * `top`, and force `width: 100%` so the page does not reflow. On close we
+ * restore every style we touched and scroll the window back to the saved
+ * offset so the page never jumps.
+ *
  * Inputs: a boolean signalling whether the modal is currently visible.
  * Output: side effect only; no return value.
  */
 function useBodyScrollLock(active: boolean): void {
   useEffect(() => {
     if (!active) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const { body } = document;
+    const scrollY = window.scrollY;
+
+    const prev = {
+      position: body.style.position,
+      top: body.style.top,
+      left: body.style.left,
+      right: body.style.right,
+      width: body.style.width,
+      overflow: body.style.overflow,
+    };
+
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollY}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.style.overflow = 'hidden';
+
     return () => {
-      document.body.style.overflow = previous;
+      body.style.position = prev.position;
+      body.style.top = prev.top;
+      body.style.left = prev.left;
+      body.style.right = prev.right;
+      body.style.width = prev.width;
+      body.style.overflow = prev.overflow;
+      window.scrollTo(0, scrollY);
     };
   }, [active]);
 }
@@ -188,7 +219,7 @@ export default function ContactSalesModal({ open, onClose }: ContactSalesModalPr
       />
 
       {/* Panel */}
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl max-h-[92vh] flex flex-col overflow-hidden [overscroll-behavior:contain]">
         <div className="flex items-start justify-between gap-4 px-6 pt-6 pb-3">
           <div className="min-w-0">
             <h2 id="contact-sales-title" className="text-xl font-bold text-slate-900">
