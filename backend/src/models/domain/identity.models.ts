@@ -71,7 +71,6 @@ export const walletProfileSchema = z.object({
   lifeStage: z.string().min(1).max(100).optional(),
   motivation: z.string().min(1).max(200).optional(),
   purpose: z.array(z.string().min(1).max(100)).max(20).optional(),
-  benefitCategories: z.array(z.string().min(1).max(100)).max(50).optional(),
   inviteFriendsSent: z.number().int().min(0).optional(),
   completedAt: z.date().optional(),
   updatedAt: z.date(),
