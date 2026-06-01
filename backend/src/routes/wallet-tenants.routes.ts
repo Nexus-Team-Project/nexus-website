@@ -15,6 +15,7 @@ import { authenticate } from '../middleware/authenticate';
 import { getMongoDb } from '../config/mongo';
 import { discoverTenants } from '../services/wallet/tenant-discovery.service';
 import { getEcosystemCatalogForWallet } from '../services/wallet/ecosystem-catalog.service';
+import { setWalletDefaultTenant } from '../services/wallet/wallet-default-tenant.service';
 import {
   createJoinRequests,
   listMyJoinRequests,
@@ -213,6 +214,43 @@ router.get('/join-requests/mine', authenticate, async (req: Request, res: Respon
     res.json({ requests: rows });
   } catch (e) {
     console.error('[wallet-tenants] list-mine failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// Set the caller's default landing context. null => Nexus (ecosystem)
+// catalog; a string => a tenantId the caller belongs to (re-checked
+// server-side in the service). Caller identity is derived from the
+// authenticated session, never from the request body.
+const defaultTenantSchema = z.object({
+  tenantId: z.string().min(1).max(200).nullable(),
+});
+
+router.patch('/default-tenant', authenticate, async (req: Request, res: Response) => {
+  const parsed = defaultTenantSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_request' });
+    return;
+  }
+  try {
+    const me = await getCallingNexusIdentity(req);
+    if (!me) {
+      res.status(404).json({ error: 'identity_not_found' });
+      return;
+    }
+    const db = await getMongoDb();
+    await setWalletDefaultTenant(db, {
+      nexusIdentityId: me.nexusIdentityId,
+      tenantId: parsed.data.tenantId,
+    });
+    res.json({ ok: true, defaultTenantId: parsed.data.tenantId });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    if (msg === 'not_a_member') {
+      res.status(403).json({ error: 'not_a_member' });
+      return;
+    }
+    console.error('[wallet-tenants] set default-tenant failed:', e);
     res.status(500).json({ error: 'internal_error' });
   }
 });

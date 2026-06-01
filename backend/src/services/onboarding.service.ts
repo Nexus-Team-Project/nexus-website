@@ -93,6 +93,12 @@ export interface MeResponse {
   memberships?: import('./auth/wallet-me-router.service').MembershipSummary[];
   isPlatformAdmin?: boolean;
   canOpenDashboard?: boolean;
+  /**
+   * Effective default landing context for a returning member (a tenantId,
+   * or null for the Nexus ecosystem catalog). Drives resolvePostLogin when
+   * the user logs in without a ?tenant in the URL.
+   */
+  defaultTenantId?: string | null;
   router?: import('./auth/wallet-me-router.service').WalletMeRouter['router'];
   /**
    * Wallet profile sub-doc (Plan #3). completedAt is the gate the
@@ -459,6 +465,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
     memberships: walletRouter.memberships,
     isPlatformAdmin: walletRouter.isPlatformAdmin,
     canOpenDashboard: walletRouter.canOpenDashboard,
+    defaultTenantId: walletRouter.defaultTenantId,
     router: walletRouter.router,
     profile: walletProfile,
   };
