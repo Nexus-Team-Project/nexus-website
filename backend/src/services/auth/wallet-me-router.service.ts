@@ -23,8 +23,16 @@ export interface MembershipSummary {
   tenantName: string;
   /** Public logo URL of the tenant, when set on domainTenants. */
   logoUrl?: string;
+  /** The collapsed primary role (admin beats member when both are held). */
   role: string;
   isPrivilegedRole: boolean;
+  /**
+   * Whether the user holds the 'member' role in this tenant (independent of
+   * also holding a privileged role). The wallet uses THIS - not
+   * !isPrivilegedRole - to decide whether the tenant's catalog is browsable,
+   * so a user who is both admin AND member still sees the catalog.
+   */
+  isMember: boolean;
 }
 
 export interface MemberTenantSummary {
@@ -118,12 +126,13 @@ export async function computeWalletMeRouter(
         logoUrl: logoByTenant.get(tenantId),
         role,
         isPrivilegedRole: PRIVILEGED_NON_MEMBER(role),
+        isMember: roles.includes('member'),
       });
     }
   }
 
   const memberTenants: MemberTenantSummary[] = memberships
-    .filter((m) => !m.isPrivilegedRole)
+    .filter((m) => m.isMember)
     .map((m) => ({ tenantId: m.tenantId, tenantName: m.tenantName }));
   const canOpenDashboard = isPlatformAdmin || memberships.some((m) => m.isPrivilegedRole);
 
@@ -135,8 +144,12 @@ export async function computeWalletMeRouter(
     { projection: { walletDefaultTenantId: 1 } },
   );
   const storedDefault = (identityDoc as { walletDefaultTenantId?: string } | null)?.walletDefaultTenantId;
-  const membershipTenantIds = new Set(memberships.map((m) => m.tenantId));
-  const defaultTenantId = resolveDefaultTenant(storedDefault, membershipTenantIds, allRoles);
+  // Wallet is member-facing: only 'member'-role tenants are valid landing
+  // contexts. Tenants the user merely administers (privileged roles) are NOT
+  // wallet member contexts - those belong in the dashboard - so they never
+  // become a default and a privileged-only user defaults to the ecosystem.
+  const memberTenantIds = new Set(memberTenants.map((t) => t.tenantId));
+  const defaultTenantId = resolveDefaultTenant(storedDefault, memberTenantIds, allRoles);
 
   return {
     memberships,
