@@ -64,6 +64,13 @@ export const domainTenantSchema = z.object({
   plan: z.enum(TENANT_PLANS).default('basic'),
   createdByIdentityId: z.string().min(1),
   goLiveCompletedAt: z.date().optional(),
+  /**
+   * When true (the default), wallet join requests for this tenant are accepted
+   * automatically - the requester becomes a member immediately with no admin
+   * action. When false, requests stay pending for manual approve/deny from the
+   * dashboard. Absent on tenants created before this field = treated as true.
+   */
+  autoAcceptJoinRequests: z.boolean().default(true),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

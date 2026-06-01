@@ -195,6 +195,19 @@ router.post('/join-requests', authenticate, async (req: Request, res: Response) 
         console.error('[join-request] admin notify failed (non-fatal):', err),
       );
     }
+    // Auto-accepted requests: email the joiner their "you've joined" approval.
+    // No admin email - the tenant opted into auto-accept, nothing to action.
+    for (const tenantId of out.autoAccepted) {
+      void notifyRequesterOfDecision({
+        db,
+        tenantId,
+        nexusIdentityId: me.nexusIdentityId,
+        decision: 'approved',
+        requesterEmail: me.email,
+      }).catch((err) =>
+        console.error('[join-request] auto-accept email failed (non-fatal):', err),
+      );
+    }
     res.json(out);
   } catch (e) {
     console.error('[wallet-tenants] create-join failed:', e);
@@ -258,6 +271,54 @@ router.patch('/default-tenant', authenticate, async (req: Request, res: Response
 // ── Tenant admin endpoints ──────────────────────────────────────────────────
 
 export const tenantJoinAdminRouter = Router();
+
+// Auto-accept setting. Registered BEFORE '/join-requests/:id' so 'settings'
+// is never matched as a request id.
+tenantJoinAdminRouter.get('/join-requests/settings', authenticate, async (req: Request, res: Response) => {
+  try {
+    const ctx = await resolveAdminTenantForJoinRequests(req, 'team.view_members');
+    const db = await getMongoDb();
+    const tenant = await db
+      .collection<{ tenantId: string; autoAcceptJoinRequests?: boolean }>(DOMAIN_COLLECTIONS.domainTenants)
+      .findOne({ tenantId: ctx.tenantId }, { projection: { autoAcceptJoinRequests: 1 } });
+    res.json({ autoAcceptEnabled: tenant?.autoAcceptJoinRequests ?? true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    if (msg.includes('forbidden') || msg.includes('permission')) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    console.error('[wallet-tenants] get join settings failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+const autoAcceptSchema = z.object({ autoAcceptEnabled: z.boolean() });
+
+tenantJoinAdminRouter.patch('/join-requests/settings', authenticate, async (req: Request, res: Response) => {
+  const parsed = autoAcceptSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_payload' });
+    return;
+  }
+  try {
+    const ctx = await resolveAdminTenantForJoinRequests(req, 'team.invite_member');
+    const db = await getMongoDb();
+    await db.collection(DOMAIN_COLLECTIONS.domainTenants).updateOne(
+      { tenantId: ctx.tenantId },
+      { $set: { autoAcceptJoinRequests: parsed.data.autoAcceptEnabled, updatedAt: new Date() } },
+    );
+    res.json({ autoAcceptEnabled: parsed.data.autoAcceptEnabled });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    if (msg.includes('forbidden') || msg.includes('permission')) {
+      res.status(403).json({ error: 'forbidden' });
+      return;
+    }
+    console.error('[wallet-tenants] set join settings failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
 
 tenantJoinAdminRouter.get('/join-requests', authenticate, async (req: Request, res: Response) => {
   try {

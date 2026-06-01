@@ -30,6 +30,88 @@ export interface CreateJoinResult {
   skipped: Array<{ tenantId: string; reason: string }>;
 }
 
+/** Sentinel grantedBy value when a membership is created by auto-accept. */
+const SYSTEM_AUTO_ACCEPT = 'system_auto_accept';
+
+/**
+ * Idempotently create the membership records for a user joining a tenant:
+ * tenantUserRoles (role 'member'), tenantMembers (status active), and
+ * tenantContacts (status active). Shared by manual approval and auto-accept so
+ * both produce identical state. Mirrors the invite-accept flow.
+ *
+ * @param args.grantedByIdentityId the approving admin, or SYSTEM_AUTO_ACCEPT.
+ */
+export async function materializeTenantMembership(
+  db: Db,
+  args: {
+    tenantId: string;
+    nexusIdentityId: string;
+    email: string;
+    displayName?: string;
+    grantedByIdentityId: string;
+  },
+): Promise<void> {
+  const now = new Date();
+  await db.collection(DOMAIN_COLLECTIONS.tenantUserRoles).updateOne(
+    { nexusIdentityId: args.nexusIdentityId, tenantId: args.tenantId, role: 'member' },
+    {
+      $setOnInsert: {
+        tenantUserRoleId: `tur_${randomUUID()}`,
+        nexusIdentityId: args.nexusIdentityId,
+        tenantId: args.tenantId,
+        role: 'member',
+        grantedByIdentityId: args.grantedByIdentityId,
+        createdAt: now,
+      },
+      $set: { updatedAt: now },
+    },
+    { upsert: true },
+  );
+  await db.collection(DOMAIN_COLLECTIONS.tenantMembers).updateOne(
+    { nexusIdentityId: args.nexusIdentityId, tenantId: args.tenantId },
+    {
+      $setOnInsert: {
+        tenantMemberId: `tenant_member_${randomUUID()}`,
+        nexusIdentityId: args.nexusIdentityId,
+        tenantId: args.tenantId,
+        services: [],
+        createdAt: now,
+      },
+      $set: { status: 'active', updatedAt: now, email: args.email },
+    },
+    { upsert: true },
+  );
+  // Mirror the invite-accept flow: an approved member must also appear in the
+  // tenant's Contacts tab.
+  await db.collection(DOMAIN_COLLECTIONS.tenantContacts).updateOne(
+    { tenantId: args.tenantId, normalizedEmail: args.email },
+    {
+      $setOnInsert: {
+        tenantContactId: `tenant_contact_${randomUUID()}`,
+        tenantId: args.tenantId,
+        email: args.email,
+        normalizedEmail: args.email,
+        displayName: args.displayName ?? args.email.split('@')[0],
+        nexusIdentityId: args.nexusIdentityId,
+        createdAt: now,
+      },
+      $set: { status: 'active', lastActivityAt: now, updatedAt: now },
+    },
+    { upsert: true },
+  );
+}
+
+/**
+ * Read a tenant's auto-accept-join-requests setting. Absent (tenants created
+ * before the field existed) is treated as ON, matching the schema default.
+ */
+async function tenantAutoAcceptsJoinRequests(db: Db, tenantId: string): Promise<boolean> {
+  const tenant = await db
+    .collection<{ tenantId: string; autoAcceptJoinRequests?: boolean }>(DOMAIN_COLLECTIONS.domainTenants)
+    .findOne({ tenantId }, { projection: { autoAcceptJoinRequests: 1 } });
+  return tenant?.autoAcceptJoinRequests ?? true;
+}
+
 export async function createJoinRequests(
   db: Db,
   args: {
@@ -72,7 +154,35 @@ export async function createJoinRequests(
       }
     }
 
-    // 2) Otherwise insert pending. Unique index blocks duplicate pendings.
+    // 2) Auto-accept by tenant setting (default ON): make them a member now,
+    //    exactly as a manual approval would, and record an auto_accepted row.
+    if (await tenantAutoAcceptsJoinRequests(db, tenantId)) {
+      try {
+        await materializeTenantMembership(db, {
+          tenantId,
+          nexusIdentityId: args.nexusIdentityId,
+          email: args.email,
+          displayName: args.displayName,
+          grantedByIdentityId: SYSTEM_AUTO_ACCEPT,
+        });
+        out.autoAccepted.push(tenantId);
+        await db.collection<TenantJoinRequestDocument>(TENANT_JOIN_REQUEST_COLLECTION).insertOne({
+          nexusIdentityId: args.nexusIdentityId,
+          tenantId,
+          email: args.email,
+          displayName: args.displayName,
+          status: 'auto_accepted',
+          createdAt: now,
+          decidedAt: now,
+        });
+        continue;
+      } catch (e) {
+        // Fall through to a pending request if auto-accept hit an error.
+        console.error('[join-request] auto-accept-by-setting failed for', tenantId, e);
+      }
+    }
+
+    // 3) Otherwise insert pending. Unique index blocks duplicate pendings.
     try {
       await db.collection<TenantJoinRequestDocument>(TENANT_JOIN_REQUEST_COLLECTION).insertOne({
         nexusIdentityId: args.nexusIdentityId,
@@ -168,57 +278,14 @@ export async function approveJoinRequest(
   if (doc.status !== 'pending') throw new Error(`request_${doc.status}`);
 
   const now = new Date();
-  // Idempotent upserts.
-  await db.collection(DOMAIN_COLLECTIONS.tenantUserRoles).updateOne(
-    { nexusIdentityId: doc.nexusIdentityId, tenantId: doc.tenantId, role: 'member' },
-    {
-      $setOnInsert: {
-        tenantUserRoleId: `tur_${randomUUID()}`,
-        nexusIdentityId: doc.nexusIdentityId,
-        tenantId: doc.tenantId,
-        role: 'member',
-        grantedByIdentityId: args.adminIdentityId,
-        createdAt: now,
-      },
-      $set: { updatedAt: now },
-    },
-    { upsert: true },
-  );
-  await db.collection(DOMAIN_COLLECTIONS.tenantMembers).updateOne(
-    { nexusIdentityId: doc.nexusIdentityId, tenantId: doc.tenantId },
-    {
-      $setOnInsert: {
-        tenantMemberId: `tenant_member_${randomUUID()}`,
-        nexusIdentityId: doc.nexusIdentityId,
-        tenantId: doc.tenantId,
-        services: [],
-        createdAt: now,
-      },
-      $set: { status: 'active', updatedAt: now, email: doc.email },
-    },
-    { upsert: true },
-  );
-
-  // Mirror the invite-accept flow: an approved member must also appear
-  // in the tenant's Contacts tab. Without this upsert, /api/v1/tenant/
-  // contacts returns the contacts collection unchanged and the new
-  // member is invisible to the admin until they manually add them.
-  await db.collection(DOMAIN_COLLECTIONS.tenantContacts).updateOne(
-    { tenantId: doc.tenantId, normalizedEmail: doc.email },
-    {
-      $setOnInsert: {
-        tenantContactId: `tenant_contact_${randomUUID()}`,
-        tenantId: doc.tenantId,
-        email: doc.email,
-        normalizedEmail: doc.email,
-        displayName: doc.displayName ?? doc.email.split('@')[0],
-        nexusIdentityId: doc.nexusIdentityId,
-        createdAt: now,
-      },
-      $set: { status: 'active', lastActivityAt: now, updatedAt: now },
-    },
-    { upsert: true },
-  );
+  // Create the membership records (idempotent) - shared with auto-accept.
+  await materializeTenantMembership(db, {
+    tenantId: doc.tenantId,
+    nexusIdentityId: doc.nexusIdentityId,
+    email: doc.email,
+    displayName: doc.displayName,
+    grantedByIdentityId: args.adminIdentityId,
+  });
 
   await col.updateOne(
     { _id: doc._id },
