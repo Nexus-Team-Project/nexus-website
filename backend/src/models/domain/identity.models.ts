@@ -100,6 +100,15 @@ export const nexusIdentitySchema = z.object({
   emailVerifiedAt: z.date().optional(),
   marketingConsent: marketingConsentSchema.optional(),
   /**
+   * Wallet default landing context for returning members. A tenantId
+   * (land on that tenant's catalog), the literal 'ecosystem' (land on the
+   * Nexus catalog), or absent (smart default = last-joined tenant). The
+   * effective value is computed in computeWalletMeRouter and surfaced as
+   * /api/me defaultTenantId; the member changes it from the wallet's
+   * avatar/settings menu via PATCH /api/v1/wallet/default-tenant.
+   */
+  walletDefaultTenantId: z.string().min(1).max(200).optional(),
+  /**
    * Wallet onboarding profile (Plan #3). Optional - new identities
    * created via Google or email-OTP start without a profile and fill
    * it through the wallet slide chain.

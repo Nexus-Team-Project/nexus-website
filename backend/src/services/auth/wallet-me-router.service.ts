@@ -21,8 +21,18 @@ import { getTenantDomainCollections } from '../../models/domain/tenant.models';
 export interface MembershipSummary {
   tenantId: string;
   tenantName: string;
+  /** Public logo URL of the tenant, when set on domainTenants. */
+  logoUrl?: string;
+  /** The collapsed primary role (admin beats member when both are held). */
   role: string;
   isPrivilegedRole: boolean;
+  /**
+   * Whether the user holds the 'member' role in this tenant (independent of
+   * also holding a privileged role). The wallet uses THIS - not
+   * !isPrivilegedRole - to decide whether the tenant's catalog is browsable,
+   * so a user who is both admin AND member still sees the catalog.
+   */
+  isMember: boolean;
 }
 
 export interface MemberTenantSummary {
@@ -34,6 +44,13 @@ export interface WalletMeRouter {
   memberships: MembershipSummary[];
   isPlatformAdmin: boolean;
   canOpenDashboard: boolean;
+  /**
+   * Effective default landing context for a returning member: a tenantId
+   * to land on that tenant's catalog, or null for the Nexus (ecosystem)
+   * catalog. Resolves the member's explicit choice (walletDefaultTenantId)
+   * when still valid, else the last-joined tenant, else ecosystem (null).
+   */
+  defaultTenantId: string | null;
   router: {
     showMemberTenants: MemberTenantSummary[];
     showAdminEntry: boolean;
@@ -80,13 +97,16 @@ export async function computeWalletMeRouter(
     const tenantDocs = await domainTenants
       .find(
         { tenantId: { $in: tenantIds } },
-        { projection: { tenantId: 1, organizationName: 1 } },
+        { projection: { tenantId: 1, organizationName: 1, logoUrl: 1 } },
       )
       .toArray();
     const nameByTenant = new Map<string, string>();
+    const logoByTenant = new Map<string, string>();
     for (const t of tenantDocs) {
       const raw = (t as { organizationName?: string }).organizationName;
       nameByTenant.set(t.tenantId, raw && raw.trim() ? raw : 'Tenant');
+      const logo = (t as { logoUrl?: string }).logoUrl;
+      if (logo && logo.trim()) logoByTenant.set(t.tenantId, logo);
     }
     // Collapse to one row per tenant - prefer the most privileged role
     // when a user holds multiple roles in the same tenant.
@@ -103,21 +123,39 @@ export async function computeWalletMeRouter(
         tenantId,
         // Never expose a raw Mongo tenantId - prefer a localized fallback.
         tenantName: nameByTenant.get(tenantId) ?? 'Tenant',
+        logoUrl: logoByTenant.get(tenantId),
         role,
         isPrivilegedRole: PRIVILEGED_NON_MEMBER(role),
+        isMember: roles.includes('member'),
       });
     }
   }
 
   const memberTenants: MemberTenantSummary[] = memberships
-    .filter((m) => !m.isPrivilegedRole)
+    .filter((m) => m.isMember)
     .map((m) => ({ tenantId: m.tenantId, tenantName: m.tenantName }));
   const canOpenDashboard = isPlatformAdmin || memberships.some((m) => m.isPrivilegedRole);
+
+  // Effective default landing context (returning members). Read the
+  // member's explicit choice, then fall back to the last-joined tenant.
+  const { nexusIdentities } = getIdentityDomainCollections(db);
+  const identityDoc = await nexusIdentities.findOne(
+    { nexusIdentityId: args.nexusIdentityId },
+    { projection: { walletDefaultTenantId: 1 } },
+  );
+  const storedDefault = (identityDoc as { walletDefaultTenantId?: string } | null)?.walletDefaultTenantId;
+  // Wallet is member-facing: only 'member'-role tenants are valid landing
+  // contexts. Tenants the user merely administers (privileged roles) are NOT
+  // wallet member contexts - those belong in the dashboard - so they never
+  // become a default and a privileged-only user defaults to the ecosystem.
+  const memberTenantIds = new Set(memberTenants.map((t) => t.tenantId));
+  const defaultTenantId = resolveDefaultTenant(storedDefault, memberTenantIds, allRoles);
 
   return {
     memberships,
     isPlatformAdmin,
     canOpenDashboard,
+    defaultTenantId,
     router: {
       showMemberTenants: memberTenants,
       showAdminEntry: canOpenDashboard,
@@ -125,6 +163,47 @@ export async function computeWalletMeRouter(
       showJoinRequest: true,
     },
   };
+}
+
+/**
+ * Resolve the effective default landing tenant for a returning member.
+ *
+ * @param stored      the member's explicit choice: a tenantId, the literal
+ *                    'ecosystem', or undefined when never set.
+ * @param memberTenantIds tenantIds the member currently belongs to.
+ * @param roles       the member's tenantUserRole rows (carry createdAt).
+ * @returns a tenantId to land on, or null for the ecosystem catalog.
+ *
+ * Order: an explicit 'ecosystem' wins; an explicit tenant wins while still
+ * a member; otherwise the last-joined tenant (latest per-tenant earliest
+ * role createdAt); otherwise null (no memberships → ecosystem).
+ */
+function resolveDefaultTenant(
+  stored: string | undefined,
+  memberTenantIds: Set<string>,
+  roles: Array<{ tenantId: string | null; createdAt: Date }>,
+): string | null {
+  if (stored === 'ecosystem') return null;
+  if (stored && memberTenantIds.has(stored)) return stored;
+  // Last-joined: per tenant, take the earliest role createdAt (when they
+  // joined that tenant), then pick the tenant whose join time is latest.
+  const joinedAtByTenant = new Map<string, number>();
+  for (const r of roles) {
+    if (!r.tenantId || !memberTenantIds.has(r.tenantId)) continue;
+    const t = r.createdAt instanceof Date ? r.createdAt.getTime() : new Date(r.createdAt).getTime();
+    if (!Number.isFinite(t)) continue;
+    const prev = joinedAtByTenant.get(r.tenantId);
+    if (prev === undefined || t < prev) joinedAtByTenant.set(r.tenantId, t);
+  }
+  let best: string | null = null;
+  let bestTime = -Infinity;
+  for (const [tenantId, t] of joinedAtByTenant) {
+    if (t > bestTime) {
+      bestTime = t;
+      best = tenantId;
+    }
+  }
+  return best;
 }
 
 /**

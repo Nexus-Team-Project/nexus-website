@@ -75,6 +75,9 @@ export async function syncDomainTenantMembership(input: LegacyTenantMembershipSy
           createdByIdentityId: input.nexusIdentityId,
           // New tenants start on the basic plan. Upgrade via MongoDB or PayMe billing.
           plan: 'basic' as const,
+          // New tenants auto-accept wallet join requests by default; a tenant
+          // admin can switch to manual approval from the dashboard.
+          autoAcceptJoinRequests: true,
           createdAt: input.tenant.createdAt,
         },
         $set: {
