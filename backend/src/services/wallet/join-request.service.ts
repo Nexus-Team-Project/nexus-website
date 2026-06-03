@@ -23,6 +23,7 @@ import {
 } from '../../models/auth/tenant-join-request.models';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import { markTenantMemberInvitationAccepted } from '../domain-member-invitation-read.service';
+import { activeCatalogTenantIds } from './tenant-discovery.service';
 
 export interface CreateJoinResult {
   created: string[];
@@ -124,6 +125,12 @@ export async function createJoinRequests(
   const out: CreateJoinResult = { created: [], autoAccepted: [], skipped: [] };
   const now = new Date();
 
+  // Tenants without an active Benefits Catalog cannot be joined from the wallet
+  // (they are shown as "soon"). One query for the whole batch; the per-tenant
+  // guard below rejects any that are not active, unless the user already holds a
+  // direct invitation from that tenant (which is honored regardless).
+  const activeCatalog = await activeCatalogTenantIds(db, args.tenantIds);
+
   for (const tenantId of args.tenantIds) {
     // 1) Auto-accept any pending non-expired invitation match.
     const invite = await db
@@ -154,7 +161,17 @@ export async function createJoinRequests(
       }
     }
 
-    // 2) Auto-accept by tenant setting (default ON): make them a member now,
+    // 2) Block join requests to tenants that have not activated their Benefits
+    //    Catalog. They are listed in the wallet as "soon" but not joinable; this
+    //    is the server-side enforcement of that rule (frontend only disables the
+    //    row). A direct invitation above is the one exception and already
+    //    short-circuited via `continue`.
+    if (!activeCatalog.has(tenantId)) {
+      out.skipped.push({ tenantId, reason: 'catalog_inactive' });
+      continue;
+    }
+
+    // 3) Auto-accept by tenant setting (default ON): make them a member now,
     //    exactly as a manual approval would, and record an auto_accepted row.
     if (await tenantAutoAcceptsJoinRequests(db, tenantId)) {
       try {
@@ -182,7 +199,7 @@ export async function createJoinRequests(
       }
     }
 
-    // 3) Otherwise insert pending. Unique index blocks duplicate pendings.
+    // 4) Otherwise insert pending. Unique index blocks duplicate pendings.
     try {
       await db.collection<TenantJoinRequestDocument>(TENANT_JOIN_REQUEST_COLLECTION).insertOne({
         nexusIdentityId: args.nexusIdentityId,
