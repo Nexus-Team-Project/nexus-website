@@ -19,6 +19,13 @@ export interface DiscoverableTenant {
   tenantId: string;
   tenantName: string;
   logoUrl?: string;
+  /**
+   * Whether the tenant has an active Benefits Catalog. Tenants without it are
+   * still listed (so members can see them coming) but cannot be joined yet —
+   * the wallet renders them as a non-clickable "soon" row and the join-request
+   * endpoint rejects them.
+   */
+  catalogActive: boolean;
 }
 
 /**
@@ -59,14 +66,44 @@ export async function discoverTenants(
     .limit(cap)
     .toArray();
 
-  return docs
+  const named = docs
     // Drop anonymous / unnamed workspaces - they would render as
     // 'Tenant' with no way to disambiguate. Once tenants must always
     // have an organizationName at create-time this filter is a no-op.
-    .filter((d) => (d.organizationName ?? '').trim().length > 0)
-    .map((d) => ({
-      tenantId: d.tenantId,
-      tenantName: d.organizationName!.trim(),
-      ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
-    }));
+    .filter((d) => (d.organizationName ?? '').trim().length > 0);
+
+  // Which of these tenants have an ACTIVE Benefits Catalog? Only those can be
+  // joined; the rest are listed as "soon". One query over the candidate set.
+  const activeCatalogIds = await activeCatalogTenantIds(
+    db,
+    named.map((d) => d.tenantId),
+  );
+
+  return named.map((d) => ({
+    tenantId: d.tenantId,
+    tenantName: d.organizationName!.trim(),
+    catalogActive: activeCatalogIds.has(d.tenantId),
+    ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
+  }));
+}
+
+/**
+ * Returns the subset of the given tenantIds that have an active Benefits
+ * Catalog (a tenantServiceActivations row with serviceKey 'benefits_catalog'
+ * and status 'active').
+ * @param db Mongo handle.
+ * @param tenantIds candidate tenantIds to check.
+ * @returns a Set of the tenantIds whose catalog is active.
+ */
+export async function activeCatalogTenantIds(
+  db: Db,
+  tenantIds: string[],
+): Promise<Set<string>> {
+  if (tenantIds.length === 0) return new Set();
+  const rows = await db
+    .collection<{ tenantId: string }>(DOMAIN_COLLECTIONS.tenantServiceActivations)
+    .find({ tenantId: { $in: tenantIds }, serviceKey: 'benefits_catalog', status: 'active' })
+    .project<{ tenantId: string }>({ tenantId: 1 })
+    .toArray();
+  return new Set(rows.map((r) => r.tenantId));
 }
