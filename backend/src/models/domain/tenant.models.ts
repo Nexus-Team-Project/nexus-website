@@ -122,6 +122,8 @@ export const tenantMemberDomainSchema = z.object({
   // Optional canonical Israeli mobile ("05XXXXXXXX"). Set from the invite
   // payload at invite time so it is already present when the invitee accepts.
   phone: z.string().regex(/^05\d{8}$/).optional(),
+  // True only when the member verified the number themselves (SMS / wallet OTP).
+  phoneVerified: z.boolean().optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -186,6 +188,9 @@ export const tenantContactSchema = z.object({
   // Canonical Israeli mobile number "05XXXXXXXX". Always stored in the local
   // 10-digit form; the API layer accepts +972 input and normalizes before save.
   phone: z.string().regex(/^05\d{8}$/).optional(),
+  // True only when the member verified this number themselves (SMS / wallet OTP).
+  // Tenant-entered or test-attached numbers are false.
+  phoneVerified: z.boolean().optional(),
   lastActivityAt: z.date().optional(),
   nexusIdentityId: z.string().optional(),
   createdAt: z.date(),

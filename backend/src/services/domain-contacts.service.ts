@@ -20,6 +20,12 @@ export interface TenantContactListItem {
   address: string | null;
   /** Canonical Israeli mobile number ("05XXXXXXXX") or null when not provided. */
   phone: string | null;
+  /**
+   * True only when the member verified this number themselves (SMS / wallet OTP).
+   * A tenant-entered or test-attached number is false — it is a guess until the
+   * user confirms it.
+   */
+  phoneVerified: boolean;
   lastActivityAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -64,6 +70,7 @@ function toListItem(doc: TenantContactDocument): TenantContactListItem {
     status: doc.status,
     address: doc.address ?? null,
     phone: doc.phone ?? null,
+    phoneVerified: doc.phoneVerified ?? false,
     lastActivityAt: doc.lastActivityAt ? doc.lastActivityAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -138,7 +145,8 @@ export async function createTenantContact(
         displayName: data.displayName,
         status: 'inactive', // all contacts start inactive; status advances via invite lifecycle
         ...(data.address !== undefined && { address: data.address }),
-        ...(data.phone !== undefined && { phone: data.phone }),
+        // A tenant-entered phone is a guess -> unverified until the user confirms.
+        ...(data.phone !== undefined && { phone: data.phone, phoneVerified: false }),
         updatedAt: now,
       },
     },
@@ -165,7 +173,8 @@ export async function updateTenantContact(
 
   const result = await col.findOneAndUpdate(
     { tenantContactId: contactId, tenantId: access.tenantId },
-    { $set: { ...data, updatedAt: new Date() } },
+    // Editing the phone resets verification — it is again a tenant-entered guess.
+    { $set: { ...data, ...(data.phone !== undefined ? { phoneVerified: false } : {}), updatedAt: new Date() } },
     { returnDocument: 'after' },
   );
 
@@ -216,7 +225,8 @@ export async function importTenantContacts(
             displayName: row.displayName ?? '',
             status: 'inactive', // all imported contacts start inactive
             ...(row.address !== undefined && { address: row.address }),
-            ...(row.phone !== undefined && { phone: row.phone }),
+            // Imported phones are tenant-supplied guesses -> unverified.
+            ...(row.phone !== undefined && { phone: row.phone, phoneVerified: false }),
             updatedAt: now,
           },
         },
