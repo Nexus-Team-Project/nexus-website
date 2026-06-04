@@ -9,12 +9,16 @@ import { startPhoneOtp, confirmPhoneOtpChallenge } from '../auth/phone-otp.servi
 import { attachPhoneToIdentity, requireIsraeliPhone } from './phone-attach.service';
 
 /**
- * Whether InforU SMS is configured. The test-attach path is only permitted when
- * it is NOT — a dev stopgap until the env vars are set; it must never run in
- * production once SMS is live.
+ * Whether the REAL wallet phone-OTP flow is enabled — an explicit ops flag that
+ * mirrors the frontend VITE_PHONE_OTP_ENABLED. When false (default) the dev
+ * test-attach path (attach without OTP) is permitted; when true it is rejected.
+ *
+ * Decoupled from whether InforU env is present: a team may have InforU
+ * credentials set while still wanting the test path during wiring-up. Flip this
+ * to 'true' (and VITE_PHONE_OTP_ENABLED) once real OTP should go live.
  */
-export function isInforuConfigured(): boolean {
-  return Boolean(process.env.INFORU_USER && process.env.INFORU_TOKEN);
+export function isWalletPhoneOtpEnabled(): boolean {
+  return process.env.WALLET_PHONE_OTP_ENABLED === 'true';
 }
 
 /**
@@ -51,8 +55,8 @@ export async function verifyWalletPhoneOtp(
 
 /**
  * TEST-ONLY: attach the phone WITHOUT an OTP (saved unverified). Exercises the
- * full DB write path while InforU is not configured. Route-gated by
- * isInforuConfigured(); never reachable once SMS is live.
+ * full DB write path while real OTP is off. Route-gated by
+ * isWalletPhoneOtpEnabled(); rejected once that flag is true.
  * @throws PhoneAttachError('phone_not_israeli' | 'phone_in_use').
  */
 export async function attachWalletPhoneTest(

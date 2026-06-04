@@ -18,7 +18,7 @@ import {
   startWalletPhoneOtp,
   verifyWalletPhoneOtp,
   attachWalletPhoneTest,
-  isInforuConfigured,
+  isWalletPhoneOtpEnabled,
 } from '../services/wallet/wallet-phone-otp.service';
 import { PhoneAttachError } from '../services/wallet/phone-attach.service';
 
@@ -81,8 +81,8 @@ router.post('/phone/verify', authenticate, async (req: Request, res: Response) =
 });
 
 router.post('/phone/attach-test', authenticate, async (req: Request, res: Response) => {
-  // Dev stopgap: only while InforU SMS is NOT configured.
-  if (isInforuConfigured()) { res.status(403).json({ error: 'test_disabled' }); return; }
+  // Dev stopgap: only while the real OTP flow is off (WALLET_PHONE_OTP_ENABLED).
+  if (isWalletPhoneOtpEnabled()) { res.status(403).json({ error: 'test_disabled' }); return; }
   const parsed = phoneSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'invalid_request' }); return; }
   try {
