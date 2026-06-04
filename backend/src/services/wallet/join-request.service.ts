@@ -53,6 +53,16 @@ export async function materializeTenantMembership(
   },
 ): Promise<void> {
   const now = new Date();
+  // Carry the identity's phone onto the tenant rows so the dashboard /users page
+  // shows it. NexusIdentity.phone is the source of truth (set when the user adds
+  // a phone in the wallet); absent for users who never added one.
+  const identityDoc = await db
+    .collection<{ nexusIdentityId: string; phone?: string; phoneVerifiedAt?: Date }>(DOMAIN_COLLECTIONS.nexusIdentities)
+    .findOne({ nexusIdentityId: args.nexusIdentityId }, { projection: { phone: 1, phoneVerifiedAt: 1 } });
+  const phone = identityDoc?.phone;
+  // The phone is "verified" on the row only if the user confirmed it via OTP.
+  const phoneFields = phone ? { phone, phoneVerified: !!identityDoc?.phoneVerifiedAt } : {};
+
   await db.collection(DOMAIN_COLLECTIONS.tenantUserRoles).updateOne(
     { nexusIdentityId: args.nexusIdentityId, tenantId: args.tenantId, role: 'member' },
     {
@@ -78,7 +88,7 @@ export async function materializeTenantMembership(
         services: [],
         createdAt: now,
       },
-      $set: { status: 'active', updatedAt: now, email: args.email },
+      $set: { status: 'active', updatedAt: now, email: args.email, ...phoneFields },
     },
     { upsert: true },
   );
@@ -96,7 +106,7 @@ export async function materializeTenantMembership(
         nexusIdentityId: args.nexusIdentityId,
         createdAt: now,
       },
-      $set: { status: 'active', lastActivityAt: now, updatedAt: now },
+      $set: { status: 'active', lastActivityAt: now, updatedAt: now, ...phoneFields },
     },
     { upsert: true },
   );

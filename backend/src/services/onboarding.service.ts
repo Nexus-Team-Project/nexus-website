@@ -106,6 +106,10 @@ export interface MeResponse {
    * slide chain and goes straight to RouterScreen.
    */
   profile?: import('./wallet/wallet-profile.service').WalletProfileView | null;
+  /** Canonical phone on the NexusIdentity (05XXXXXXXX), or null when unset. */
+  phone?: string | null;
+  /** ISO timestamp the phone was OTP-verified; null for a test-attached number. */
+  phoneVerifiedAt?: string | null;
 }
 
 /**
@@ -439,6 +443,14 @@ export async function getMe(userId: string): Promise<MeResponse> {
     email: user.email,
   });
 
+  // Surface the identity's phone (the canonical SMS-login store) so the wallet
+  // can display it and let the user edit it. phoneVerifiedAt is null for a
+  // test-attached number that never went through a real OTP.
+  const phoneDoc = await identityCollections.nexusIdentities.findOne(
+    { nexusIdentityId: domainIdentity.nexusIdentityId },
+    { projection: { phone: 1, phoneVerifiedAt: 1 } },
+  );
+
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
     context: {
@@ -468,6 +480,8 @@ export async function getMe(userId: string): Promise<MeResponse> {
     defaultTenantId: walletRouter.defaultTenantId,
     router: walletRouter.router,
     profile: walletProfile,
+    phone: phoneDoc?.phone ?? null,
+    phoneVerifiedAt: phoneDoc?.phoneVerifiedAt ? phoneDoc.phoneVerifiedAt.toISOString() : null,
   };
 }
 

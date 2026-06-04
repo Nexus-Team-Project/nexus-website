@@ -88,10 +88,19 @@ export async function startPhoneOtp(
  * @throws otp_invalid (bad code, malformed id, expired, already verified)
  *         or otp_locked
  */
-export async function verifyPhoneOtp(
+/**
+ * Confirm an OTP code against its challenge: validates the id, expiry, lock and
+ * the InforU RequestToken, increments attempts on a wrong code, and marks the
+ * challenge verified on success. Returns the challenge's phone. Shared by the
+ * login verify (below) and the wallet add-phone flow (attach to an existing
+ * identity) so both validate identically.
+ *
+ * @throws otp_invalid (bad id / code / expired / already used) or otp_locked.
+ */
+export async function confirmPhoneOtpChallenge(
   db: Db,
   args: { challengeId: string; code: string },
-): Promise<VerifyPhoneResult> {
+): Promise<{ phone: string }> {
   if (!ObjectId.isValid(args.challengeId)) throw new Error('otp_invalid');
   const col = db.collection<PhoneOtpChallenge>(PHONE_OTP_COLLECTION);
   const doc = await col.findOne({ _id: new ObjectId(args.challengeId) });
@@ -108,13 +117,21 @@ export async function verifyPhoneOtp(
     throw new Error('otp_invalid');
   }
   await col.updateOne({ _id: doc._id }, { $set: { verifiedAt: new Date() } });
+  return { phone: doc.phone };
+}
+
+export async function verifyPhoneOtp(
+  db: Db,
+  args: { challengeId: string; code: string },
+): Promise<VerifyPhoneResult> {
+  const { phone } = await confirmPhoneOtpChallenge(db, args);
 
   const identities = db.collection<{
     _id: ObjectId;
     normalizedEmail: string;
     prismaUserId?: string;
   }>(DOMAIN_COLLECTIONS.nexusIdentities);
-  const identity = await identities.findOne({ phone: doc.phone });
+  const identity = await identities.findOne({ phone });
   if (identity) {
     return {
       mode: 'logged_in',
@@ -123,8 +140,8 @@ export async function verifyPhoneOtp(
       prismaUserId: identity.prismaUserId ?? null,
     };
   }
-  const ticket = await createPhoneSignupTicket(db, doc.phone);
-  return { mode: 'phone_verified', signupTicketId: ticket.id, phone: doc.phone };
+  const ticket = await createPhoneSignupTicket(db, phone);
+  return { mode: 'phone_verified', signupTicketId: ticket.id, phone };
 }
 
 /**
