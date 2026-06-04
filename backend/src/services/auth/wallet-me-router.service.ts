@@ -23,6 +23,8 @@ export interface MembershipSummary {
   tenantName: string;
   /** Public logo URL of the tenant, when set on domainTenants. */
   logoUrl?: string;
+  /** Org brand color ("#rrggbb"), when set; drives the wallet first-login accent. */
+  brandColor?: string;
   /** The collapsed primary role (admin beats member when both are held). */
   role: string;
   isPrivilegedRole: boolean;
@@ -97,16 +99,19 @@ export async function computeWalletMeRouter(
     const tenantDocs = await domainTenants
       .find(
         { tenantId: { $in: tenantIds } },
-        { projection: { tenantId: 1, organizationName: 1, logoUrl: 1 } },
+        { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1 } },
       )
       .toArray();
     const nameByTenant = new Map<string, string>();
     const logoByTenant = new Map<string, string>();
+    const colorByTenant = new Map<string, string>();
     for (const t of tenantDocs) {
       const raw = (t as { organizationName?: string }).organizationName;
       nameByTenant.set(t.tenantId, raw && raw.trim() ? raw : 'Tenant');
       const logo = (t as { logoUrl?: string }).logoUrl;
       if (logo && logo.trim()) logoByTenant.set(t.tenantId, logo);
+      const color = (t as { brandColor?: string }).brandColor;
+      if (color && color.trim()) colorByTenant.set(t.tenantId, color);
     }
     // Collapse to one row per tenant - prefer the most privileged role
     // when a user holds multiple roles in the same tenant.
@@ -124,6 +129,7 @@ export async function computeWalletMeRouter(
         // Never expose a raw Mongo tenantId - prefer a localized fallback.
         tenantName: nameByTenant.get(tenantId) ?? 'Tenant',
         logoUrl: logoByTenant.get(tenantId),
+        brandColor: colorByTenant.get(tenantId),
         role,
         isPrivilegedRole: PRIVILEGED_NON_MEMBER(role),
         isMember: roles.includes('member'),

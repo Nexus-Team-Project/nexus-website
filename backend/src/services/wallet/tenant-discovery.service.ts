@@ -19,6 +19,8 @@ export interface DiscoverableTenant {
   tenantId: string;
   tenantName: string;
   logoUrl?: string;
+  /** Org brand color ("#rrggbb"), when set; keeps tenant cards on-brand. */
+  brandColor?: string;
   /**
    * Whether the tenant has an active Benefits Catalog. Tenants without it are
    * still listed (so members can see them coming) but cannot be joined yet —
@@ -53,14 +55,15 @@ export async function discoverTenants(
   }
 
   const docs = await db
-    .collection<{ tenantId: string; organizationName?: string; logoUrl?: string }>(
+    .collection<{ tenantId: string; organizationName?: string; logoUrl?: string; brandColor?: string }>(
       DOMAIN_COLLECTIONS.domainTenants,
     )
     .find(tenantFilter)
-    .project<{ tenantId: string; organizationName?: string; logoUrl?: string }>({
+    .project<{ tenantId: string; organizationName?: string; logoUrl?: string; brandColor?: string }>({
       tenantId: 1,
       organizationName: 1,
       logoUrl: 1,
+      brandColor: 1,
     })
     .sort({ organizationName: 1 })
     .limit(cap)
@@ -84,6 +87,7 @@ export async function discoverTenants(
     tenantName: d.organizationName!.trim(),
     catalogActive: activeCatalogIds.has(d.tenantId),
     ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
+    ...(d.brandColor ? { brandColor: d.brandColor } : {}),
   }));
 }
 

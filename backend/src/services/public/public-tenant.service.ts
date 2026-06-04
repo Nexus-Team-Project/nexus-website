@@ -12,6 +12,8 @@ export interface PublicTenantInfo {
   tenantId: string;
   organizationName: string;
   logoUrl?: string;
+  /** Org brand color ("#rrggbb"); drives the wallet first-login accent. */
+  brandColor?: string;
 }
 
 /**
@@ -40,5 +42,6 @@ export async function getPublicTenantInfo(
     tenantId,
     organizationName: tenant.organizationName as string,
     logoUrl: (tenant.logoUrl as string | undefined) ?? undefined,
+    brandColor: (tenant.brandColor as string | undefined) ?? undefined,
   };
 }

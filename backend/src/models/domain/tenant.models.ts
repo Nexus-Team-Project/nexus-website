@@ -58,6 +58,14 @@ export type TenantMemberInvitationStatus = typeof TENANT_MEMBER_INVITATION_STATU
 export const domainTenantSchema = z.object({
   tenantId: z.string().min(1),
   organizationName: z.string().min(1).max(255),
+  // Cloudinary URL of the organization logo. Absent -> the UI shows the
+  // tenant-name initials (only the Nexus ecosystem catalog uses the Nexus logo).
+  logoUrl: z.string().url().optional(),
+  // Organization brand color as a 6-digit hex (e.g. "#635bff"). This is the
+  // accent color wallet members see the first time they sign in to this
+  // tenant's benefits. Absent -> the wallet derives a deterministic color from
+  // the tenantId so every tenant still looks distinct.
+  brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   status: z.enum(TENANT_STATUSES),
   // Billing plan that controls how many non-member seats this tenant has.
   // Defaults to 'basic'. Updated manually in MongoDB until PayMe billing lands.
