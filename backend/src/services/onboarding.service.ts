@@ -82,6 +82,11 @@ export interface MeResponse {
   context: UserContext & {
     plan?: string;
     seats?: TenantSeats;
+    /** Cloudinary URL of the tenant's logo, or null -> the dashboard shows the
+     *  tenant-name initials. */
+    tenantLogoUrl?: string | null;
+    /** Org brand color ("#rrggbb"), or null -> wallet derives one from the id. */
+    tenantBrandColor?: string | null;
   };
   authorization: DashboardAuthorization;
   onboarding: OnboardingInfo;
@@ -451,10 +456,21 @@ export async function getMe(userId: string): Promise<MeResponse> {
     { projection: { phone: 1, phoneVerifiedAt: 1 } },
   );
 
+  // The tenant's logo + brand color for the dashboard header / branding UI
+  // (logo null -> initials; color null -> wallet derives one from the id).
+  const tenantBrandingDoc = context.tenantId
+    ? await getTenantDomainCollections(db).domainTenants.findOne(
+        { tenantId: context.tenantId },
+        { projection: { logoUrl: 1, brandColor: 1 } },
+      )
+    : null;
+
   return {
     user: { id: user.id, email: user.email, name: user.fullName },
     context: {
       ...context,
+      tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
+      tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
       ...(planSummary && {
         plan: planSummary.plan,
         seats: {

@@ -143,6 +143,53 @@ export async function uploadOfferImage(buffer: Buffer, filename: string): Promis
 }
 
 /**
+ * Uploads a tenant (organization) logo to Cloudinary under the
+ * `nexus/tenant-logos` folder using a signed REST request. A fresh unique
+ * public_id is used each time; callers delete the previous logo via
+ * deleteOfferImage (it works for any Cloudinary URL) so there are no orphans.
+ *
+ * Input:  buffer - raw (already square-cropped) image data; filename - original
+ *         name used to derive a readable public_id.
+ * Output: Promise resolving to the secure HTTPS URL.
+ * Throws: if CLOUDINARY_URL is unset or Cloudinary returns a non-2xx.
+ */
+export async function uploadTenantLogo(buffer: Buffer, filename: string): Promise<string> {
+  if (!env.CLOUDINARY_URL) {
+    throw new Error('CLOUDINARY_URL is not configured - tenant logo upload is unavailable');
+  }
+
+  const { apiKey, apiSecret, cloudName } = parseCloudinaryUrl(env.CLOUDINARY_URL);
+
+  const folder = 'nexus/tenant-logos';
+  const publicId = `${folder}/${Date.now()}-${sanitizeFilename(filename)}`;
+  const timestamp = String(Math.round(Date.now() / 1000));
+
+  const signedParams: Record<string, string> = { folder, public_id: publicId, timestamp };
+  const signature = buildSignature(signedParams, apiSecret);
+
+  const form = new FormData();
+  form.append('file', new Blob([buffer]));
+  form.append('api_key', apiKey);
+  form.append('timestamp', timestamp);
+  form.append('signature', signature);
+  form.append('folder', folder);
+  form.append('public_id', publicId);
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Cloudinary tenant-logo upload failed (HTTP ${res.status}): ${body}`);
+  }
+
+  const data = (await res.json()) as CloudinaryUploadResult;
+  return data.secure_url;
+}
+
+/**
  * Returns a static default placeholder image URL for offers that have no
  * uploaded image.
  *
