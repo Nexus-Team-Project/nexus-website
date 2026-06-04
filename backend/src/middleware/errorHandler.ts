@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodError } from 'zod';
 import { env } from '../config/env';
 
 export interface AppError extends Error {
@@ -12,6 +13,15 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  // Zod validation failures are client errors (400), not server errors. Without
+  // this they fall through to 500 "Internal server error", hiding the real cause.
+  if (err instanceof ZodError) {
+    if (res.headersSent) return;
+    const message = err.issues.map((i) => i.message).filter(Boolean).join('; ') || 'Invalid request';
+    res.status(400).json({ error: message });
+    return;
+  }
+
   const statusCode = err.statusCode ?? 500;
   const message = err.isOperational ? err.message : 'Internal server error';
 

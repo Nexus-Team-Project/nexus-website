@@ -59,6 +59,12 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     // Unique contact per tenant per email; sorted list by creation time.
     tenants.tenantContacts.createIndex({ tenantId: 1, normalizedEmail: 1 }, { unique: true }),
     tenants.tenantContacts.createIndex({ tenantId: 1, createdAt: -1 }),
+    // Backs filtering by custom column values (customFields.<fieldId>). Wildcard
+    // index so any dynamic custom-column path is covered without a fixed schema.
+    tenants.tenantContacts.createIndex({ 'customFields.$**': 1 }, { name: 'customFields_wildcard' }),
+    // Custom column definitions: unique id per tenant, ordered list per tenant.
+    tenants.tenantContactFields.createIndex({ tenantId: 1, fieldId: 1 }, { unique: true }),
+    tenants.tenantContactFields.createIndex({ tenantId: 1, order: 1 }),
 
     orchestration.platformEvents.createIndex({ eventType: 1, createdAt: -1 }),
     orchestration.sagaInstances.createIndex(
