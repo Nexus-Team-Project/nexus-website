@@ -201,6 +201,38 @@ export const tenantContactSchema = z.object({
   phoneVerified: z.boolean().optional(),
   lastActivityAt: z.date().optional(),
   nexusIdentityId: z.string().optional(),
+  // User-defined custom column values, keyed by the server-generated fieldId
+  // ("cf_<id>") of a tenantContactFields definition - never by the user's
+  // free-text column name. This is the core NoSQL-injection guard.
+  customFields: z.record(z.unknown()).optional(),
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+/** Value types a tenant admin can give a custom contact column. */
+export const CONTACT_FIELD_TYPES = [
+  'free_text',
+  'number',
+  'date',
+  'single_label',
+  'multi_label',
+  'location',
+] as const;
+export type ContactFieldType = typeof CONTACT_FIELD_TYPES[number];
+
+/**
+ * A tenant-defined custom column on the contacts table. One document per column.
+ * `fieldId` is server-generated ("cf_<id>"); `options` is required only for the
+ * label types. `order` drives display order in the table and filter panel.
+ */
+export const tenantContactFieldSchema = z.object({
+  fieldId: z.string().regex(/^cf_[a-z0-9]{8,}$/),
+  tenantId: z.string().min(1),
+  name: z.string().min(1).max(50),
+  type: z.enum(CONTACT_FIELD_TYPES),
+  // Allowed values for single_label / multi_label columns; absent otherwise.
+  options: z.array(z.string().min(1).max(40)).max(30).optional(),
+  order: z.number().int().nonnegative(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
@@ -226,6 +258,7 @@ export type MemberGroupDocument = z.infer<typeof memberGroupSchema> & { _id?: Ob
 export type MemberGroupAssignmentDocument = z.infer<typeof memberGroupAssignmentSchema> & { _id?: ObjectId };
 export type TenantMemberInvitationDocument = z.infer<typeof tenantMemberInvitationSchema> & { _id?: ObjectId };
 export type TenantContactDocument = z.infer<typeof tenantContactSchema> & { _id?: ObjectId };
+export type TenantContactFieldDocument = z.infer<typeof tenantContactFieldSchema> & { _id?: ObjectId };
 export type TenantCatalogPolicyDocument = z.infer<typeof tenantCatalogPolicySchema> & { _id?: ObjectId };
 
 export interface TenantDomainCollections {
@@ -239,6 +272,7 @@ export interface TenantDomainCollections {
   memberGroupAssignments: Collection<MemberGroupAssignmentDocument>;
   tenantCatalogPolicies: Collection<TenantCatalogPolicyDocument>;
   tenantContacts: Collection<TenantContactDocument>;
+  tenantContactFields: Collection<TenantContactFieldDocument>;
 }
 
 /**
@@ -260,5 +294,6 @@ export function getTenantDomainCollections(db: Db): TenantDomainCollections {
     memberGroupAssignments: db.collection<MemberGroupAssignmentDocument>(DOMAIN_COLLECTIONS.memberGroupAssignments),
     tenantCatalogPolicies: db.collection<TenantCatalogPolicyDocument>(DOMAIN_COLLECTIONS.tenantCatalogPolicies),
     tenantContacts: db.collection<TenantContactDocument>(DOMAIN_COLLECTIONS.tenantContacts),
+    tenantContactFields: db.collection<TenantContactFieldDocument>(DOMAIN_COLLECTIONS.tenantContactFields),
   };
 }

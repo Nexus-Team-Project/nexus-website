@@ -10,6 +10,8 @@ import { getTenantDomainCollections, type TenantContactDocument } from '../model
 import { requireTenantMemberPermission } from './domain-member.service';
 import type { ListContactsQuery, CreateContactInput, UpdateContactInput, ImportContactRow } from '../schemas/domain-contacts.schemas';
 import { createError } from '../middleware/errorHandler';
+import { fetchContactFieldDefs } from './domain-contact-fields.service';
+import { planCustomWrites, buildCustomFilterClauses, type CustomFilter } from './contact-custom-fields.helper';
 
 /** One row returned in the paginated contact list. */
 export interface TenantContactListItem {
@@ -26,6 +28,8 @@ export interface TenantContactListItem {
    * user confirms it.
    */
   phoneVerified: boolean;
+  /** Custom-column values keyed by fieldId; empty when none set. */
+  customFields: Record<string, unknown>;
   lastActivityAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -71,6 +75,7 @@ function toListItem(doc: TenantContactDocument): TenantContactListItem {
     address: doc.address ?? null,
     phone: doc.phone ?? null,
     phoneVerified: doc.phoneVerified ?? false,
+    customFields: (doc.customFields as Record<string, unknown>) ?? {},
     lastActivityAt: doc.lastActivityAt ? doc.lastActivityAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -92,10 +97,17 @@ export async function listTenantContacts(
 
   const filter: Record<string, unknown> = { tenantId: access.tenantId };
   if (query.status) filter.status = query.status;
+
+  // Combine free-text search and custom-column filters under a single $and so
+  // they all narrow the result set together.
+  const and: Record<string, unknown>[] = [];
   if (query.search) {
     const pattern = new RegExp(escapeRegex(query.search), 'i');
-    filter.$or = [{ normalizedEmail: pattern }, { displayName: pattern }];
+    and.push({ $or: [{ normalizedEmail: pattern }, { displayName: pattern }] });
   }
+  const defs = await fetchContactFieldDefs(db, access.tenantId);
+  and.push(...buildCustomFilterClauses(defs, (query.customFilters ?? []) as CustomFilter[]));
+  if (and.length) filter.$and = and;
 
   const skip = (query.page - 1) * query.limit;
   const [docs, total] = await Promise.all([
@@ -131,6 +143,16 @@ export async function createTenantContact(
   const normalized = normalizeEmail(data.email);
   const now = new Date();
 
+  // Validate custom-column values against the tenant's definitions (strict:
+  // an invalid value is a 400 so the admin gets feedback).
+  let customSet: Record<string, unknown> = {};
+  if (data.customFields) {
+    const defs = await fetchContactFieldDefs(db, access.tenantId);
+    const plan = planCustomWrites(defs, data.customFields);
+    if (plan.invalid.length) throw createError(`Invalid value for: ${plan.invalid.join(', ')}`, 400);
+    customSet = plan.set;
+  }
+
   const result = await col.findOneAndUpdate(
     { tenantId: access.tenantId, normalizedEmail: normalized },
     {
@@ -147,6 +169,7 @@ export async function createTenantContact(
         ...(data.address !== undefined && { address: data.address }),
         // A tenant-entered phone is a guess -> unverified until the user confirms.
         ...(data.phone !== undefined && { phone: data.phone, phoneVerified: false }),
+        ...customSet,
         updatedAt: now,
       },
     },
@@ -171,10 +194,28 @@ export async function updateTenantContact(
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContacts;
 
+  // Pull customFields out of the raw spread - it must be validated and written
+  // as individual dot-paths, never set wholesale from the request body.
+  const { customFields: rawCustom, ...rest } = data;
+  const customSet: Record<string, unknown> = {};
+  const customUnset: Record<string, ''> = {};
+  if (rawCustom) {
+    const defs = await fetchContactFieldDefs(db, access.tenantId);
+    const plan = planCustomWrites(defs, rawCustom);
+    if (plan.invalid.length) throw createError(`Invalid value for: ${plan.invalid.join(', ')}`, 400);
+    Object.assign(customSet, plan.set);
+    for (const key of plan.clearKeys) customUnset[`customFields.${key}`] = '';
+  }
+
+  const update: Record<string, unknown> = {
+    // Editing the phone resets verification — it is again a tenant-entered guess.
+    $set: { ...rest, ...(rest.phone !== undefined ? { phoneVerified: false } : {}), ...customSet, updatedAt: new Date() },
+  };
+  if (Object.keys(customUnset).length) update.$unset = customUnset;
+
   const result = await col.findOneAndUpdate(
     { tenantContactId: contactId, tenantId: access.tenantId },
-    // Editing the phone resets verification — it is again a tenant-entered guess.
-    { $set: { ...data, ...(data.phone !== undefined ? { phoneVerified: false } : {}), updatedAt: new Date() } },
+    update,
     { returnDocument: 'after' },
   );
 
@@ -201,6 +242,8 @@ export async function importTenantContacts(
   const ops: import('mongodb').AnyBulkWriteOperation<TenantContactDocument>[] = [];
   const errors: string[] = [];
   const now = new Date();
+  // Load the tenant's column definitions once for the whole batch.
+  const defs = await fetchContactFieldDefs(db, access.tenantId);
 
   for (const row of rows) {
     const normalized = normalizeEmail(row.email);
@@ -209,6 +252,10 @@ export async function importTenantContacts(
       continue;
     }
     seen.add(normalized);
+
+    // Lenient: an invalid custom value is simply left blank (cell omitted), the
+    // row is still imported. Only validated values become dot-path $set entries.
+    const customSet = row.customFields ? planCustomWrites(defs, row.customFields).set : {};
 
     ops.push({
       updateOne: {
@@ -227,6 +274,7 @@ export async function importTenantContacts(
             ...(row.address !== undefined && { address: row.address }),
             // Imported phones are tenant-supplied guesses -> unverified.
             ...(row.phone !== undefined && { phone: row.phone, phoneVerified: false }),
+            ...customSet,
             updatedAt: now,
           },
         },
