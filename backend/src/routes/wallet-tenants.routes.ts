@@ -12,6 +12,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { discoverTenants } from '../services/wallet/tenant-discovery.service';
 import { getEcosystemCatalogForWallet } from '../services/wallet/ecosystem-catalog.service';
@@ -38,6 +39,9 @@ import { DOMAIN_COLLECTIONS } from '../models/domain/collections';
 import { prisma } from '../config/database';
 
 const router = Router();
+
+// Rate-limit all wallet tenant-discovery / join-request routes (100 req/min/IP).
+router.use(apiLimiter);
 
 async function getCallingNexusIdentity(req: Request): Promise<{ nexusIdentityId: string; email: string; displayName?: string } | null> {
   const email = req.user!.email.toLowerCase().trim();
@@ -271,6 +275,9 @@ router.patch('/default-tenant', authenticate, async (req: Request, res: Response
 // ── Tenant admin endpoints ──────────────────────────────────────────────────
 
 export const tenantJoinAdminRouter = Router();
+
+// Rate-limit the tenant-admin join-request routes (100 req/min/IP).
+tenantJoinAdminRouter.use(apiLimiter);
 
 // Auto-accept setting. Registered BEFORE '/join-requests/:id' so 'settings'
 // is never matched as a request id.

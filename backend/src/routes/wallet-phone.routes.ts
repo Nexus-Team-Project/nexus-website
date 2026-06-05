@@ -12,6 +12,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { getCallingNexusIdentity } from '../services/wallet/wallet-identity.helper';
 import {
@@ -23,6 +24,10 @@ import {
 import { PhoneAttachError } from '../services/wallet/phone-attach.service';
 
 const router = Router();
+
+// Coarse IP rate-limit (100 req/min/IP) layered on top of the per-phone Mongo
+// OTP limiter inside the service, to blunt SMS-cost abuse from a single source.
+router.use(apiLimiter);
 
 const phoneSchema = z.object({ phone: z.string().min(3).max(20) });
 const verifySchema = z.object({

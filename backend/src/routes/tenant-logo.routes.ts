@@ -11,6 +11,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { authenticate } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { resolveTenantContextWithPermission } from '../utils/resolve-tenant-context';
 import { setTenantLogo, removeTenantLogo, setTenantBrandColor } from '../services/tenant-logo.service';
@@ -19,6 +20,9 @@ import { setTenantLogo, removeTenantLogo, setTenantBrandColor } from '../service
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 const router = Router();
+
+// Rate-limit branding routes (100 req/min/IP); guards the multipart upload path.
+router.use(apiLimiter);
 
 const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);

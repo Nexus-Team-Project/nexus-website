@@ -7,8 +7,13 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { getMongoDb } from '../config/mongo';
 import { getPublicTenantInfo } from '../services/public/public-tenant.service';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+
+// Unauthenticated + hits Mongo on every call. Rate-limit (100 req/min/IP) to
+// blunt tenant-id enumeration and DoS.
+router.use(apiLimiter);
 
 const tenantIdSchema = z.string().min(1).max(128);
 

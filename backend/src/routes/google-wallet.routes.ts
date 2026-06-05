@@ -13,8 +13,13 @@ import {
   handleGoogleWalletCode,
 } from '../services/auth/google-wallet.service';
 import { issueWalletSession } from '../services/auth/session-issuer.service';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+
+// Unauthenticated session-minting endpoint. Rate-limit (100 req/min/IP) to
+// blunt automated abuse of the Google sign-in path.
+router.use(apiLimiter);
 
 /** POST /api/v1/auth/google/wallet - { idToken } OR { code, redirectUri } */
 router.post('/', async (req: Request, res: Response) => {

@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { pushService } from '../services/push.service';
 import { env } from '../config/env';
 
 const router = Router();
+
+// Rate-limit push routes (100 req/min/IP).
+router.use(apiLimiter);
 
 /** GET /api/push/vapid-public-key — public key needed by the browser to subscribe */
 router.get('/vapid-public-key', (_req, res) => {

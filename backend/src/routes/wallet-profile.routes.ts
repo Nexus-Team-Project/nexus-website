@@ -6,6 +6,7 @@
  */
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import {
   walletProfilePatchSchema,
@@ -18,6 +19,9 @@ import {
 } from '../services/wallet/wallet-profile.service';
 
 const router = Router();
+
+// Rate-limit all wallet profile routes (100 req/min/IP).
+router.use(apiLimiter);
 
 /**
  * GET /api/v1/wallet/profile

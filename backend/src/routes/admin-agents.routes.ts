@@ -9,10 +9,11 @@
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate, requireAdmin } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { env } from '../config/env';
 
 const router = Router();
-router.use(authenticate, requireAdmin);
+router.use(authenticate, requireAdmin, apiLimiter);
 
 // Generic proxy: forwards any request to nexus-agents API
 router.all('/*', async (req: Request, res: Response, next: NextFunction) => {

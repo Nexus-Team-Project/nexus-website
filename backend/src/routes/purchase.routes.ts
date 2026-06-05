@@ -10,8 +10,12 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { authenticate } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+
+// Money path. Rate-limit (100 req/min/IP) to blunt abuse of purchase initiation.
+router.use(apiLimiter);
 
 /**
  * POST /api/v1/purchase

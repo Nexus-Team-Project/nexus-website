@@ -20,6 +20,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import multer from 'multer';
 import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { prisma } from '../config/database';
 import { getTenantDomainCollections } from '../models/domain';
@@ -50,6 +51,9 @@ import { getIdentityDomainCollections } from '../models/domain/identity.models';
 import { getOnboardingStatus } from '../services/onboarding.service';
 
 const router = Router();
+
+// Rate-limit all offer routes (100 req/min/IP) to blunt scraping/DoS.
+router.use(apiLimiter);
 
 /**
  * Multer upload instance configured for in-memory storage.
