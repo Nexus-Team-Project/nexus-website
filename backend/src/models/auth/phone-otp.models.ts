@@ -1,8 +1,8 @@
 /**
  * Mongo collection for in-flight phone-OTP challenges.
- * Each row represents one InforU SendOtp call. TTL auto-deletes after
- * 10 minutes. Verified rows are kept until TTL expires so a successful
- * code cannot be replayed.
+ * Each row holds the bcrypt HASH of a code we generated and sent by SMS. TTL
+ * auto-deletes after 10 minutes. Verified rows are kept until TTL expires so a
+ * successful code cannot be replayed.
  *
  * Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md section 4.2
  */
@@ -14,17 +14,17 @@ export const PHONE_OTP_COLLECTION = 'phoneOtpChallenges';
 export type PhoneOtpPurpose = 'login' | 'signup';
 
 /**
- * A single phone-OTP challenge row. The InforU code itself is never stored;
- * only the RequestToken we got back from SendOtp, which is useless without
- * the code the user receives by SMS.
+ * A single phone-OTP challenge row. The plaintext code is NEVER stored or
+ * logged - only its bcrypt hash, which is useless without the code the user
+ * received by SMS.
  */
 export interface PhoneOtpChallenge {
   _id?: ObjectId;
   /** Canonical 05XXXXXXXX form, produced by normalizeIsraeliPhone. */
   phone: string;
   purpose: PhoneOtpPurpose;
-  /** Pair token from InforU SendOtp; passed back to Authenticate. */
-  inforuRequestToken: string;
+  /** bcrypt hash of the 6-digit code we generated and sent by SMS. */
+  codeHash: string;
   createdAt: Date;
   /** TTL-deletion target. 10 minutes after createdAt by convention. */
   expiresAt: Date;

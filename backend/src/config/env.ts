@@ -87,11 +87,9 @@ const envSchema = z.object({
   INFORU_USER: z.string().min(1).optional(),
   INFORU_TOKEN: z.string().min(1).optional(),
   INFORU_BASE_URL: z.string().trim().url().default('https://capi.inforu.co.il'),
-  // Enables the REAL wallet phone-OTP flow. While not 'true' (default) the dev
-  // /phone/attach-test path is allowed (attach without an OTP). Mirror with the
-  // frontend VITE_PHONE_OTP_ENABLED. Read directly via process.env in the
-  // service; declared here as the documented source of truth.
-  WALLET_PHONE_OTP_ENABLED: z.string().optional(),
+  // Sender ID shown on the OTP SMS (alphanumeric, must be approved by InforU for
+  // production; falls back to 'Nexus' if unset).
+  INFORU_SENDER: z.string().trim().min(1).optional(),
 
   // Wallet - public URL for the wallet app (wallet.nexus-payment.com).
   WALLET_URL: z.string().trim().url().optional(),

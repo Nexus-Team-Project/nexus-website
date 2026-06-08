@@ -15,8 +15,13 @@ import { startEmailOtp, verifyEmailOtp } from '../services/auth/email-otp.servic
 import { consumePhoneSignupTicket } from '../services/auth/phone-signup-ticket.service';
 import { resolveWalletIdentity } from '../services/auth/wallet-identity.service';
 import { issueWalletSession } from '../services/auth/session-issuer.service';
+import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
+
+// Coarse IP rate-limit (100 req/min/IP) layered on top of the per-email Mongo
+// OTP limiter in the service (1/30s + 5/h per email) to blunt a request flood.
+router.use(apiLimiter);
 
 function clientError(e: unknown): { status: number; code: string } {
   const msg = e instanceof Error ? e.message : 'unknown';

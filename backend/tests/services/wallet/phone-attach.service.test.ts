@@ -78,4 +78,14 @@ describe('attachPhoneToIdentity', () => {
       attachPhoneToIdentity(db, { nexusIdentityId: 'id-3', phone: '0508465858', verified: true }),
     ).rejects.toThrow(PhoneAttachError);
   });
+
+  it("blocks re-attaching the identity's OWN current number (phone_unchanged)", async () => {
+    await db.collection(DOMAIN_COLLECTIONS.nexusIdentities).insertOne({
+      nexusIdentityId: 'id-4', normalizedEmail: 'd@x.com', phone: '0508465858',
+    });
+    // Same number (any formatting) on the same identity is a pointless no-op.
+    await expect(
+      attachPhoneToIdentity(db, { nexusIdentityId: 'id-4', phone: '050-846-5858', verified: true }),
+    ).rejects.toThrow(/phone_unchanged/);
+  });
 });
