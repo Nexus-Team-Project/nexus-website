@@ -24,7 +24,14 @@ export interface ContactFieldDto {
   type: TenantContactFieldDocument['type'];
   options?: string[];
   order: number;
+  /** 'manual' (default) or 'wallet_profile' for read-only mirror columns. */
+  origin?: 'manual' | 'wallet_profile';
+  /** Stable mirror-field key when origin === 'wallet_profile'. */
+  sourceFieldKey?: string;
 }
+
+/** Error code returned when a caller tries to mutate a read-only mirror column. */
+const WALLET_FIELD_READONLY = 'wallet_field_readonly';
 
 /** Generates a server-side custom-field id (`cf_<32 hex>`). */
 function newFieldId(): string {
@@ -39,7 +46,25 @@ function toDto(doc: TenantContactFieldDocument): ContactFieldDto {
     type: doc.type,
     ...(doc.options ? { options: doc.options } : {}),
     order: doc.order,
+    ...(doc.origin ? { origin: doc.origin } : {}),
+    ...(doc.sourceFieldKey ? { sourceFieldKey: doc.sourceFieldKey } : {}),
   };
+}
+
+/**
+ * Throws 400 when the target field is a read-only wallet_profile mirror column.
+ * Mirror columns are owned by the member's wallet answers; admins cannot rename,
+ * delete, or reorder them.
+ */
+async function assertNotWalletField(
+  col: ReturnType<typeof getTenantDomainCollections>['tenantContactFields'],
+  tenantId: string,
+  fieldId: string,
+): Promise<void> {
+  const doc = await col.findOne({ tenantId, fieldId }, { projection: { origin: 1 } });
+  if (doc?.origin === 'wallet_profile') {
+    throw createError(WALLET_FIELD_READONLY, 400);
+  }
 }
 
 /**
@@ -74,7 +99,8 @@ export async function createContactField(
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContactFields;
 
-  const count = await col.countDocuments({ tenantId: access.tenantId });
+  // Mirror columns (origin: 'wallet_profile') do not count against the manual cap.
+  const count = await col.countDocuments({ tenantId: access.tenantId, origin: { $ne: 'wallet_profile' } });
   if (count >= MAX_CONTACT_FIELDS) {
     throw createError(`Maximum of ${MAX_CONTACT_FIELDS} custom columns reached`, 400);
   }
@@ -109,6 +135,7 @@ export async function renameContactField(
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContactFields;
 
+  await assertNotWalletField(col, access.tenantId, fieldId);
   const result = await col.findOneAndUpdate(
     { tenantId: access.tenantId, fieldId },
     { $set: { name: input.name, updatedAt: new Date() } },
@@ -127,6 +154,7 @@ export async function deleteContactField(userId: string, fieldId: string): Promi
   const db = await getMongoDb();
   const cols = getTenantDomainCollections(db);
 
+  await assertNotWalletField(cols.tenantContactFields, access.tenantId, fieldId);
   const deleted = await cols.tenantContactFields.deleteOne({ tenantId: access.tenantId, fieldId });
   if (deleted.deletedCount === 0) throw createError('Custom column not found', 404);
 
@@ -152,12 +180,19 @@ export async function reorderContactFields(
   const col = getTenantDomainCollections(db).tenantContactFields;
 
   const now = new Date();
-  const ops = input.order.map((o) => ({
-    updateOne: {
-      filter: { tenantId: access.tenantId, fieldId: o.fieldId },
-      update: { $set: { order: o.order, updatedAt: now } },
-    },
-  }));
+  // Mirror columns are read-only: never let the client reorder them.
+  const walletIds = new Set(
+    (await col.find({ tenantId: access.tenantId, origin: 'wallet_profile' }).project({ fieldId: 1 }).toArray())
+      .map((d) => d.fieldId as string),
+  );
+  const ops = input.order
+    .filter((o) => !walletIds.has(o.fieldId))
+    .map((o) => ({
+      updateOne: {
+        filter: { tenantId: access.tenantId, fieldId: o.fieldId },
+        update: { $set: { order: o.order, updatedAt: now } },
+      },
+    }));
   if (ops.length > 0) await col.bulkWrite(ops, { ordered: false });
 
   const defs = await fetchContactFieldDefs(db, access.tenantId);
