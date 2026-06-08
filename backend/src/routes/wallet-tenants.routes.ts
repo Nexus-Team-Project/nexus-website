@@ -340,6 +340,7 @@ tenantJoinAdminRouter.get('/join-requests', authenticate, async (req: Request, r
         displayName: r.displayName ?? null,
         status: r.status,
         createdAt: r.createdAt.toISOString(),
+        answersSnapshot: r.answersSnapshot ?? null,
       })),
     });
   } catch (e) {

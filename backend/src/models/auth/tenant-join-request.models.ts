@@ -34,6 +34,14 @@ export interface TenantJoinRequestDocument {
   decidedAt?: Date;
   decidedByIdentityId?: string;
   denyReason?: string;
+  /** Snapshot of the requester's mirrorable onboarding answers at request time. */
+  answersSnapshot?: {
+    purpose?: string[];
+    lifeStage?: string;
+    gender?: string;
+    birthday?: string;
+    motivation?: string;
+  };
 }
 
 export async function ensureTenantJoinRequestIndexes(db: Db): Promise<void> {

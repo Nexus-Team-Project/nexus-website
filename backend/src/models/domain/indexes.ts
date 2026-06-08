@@ -65,6 +65,11 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     // Custom column definitions: unique id per tenant, ordered list per tenant.
     tenants.tenantContactFields.createIndex({ tenantId: 1, fieldId: 1 }, { unique: true }),
     tenants.tenantContactFields.createIndex({ tenantId: 1, order: 1 }),
+    // One wallet-profile mirror column per (tenant, sourceFieldKey).
+    tenants.tenantContactFields.createIndex(
+      { tenantId: 1, sourceFieldKey: 1 },
+      { name: 'uniq_wallet_profile_field', unique: true, partialFilterExpression: { origin: 'wallet_profile' } },
+    ),
 
     orchestration.platformEvents.createIndex({ eventType: 1, createdAt: -1 }),
     orchestration.sagaInstances.createIndex(

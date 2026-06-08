@@ -125,6 +125,7 @@ export function planCustomWrites(
     if (!FIELD_ID_RE.test(key)) continue; // never trust an arbitrary key
     const def = byId.get(key);
     if (!def) continue;
+    if (def.origin === 'wallet_profile') continue; // mirror columns are read-only
     const res = validateCustomValue(def, raw);
     if (res.state === 'set') plan.set[`customFields.${key}`] = res.value;
     else if (res.state === 'clear') plan.clearKeys.push(key);

@@ -24,6 +24,8 @@ import {
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import { markTenantMemberInvitationAccepted } from '../domain-member-invitation-read.service';
 import { activeCatalogTenantIds } from './tenant-discovery.service';
+import { applyMirrorTokensToTenantContact } from './wallet-mirror-fields.helper';
+import { profileToMirrorTokens, normalizeGenderToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
 
 export interface CreateJoinResult {
   created: string[];
@@ -103,13 +105,26 @@ export async function materializeTenantMembership(
         email: args.email,
         normalizedEmail: args.email,
         displayName: args.displayName ?? args.email.split('@')[0],
-        nexusIdentityId: args.nexusIdentityId,
         createdAt: now,
       },
-      $set: { status: 'active', lastActivityAt: now, updatedAt: now, ...phoneFields },
+      // nexusIdentityId is in $set (not $setOnInsert) so a pre-existing
+      // admin-added contact (added by email, no identity link) gets backfilled
+      // when its owner joins - otherwise the mirror write below, which matches by
+      // nexusIdentityId, would silently miss that row.
+      $set: { status: 'active', lastActivityAt: now, updatedAt: now, nexusIdentityId: args.nexusIdentityId, ...phoneFields },
     },
     { upsert: true },
   );
+
+  // Mirror the member's onboarding answers into this tenant's contact columns.
+  const profileDoc = await db
+    .collection<{ nexusIdentityId: string; profile?: WalletProfileLike }>(DOMAIN_COLLECTIONS.nexusIdentities)
+    .findOne({ nexusIdentityId: args.nexusIdentityId }, { projection: { profile: 1 } });
+  if (profileDoc?.profile) {
+    await applyMirrorTokensToTenantContact(
+      db, args.tenantId, args.nexusIdentityId, profileToMirrorTokens(profileDoc.profile),
+    );
+  }
 }
 
 /**
@@ -123,6 +138,24 @@ async function tenantAutoAcceptsJoinRequests(db: Db, tenantId: string): Promise<
   return tenant?.autoAcceptJoinRequests ?? true;
 }
 
+/** Read the requester's mirrorable answers for a pending-request snapshot. */
+async function readAnswersSnapshot(
+  db: Db, nexusIdentityId: string,
+): Promise<TenantJoinRequestDocument['answersSnapshot'] | undefined> {
+  const doc = await db
+    .collection<{ profile?: WalletProfileLike }>(DOMAIN_COLLECTIONS.nexusIdentities)
+    .findOne({ nexusIdentityId }, { projection: { profile: 1 } });
+  const p = doc?.profile;
+  if (!p) return undefined;
+  const snap: NonNullable<TenantJoinRequestDocument['answersSnapshot']> = {};
+  if (Array.isArray(p.purpose) && p.purpose.length) snap.purpose = p.purpose;
+  if (p.lifeStage) snap.lifeStage = p.lifeStage;
+  if (p.gender) snap.gender = normalizeGenderToken(p.gender);
+  if (p.birthday) snap.birthday = (p.birthday instanceof Date ? p.birthday : new Date(p.birthday)).toISOString().slice(0, 10);
+  if (typeof p.motivation === 'string' && p.motivation.trim()) snap.motivation = p.motivation.trim();
+  return Object.keys(snap).length ? snap : undefined;
+}
+
 export async function createJoinRequests(
   db: Db,
   args: {
@@ -134,6 +167,7 @@ export async function createJoinRequests(
 ): Promise<CreateJoinResult> {
   const out: CreateJoinResult = { created: [], autoAccepted: [], skipped: [] };
   const now = new Date();
+  const answersSnapshot = await readAnswersSnapshot(db, args.nexusIdentityId);
 
   // Tenants without an active Benefits Catalog cannot be joined from the wallet
   // (they are shown as "soon"). One query for the whole batch; the per-tenant
@@ -218,6 +252,7 @@ export async function createJoinRequests(
         displayName: args.displayName,
         status: 'pending',
         createdAt: now,
+        ...(answersSnapshot ? { answersSnapshot } : {}),
       });
       out.created.push(tenantId);
     } catch (e) {

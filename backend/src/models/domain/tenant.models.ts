@@ -233,6 +233,11 @@ export const tenantContactFieldSchema = z.object({
   // Allowed values for single_label / multi_label columns; absent otherwise.
   options: z.array(z.string().min(1).max(40)).max(30).optional(),
   order: z.number().int().nonnegative(),
+  // 'manual' (default) for admin-created columns; 'wallet_profile' for read-only
+  // mirror columns synced from a member's wallet onboarding answers.
+  origin: z.enum(['manual', 'wallet_profile']).optional(),
+  // Stable mirror-field key (e.g. 'gender') when origin === 'wallet_profile'.
+  sourceFieldKey: z.string().min(1).max(40).optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

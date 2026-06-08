@@ -109,3 +109,16 @@ describe('buildCustomFilterClauses', () => {
     expect(clauses).toEqual([]);
   });
 });
+
+describe('planCustomWrites wallet_profile lock', () => {
+  it('ignores keys whose field is origin wallet_profile', () => {
+    const defs = [
+      def({ fieldId: 'cf_aaaaaaaa', type: 'free_text', name: 'Notes' }),
+      def({ fieldId: 'cf_bbbbbbbb', type: 'single_label', name: 'Gender',
+        options: ['male', 'female'], origin: 'wallet_profile', sourceFieldKey: 'gender' }),
+    ];
+    const plan = planCustomWrites(defs, { cf_aaaaaaaa: 'hi', cf_bbbbbbbb: 'female' });
+    expect(plan.set).toEqual({ 'customFields.cf_aaaaaaaa': 'hi' });
+    expect(plan.set['customFields.cf_bbbbbbbb']).toBeUndefined();
+  });
+});
