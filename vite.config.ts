@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import legacy from '@vitejs/plugin-legacy'
 import { visualizer } from 'rollup-plugin-visualizer'
 import { readFileSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
@@ -88,6 +89,17 @@ export default defineConfig({
     react(),
     tailwindcss(),
     sitemapPlugin(),
+    // Emit a second, ES5-compatible bundle for browsers that cannot parse
+    // modern JS (older Android Chrome / WebView, in-app browsers like
+    // Facebook/Instagram/Gmail). Without this, a single unsupported syntax
+    // token causes the whole bundle to fail to parse and users see a blank
+    // white page with no visible error. Modern browsers continue to load the
+    // smaller modern bundle via <script type="module">.
+    legacy({
+      targets: ['defaults', 'not IE 11', 'Android >= 7', 'Chrome >= 70'],
+      modernPolyfills: true,
+      renderLegacyChunks: true,
+    }),
     visualizer({
       filename: './dist/stats.html',
       open: false,
@@ -100,7 +112,11 @@ export default defineConfig({
     host: true,
   },
   build: {
-    target: 'esnext',
+    // Down-level modern JS so the primary bundle parses on Chrome >= 80 and
+    // Safari >= 14 (released 2020). `esnext` previously emitted untranspiled
+    // syntax that older Android browsers could not parse, producing a blank
+    // white page. `@vitejs/plugin-legacy` above covers anything older still.
+    target: ['es2020', 'chrome80', 'edge88', 'firefox78', 'safari14'],
     minify: 'terser',
     terserOptions: {
       compress: {
