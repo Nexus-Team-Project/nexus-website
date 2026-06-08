@@ -11,6 +11,7 @@ import type {
   WalletProfilePatchInput,
   WalletMarketingConsentInput,
 } from '../../schemas/wallet-profile.schemas';
+import { syncWalletProfileToTenants } from './wallet-profile-sync.service';
 
 const normalize = (e: string): string => e.trim().toLowerCase();
 
@@ -85,6 +86,20 @@ export async function patchWalletProfile(
     { normalizedEmail: normalize(args.email) },
     { $set: set },
   );
+
+  // Mirror the updated answers into every tenant the user is an active member of.
+  // Best-effort: a sync hiccup must never fail the profile save.
+  try {
+    const idDoc = await nexusIdentities.findOne(
+      { normalizedEmail: normalize(args.email) },
+      { projection: { nexusIdentityId: 1 } },
+    );
+    if (idDoc?.nexusIdentityId) {
+      await syncWalletProfileToTenants(db, idDoc.nexusIdentityId);
+    }
+  } catch (err) {
+    console.error('[wallet-profile] mirror sync failed (non-fatal):', err);
+  }
 
   const view = await getWalletProfile(db, args);
   return view ?? { updatedAt: now.toISOString() };
