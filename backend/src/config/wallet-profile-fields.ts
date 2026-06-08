@@ -58,7 +58,7 @@ const GENDER_OPTIONS: MirrorOption[] = [
 
 const DEFS: MirrorFieldDef[] = [
   { sourceFieldKey: 'purpose',    profileKey: 'purpose',    columnType: 'multi_label',  labelEn: 'Interests',  labelHe: 'תחומי עניין', options: PURPOSE_OPTIONS },
-  { sourceFieldKey: 'life_stage', profileKey: 'lifeStage',  columnType: 'single_label', labelEn: 'Life stage', labelHe: 'שלב חיים',    options: LIFE_STAGE_OPTIONS },
+  { sourceFieldKey: 'life_stage', profileKey: 'lifeStage',  columnType: 'single_label', labelEn: 'Life stage', labelHe: 'מצב משפחתי', options: LIFE_STAGE_OPTIONS },
   { sourceFieldKey: 'gender',     profileKey: 'gender',     columnType: 'single_label', labelEn: 'Gender',     labelHe: 'מגדר',        options: GENDER_OPTIONS },
   { sourceFieldKey: 'birthday',   profileKey: 'birthday',   columnType: 'date',         labelEn: 'Birthday',   labelHe: 'יום הולדת' },
   { sourceFieldKey: 'motivation', profileKey: 'motivation', columnType: 'free_text',    labelEn: 'Motivation', labelHe: 'מוטיבציה' },
