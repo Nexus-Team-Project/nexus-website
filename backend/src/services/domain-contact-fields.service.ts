@@ -56,7 +56,7 @@ function toDto(doc: TenantContactFieldDocument): ContactFieldDto {
  * Mirror columns are owned by the member's wallet answers; admins cannot rename,
  * delete, or reorder them.
  */
-async function assertNotWalletField(
+export async function assertNotWalletField(
   col: ReturnType<typeof getTenantDomainCollections>['tenantContactFields'],
   tenantId: string,
   fieldId: string,

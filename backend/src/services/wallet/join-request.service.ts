@@ -25,7 +25,7 @@ import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import { markTenantMemberInvitationAccepted } from '../domain-member-invitation-read.service';
 import { activeCatalogTenantIds } from './tenant-discovery.service';
 import { applyMirrorTokensToTenantContact } from './wallet-mirror-fields.helper';
-import { profileToMirrorTokens, type WalletProfileLike } from '../../config/wallet-profile-fields';
+import { profileToMirrorTokens, normalizeGenderToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
 
 export interface CreateJoinResult {
   created: string[];
@@ -105,10 +105,13 @@ export async function materializeTenantMembership(
         email: args.email,
         normalizedEmail: args.email,
         displayName: args.displayName ?? args.email.split('@')[0],
-        nexusIdentityId: args.nexusIdentityId,
         createdAt: now,
       },
-      $set: { status: 'active', lastActivityAt: now, updatedAt: now, ...phoneFields },
+      // nexusIdentityId is in $set (not $setOnInsert) so a pre-existing
+      // admin-added contact (added by email, no identity link) gets backfilled
+      // when its owner joins - otherwise the mirror write below, which matches by
+      // nexusIdentityId, would silently miss that row.
+      $set: { status: 'active', lastActivityAt: now, updatedAt: now, nexusIdentityId: args.nexusIdentityId, ...phoneFields },
     },
     { upsert: true },
   );
@@ -147,7 +150,7 @@ async function readAnswersSnapshot(
   const snap: NonNullable<TenantJoinRequestDocument['answersSnapshot']> = {};
   if (Array.isArray(p.purpose) && p.purpose.length) snap.purpose = p.purpose;
   if (p.lifeStage) snap.lifeStage = p.lifeStage;
-  if (p.gender) snap.gender = p.gender;
+  if (p.gender) snap.gender = normalizeGenderToken(p.gender);
   if (p.birthday) snap.birthday = (p.birthday instanceof Date ? p.birthday : new Date(p.birthday)).toISOString().slice(0, 10);
   if (typeof p.motivation === 'string' && p.motivation.trim()) snap.motivation = p.motivation.trim();
   return Object.keys(snap).length ? snap : undefined;

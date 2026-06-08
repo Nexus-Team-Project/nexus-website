@@ -41,6 +41,25 @@ describe('materializeTenantMembership mirror columns', () => {
     const contact = await db.collection(DOMAIN_COLLECTIONS.tenantContacts).findOne({ tenantId: 't1' });
     expect(contact!.customFields[field!.fieldId]).toBe('male');
   });
+
+  it('backfills nexusIdentityId and mirrors onto a pre-existing email-only contact', async () => {
+    await seedIdentity();
+    // Admin already added this contact by email (no identity link), as
+    // domain-contacts.service does.
+    await db.collection(DOMAIN_COLLECTIONS.tenantContacts).insertOne({
+      tenantContactId: 'pre1', tenantId: 't1', email: 'a@b.com', normalizedEmail: 'a@b.com',
+      displayName: 'A', status: 'active', createdAt: new Date(), updatedAt: new Date(),
+    });
+    await materializeTenantMembership(db, {
+      tenantId: 't1', nexusIdentityId: 'id1', email: 'a@b.com', grantedByIdentityId: 'admin1',
+    });
+    const field = await db.collection(DOMAIN_COLLECTIONS.tenantContactFields)
+      .findOne({ tenantId: 't1', sourceFieldKey: 'gender' });
+    const contact = await db.collection(DOMAIN_COLLECTIONS.tenantContacts)
+      .findOne({ tenantId: 't1', normalizedEmail: 'a@b.com' });
+    expect(contact!.nexusIdentityId).toBe('id1'); // backfilled onto the existing row
+    expect(contact!.customFields[field!.fieldId]).toBe('male');
+  });
 });
 
 describe('createJoinRequests snapshot', () => {

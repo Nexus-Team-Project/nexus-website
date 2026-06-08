@@ -61,6 +61,27 @@ describe('syncWalletProfileToTenants', () => {
     expect(manualCount).toBe(0);
   });
 
+  it('unsets a cleared answer across all member tenants on the next sync', async () => {
+    await db.collection(DOMAIN_COLLECTIONS.nexusIdentities).insertOne({
+      nexusIdentityId: 'id1', normalizedEmail: 'a@b.com', profile: { gender: 'female' },
+    });
+    await seedMemberWithContact('t1');
+    await seedMemberWithContact('t2');
+    await syncWalletProfileToTenants(db, 'id1');
+
+    // User clears the gender answer; next sync must $unset it everywhere.
+    await db.collection(DOMAIN_COLLECTIONS.nexusIdentities)
+      .updateOne({ nexusIdentityId: 'id1' }, { $unset: { 'profile.gender': '' } });
+    await syncWalletProfileToTenants(db, 'id1');
+
+    for (const t of ['t1', 't2']) {
+      const field = await db.collection(DOMAIN_COLLECTIONS.tenantContactFields)
+        .findOne({ tenantId: t, sourceFieldKey: 'gender' });
+      const contact = await db.collection(DOMAIN_COLLECTIONS.tenantContacts).findOne({ tenantId: t });
+      expect(contact!.customFields?.[field!.fieldId]).toBeUndefined();
+    }
+  });
+
   it('returns 0 and writes nothing when the identity has no profile', async () => {
     await db.collection(DOMAIN_COLLECTIONS.nexusIdentities).insertOne({
       nexusIdentityId: 'id1', normalizedEmail: 'a@b.com',
