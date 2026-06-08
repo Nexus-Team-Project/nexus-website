@@ -17,11 +17,22 @@ import {
   patchWalletProfile,
   setWalletMarketingConsent,
 } from '../services/wallet/wallet-profile.service';
+import { getMirrorFieldDefs } from '../config/wallet-profile-fields';
 
 const router = Router();
 
 // Rate-limit all wallet profile routes (100 req/min/IP).
 router.use(apiLimiter);
+
+/**
+ * GET /api/v1/wallet/profile-fields
+ * Returns the mirror-field registry (labels + options in both languages) so the
+ * dashboard can localize wallet mirror columns and the join-request answers view.
+ * Static, identical for all users; authed to gate anonymous scraping.
+ */
+router.get('/profile-fields', authenticate, (_req: Request, res: Response) => {
+  res.json({ fields: getMirrorFieldDefs() });
+});
 
 /**
  * GET /api/v1/wallet/profile
