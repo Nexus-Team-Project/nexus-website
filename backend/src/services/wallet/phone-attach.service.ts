@@ -13,7 +13,10 @@ import { normalizeIsraeliPhone } from '../../utils/israeliPhone';
 
 /** Typed error so the route can map to a 400 (validation) / 409 (collision). */
 export class PhoneAttachError extends Error {
-  constructor(public readonly code: 'phone_not_israeli' | 'phone_in_use', message?: string) {
+  constructor(
+    public readonly code: 'phone_not_israeli' | 'phone_in_use' | 'phone_unchanged',
+    message?: string,
+  ) {
     super(message ?? code);
     this.name = 'PhoneAttachError';
   }
@@ -45,13 +48,20 @@ export async function attachPhoneToIdentity(
   const phone = requireIsraeliPhone(args.phone);
   const { nexusIdentities } = getIdentityDomainCollections(db);
 
-  // Collision: a number owned by a DIFFERENT identity is blocked (the unique
-  // sparse index is the hard guard; this gives a clean error first).
-  const owner = await nexusIdentities.findOne(
-    { phone, nexusIdentityId: { $ne: args.nexusIdentityId } },
+  // One lookup covers both rules: if the SAME identity already holds this exact
+  // number it is an unchanged no-op (block it); a DIFFERENT identity holding it
+  // is a collision (the unique sparse index is the hard guard - this is a clean
+  // error first).
+  const existing = await nexusIdentities.findOne(
+    { phone },
     { projection: { nexusIdentityId: 1 } },
   );
-  if (owner) throw new PhoneAttachError('phone_in_use');
+  if (existing) {
+    if (existing.nexusIdentityId === args.nexusIdentityId) {
+      throw new PhoneAttachError('phone_unchanged');
+    }
+    throw new PhoneAttachError('phone_in_use');
+  }
 
   const now = new Date();
   const set: Record<string, unknown> = { phone, updatedAt: now };

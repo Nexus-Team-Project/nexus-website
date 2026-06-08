@@ -1,17 +1,18 @@
 /**
- * Low-level HTTP client for InforU hosted OTP. This is the ONLY file
- * in the codebase that knows InforU URLs and payload shapes. Higher-
- * level code calls inforuSendOtp / inforuAuthenticateOtp.
+ * Low-level HTTP client for InforU regular SMS send. This is the ONLY file
+ * in the codebase that knows InforU URLs and payload shapes. The OTP code is
+ * generated, hashed, and verified by US (see phone-otp.service); InforU only
+ * delivers the SMS text we build. We do NOT use InforU's hosted OTP product.
  *
- * Spec: inforu-sms-api.md sections 2 and 3.
+ * Spec: inforu-sms-api.md section 4 (POST /api/v2/SMS/SendSms).
  *
  * Notes:
- * - Credentials sit inside the JSON body (User.UserName + User.Token).
- *   InforU OTP endpoints do not use an Authorization header.
- * - StatusId === 1 means success. Anything else is mapped to an Error
- *   with code `inforu_send_status_<N>` or `inforu_auth_status_<N>`.
- * - HTTP-level failures are mapped to `inforu_http_<status>`.
+ * - Auth is the HTTP `Authorization: Basic base64(user:token)` header.
+ * - StatusId === 1 means success; anything else -> `inforu_send_status_<N>`.
+ * - HTTP-level failures -> `inforu_http_<status>`; transport -> `inforu_network_error`.
+ * - SECURITY: the message body contains the OTP code, so it is NEVER logged.
  */
+import { createHash } from 'crypto';
 import { env } from '../../config/env';
 
 interface InforuResponse {
@@ -23,82 +24,96 @@ interface InforuResponse {
 }
 
 /**
+ * Short, non-reversible tag for a phone so logs can correlate calls for the same
+ * number WITHOUT leaking it (never log raw phones or OTP codes). SHA-256 -> 10 hex.
+ */
+function phoneTag(phone: string): string {
+  return createHash('sha256').update(phone).digest('hex').slice(0, 10);
+}
+
+/** Safely read a response body for logging; never throws, capped at 300 chars. */
+async function readBodyForLog(res: { text?: () => Promise<string> }): Promise<string> {
+  try {
+    if (typeof res.text !== 'function') return '';
+    return (await res.text()).slice(0, 300);
+  } catch {
+    return '';
+  }
+}
+
+/**
  * Reads creds and base URL from env at call time (not module load) so
  * tests can override them via process.env without re-importing.
  */
-function readCreds(): { user: string; token: string; base: string } {
+function readCreds(): { user: string; token: string; base: string; sender: string } {
   const user = process.env.INFORU_USER ?? env.INFORU_USER;
   const token = process.env.INFORU_TOKEN ?? env.INFORU_TOKEN;
   const base = process.env.INFORU_BASE_URL ?? env.INFORU_BASE_URL;
+  // Sender ID shown to the recipient; must be approved by InforU for production.
+  const sender = process.env.INFORU_SENDER ?? env.INFORU_SENDER ?? 'Nexus';
   if (!user || !token) throw new Error('inforu_not_configured');
-  return { user, token, base };
+  return { user, token, base, sender };
 }
 
 /**
- * Trigger InforU to send a 6-digit OTP by SMS. InforU stores and
- * verifies the code itself; we only persist the RequestToken returned
- * here so we can pair it with the subsequent Authenticate call.
+ * Send one SMS via InforU's regular SMS API. The caller builds the full message
+ * text (which includes the OTP code we generated). InforU only delivers it.
+ *
+ * SECURITY: `input.message` contains the OTP code and is therefore NEVER logged.
  *
  * @param input.phone canonical 05XXXXXXXX phone
- * @param input.userIp end-user IP, recommended by InforU for abuse signals
- * @returns the RequestToken to store on our local challenge row
+ * @param input.message the SMS text to deliver
+ * @throws inforu_not_configured | inforu_network_error | inforu_http_<n> | inforu_send_status_<n>
  */
-export async function inforuSendOtp(input: {
+export async function inforuSendSms(input: {
   phone: string;
-  userIp?: string;
-}): Promise<{ requestToken: string }> {
-  const { user, token, base } = readCreds();
+  message: string;
+}): Promise<void> {
+  const { user, token, base, sender } = readCreds();
+  const tag = phoneTag(input.phone);
+  const started = Date.now();
+  const auth = Buffer.from(`${user}:${token}`).toString('base64');
   const body = {
-    User: { UserName: user, Token: token },
     Data: {
-      OtpType: 'sms',
-      OtpValue: input.phone,
-      ...(input.userIp ? { UserIP: input.userIp } : {}),
+      Message: input.message,
+      Recipients: [{ Phone: input.phone }],
+      Settings: { Sender: sender },
     },
   };
-  const res = await fetch(`${base}/api/Otp/SendOtp`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`inforu_http_${res.status}`);
+  console.info(`[inforu] SendSms -> phone#${tag} sender=${sender} base=${base}`);
+
+  let res: Awaited<ReturnType<typeof fetch>>;
+  try {
+    res = await fetch(`${base}/api/v2/SMS/SendSms`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        Authorization: `Basic ${auth}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    console.error(
+      `[inforu] SendSms NETWORK FAIL phone#${tag} (${Date.now() - started}ms): ${e instanceof Error ? e.message : String(e)}`,
+    );
+    throw new Error('inforu_network_error');
+  }
+
+  if (!res.ok) {
+    const detail = await readBodyForLog(res);
+    console.error(
+      `[inforu] SendSms HTTP ${res.status} phone#${tag} (${Date.now() - started}ms) body=${detail}`,
+    );
+    throw new Error(`inforu_http_${res.status}`);
+  }
+
   const json = (await res.json()) as InforuResponse;
-  if (json.StatusId !== 1 || !json.RequestToken) {
+  if (json.StatusId !== 1) {
+    console.error(
+      `[inforu] SendSms FAILED phone#${tag} (${Date.now() - started}ms) StatusId=${json.StatusId} desc="${json.StatusDescription ?? ''}" detail="${json.DetailDescription ?? ''}"`,
+    );
     throw new Error(`inforu_send_status_${json.StatusId}`);
   }
-  return { requestToken: json.RequestToken };
-}
 
-/**
- * Verify a code the user entered against the InforU RequestToken we
- * stored at SendOtp time. Returns ok=true only on StatusId=1; all other
- * statuses (wrong code, expired, locked) collapse to ok=false so the
- * caller can map them to a single generic `otp_invalid` for the client.
- *
- * @param input.phone canonical 05XXXXXXXX phone (same as in SendOtp)
- * @param input.code 6-digit code the user entered
- * @param input.requestToken token returned by SendOtp
- */
-export async function inforuAuthenticateOtp(input: {
-  phone: string;
-  code: string;
-  requestToken: string;
-}): Promise<{ ok: boolean }> {
-  const { user, token, base } = readCreds();
-  const body = {
-    User: { UserName: user, Token: token },
-    Data: {
-      OtpCode: input.code,
-      OtpValue: input.phone,
-      RequestToken: input.requestToken,
-    },
-  };
-  const res = await fetch(`${base}/api/Otp/Authenticate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`inforu_http_${res.status}`);
-  const json = (await res.json()) as InforuResponse;
-  return { ok: json.StatusId === 1 };
+  console.info(`[inforu] SendSms OK phone#${tag} (${Date.now() - started}ms) StatusId=1`);
 }

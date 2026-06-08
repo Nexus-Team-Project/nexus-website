@@ -13,7 +13,9 @@
  *     - phone unknown -> issue phoneSignupTicket, return mode=phone_verified
  */
 import { Db, ObjectId } from 'mongodb';
-import { inforuSendOtp, inforuAuthenticateOtp } from '../sms/inforu.client';
+import bcrypt from 'bcryptjs';
+import { randomInt } from 'crypto';
+import { inforuSendSms } from '../sms/inforu.client';
 import { normalizeIsraeliPhone } from '../../utils/phone';
 import { assertRateLimit } from './wallet-rate-limit';
 import {
@@ -25,6 +27,15 @@ import { createPhoneSignupTicket } from './phone-signup-ticket.service';
 
 const TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+const BCRYPT_ROUNDS = 10;
+
+/**
+ * Builds the OTP SMS text. Short and link-free (InforU forbids URL shortening on
+ * OTP). The code is placed clearly to aid one-time-code autofill.
+ */
+function buildOtpSms(code: string): string {
+  return `קוד האימות שלך לנקסוס: ${code}`;
+}
 
 /**
  * The two shapes verifyPhoneOtp can return. logged_in carries an
@@ -51,7 +62,7 @@ export type VerifyPhoneResult =
 export async function startPhoneOtp(
   db: Db,
   args: { phone: string; ip: string; userAgentHash?: string },
-): Promise<{ challengeId: string }> {
+): Promise<{ challengeId: string; __testCode?: string }> {
   const phone = normalizeIsraeliPhone(args.phone);
   await assertRateLimit(db, { bucket: 'phone_otp_send', key: phone, windowSec: 30, max: 1 });
   await assertRateLimit(db, { bucket: 'phone_otp_send_hourly', key: phone, windowSec: 3600, max: 5 });
@@ -61,12 +72,17 @@ export async function startPhoneOtp(
   const existing = await identities.findOne({ phone });
   const purpose: PhoneOtpChallenge['purpose'] = existing ? 'login' : 'signup';
 
-  const { requestToken } = await inforuSendOtp({ phone, userIp: args.ip });
+  // Cryptographically-random 6-digit code. Only its bcrypt hash is stored; the
+  // plaintext lives only in the SMS we send and is never persisted or logged.
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
+  await inforuSendSms({ phone, message: buildOtpSms(code) });
+
   const now = new Date();
   const insert: PhoneOtpChallenge = {
     phone,
     purpose,
-    inforuRequestToken: requestToken,
+    codeHash,
     createdAt: now,
     expiresAt: new Date(now.getTime() + TTL_MS),
     verifiedAt: null,
@@ -75,6 +91,11 @@ export async function startPhoneOtp(
     userAgentHash: args.userAgentHash || null,
   };
   const r = await db.collection<PhoneOtpChallenge>(PHONE_OTP_COLLECTION).insertOne(insert);
+  // __testCode is returned ONLY under NODE_ENV=test so tests can verify; it is
+  // never present in production responses.
+  if (process.env.NODE_ENV === 'test') {
+    return { challengeId: r.insertedId.toHexString(), __testCode: code };
+  }
   return { challengeId: r.insertedId.toHexString() };
 }
 
@@ -107,15 +128,14 @@ export async function confirmPhoneOtpChallenge(
   if (!doc || doc.verifiedAt || doc.expiresAt < new Date()) throw new Error('otp_invalid');
   if (doc.attempts >= MAX_ATTEMPTS) throw new Error('otp_locked');
 
-  const { ok } = await inforuAuthenticateOtp({
-    phone: doc.phone,
-    code: args.code,
-    requestToken: doc.inforuRequestToken,
-  });
+  // Constant-time-ish bcrypt comparison against the stored hash. A wrong code
+  // increments attempts (locks at MAX_ATTEMPTS); the code is never logged.
+  const ok = await bcrypt.compare(args.code, doc.codeHash);
   if (!ok) {
     await col.updateOne({ _id: doc._id }, { $inc: { attempts: 1 } });
     throw new Error('otp_invalid');
   }
+  // Single-use: stamp verifiedAt so the same code/challenge cannot be replayed.
   await col.updateOne({ _id: doc._id }, { $set: { verifiedAt: new Date() } });
   return { phone: doc.phone };
 }

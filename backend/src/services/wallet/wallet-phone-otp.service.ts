@@ -6,32 +6,29 @@
  */
 import { Db } from 'mongodb';
 import { startPhoneOtp, confirmPhoneOtpChallenge } from '../auth/phone-otp.service';
-import { attachPhoneToIdentity, requireIsraeliPhone } from './phone-attach.service';
+import { attachPhoneToIdentity, requireIsraeliPhone, PhoneAttachError } from './phone-attach.service';
+import { getIdentityDomainCollections } from '../../models/domain';
 
 /**
- * Whether the REAL wallet phone-OTP flow is enabled — an explicit ops flag that
- * mirrors the frontend VITE_PHONE_OTP_ENABLED. When false (default) the dev
- * test-attach path (attach without OTP) is permitted; when true it is rejected.
- *
- * Decoupled from whether InforU env is present: a team may have InforU
- * credentials set while still wanting the test path during wiring-up. Flip this
- * to 'true' (and VITE_PHONE_OTP_ENABLED) once real OTP should go live.
- */
-export function isWalletPhoneOtpEnabled(): boolean {
-  return process.env.WALLET_PHONE_OTP_ENABLED === 'true';
-}
-
-/**
- * Send an OTP to a phone the caller wants to attach. Validates Israel-only
- * before spending an SMS.
- * @throws PhoneAttachError('phone_not_israeli') | 'sms_unavailable' | rate limits.
+ * Send an OTP to a phone the caller wants to attach. Validates Israel-only and
+ * rejects the caller's CURRENT number (no pointless re-OTP) BEFORE spending an
+ * SMS.
+ * @throws PhoneAttachError('phone_not_israeli' | 'phone_unchanged') |
+ *         'sms_unavailable' | rate limits.
  */
 export async function startWalletPhoneOtp(
   db: Db,
-  args: { phone: string; ip: string; userAgentHash?: string },
-): Promise<{ challengeId: string }> {
-  requireIsraeliPhone(args.phone);
-  return startPhoneOtp(db, args);
+  args: { phone: string; ip: string; userAgentHash?: string; nexusIdentityId: string },
+): Promise<{ challengeId: string; __testCode?: string }> {
+  const phone = requireIsraeliPhone(args.phone);
+  // Block re-verifying the number the caller already has, before any SMS cost.
+  const { nexusIdentities } = getIdentityDomainCollections(db);
+  const self = await nexusIdentities.findOne(
+    { nexusIdentityId: args.nexusIdentityId },
+    { projection: { phone: 1 } },
+  );
+  if (self?.phone === phone) throw new PhoneAttachError('phone_unchanged');
+  return startPhoneOtp(db, { phone, ip: args.ip, userAgentHash: args.userAgentHash });
 }
 
 /**
@@ -50,22 +47,5 @@ export async function verifyWalletPhoneOtp(
     nexusIdentityId: args.nexusIdentityId,
     phone,
     verified: true,
-  });
-}
-
-/**
- * TEST-ONLY: attach the phone WITHOUT an OTP (saved unverified). Exercises the
- * full DB write path while real OTP is off. Route-gated by
- * isWalletPhoneOtpEnabled(); rejected once that flag is true.
- * @throws PhoneAttachError('phone_not_israeli' | 'phone_in_use').
- */
-export async function attachWalletPhoneTest(
-  db: Db,
-  args: { nexusIdentityId: string; phone: string },
-): Promise<{ phone: string }> {
-  return attachPhoneToIdentity(db, {
-    nexusIdentityId: args.nexusIdentityId,
-    phone: args.phone,
-    verified: false,
   });
 }
