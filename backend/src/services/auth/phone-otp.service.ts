@@ -1,14 +1,16 @@
 /**
- * Wallet phone-OTP lifecycle service. Wraps the InforU SendOtp /
- * Authenticate calls with our own rate limits, attempt cap, and
- * signup-ticket emission for unknown phones.
+ * Wallet phone-OTP lifecycle service. Self-managed OTP: we generate the
+ * code, bcrypt-hash it at rest, send the plaintext via InforU regular SMS,
+ * and verify it ourselves (bcrypt.compare) with our own rate limits,
+ * attempt cap, and signup-ticket emission for unknown phones. (InforU's
+ * hosted OTP product is not enabled on the account, so we own the lifecycle.)
  *
  * Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md sections 6 + 10.6
- * Side: inforu-sms-api.md sections 2 and 3.
+ * Side: inforu-sms-api.md (self-managed SendSms flow).
  *
  * Flow:
- *   startPhoneOtp ->  rate-limit  ->  InforU SendOtp  ->  challenge row
- *   verifyPhoneOtp -> attempt cap -> InforU Authenticate -> either
+ *   startPhoneOtp ->  rate-limit  ->  hash code + InforU SendSms  ->  challenge row
+ *   verifyPhoneOtp -> attempt cap -> bcrypt.compare -> either
  *     - phone known -> return mode=logged_in with the identity hint
  *     - phone unknown -> issue phoneSignupTicket, return mode=phone_verified
  */
@@ -53,8 +55,9 @@ export type VerifyPhoneResult =
 
 /**
  * Start a phone-OTP challenge. Normalizes the phone, applies the
- * 1/30s + 5/h + 50/day-per-IP rate limits, calls InforU SendOtp, and
- * persists a phoneOtpChallenge row keyed by the returned RequestToken.
+ * 1/30s + 5/h + 50/day-per-IP rate limits, generates + bcrypt-hashes a
+ * 6-digit code, sends the plaintext via InforU SendSms, and persists a
+ * phoneOtpChallenge row holding only the codeHash.
  *
  * @returns the challengeId to be passed back in verify / resend
  * @throws invalid_phone, rate_limited:<bucket>, or InforU errors
@@ -100,18 +103,17 @@ export async function startPhoneOtp(
 }
 
 /**
- * Verify a code against the InforU RequestToken stored on the challenge
- * row. Wrong codes increment `attempts`; >= MAX_ATTEMPTS locks the
- * challenge and forces a new SendOtp. On success, returns mode=logged_in
- * if a NexusIdentity owns the phone, otherwise mode=phone_verified with
- * a single-use signup ticket.
+ * Verify a code against the bcrypt hash stored on the challenge row. Wrong
+ * codes increment `attempts`; >= MAX_ATTEMPTS locks the challenge and forces
+ * a new send. On success, returns mode=logged_in if a NexusIdentity owns the
+ * phone, otherwise mode=phone_verified with a single-use signup ticket.
  *
  * @throws otp_invalid (bad code, malformed id, expired, already verified)
  *         or otp_locked
  */
 /**
  * Confirm an OTP code against its challenge: validates the id, expiry, lock and
- * the InforU RequestToken, increments attempts on a wrong code, and marks the
+ * the stored bcrypt hash, increments attempts on a wrong code, and marks the
  * challenge verified on success. Returns the challenge's phone. Shared by the
  * login verify (below) and the wallet add-phone flow (attach to an existing
  * identity) so both validate identically.
