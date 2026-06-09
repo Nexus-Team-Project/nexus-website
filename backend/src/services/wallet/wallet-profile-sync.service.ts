@@ -9,7 +9,7 @@
  */
 import { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
-import { profileToMirrorTokens, profileFullName, type WalletProfileLike } from '../../config/wallet-profile-fields';
+import { profileToMirrorTokens, profileFullName, marketingConsentToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
 import { applyMirrorTokensToTenantContact } from './wallet-mirror-fields.helper';
 
 /**
@@ -24,15 +24,22 @@ export async function syncWalletProfileToTenants(
   nexusIdentityId: string,
 ): Promise<{ tenantsUpdated: number }> {
   const identity = await db
-    .collection<{ nexusIdentityId: string; profile?: WalletProfileLike }>(DOMAIN_COLLECTIONS.nexusIdentities)
-    .findOne({ nexusIdentityId }, { projection: { profile: 1 } });
-  if (!identity?.profile) return { tenantsUpdated: 0 };
+    .collection<{ nexusIdentityId: string; profile?: WalletProfileLike; marketingConsent?: { granted?: boolean } }>(DOMAIN_COLLECTIONS.nexusIdentities)
+    .findOne({ nexusIdentityId }, { projection: { profile: 1, marketingConsent: 1 } });
+  // Sync when the identity has either profile answers OR a recorded consent.
+  if (!identity?.profile && identity?.marketingConsent?.granted === undefined) {
+    return { tenantsUpdated: 0 };
+  }
 
-  const tokens = profileToMirrorTokens(identity.profile);
+  const tokens = profileToMirrorTokens(identity.profile ?? {});
+  // Marketing consent is a mirror column too, but sourced from the top-level
+  // marketingConsent audit object (not the profile sub-doc).
+  const mk = marketingConsentToken(identity.marketingConsent?.granted);
+  if (mk !== undefined) tokens.marketing = mk;
 
   // The Contacts tab shows tenantContacts.displayName. Mirror the wallet full name onto each
   // active-member tenant's contact row. Never blank an existing name: skip when empty.
-  const fullName = profileFullName(identity.profile);
+  const fullName = profileFullName(identity.profile ?? {});
 
   const memberships = await db
     .collection<{ tenantId: string }>(DOMAIN_COLLECTIONS.tenantMembers)

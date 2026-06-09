@@ -118,6 +118,9 @@ export interface MeResponse {
   phone?: string | null;
   /** ISO timestamp the phone was OTP-verified; null for a test-attached number. */
   phoneVerifiedAt?: string | null;
+  /** Whether the member opted in to marketing. Drives the wallet profile toggle
+   *  initial state; collected in the auth-flow consent question. */
+  marketingConsent?: boolean;
 }
 
 /**
@@ -456,7 +459,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   // test-attached number that never went through a real OTP.
   const phoneDoc = await identityCollections.nexusIdentities.findOne(
     { nexusIdentityId: domainIdentity.nexusIdentityId },
-    { projection: { phone: 1, phoneVerifiedAt: 1 } },
+    { projection: { phone: 1, phoneVerifiedAt: 1, marketingConsent: 1 } },
   );
 
   // The tenant's logo + brand color for the dashboard header / branding UI
@@ -501,6 +504,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
     profile: walletProfile,
     phone: phoneDoc?.phone ?? null,
     phoneVerifiedAt: phoneDoc?.phoneVerifiedAt ? phoneDoc.phoneVerifiedAt.toISOString() : null,
+    marketingConsent: phoneDoc?.marketingConsent?.granted ?? false,
   };
 }
 

@@ -6,12 +6,25 @@ import {
   localizeAnswer,
   profileToMirrorTokens,
   profileFullName,
+  marketingConsentToken,
 } from '../../src/config/wallet-profile-fields';
 
 describe('wallet-profile-fields registry', () => {
-  it('defines the five mirror fields with stable keys', () => {
+  it('defines the mirror fields with stable keys', () => {
     const keys = getMirrorFieldDefs().map((d) => d.sourceFieldKey).sort();
-    expect(keys).toEqual(['birthday', 'gender', 'life_stage', 'motivation', 'purpose']);
+    expect(keys).toEqual(['birthday', 'gender', 'life_stage', 'marketing', 'motivation', 'purpose']);
+  });
+
+  it('maps marketing consent to yes/no tokens (undefined when never set)', () => {
+    expect(marketingConsentToken(true)).toBe('yes');
+    expect(marketingConsentToken(false)).toBe('no');
+    expect(marketingConsentToken(undefined)).toBeUndefined();
+  });
+
+  it('localizes the marketing column tokens per language', () => {
+    const marketing = getMirrorFieldDef('marketing')!;
+    expect(localizeAnswer(marketing, 'yes', 'en')).toBe('Yes');
+    expect(localizeAnswer(marketing, 'no', 'he')).toBe('לא');
   });
 
   it('localizes a single_label token per language', () => {

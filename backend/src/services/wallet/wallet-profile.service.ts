@@ -140,7 +140,7 @@ export async function setWalletMarketingConsent(
   const { nexusIdentities } = getIdentityDomainCollections(db);
   const identity = await nexusIdentities.findOne(
     { normalizedEmail: normalize(args.email) },
-    { projection: { marketingConsent: 1 } },
+    { projection: { marketingConsent: 1, nexusIdentityId: 1 } },
   );
   const now = new Date();
   const grantedAt = identity?.marketingConsent?.grantedAt ?? now;
@@ -158,4 +158,14 @@ export async function setWalletMarketingConsent(
       },
     },
   );
+
+  // Mirror the consent into every active-member tenant's "Marketing consent"
+  // contact column. Best-effort: a sync hiccup must never fail the consent save.
+  try {
+    if (identity?.nexusIdentityId) {
+      await syncWalletProfileToTenants(db, identity.nexusIdentityId);
+    }
+  } catch (err) {
+    console.error('[wallet-profile] marketing-consent mirror sync failed (non-fatal):', err);
+  }
 }

@@ -21,9 +21,10 @@ export interface MirrorOption {
 /** A mirrorable profile field definition. */
 export interface MirrorFieldDef {
   /** Stable per-tenant column key (snake_case). */
-  sourceFieldKey: 'purpose' | 'life_stage' | 'gender' | 'birthday' | 'motivation';
-  /** Key on NexusIdentity.profile (camelCase). */
-  profileKey: 'purpose' | 'lifeStage' | 'gender' | 'birthday' | 'motivation';
+  sourceFieldKey: 'purpose' | 'life_stage' | 'gender' | 'birthday' | 'motivation' | 'marketing';
+  /** Key on NexusIdentity.profile (camelCase). Absent for non-profile sources
+   *  like `marketing`, which is sourced from NexusIdentity.marketingConsent. */
+  profileKey?: 'purpose' | 'lifeStage' | 'gender' | 'birthday' | 'motivation';
   columnType: MirrorColumnType;
   labelEn: string;
   labelHe: string;
@@ -56,12 +57,19 @@ const GENDER_OPTIONS: MirrorOption[] = [
   { value: 'prefer_not_to_say', labelEn: 'No preference', labelHe: 'לא משנה לי' },
 ];
 
+/** Marketing-consent column tokens (sourced from NexusIdentity.marketingConsent). */
+const MARKETING_OPTIONS: MirrorOption[] = [
+  { value: 'yes', labelEn: 'Yes', labelHe: 'כן' },
+  { value: 'no',  labelEn: 'No',  labelHe: 'לא' },
+];
+
 const DEFS: MirrorFieldDef[] = [
   { sourceFieldKey: 'purpose',    profileKey: 'purpose',    columnType: 'multi_label',  labelEn: 'Interests',  labelHe: 'תחומי עניין', options: PURPOSE_OPTIONS },
   { sourceFieldKey: 'life_stage', profileKey: 'lifeStage',  columnType: 'single_label', labelEn: 'Life stage', labelHe: 'מצב משפחתי', options: LIFE_STAGE_OPTIONS },
   { sourceFieldKey: 'gender',     profileKey: 'gender',     columnType: 'single_label', labelEn: 'Gender',     labelHe: 'מגדר',        options: GENDER_OPTIONS },
   { sourceFieldKey: 'birthday',   profileKey: 'birthday',   columnType: 'date',         labelEn: 'Birthday',   labelHe: 'יום הולדת' },
   { sourceFieldKey: 'motivation', profileKey: 'motivation', columnType: 'free_text',    labelEn: 'Motivation', labelHe: 'מוטיבציה' },
+  { sourceFieldKey: 'marketing',  columnType: 'single_label', labelEn: 'Marketing consent', labelHe: 'הסכמה לדיוור', options: MARKETING_OPTIONS },
 ];
 
 /** Returns all mirror field definitions. */
@@ -149,6 +157,17 @@ export function profileFullName(profile: { firstName?: string; lastName?: string
  * @param profile - Partial NexusIdentity.profile sub-doc.
  * @returns Record keyed by sourceFieldKey with ready-to-store token values.
  */
+/**
+ * Map a marketing-consent `granted` flag to its mirror-column token.
+ * @param granted true = opted in, false = declined, undefined = never set.
+ * @returns 'yes' / 'no', or undefined when consent was never recorded (so the
+ *   column is left untouched rather than written as a blank).
+ */
+export function marketingConsentToken(granted: boolean | undefined): 'yes' | 'no' | undefined {
+  if (granted === undefined || granted === null) return undefined;
+  return granted ? 'yes' : 'no';
+}
+
 export function profileToMirrorTokens(profile: WalletProfileLike): Record<string, unknown> {
   const out: Record<string, unknown> = {};
 

@@ -25,7 +25,7 @@ import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import { markTenantMemberInvitationAccepted } from '../domain-member-invitation-read.service';
 import { activeCatalogTenantIds } from './tenant-discovery.service';
 import { applyMirrorTokensToTenantContact } from './wallet-mirror-fields.helper';
-import { profileToMirrorTokens, profileFullName, normalizeGenderToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
+import { profileToMirrorTokens, profileFullName, marketingConsentToken, normalizeGenderToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
 
 export interface CreateJoinResult {
   created: string[];
@@ -59,8 +59,8 @@ export async function materializeTenantMembership(
   // shows it. NexusIdentity.phone is the source of truth (set when the user adds
   // a phone in the wallet); absent for users who never added one.
   const identityDoc = await db
-    .collection<{ nexusIdentityId: string; phone?: string; phoneVerifiedAt?: Date; profile?: WalletProfileLike }>(DOMAIN_COLLECTIONS.nexusIdentities)
-    .findOne({ nexusIdentityId: args.nexusIdentityId }, { projection: { phone: 1, phoneVerifiedAt: 1, profile: 1 } });
+    .collection<{ nexusIdentityId: string; phone?: string; phoneVerifiedAt?: Date; profile?: WalletProfileLike; marketingConsent?: { granted?: boolean } }>(DOMAIN_COLLECTIONS.nexusIdentities)
+    .findOne({ nexusIdentityId: args.nexusIdentityId }, { projection: { phone: 1, phoneVerifiedAt: 1, profile: 1, marketingConsent: 1 } });
   const phone = identityDoc?.phone;
   // The phone is "verified" on the row only if the user confirmed it via OTP.
   const phoneFields = phone ? { phone, phoneVerified: !!identityDoc?.phoneVerifiedAt } : {};
@@ -131,11 +131,14 @@ export async function materializeTenantMembership(
     { upsert: true },
   );
 
-  // Mirror the member's onboarding answers into this tenant's contact columns.
-  // Reuse identityDoc.profile fetched above - no second round-trip needed.
-  if (identityDoc?.profile) {
+  // Mirror the member's onboarding answers + marketing consent into this tenant's
+  // contact columns. Reuse identityDoc fetched above - no second round-trip needed.
+  const mirrorTokens = profileToMirrorTokens(identityDoc?.profile ?? {});
+  const joinMk = marketingConsentToken(identityDoc?.marketingConsent?.granted);
+  if (joinMk !== undefined) mirrorTokens.marketing = joinMk;
+  if (Object.keys(mirrorTokens).length > 0) {
     await applyMirrorTokensToTenantContact(
-      db, args.tenantId, args.nexusIdentityId, profileToMirrorTokens(identityDoc.profile),
+      db, args.tenantId, args.nexusIdentityId, mirrorTokens,
     );
   }
 }
