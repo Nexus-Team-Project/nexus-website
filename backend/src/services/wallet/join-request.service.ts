@@ -25,7 +25,7 @@ import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import { markTenantMemberInvitationAccepted } from '../domain-member-invitation-read.service';
 import { activeCatalogTenantIds } from './tenant-discovery.service';
 import { applyMirrorTokensToTenantContact } from './wallet-mirror-fields.helper';
-import { profileToMirrorTokens, normalizeGenderToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
+import { profileToMirrorTokens, profileFullName, normalizeGenderToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
 
 export interface CreateJoinResult {
   created: string[];
@@ -59,11 +59,16 @@ export async function materializeTenantMembership(
   // shows it. NexusIdentity.phone is the source of truth (set when the user adds
   // a phone in the wallet); absent for users who never added one.
   const identityDoc = await db
-    .collection<{ nexusIdentityId: string; phone?: string; phoneVerifiedAt?: Date }>(DOMAIN_COLLECTIONS.nexusIdentities)
-    .findOne({ nexusIdentityId: args.nexusIdentityId }, { projection: { phone: 1, phoneVerifiedAt: 1 } });
+    .collection<{ nexusIdentityId: string; phone?: string; phoneVerifiedAt?: Date; profile?: WalletProfileLike }>(DOMAIN_COLLECTIONS.nexusIdentities)
+    .findOne({ nexusIdentityId: args.nexusIdentityId }, { projection: { phone: 1, phoneVerifiedAt: 1, profile: 1 } });
   const phone = identityDoc?.phone;
   // The phone is "verified" on the row only if the user confirmed it via OTP.
   const phoneFields = phone ? { phone, phoneVerified: !!identityDoc?.phoneVerifiedAt } : {};
+
+  // Prefer the wallet profile name for the contact's display name; always overwrite an
+  // existing row's name with it when present. Fall back to the caller-supplied name, then
+  // the email local-part, only when the profile has no name (and only on insert).
+  const fullName = profileFullName(identityDoc?.profile ?? {});
 
   await db.collection(DOMAIN_COLLECTIONS.tenantUserRoles).updateOne(
     { nexusIdentityId: args.nexusIdentityId, tenantId: args.tenantId, role: 'member' },
@@ -96,33 +101,41 @@ export async function materializeTenantMembership(
   );
   // Mirror the invite-accept flow: an approved member must also appear in the
   // tenant's Contacts tab.
+  //
+  // displayName placement rules (Mongo rejects a field in both $set and $setOnInsert):
+  //   - fullName present  -> always overwrite with wallet name via $set
+  //   - fullName absent   -> fall back to caller-supplied name / email prefix, new rows only via $setOnInsert
+  const contactSetOnInsert: Record<string, unknown> = {
+    tenantContactId: `tenant_contact_${randomUUID()}`,
+    tenantId: args.tenantId,
+    email: args.email,
+    normalizedEmail: args.email,
+    createdAt: now,
+  };
+  // nexusIdentityId is in $set (not $setOnInsert) so a pre-existing
+  // admin-added contact (added by email, no identity link) gets backfilled
+  // when its owner joins - otherwise the mirror write below, which matches by
+  // nexusIdentityId, would silently miss that row.
+  const contactSet: Record<string, unknown> = {
+    status: 'active', lastActivityAt: now, updatedAt: now,
+    nexusIdentityId: args.nexusIdentityId, ...phoneFields,
+  };
+  if (fullName) {
+    contactSet.displayName = fullName;
+  } else {
+    contactSetOnInsert.displayName = args.displayName ?? args.email.split('@')[0];
+  }
   await db.collection(DOMAIN_COLLECTIONS.tenantContacts).updateOne(
     { tenantId: args.tenantId, normalizedEmail: args.email },
-    {
-      $setOnInsert: {
-        tenantContactId: `tenant_contact_${randomUUID()}`,
-        tenantId: args.tenantId,
-        email: args.email,
-        normalizedEmail: args.email,
-        displayName: args.displayName ?? args.email.split('@')[0],
-        createdAt: now,
-      },
-      // nexusIdentityId is in $set (not $setOnInsert) so a pre-existing
-      // admin-added contact (added by email, no identity link) gets backfilled
-      // when its owner joins - otherwise the mirror write below, which matches by
-      // nexusIdentityId, would silently miss that row.
-      $set: { status: 'active', lastActivityAt: now, updatedAt: now, nexusIdentityId: args.nexusIdentityId, ...phoneFields },
-    },
+    { $setOnInsert: contactSetOnInsert, $set: contactSet },
     { upsert: true },
   );
 
   // Mirror the member's onboarding answers into this tenant's contact columns.
-  const profileDoc = await db
-    .collection<{ nexusIdentityId: string; profile?: WalletProfileLike }>(DOMAIN_COLLECTIONS.nexusIdentities)
-    .findOne({ nexusIdentityId: args.nexusIdentityId }, { projection: { profile: 1 } });
-  if (profileDoc?.profile) {
+  // Reuse identityDoc.profile fetched above - no second round-trip needed.
+  if (identityDoc?.profile) {
     await applyMirrorTokensToTenantContact(
-      db, args.tenantId, args.nexusIdentityId, profileToMirrorTokens(profileDoc.profile),
+      db, args.tenantId, args.nexusIdentityId, profileToMirrorTokens(identityDoc.profile),
     );
   }
 }

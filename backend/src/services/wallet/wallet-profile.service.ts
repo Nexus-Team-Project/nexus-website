@@ -12,6 +12,7 @@ import type {
   WalletMarketingConsentInput,
 } from '../../schemas/wallet-profile.schemas';
 import { syncWalletProfileToTenants } from './wallet-profile-sync.service';
+import { profileFullName } from '../../config/wallet-profile-fields';
 
 const normalize = (e: string): string => e.trim().toLowerCase();
 
@@ -81,6 +82,23 @@ export async function patchWalletProfile(
   if (args.patch.purpose !== undefined) set['profile.purpose'] = args.patch.purpose;
   if (args.patch.inviteFriendsSent !== undefined) set['profile.inviteFriendsSent'] = args.patch.inviteFriendsSent;
   if (args.patch.complete === true) set['profile.completedAt'] = now;
+
+  // Members tab reads the top-level NexusIdentity.displayName, not profile.firstName/lastName.
+  // Keep it converged with the wallet name on EVERY save (not only on name-carrying patches):
+  // recompute from the merged (patch over stored) name so a save that does not carry the name
+  // still syncs displayName to the current profile name. This matches the Contacts mirror
+  // (syncWalletProfileToTenants), which always reads the stored profile. Always overwrite;
+  // never blank an existing name: skip the write when the merged name is empty.
+  {
+    const existing = await nexusIdentities.findOne(
+      { normalizedEmail: normalize(args.email) },
+      { projection: { 'profile.firstName': 1, 'profile.lastName': 1 } },
+    );
+    const mergedFirst = args.patch.firstName ?? existing?.profile?.firstName;
+    const mergedLast = args.patch.lastName ?? existing?.profile?.lastName;
+    const fullName = profileFullName({ firstName: mergedFirst, lastName: mergedLast });
+    if (fullName) set.displayName = fullName;
+  }
 
   await nexusIdentities.updateOne(
     { normalizedEmail: normalize(args.email) },

@@ -122,6 +122,21 @@ export interface WalletProfileLike {
   gender?: string;
   birthday?: Date | string;
   motivation?: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+/**
+ * Build a display name from a profile's first/last name.
+ * @param profile partial wallet profile.
+ * @returns trimmed "first last" (or the present part), or null when both empty.
+ */
+export function profileFullName(profile: { firstName?: string; lastName?: string }): string | null {
+  const full = [profile.firstName, profile.lastName]
+    .map((s) => (s ?? '').trim())
+    .filter(Boolean)
+    .join(' ');
+  return full.length > 0 ? full : null;
 }
 
 /**

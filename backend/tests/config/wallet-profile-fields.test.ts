@@ -5,6 +5,7 @@ import {
   normalizeGenderToken,
   localizeAnswer,
   profileToMirrorTokens,
+  profileFullName,
 } from '../../src/config/wallet-profile-fields';
 
 describe('wallet-profile-fields registry', () => {
@@ -57,5 +58,19 @@ describe('wallet-profile-fields registry', () => {
 
   it('omits keys for absent profile fields', () => {
     expect(profileToMirrorTokens({ lifeStage: 'just-me' })).toEqual({ life_stage: 'just-me' });
+  });
+});
+
+describe('profileFullName', () => {
+  it('joins first + last, trimmed', () => {
+    expect(profileFullName({ firstName: ' Dana ', lastName: ' Levi ' })).toBe('Dana Levi');
+  });
+  it('returns just the present part', () => {
+    expect(profileFullName({ firstName: 'Dana' })).toBe('Dana');
+    expect(profileFullName({ lastName: 'Levi' })).toBe('Levi');
+  });
+  it('returns null when both are empty/absent', () => {
+    expect(profileFullName({})).toBeNull();
+    expect(profileFullName({ firstName: '   ', lastName: '' })).toBeNull();
   });
 });
