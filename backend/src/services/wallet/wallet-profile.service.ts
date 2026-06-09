@@ -12,6 +12,7 @@ import type {
   WalletMarketingConsentInput,
 } from '../../schemas/wallet-profile.schemas';
 import { syncWalletProfileToTenants } from './wallet-profile-sync.service';
+import { profileFullName } from '../../config/wallet-profile-fields';
 
 const normalize = (e: string): string => e.trim().toLowerCase();
 
@@ -26,6 +27,7 @@ export interface WalletProfileView {
   purpose?: string[];
   inviteFriendsSent?: number;
   completedAt?: string;
+  onboardingStartedAt?: string;
   updatedAt?: string;
 }
 
@@ -55,6 +57,7 @@ export async function getWalletProfile(
     purpose: p.purpose,
     inviteFriendsSent: p.inviteFriendsSent,
     completedAt: p.completedAt instanceof Date ? p.completedAt.toISOString() : undefined,
+    onboardingStartedAt: p.onboardingStartedAt instanceof Date ? p.onboardingStartedAt.toISOString() : undefined,
     updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : undefined,
   };
 }
@@ -81,6 +84,32 @@ export async function patchWalletProfile(
   if (args.patch.purpose !== undefined) set['profile.purpose'] = args.patch.purpose;
   if (args.patch.inviteFriendsSent !== undefined) set['profile.inviteFriendsSent'] = args.patch.inviteFriendsSent;
   if (args.patch.complete === true) set['profile.completedAt'] = now;
+
+  // One read of the current name + onboarding-started stamp, reused below.
+  const existing = await nexusIdentities.findOne(
+    { normalizedEmail: normalize(args.email) },
+    { projection: { 'profile.firstName': 1, 'profile.lastName': 1, 'profile.onboardingStartedAt': 1 } },
+  );
+
+  // Members tab reads the top-level NexusIdentity.displayName, not profile.firstName/lastName.
+  // Keep it converged with the wallet name on EVERY save (not only on name-carrying patches):
+  // recompute from the merged (patch over stored) name so a save that does not carry the name
+  // still syncs displayName to the current profile name. This matches the Contacts mirror
+  // (syncWalletProfileToTenants), which always reads the stored profile. Always overwrite;
+  // never blank an existing name: skip the write when the merged name is empty.
+  {
+    const mergedFirst = args.patch.firstName ?? existing?.profile?.firstName;
+    const mergedLast = args.patch.lastName ?? existing?.profile?.lastName;
+    const fullName = profileFullName({ firstName: mergedFirst, lastName: mergedLast });
+    if (fullName) set.displayName = fullName;
+  }
+
+  // Stamp onboardingStartedAt ONCE, the first time the user enters the flow.
+  // Drives resume-on-return: a returning incomplete user (started but not
+  // completed) skips the stories and resumes at the questions.
+  if (args.patch.onboardingStarted === true && !existing?.profile?.onboardingStartedAt) {
+    set['profile.onboardingStartedAt'] = now;
+  }
 
   await nexusIdentities.updateOne(
     { normalizedEmail: normalize(args.email) },
@@ -122,7 +151,7 @@ export async function setWalletMarketingConsent(
   const { nexusIdentities } = getIdentityDomainCollections(db);
   const identity = await nexusIdentities.findOne(
     { normalizedEmail: normalize(args.email) },
-    { projection: { marketingConsent: 1 } },
+    { projection: { marketingConsent: 1, nexusIdentityId: 1 } },
   );
   const now = new Date();
   const grantedAt = identity?.marketingConsent?.grantedAt ?? now;
@@ -140,4 +169,14 @@ export async function setWalletMarketingConsent(
       },
     },
   );
+
+  // Mirror the consent into every active-member tenant's "Marketing consent"
+  // contact column. Best-effort: a sync hiccup must never fail the consent save.
+  try {
+    if (identity?.nexusIdentityId) {
+      await syncWalletProfileToTenants(db, identity.nexusIdentityId);
+    }
+  } catch (err) {
+    console.error('[wallet-profile] marketing-consent mirror sync failed (non-fatal):', err);
+  }
 }

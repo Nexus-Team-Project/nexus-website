@@ -36,7 +36,7 @@ const BCRYPT_ROUNDS = 10;
  * OTP). The code is placed clearly to aid one-time-code autofill.
  */
 function buildOtpSms(code: string): string {
-  return `קוד האימות שלך לנקסוס: ${code}`;
+  return `קוד האימות שלך הוא: ${code}\nאין לשתף קוד זה עם אף אחד.`;
 }
 
 /**

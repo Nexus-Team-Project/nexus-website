@@ -72,9 +72,14 @@ export async function syncDomainIdentityForLoginUser(user: LoginUserIdentityInpu
         normalizedEmail: identityOnInsert.normalizedEmail,
         locale: identityOnInsert.locale,
         createdAt: identityOnInsert.createdAt,
+        // Seed displayName from the login (Google/Prisma) full name ONLY at
+        // creation. After that the wallet profile owns NexusIdentity.displayName
+        // (set by patchWalletProfile). This sync runs on every /api/me + tenant
+        // context resolve; re-$set-ing displayName here would clobber a
+        // wallet-edited name back to the login name on the next request.
+        displayName: user.fullName,
       },
       $set: {
-        displayName: user.fullName,
         authProvider: mapAuthProvider(user.provider),
         status: 'active',
         prismaUserId: user.id,

@@ -73,6 +73,9 @@ export const walletProfileSchema = z.object({
   purpose: z.array(z.string().min(1).max(100)).max(20).optional(),
   inviteFriendsSent: z.number().int().min(0).optional(),
   completedAt: z.date().optional(),
+  /** First time the user entered the onboarding flow (stories or questions).
+   *  Set once; lets a returning incomplete user resume at the questions. */
+  onboardingStartedAt: z.date().optional(),
   updatedAt: z.date(),
 });
 export type WalletProfileDocument = z.infer<typeof walletProfileSchema>;

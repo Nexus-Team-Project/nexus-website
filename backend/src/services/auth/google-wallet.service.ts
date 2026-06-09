@@ -21,6 +21,8 @@ const idTokenVerifier = new OAuth2Client(env.GOOGLE_CLIENT_ID);
 interface VerifiedPayload {
   email: string;
   name?: string;
+  /** Google profile photo URL from the id_token `picture` claim, if present. */
+  picture?: string;
 }
 
 /**
@@ -39,7 +41,29 @@ async function verifyIdToken(idToken: string): Promise<VerifiedPayload> {
   if (!payload || !payload.email || !payload.email_verified) {
     throw new Error('google_token_invalid');
   }
-  return { email: payload.email, name: payload.name };
+  return { email: payload.email, name: payload.name, picture: payload.picture };
+}
+
+/**
+ * Best-effort fetch of the user's Google profile photo from the OpenID
+ * userinfo endpoint. The id_token sometimes omits the `picture` claim even
+ * when the account has a photo, so the code flow (which has an access token)
+ * falls back to this. Never throws - returns null on any failure.
+ *
+ * @param accessToken Google OAuth access token with the `profile` scope.
+ * @returns the photo URL, or null when absent/unavailable.
+ */
+async function fetchGooglePicture(accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { picture?: string };
+    return data.picture ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -54,6 +78,7 @@ export async function handleGoogleWalletLogin(args: {
     email: payload.email,
     verifiedPhone: null,
     displayName: payload.name,
+    avatarUrl: payload.picture ?? null,
   });
 }
 
@@ -82,9 +107,16 @@ export async function handleGoogleWalletCode(args: {
   const { tokens } = await codeClient.getToken(args.code);
   if (!tokens.id_token) throw new Error('google_token_invalid');
   const payload = await verifyIdToken(tokens.id_token);
+  // The id_token often omits `picture`; the code flow has an access token, so
+  // fall back to the userinfo endpoint to reliably capture the profile photo.
+  let avatarUrl = payload.picture ?? null;
+  if (!avatarUrl && tokens.access_token) {
+    avatarUrl = await fetchGooglePicture(tokens.access_token);
+  }
   return resolveWalletIdentity({
     email: payload.email,
     verifiedPhone: null,
     displayName: payload.name,
+    avatarUrl,
   });
 }

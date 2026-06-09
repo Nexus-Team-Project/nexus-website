@@ -17,6 +17,10 @@ export const walletProfilePatchSchema = z.object({
   inviteFriendsSent: z.number().int().min(0).max(10000).optional(),
   /** Set to true to stamp completedAt and gate the slide chain for returning users. */
   complete: z.boolean().optional(),
+  /** Set to true the first time the user enters the onboarding flow (stories or
+   *  questions). Stamps onboardingStartedAt once so a returning incomplete user
+   *  resumes at the questions (skipping the stories) instead of the catalog. */
+  onboardingStarted: z.boolean().optional(),
 });
 export type WalletProfilePatchInput = z.infer<typeof walletProfilePatchSchema>;
 

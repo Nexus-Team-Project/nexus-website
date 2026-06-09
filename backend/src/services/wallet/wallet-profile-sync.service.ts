@@ -1,13 +1,15 @@
 /**
- * Sync a wallet member's onboarding answers into every tenant they are an active
- * member of. Reads NexusIdentity.profile, maps to mirror tokens, and applies the
- * tokens to each tenant's contact row (set present, unset cleared). Idempotent.
+ * Sync a wallet member's onboarding answers and display name into every tenant
+ * they are an active member of. Reads NexusIdentity.profile, maps to mirror
+ * tokens, applies them to each tenant's contact row (set present, unset cleared),
+ * and also sets tenantContacts.displayName to the wallet full name when non-empty.
+ * Idempotent. Never creates contact rows - only updates existing ones.
  *
  * Spec: docs/superpowers/specs/2026-06-08-wallet-answers-to-contacts-design.md s.6.5
  */
 import { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
-import { profileToMirrorTokens, type WalletProfileLike } from '../../config/wallet-profile-fields';
+import { profileToMirrorTokens, profileFullName, marketingConsentToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
 import { applyMirrorTokensToTenantContact } from './wallet-mirror-fields.helper';
 
 /**
@@ -22,11 +24,22 @@ export async function syncWalletProfileToTenants(
   nexusIdentityId: string,
 ): Promise<{ tenantsUpdated: number }> {
   const identity = await db
-    .collection<{ nexusIdentityId: string; profile?: WalletProfileLike }>(DOMAIN_COLLECTIONS.nexusIdentities)
-    .findOne({ nexusIdentityId }, { projection: { profile: 1 } });
-  if (!identity?.profile) return { tenantsUpdated: 0 };
+    .collection<{ nexusIdentityId: string; profile?: WalletProfileLike; marketingConsent?: { granted?: boolean } }>(DOMAIN_COLLECTIONS.nexusIdentities)
+    .findOne({ nexusIdentityId }, { projection: { profile: 1, marketingConsent: 1 } });
+  // Sync when the identity has either profile answers OR a recorded consent.
+  if (!identity?.profile && identity?.marketingConsent?.granted === undefined) {
+    return { tenantsUpdated: 0 };
+  }
 
-  const tokens = profileToMirrorTokens(identity.profile);
+  const tokens = profileToMirrorTokens(identity.profile ?? {});
+  // Marketing consent is a mirror column too, but sourced from the top-level
+  // marketingConsent audit object (not the profile sub-doc).
+  const mk = marketingConsentToken(identity.marketingConsent?.granted);
+  if (mk !== undefined) tokens.marketing = mk;
+
+  // The Contacts tab shows tenantContacts.displayName. Mirror the wallet full name onto each
+  // active-member tenant's contact row. Never blank an existing name: skip when empty.
+  const fullName = profileFullName(identity.profile ?? {});
 
   const memberships = await db
     .collection<{ tenantId: string }>(DOMAIN_COLLECTIONS.tenantMembers)
@@ -36,6 +49,12 @@ export async function syncWalletProfileToTenants(
   let tenantsUpdated = 0;
   for (const m of memberships) {
     await applyMirrorTokensToTenantContact(db, m.tenantId, nexusIdentityId, tokens);
+    if (fullName) {
+      await db.collection(DOMAIN_COLLECTIONS.tenantContacts).updateOne(
+        { tenantId: m.tenantId, nexusIdentityId },
+        { $set: { displayName: fullName, updatedAt: new Date() } },
+      );
+    }
     tenantsUpdated += 1;
   }
   return { tenantsUpdated };
