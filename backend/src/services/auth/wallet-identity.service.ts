@@ -45,19 +45,24 @@ export interface ResolvedWalletIdentity {
  *   else null. When set, the phone is attached to the identity and stale
  *   tenant phone fields are cleared.
  * @param args.displayName optional name (e.g. from Google profile)
+ * @param args.avatarUrl optional Google profile photo URL. Stored on the Prisma
+ *   user (the wallet TopBar + auth-flow hero render it). Set on create and
+ *   refreshed on login; a null/empty value never overwrites an existing photo.
  */
 export async function resolveWalletIdentity(args: {
   email: string;
   verifiedPhone: string | null;
   displayName?: string;
+  avatarUrl?: string | null;
 }): Promise<ResolvedWalletIdentity> {
   const email = normalizeEmail(args.email);
   const fallbackName = args.displayName?.trim() || deriveNameFromEmail(email);
+  const incomingAvatar = args.avatarUrl?.trim() || null;
 
   // 1) Prisma user upsert.
   let prismaUser = await prisma.user.findUnique({
     where: { email },
-    select: { id: true, email: true, role: true },
+    select: { id: true, email: true, role: true, avatarUrl: true },
   });
   if (!prismaUser) {
     const created = await prisma.user.create({
@@ -66,10 +71,15 @@ export async function resolveWalletIdentity(args: {
         emailVerified: true,
         fullName: fallbackName,
         provider: 'EMAIL',
+        avatarUrl: incomingAvatar,
       },
-      select: { id: true, email: true, role: true },
+      select: { id: true, email: true, role: true, avatarUrl: true },
     });
     prismaUser = created;
+  } else if (incomingAvatar && incomingAvatar !== prismaUser.avatarUrl) {
+    // Keep the Google photo fresh on each login; never clobber a stored photo
+    // with null (an account that has no picture this time keeps the old one).
+    await prisma.user.update({ where: { id: prismaUser.id }, data: { avatarUrl: incomingAvatar } });
   }
 
   // 2) NexusIdentity upsert.

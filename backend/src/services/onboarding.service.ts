@@ -78,6 +78,9 @@ export interface MeResponse {
     id: string;
     email: string;
     name: string;
+    /** Google profile photo URL (from OAuth), or null. Wallet uses it for the
+     *  authenticated user avatar; falls back to initials when null. */
+    avatarUrl?: string | null;
   };
   context: UserContext & {
     plan?: string;
@@ -131,10 +134,10 @@ function toId(value: ObjectId | undefined): string | null {
  * Input: Prisma user id from a verified access token.
  * Output: public user identity or a 404 error.
  */
-async function getPrismaUser(userId: string): Promise<{ id: string; email: string; fullName: string; provider: string }> {
+async function getPrismaUser(userId: string): Promise<{ id: string; email: string; fullName: string; provider: string; avatarUrl: string | null }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, fullName: true, provider: true },
+    select: { id: true, email: true, fullName: true, provider: true, avatarUrl: true },
   });
   if (!user) throw createError('User not found', 404);
   return user;
@@ -466,7 +469,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
     : null;
 
   return {
-    user: { id: user.id, email: user.email, name: user.fullName },
+    user: { id: user.id, email: user.email, name: user.fullName, avatarUrl: user.avatarUrl ?? null },
     context: {
       ...context,
       tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
