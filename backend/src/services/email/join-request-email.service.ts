@@ -43,7 +43,7 @@ function renderCardHtml(language: 'he' | 'en', inner: string): string {
 <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:${dir};">
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr><td align="center" style="padding:40px 20px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr><td align="center">
   ${bannerHtml}
   ${inner}
