@@ -286,7 +286,7 @@ export async function sendVerificationEmail(
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td align="center" style="padding:40px 20px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr>
 <td align="center">
 ${bannerHtml}
@@ -331,7 +331,7 @@ ${verifyUrl}
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td align="center" style="padding:40px 20px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr>
 <td align="center">
 ${bannerHtml}
@@ -407,7 +407,7 @@ export async function sendPasswordResetEmail(
 <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr><td align="center" style="padding:40px 20px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr><td align="center">
   ${bannerHtml}
   <h1 style="margin:0;color:#111;font-size:26px;">איפוס סיסמה</h1>
@@ -436,7 +436,7 @@ export async function sendPasswordResetEmail(
 <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr><td align="center" style="padding:40px 20px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
 <tr><td align="center">
   ${bannerHtml}
   <h1 style="margin:0;color:#111;font-size:26px;">Password Reset</h1>
@@ -544,7 +544,7 @@ export async function sendEscalationAlert(data: {
 <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr><td align="center" style="padding:30px 15px;">
-<table width="560" cellpadding="0" cellspacing="0" style="background:white;border-radius:14px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:14px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
   <tr><td>
     <div style="background:#dc2626;color:white;padding:14px 20px;border-radius:10px;text-align:center;font-size:18px;font-weight:bold;">
       צ'אט דורש נציג — ${data.topic}
