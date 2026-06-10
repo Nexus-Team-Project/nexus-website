@@ -165,7 +165,13 @@ function resolveInvitationRoles(invite: TenantMemberInvitationDocument): TenantU
   return legacyRole ? [legacyRole as TenantUserRoleName] : [];
 }
 
-async function markTenantMemberInvitationAccepted(
+/**
+ * Marks one invitation accepted. Exported so the wallet-side reconcile
+ * service (services/auth/wallet-invitation-reconcile.service.ts) can
+ * auto-accept pending invites on login without re-implementing the
+ * tenant-contact + member-row side effects.
+ */
+export async function markTenantMemberInvitationAccepted(
   invite: TenantMemberInvitationDocument,
   acceptedByIdentityId: string,
 ): Promise<{ tenantId: string; roles: TenantUserRoleName[]; alreadyAccepted: boolean }> {
@@ -186,12 +192,32 @@ async function markTenantMemberInvitationAccepted(
   );
   if (updateResult.matchedCount !== 1) throw createError('Invitation could not be accepted', 409);
 
+  // If the invitation captured a phone number, ensure it lands on the
+  // member record and the contact row. Only writes when those documents do
+  // not already have a phone — never overwrites curated values.
+  const invitedPhone = (invite as unknown as { phone?: string }).phone;
+  if (invitedPhone) {
+    void tenantCollections.tenantMembers.updateOne(
+      { tenantId: invite.tenantId, nexusIdentityId: invite.nexusIdentityId, phone: { $exists: false } },
+      { $set: { phone: invitedPhone, updatedAt: now } },
+    ).catch(() => undefined);
+  }
+
   // Advance contact to active and record acceptance time.
-  // Fire-and-forget — a missing contact record is not an error.
   void tenantCollections.tenantContacts.updateOne(
     { tenantId: invite.tenantId, normalizedEmail: invite.normalizedEmail },
     { $set: { status: 'active', lastActivityAt: now, updatedAt: now } },
   ).catch(() => undefined);
+
+  // Seed phone on the contact only when it does not already have one.
+  // This way a tenant-curated phone is preserved while an empty contact
+  // gains the phone captured on the invitation.
+  if (invitedPhone) {
+    void tenantCollections.tenantContacts.updateOne(
+      { tenantId: invite.tenantId, normalizedEmail: invite.normalizedEmail, phone: { $exists: false } },
+      { $set: { phone: invitedPhone, updatedAt: now } },
+    ).catch(() => undefined);
+  }
 
   return { tenantId: invite.tenantId, roles, alreadyAccepted: false };
 }

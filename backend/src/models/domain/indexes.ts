@@ -6,6 +6,12 @@ import type { Db } from 'mongodb';
 import { getIdentityDomainCollections } from './identity.models';
 import { getOrchestrationDomainCollections } from './orchestration.models';
 import { getTenantDomainCollections } from './tenant.models';
+import { getSupplyDomainCollections } from './supply.models';
+import { ensureInviteJobIndexes } from './invite-jobs.models';
+import { ensurePhoneOtpIndexes } from '../auth/phone-otp.models';
+import { ensureEmailOtpIndexes } from '../auth/email-otp.models';
+import { ensurePhoneSignupTicketIndexes } from '../auth/phone-signup-ticket.models';
+import { ensureTenantJoinRequestIndexes } from '../auth/tenant-join-request.models';
 
 /**
  * Creates idempotent indexes for identity, tenant, member, event, and saga data.
@@ -20,6 +26,11 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
   await Promise.all([
     identity.nexusIdentities.createIndex({ normalizedEmail: 1 }, { unique: true }),
     identity.nexusIdentities.createIndex({ prismaUserId: 1 }, { sparse: true }),
+    // Wallet phone login - unique sparse so identities without phone coexist.
+    identity.nexusIdentities.createIndex(
+      { phone: 1 },
+      { name: 'phone_unique', unique: true, sparse: true },
+    ),
     identity.contactProfiles.createIndex({ nexusIdentityId: 1, channel: 1 }),
     identity.contactProfiles.createIndex({ channel: 1, normalizedIdentifier: 1 }, { unique: true }),
     identity.tenantUserRoles.createIndex({ nexusIdentityId: 1, tenantId: 1 }),
@@ -48,6 +59,17 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     // Unique contact per tenant per email; sorted list by creation time.
     tenants.tenantContacts.createIndex({ tenantId: 1, normalizedEmail: 1 }, { unique: true }),
     tenants.tenantContacts.createIndex({ tenantId: 1, createdAt: -1 }),
+    // Backs filtering by custom column values (customFields.<fieldId>). Wildcard
+    // index so any dynamic custom-column path is covered without a fixed schema.
+    tenants.tenantContacts.createIndex({ 'customFields.$**': 1 }, { name: 'customFields_wildcard' }),
+    // Custom column definitions: unique id per tenant, ordered list per tenant.
+    tenants.tenantContactFields.createIndex({ tenantId: 1, fieldId: 1 }, { unique: true }),
+    tenants.tenantContactFields.createIndex({ tenantId: 1, order: 1 }),
+    // One wallet-profile mirror column per (tenant, sourceFieldKey).
+    tenants.tenantContactFields.createIndex(
+      { tenantId: 1, sourceFieldKey: 1 },
+      { name: 'uniq_wallet_profile_field', unique: true, partialFilterExpression: { origin: 'wallet_profile' } },
+    ),
 
     orchestration.platformEvents.createIndex({ eventType: 1, createdAt: -1 }),
     orchestration.sagaInstances.createIndex(
@@ -57,4 +79,53 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     orchestration.processedSteps.createIndex({ sagaInstanceId: 1, step: 1 }, { unique: true }),
     orchestration.consumedEvents.createIndex({ platformEventId: 1, consumerName: 1 }, { unique: true }),
   ]);
+
+  const supply = getSupplyDomainCollections(db);
+  await Promise.all([
+    supply.nexusOffers.createIndex({ offerId: 1 }, { unique: true }),
+    supply.nexusOffers.createIndex({ status: 1, visibility: 1 }),
+    supply.nexusOffers.createIndex({ createdByTenantId: 1, status: 1 }),
+    supply.nexusOffers.createIndex({ category: 1, status: 1 }),
+    // Supports the paginated platform-catalog view: filter by status + visibility,
+    // sort newest-first. Required once GET /api/v1/offers/platform is paginated.
+    supply.nexusOffers.createIndex(
+      { status: 1, visibility: 1, createdAt: -1 },
+      { name: 'status_visibility_createdAt' },
+    ),
+    // Backs filter+sort by price for the catalog views. displayPrice is the
+    // denormalized voucher→member_price / other→market_price?:member_price.
+    supply.nexusOffers.createIndex(
+      { status: 1, visibility: 1, displayPrice: 1, createdAt: -1 },
+      { name: 'status_visibility_displayPrice_createdAt' },
+    ),
+    // Backs category-narrowed price range.
+    supply.nexusOffers.createIndex(
+      { status: 1, category: 1, displayPrice: 1 },
+      { name: 'status_category_displayPrice' },
+    ),
+    // Backs expiry_soon / expiry_far sort and validUntilBefore filter.
+    supply.nexusOffers.createIndex(
+      { status: 1, validUntil: 1 },
+      { name: 'status_validUntil' },
+    ),
+    // Backs tags ANY-of filter ($in). Multikey index.
+    supply.nexusOffers.createIndex(
+      { tags: 1 },
+      { name: 'tags' },
+    ),
+    supply.tenantOfferConfigs.createIndex({ tenantId: 1, offerId: 1 }, { unique: true }),
+    supply.tenantOfferConfigs.createIndex({ tenantId: 1, adoptionStatus: 1 }),
+    // Supports the paginated member catalog: list a tenant's adopted offers
+    // sorted by adoption time. Required once GET /api/v1/offers/:tenantId is paginated.
+    supply.tenantOfferConfigs.createIndex(
+      { tenantId: 1, adoptionStatus: 1, adoptedAt: -1 },
+      { name: 'tenant_adoption_adoptedAt' },
+    ),
+  ]);
+
+  await ensureInviteJobIndexes(db);
+  await ensurePhoneOtpIndexes(db);
+  await ensureEmailOtpIndexes(db);
+  await ensurePhoneSignupTicketIndexes(db);
+  await ensureTenantJoinRequestIndexes(db);
 }

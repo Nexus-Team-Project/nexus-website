@@ -609,6 +609,35 @@ video:focus-visible {
 .code-line:nth-child(17) { animation-delay: 0.9s; }
 .code-line:nth-child(18) { animation-delay: 0.95s; }
 
+/* Phone input (react-phone-number-input) — stop the flag and dropdown arrow
+   from overlapping in RTL.
+   The library ships physical left/right margins (arrow margin-left, country
+   box margin-right) that do not flip under [dir="rtl"], so in Hebrew the
+   caret gets crammed onto the flag. We force the country selector to a fixed
+   LTR flex layout with an explicit gap (so flag → arrow order and spacing are
+   stable in both directions) and use a logical margin to separate the selector
+   from the number input regardless of text direction. */
+.rpni-shell .PhoneInputCountry {
+  direction: ltr;
+  gap: 0.4em;
+  /* LTR: selector sits left of the number input, gap goes on its right. */
+  margin-right: 0.6em;
+  margin-left: 0;
+}
+
+/* RTL: the flex row reverses, so the selector sits to the RIGHT of the input.
+   The gap must move to its left edge (toward the input). We use physical
+   margins here because the box itself is forced to direction:ltr above, which
+   would otherwise flip logical margins the wrong way. */
+[dir="rtl"] .rpni-shell .PhoneInputCountry {
+  margin-left: 0.6em;
+  margin-right: 0;
+}
+
+.rpni-shell .PhoneInputCountrySelectArrow {
+  margin-left: 0;
+}
+
 /* RTL Support */
 [dir="rtl"] {
   direction: rtl;

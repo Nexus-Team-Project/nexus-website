@@ -11,6 +11,7 @@ import {
   type CatalogAdoptionMode,
   type DefaultPricingRule,
 } from '../models/domain';
+import { getSupplyDomainCollections } from '../models/domain/supply.models';
 import { getOnboardingCollections } from '../models/onboarding.models';
 import type { BenefitsCatalogActivationInput } from '../schemas/domain-service-activation.schemas';
 import { getDomainAuthorizationContext, hasDomainPermission } from './domain-authorization.service';
@@ -30,7 +31,7 @@ interface BenefitsCatalogPolicyDefaults {
 const BENEFITS_CATALOG_MODE_DEFAULTS: Record<BenefitsCatalogStartingMode, BenefitsCatalogPolicyDefaults> = {
   plug_and_play: {
     catalogAdoptionMode: 'auto_silent',
-    defaultPricingRule: 'nexus_price',
+    defaultPricingRule: 'inherit_selection',
     publicPricingMode: 'managed_by_nexus',
   },
   curated: {
@@ -51,6 +52,13 @@ export interface BenefitsCatalogActivationResponse {
   status: 'active';
   catalogAdoptionMode: CatalogAdoptionMode;
   pricingMode: PublicPricingMode;
+}
+
+export interface BenefitsCatalogDeactivationResponse {
+  tenantId: string;
+  serviceKey: 'benefits_catalog';
+  status: 'suspended';
+  offersDeactivated: number;
 }
 
 /**
@@ -118,7 +126,7 @@ async function requireServiceActivationAccess(userId: string): Promise<{
   }
 
   const authorization = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, context.tenantId);
-  if (!hasDomainPermission(authorization, 'tenant.activate_services')) throw createError('Forbidden', 403);
+  if (!hasDomainPermission(authorization, 'workspace.activate_service')) throw createError('Forbidden', 403);
 
   return {
     tenantObjectId,
@@ -195,6 +203,22 @@ export async function activateBenefitsCatalogForUser(
     { upsert: true },
   );
 
+  // Restore all inactive tenant-created offers when the service is re-activated.
+  // NOTE: This also restores offers the admin may have manually deactivated before
+  // the service was suspended. Re-activation is treated as a full service resume.
+  // A future 'admin_deactivated' status field would allow distinguishing the two
+  // cases if this becomes a product concern.
+  const supplyCollections = getSupplyDomainCollections(db);
+  await supplyCollections.nexusOffers.updateMany(
+    { createdByTenantId: access.tenantId, status: 'inactive' },
+    {
+      $set: {
+        status: 'active',
+        updatedAt: now,
+      },
+    },
+  );
+
   await ensureBenefitsCatalogPolicy(access.tenantId, input.startingMode);
 
   return {
@@ -203,5 +227,55 @@ export async function activateBenefitsCatalogForUser(
     status: 'active',
     catalogAdoptionMode: defaults.catalogAdoptionMode,
     pricingMode: defaults.publicPricingMode,
+  };
+}
+
+/**
+ * Deactivates the Benefits Catalog service for the authenticated tenant admin.
+ * Sets TenantServiceActivation.status to 'suspended' and marks all active
+ * tenant-created NexusOffer records as inactive.
+ * Members will see the 'inactive' gate in MemberCatalog immediately because
+ * resolveCatalogMode() returns 'inactive' when no active activation exists.
+ *
+ * Input: Prisma user id from the authenticated request.
+ * Output: deactivation summary with count of offers suspended.
+ */
+export async function deactivateBenefitsCatalogForUser(
+  userId: string,
+): Promise<BenefitsCatalogDeactivationResponse> {
+  const access = await requireServiceActivationAccess(userId);
+  const db = await getMongoDb();
+  const tenantCollections = getTenantDomainCollections(db);
+  const supplyCollections = getSupplyDomainCollections(db);
+  const now = new Date();
+
+  // Suspend the service activation record.
+  await tenantCollections.tenantServiceActivations.updateOne(
+    { tenantId: access.tenantId, serviceKey: 'benefits_catalog' },
+    {
+      $set: {
+        status: 'suspended',
+        updatedAt: now,
+      },
+    },
+  );
+
+  // Bulk-mark all active tenant-created offers as inactive.
+  // Platform offers (createdByTenantId === null) are not touched.
+  const offerResult = await supplyCollections.nexusOffers.updateMany(
+    { createdByTenantId: access.tenantId, status: 'active' },
+    {
+      $set: {
+        status: 'inactive',
+        updatedAt: now,
+      },
+    },
+  );
+
+  return {
+    tenantId: access.tenantObjectId.toHexString(),
+    serviceKey: 'benefits_catalog',
+    status: 'suspended',
+    offersDeactivated: offerResult.modifiedCount,
   };
 }

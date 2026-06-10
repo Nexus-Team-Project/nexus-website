@@ -62,7 +62,7 @@ export async function updateTenantMemberRoles(
   tenantMemberId: string,
   newRoles: TenantUserRoleName[],
 ): Promise<{ roles: TenantUserRoleName[] }> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
@@ -143,7 +143,7 @@ export async function updateTenantMemberEmail(
   tenantMemberId: string,
   newEmail: string,
 ): Promise<{ tenantMemberId: string; invitationId: string }> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
@@ -217,6 +217,10 @@ export async function updateTenantMemberEmail(
   });
 
   // Create new member records for the new email.
+  // Carry forward the services from the old invitation so access grants are preserved.
+  const oldServices: string[] = Array.isArray(latestInvite?.services) && latestInvite.services.length > 0
+    ? latestInvite.services
+    : ['benefits_catalog'];
   const newIdentity = await syncDomainIdentityForMemberInvite({ email: newEmail });
   const newTenantMemberId = `tenant_member_${randomUUID()}`;
   await tenantCollections.tenantMembers.insertOne({
@@ -226,6 +230,7 @@ export async function updateTenantMemberEmail(
     status: 'active',
     requireAdminApproval: false,
     customFields: {},
+    services: oldServices,
     createdAt: now,
     updatedAt: now,
   });
@@ -270,7 +275,7 @@ export async function updateTenantMemberEmail(
     );
   }
 
-  // Create a new pending invitation.
+  // Create a new pending invitation carrying over roles, groups, and services.
   const rawToken = generateToken(48);
   const invitationId = `tenant_member_invitation_${randomUUID()}`;
   const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -283,6 +288,7 @@ export async function updateTenantMemberEmail(
     normalizedEmail: newNormalized,
     roles: oldRoles,
     groupIds: oldGroupIds,
+    services: oldServices,
     tokenHash: hashToken(rawToken),
     status: 'pending',
     invitedByIdentityId: access.managerIdentityId,
@@ -346,7 +352,7 @@ export async function removeTenantMemberFromTenant(
   tenantMemberId: string,
   opts: { suppressEmail?: boolean } = {},
 ): Promise<void> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
@@ -430,7 +436,7 @@ export async function removeTenantContact(
   managerUserId: string,
   tenantContactId: string,
 ): Promise<void> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
 
@@ -480,7 +486,7 @@ export async function updateTenantContactEmail(
   tenantContactId: string,
   newEmail: string,
 ): Promise<void> {
-  const access = await requireTenantMemberPermission(managerUserId, 'member.manage');
+  const access = await requireTenantMemberPermission(managerUserId, 'members.update');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const now = new Date();

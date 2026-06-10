@@ -16,7 +16,16 @@ let database: Db | null = null;
 export async function getMongoClient(): Promise<MongoClient> {
   if (client) return client;
 
-  client = new MongoClient(env.MONGODB_URI);
+  client = new MongoClient(env.MONGODB_URI, {
+    tls: true,
+    retryWrites: true,
+    retryReads: true,
+    serverSelectionTimeoutMS: 30_000,
+    connectTimeoutMS: 30_000,
+    socketTimeoutMS: 360_000,
+    maxPoolSize: 10,
+    minPoolSize: 1,
+  });
   await client.connect();
   return client;
 }

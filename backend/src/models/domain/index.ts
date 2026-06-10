@@ -7,3 +7,4 @@ export * from './identity.models';
 export * from './indexes';
 export * from './orchestration.models';
 export * from './tenant.models';
+export * from './invite-jobs.models';

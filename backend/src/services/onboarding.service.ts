@@ -6,6 +6,7 @@ import { ObjectId } from 'mongodb';
 import { prisma } from '../config/database';
 import { getMongoDb } from '../config/mongo';
 import { PlatformRole, getPlatformRoleForEmail, normalizeEmail } from '../config/platform-admins';
+import { isPlatformAdminEmail } from '../utils/platform-admin';
 import { createError } from '../middleware/errorHandler';
 import {
   BusinessSetupDocument,
@@ -15,6 +16,7 @@ import {
   getOnboardingCollections,
 } from '../models/onboarding.models';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
+import { DEFAULT_MEMBER_SERVICES } from '../models/domain/tenant.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
 import { getDomainAuthorizationContext, getPrimaryTenantRole, hasDomainPermission } from './domain-authorization.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
@@ -41,10 +43,27 @@ export interface OnboardingInfo {
 export interface DashboardAuthorization {
   tenantRole: string | null;
   platformRole: PlatformRole | null;
+  /** True when the user is a NEXUS platform admin (NEXUS_ADMIN_EMAILS). */
+  isPlatformAdmin: boolean;
   canSeeDevMode: boolean;
   canUseDevPlayground: boolean;
   canViewMembers: boolean;
   canManageMembers: boolean;
+  /** True when the user can create or manage supply catalog offers. */
+  canManageSupply: boolean;
+  /** Catalog activation mode derived from TenantServiceActivation + Tenant.status. */
+  catalogMode: 'inactive' | 'sandbox' | 'live';
+  /** True when the benefits_catalog service is active for this tenant. */
+  catalogServiceActive: boolean;
+  /** True when this user holds the 'member' role AND the catalog is not inactive. */
+  canPurchaseCatalog: boolean;
+  /**
+   * Services this member was granted at invite time (e.g. ['benefits_catalog']).
+   * Empty array for platform admins or users with no domain tenant membership.
+   */
+  memberServices: string[];
+  /** True when business setup is complete and the tenant can go live. */
+  businessSetupComplete: boolean;
 }
 
 export interface TenantSeats {
@@ -59,13 +78,49 @@ export interface MeResponse {
     id: string;
     email: string;
     name: string;
+    /** Google profile photo URL (from OAuth), or null. Wallet uses it for the
+     *  authenticated user avatar; falls back to initials when null. */
+    avatarUrl?: string | null;
   };
   context: UserContext & {
     plan?: string;
     seats?: TenantSeats;
+    /** Cloudinary URL of the tenant's logo, or null -> the dashboard shows the
+     *  tenant-name initials. */
+    tenantLogoUrl?: string | null;
+    /** Org brand color ("#rrggbb"), or null -> wallet derives one from the id. */
+    tenantBrandColor?: string | null;
   };
   authorization: DashboardAuthorization;
   onboarding: OnboardingInfo;
+  /**
+   * Wallet RouterScreen payload. Lists the user's member tenants,
+   * platform-admin status, and whether to show the admin-dashboard
+   * card. See services/auth/wallet-me-router.service.ts.
+   */
+  memberships?: import('./auth/wallet-me-router.service').MembershipSummary[];
+  isPlatformAdmin?: boolean;
+  canOpenDashboard?: boolean;
+  /**
+   * Effective default landing context for a returning member (a tenantId,
+   * or null for the Nexus ecosystem catalog). Drives resolvePostLogin when
+   * the user logs in without a ?tenant in the URL.
+   */
+  defaultTenantId?: string | null;
+  router?: import('./auth/wallet-me-router.service').WalletMeRouter['router'];
+  /**
+   * Wallet profile sub-doc (Plan #3). completedAt is the gate the
+   * wallet LoginSheet checks - if set, returning user skips the
+   * slide chain and goes straight to RouterScreen.
+   */
+  profile?: import('./wallet/wallet-profile.service').WalletProfileView | null;
+  /** Canonical phone on the NexusIdentity (05XXXXXXXX), or null when unset. */
+  phone?: string | null;
+  /** ISO timestamp the phone was OTP-verified; null for a test-attached number. */
+  phoneVerifiedAt?: string | null;
+  /** Whether the member opted in to marketing. Drives the wallet profile toggle
+   *  initial state; collected in the auth-flow consent question. */
+  marketingConsent?: boolean;
 }
 
 /**
@@ -82,19 +137,44 @@ function toId(value: ObjectId | undefined): string | null {
  * Input: Prisma user id from a verified access token.
  * Output: public user identity or a 404 error.
  */
-async function getPrismaUser(userId: string): Promise<{ id: string; email: string; fullName: string; provider: string }> {
+async function getPrismaUser(userId: string): Promise<{ id: string; email: string; fullName: string; provider: string; avatarUrl: string | null }> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true, fullName: true, provider: true },
+    select: { id: true, email: true, fullName: true, provider: true, avatarUrl: true },
   });
   if (!user) throw createError('User not found', 404);
   return user;
 }
 
 /**
+ * Derives the catalog operating mode for a tenant from service activation state
+ * and the tenant's live status.
+ * Input: tenantId (null when user has no tenant), tenant domain status from Mongo,
+ *        and the typed TenantDomainCollections returned by getTenantDomainCollections.
+ * Output: 'inactive' when the service is not activated; 'sandbox' when active but
+ *         the tenant is not yet live; 'live' when active and tenant.status === 'active'.
+ */
+async function resolveCatalogMode(
+  tenantId: string | null,
+  tenantStatus: string | null,
+  tenantCollections: ReturnType<typeof getTenantDomainCollections>,
+): Promise<'inactive' | 'sandbox' | 'live'> {
+  if (!tenantId) return 'inactive';
+  const activation = await tenantCollections.tenantServiceActivations.findOne({
+    tenantId,
+    serviceKey: 'benefits_catalog',
+    status: 'active',
+  });
+  if (!activation) return 'inactive';
+  return tenantStatus === 'active' ? 'live' : 'sandbox';
+}
+
+/**
  * Builds dashboard authorization from trusted backend identity and context.
- * Input: current Prisma email and Mongo-derived user context.
- * Output: flags the dashboard can use for UX gating without exposing raw admin config.
+ * Catalog fields (catalogMode, catalogServiceActive, canPurchaseCatalog) are
+ * resolved asynchronously in getMe() and merged into the returned object there.
+ * Input: current Prisma email, Mongo-derived user context, and resolved permissions.
+ * Output: base authorization flags; catalog fields default to inactive until merged.
  */
 function getDashboardAuthorization(
   email: string,
@@ -102,15 +182,27 @@ function getDashboardAuthorization(
   permissions: DomainPermission[],
 ): DashboardAuthorization {
   const platformRole = getPlatformRoleForEmail(email);
-  const canSeeDevMode = context.role === 'admin';
+  const adminByEmail = isPlatformAdminEmail(email);
+  const canSeeDevMode = context.role === 'admin' || context.role === 'owner';
 
   return {
     tenantRole: context.role,
     platformRole,
+    isPlatformAdmin: adminByEmail,
     canSeeDevMode,
     canUseDevPlayground: canSeeDevMode && platformRole === 'nexusAdmin',
-    canViewMembers: permissions.includes('member.view') || permissions.includes('member.manage'),
-    canManageMembers: permissions.includes('member.invite') || permissions.includes('member.manage'),
+    canViewMembers: permissions.includes('members.view') || permissions.includes('team.view_members'),
+    canManageMembers: permissions.includes('team.invite_member') && permissions.includes('roles.assign'),
+    // Platform admins can always manage supply; tenant supply_managers get it via domain permissions.
+    canManageSupply: adminByEmail || permissions.includes('supply.ingest') || permissions.includes('supply.manage_offers'),
+    // Catalog fields are overwritten in getMe() after async resolution.
+    catalogMode: 'inactive',
+    catalogServiceActive: false,
+    canPurchaseCatalog: false,
+    // memberServices is overwritten in getMe() after the domain TenantMember document is fetched.
+    memberServices: [],
+    // businessSetupComplete is overwritten in getMe() after the tenantOnboardingStates lookup.
+    businessSetupComplete: false,
   };
 }
 
@@ -250,7 +342,7 @@ export async function getOnboardingStatus(userId: string): Promise<{ context: Us
   if (!context.isTenant && !context.isMember) {
     return { context, onboarding: { required: true, step: 'workspace_setup' } };
   }
-  if (context.isTenant && context.role === 'admin') {
+  if (context.isTenant && (context.role === 'admin' || context.role === 'owner')) {
     const db = await getMongoDb();
     const collections = getOnboardingCollections(db);
     const tenant = await collections.tenants.findOne({ _id: new ObjectId(context.tenantId!) });
@@ -288,10 +380,103 @@ export async function getMe(userId: string): Promise<MeResponse> {
     planSummary = await getTenantPlanSummary(context.tenantId).catch(() => undefined);
   }
 
+  // Resolve catalog mode and member-purchase eligibility.
+  // These require async DB lookups so they are computed here and merged into
+  // the authorization object rather than inside the sync getDashboardAuthorization helper.
+  const db = await getMongoDb();
+  const tenantCollections = getTenantDomainCollections(db);
+  const identityCollections = getIdentityDomainCollections(db);
+
+  // Run all four tenant-scoped lookups in parallel to avoid serial latency on
+  // every /api/me call. domainTenantStatus feeds resolveCatalogMode, which is
+  // called after Promise.all resolves.
+  const [domainTenantDoc, userRoles, domainMemberDoc] = await Promise.all([
+    // Look up the domain tenant's live status (separate from the legacy onboarding tenant).
+    context.tenantId
+      ? tenantCollections.domainTenants.findOne(
+          { tenantId: context.tenantId },
+          { projection: { status: 1 } },
+        )
+      : Promise.resolve(null),
+    // Check if this user holds the 'member' role in the tenant's role assignments.
+    // Only members are allowed to purchase from the catalog.
+    context.tenantId
+      ? identityCollections.tenantUserRoles
+          .find({ nexusIdentityId: domainIdentity.nexusIdentityId, tenantId: context.tenantId })
+          .toArray()
+      : Promise.resolve([]),
+    // Fetch the domain TenantMember document to read the services field.
+    // This document is authoritative for which services this specific member was
+    // granted at invite time (e.g. ['benefits_catalog']). Defaults to
+    // DEFAULT_MEMBER_SERVICES when the member doc has no services field (pre-Task-08
+    // records) and to [] when the user has no domain tenant membership at all.
+    context.tenantId && domainIdentity.nexusIdentityId
+      ? tenantCollections.tenantMembers.findOne(
+          { nexusIdentityId: domainIdentity.nexusIdentityId, tenantId: context.tenantId },
+          { projection: { services: 1 } },
+        )
+      : Promise.resolve(null),
+  ]);
+
+  const domainTenantStatus: string | null = domainTenantDoc?.status ?? null;
+  const hasMemberRole = userRoles.some((r) => r.role === 'member');
+  const memberServices: string[] =
+    domainMemberDoc != null ? (domainMemberDoc.services ?? [...DEFAULT_MEMBER_SERVICES]) : [];
+
+  // Business setup is complete when getOnboardingStatus() does not require it as the next
+  // step. That function checks the legacy tenant.businessSetupStatus field which is the
+  // authoritative source (the domain tenantOnboardingStates.state is set to 'build_mode'
+  // immediately after workspace creation and cannot be used to detect incomplete setup).
+  const businessSetupComplete = status.onboarding.step !== 'business_setup';
+
+  const catalogMode = await resolveCatalogMode(
+    context.tenantId ?? null,
+    domainTenantStatus,
+    tenantCollections,
+  );
+
+  const baseAuthorization = getDashboardAuthorization(user.email, context, domainAuthorization.permissions);
+
+  // Wallet RouterScreen payload - cards the user sees right after login.
+  // Lives in its own helper so getMe does not grow further (file is already
+  // at the size cap; new auth logic goes in services/auth/).
+  const { computeWalletMeRouter } = await import('./auth/wallet-me-router.service');
+  const walletRouter = await computeWalletMeRouter(db, {
+    nexusIdentityId: domainIdentity.nexusIdentityId,
+    email: user.email,
+  });
+
+  // Plan #3: wallet profile sub-doc so the LoginSheet can gate the
+  // slide chain on completedAt.
+  const { getWalletProfile } = await import('./wallet/wallet-profile.service');
+  const walletProfile = await getWalletProfile(db, {
+    prismaUserId: user.id,
+    email: user.email,
+  });
+
+  // Surface the identity's phone (the canonical SMS-login store) so the wallet
+  // can display it and let the user edit it. phoneVerifiedAt is null for a
+  // test-attached number that never went through a real OTP.
+  const phoneDoc = await identityCollections.nexusIdentities.findOne(
+    { nexusIdentityId: domainIdentity.nexusIdentityId },
+    { projection: { phone: 1, phoneVerifiedAt: 1, marketingConsent: 1 } },
+  );
+
+  // The tenant's logo + brand color for the dashboard header / branding UI
+  // (logo null -> initials; color null -> wallet derives one from the id).
+  const tenantBrandingDoc = context.tenantId
+    ? await getTenantDomainCollections(db).domainTenants.findOne(
+        { tenantId: context.tenantId },
+        { projection: { logoUrl: 1, brandColor: 1 } },
+      )
+    : null;
+
   return {
-    user: { id: user.id, email: user.email, name: user.fullName },
+    user: { id: user.id, email: user.email, name: user.fullName, avatarUrl: user.avatarUrl ?? null },
     context: {
       ...context,
+      tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
+      tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
       ...(planSummary && {
         plan: planSummary.plan,
         seats: {
@@ -302,8 +487,24 @@ export async function getMe(userId: string): Promise<MeResponse> {
         },
       }),
     },
-    authorization: getDashboardAuthorization(user.email, context, domainAuthorization.permissions),
+    authorization: {
+      ...baseAuthorization,
+      catalogMode,
+      catalogServiceActive: catalogMode !== 'inactive',
+      canPurchaseCatalog: hasMemberRole && catalogMode !== 'inactive',
+      memberServices,
+      businessSetupComplete,
+    },
     onboarding: status.onboarding,
+    memberships: walletRouter.memberships,
+    isPlatformAdmin: walletRouter.isPlatformAdmin,
+    canOpenDashboard: walletRouter.canOpenDashboard,
+    defaultTenantId: walletRouter.defaultTenantId,
+    router: walletRouter.router,
+    profile: walletProfile,
+    phone: phoneDoc?.phone ?? null,
+    phoneVerifiedAt: phoneDoc?.phoneVerifiedAt ? phoneDoc.phoneVerifiedAt.toISOString() : null,
+    marketingConsent: phoneDoc?.marketingConsent?.granted ?? false,
   };
 }
 
@@ -389,6 +590,7 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
     tenantMembershipId: membershipInsert.insertedId,
     tenantMembership: { ...membership, _id: membershipInsert.insertedId },
     nexusIdentityId: domainIdentity.nexusIdentityId,
+    isWorkspaceCreator: true,
   });
 
   await collections.onboardingStates.updateOne(
@@ -559,7 +761,7 @@ export async function getBusinessSetup(userId: string) {
  * Output: updated draft setup response.
  */
 export async function saveBusinessSetupDraft(userId: string, data: BusinessSetupInput) {
-  return upsertBusinessSetup(userId, data, 'draft', 'tenant.go_live');
+  return upsertBusinessSetup(userId, data, 'draft', 'workspace.trigger_go_live');
 }
 
 /**
@@ -568,7 +770,7 @@ export async function saveBusinessSetupDraft(userId: string, data: BusinessSetup
  * Output: submitted setup response.
  */
 export async function submitBusinessSetup(userId: string, data: BusinessSetupInput) {
-  return upsertBusinessSetup(userId, data, 'submitted', 'tenant.go_live');
+  return upsertBusinessSetup(userId, data, 'submitted', 'workspace.trigger_go_live');
 }
 
 /**
@@ -674,5 +876,48 @@ export async function clearWizardDraft(userId: string): Promise<void> {
   await collections.onboardingStates.updateOne(
     { userId },
     { $unset: { wizardDraft: '' }, $set: { updatedAt: new Date() } },
+  );
+}
+
+/**
+ * Triggers the Go Live transition for a tenant's catalog service.
+ * Transitions Tenant.status from build_mode to 'active' and
+ * TenantOnboardingState.state to 'active', making the catalog visible
+ * to purchasing members.
+ *
+ * Precondition: the tenant's onboarding state must be one of
+ * 'build_mode', 'wizard_completed', or 'go_live_pending' to ensure
+ * business setup is sufficiently complete before going live.
+ *
+ * Input:  tenantId - the domain tenant identifier string.
+ * Output: resolves when both domain records are updated.
+ * Throws: Error (status 400) when business setup is not in a ready state.
+ */
+export async function triggerGoLive(tenantId: string): Promise<void> {
+  const db = await getMongoDb();
+  const collections = getTenantDomainCollections(db);
+
+  const onboardingState = await collections.tenantOnboardingStates.findOne({ tenantId });
+  const readyStates: string[] = ['build_mode', 'wizard_completed', 'go_live_pending'];
+
+  if (!onboardingState || !readyStates.includes(onboardingState.state)) {
+    throw Object.assign(
+      new Error('Business setup must be completed before going live'),
+      { status: 400 },
+    );
+  }
+
+  const now = new Date();
+
+  // Update both domain records atomically from the backend's perspective.
+  // The Tenant status drives catalogMode resolution in getMe(); the onboarding
+  // state drives wizard/setup gating on the dashboard.
+  await collections.domainTenants.updateOne(
+    { tenantId },
+    { $set: { status: 'active' as const, updatedAt: now } },
+  );
+  await collections.tenantOnboardingStates.updateOne(
+    { tenantId },
+    { $set: { state: 'active' as const, updatedAt: now } },
   );
 }

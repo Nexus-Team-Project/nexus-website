@@ -9,10 +9,11 @@
 
 import { Router, Request, Response } from 'express';
 import { authenticate, requireAgent } from '../middleware/authenticate';
+import { apiLimiter } from '../middleware/rateLimiter';
 import { env } from '../config/env';
 
 const router = Router();
-router.use(authenticate, requireAgent);
+router.use(authenticate, requireAgent, apiLimiter);
 
 // ─── Diagnostic endpoint (no proxy) ──────────────────────────
 router.get('/status', async (_req: Request, res: Response) => {

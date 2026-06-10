@@ -101,7 +101,7 @@ export async function listTenantMembersPaginated(
   members: TenantMemberListItem[];
   pagination: PaginationMeta;
 }> {
-  const access = await requireTenantMemberPermission(userId, 'member.view');
+  const access = await requireTenantMemberPermission(userId, 'members.view');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
 
@@ -254,7 +254,7 @@ export async function listPendingInvitationsForTenant(userId: string): Promise<{
   total: number;
   hasMore: boolean;
 }> {
-  const access = await requireTenantMemberPermission(userId, 'member.view');
+  const access = await requireTenantMemberPermission(userId, 'members.view');
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
 
@@ -314,7 +314,7 @@ export async function listPendingInvitationsForTenant(userId: string): Promise<{
 export async function listTenantRolesForManager(userId: string): Promise<{
   roles: TenantRoleListItem[];
 }> {
-  await requireTenantMemberPermission(userId, 'member.view');
+  await requireTenantMemberPermission(userId, 'members.view');
   const db = await getMongoDb();
   const identityCollections = getIdentityDomainCollections(db);
   const roleRecords = await identityCollections.rolePermissionMaps

@@ -12,6 +12,7 @@
  */
 import { getMongoDb } from '../config/mongo';
 import { createError } from '../middleware/errorHandler';
+import { DOMAIN_COLLECTIONS } from '../models/domain/collections';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
 import { PLAN_SEAT_LIMITS, type TenantPlan } from '../models/domain/tenant.models';
 
@@ -29,18 +30,76 @@ export interface TenantPlanSummary {
 }
 
 /**
- * Counts distinct identities holding at least one non-member role for the tenant.
- * Input: tenant id string.
- * Output: number of occupied non-member seats (each identity counts once).
+ * Counts distinct identities occupying a non-member seat for the tenant.
+ * Rules:
+ * - Seats used by identities with accepted invitations always count.
+ * - Seats used by identities with pending, non-expired invitations count
+ *   (invite sent but not yet accepted still reserves a seat).
+ * - Seats are freed when the latest invitation expires or is revoked and the
+ *   person never accepted (i.e. TenantUserRole exists but invite is dead).
+ * - Directly added members with no invitation record always count.
+ * - The tenant creator is excluded via excludeIdentityId.
+ * Input: tenant id, optional creator identity id to exclude from the count.
+ * Output: number of occupied non-member seats (each identity counted once).
  */
-async function countNonMemberSeatsUsed(tenantId: string): Promise<number> {
+async function countNonMemberSeatsUsed(tenantId: string, excludeIdentityId?: string): Promise<number> {
   const db = await getMongoDb();
   const identityCollections = getIdentityDomainCollections(db);
 
+  const matchStage: Record<string, unknown> = { tenantId, role: { $ne: 'member' } };
+  if (excludeIdentityId) {
+    matchStage.nexusIdentityId = { $ne: excludeIdentityId };
+  }
+
+  const now = new Date();
+
   const result = await identityCollections.tenantUserRoles
     .aggregate<{ count: number }>([
-      { $match: { tenantId, role: { $ne: 'member' } } },
+      { $match: matchStage },
+      // Deduplicate by identity (one non-member seat per person regardless of how many roles).
       { $group: { _id: '$nexusIdentityId' } },
+      // Join with the most recent invitation for this identity in this tenant.
+      {
+        $lookup: {
+          from: DOMAIN_COLLECTIONS.tenantMemberInvitations,
+          let: { identityId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$tenantId', tenantId] },
+                    { $eq: ['$nexusIdentityId', '$$identityId'] },
+                  ],
+                },
+              },
+            },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 },
+          ],
+          as: 'latestInvitation',
+        },
+      },
+      // Keep the identity if:
+      // - No invitation exists (directly added member, always counts).
+      // - Invitation is accepted (real member, always counts).
+      // - Invitation is pending AND not yet expired (seat reserved until expiry).
+      // Exclude if invitation is revoked, or pending but past expiresAt.
+      {
+        $match: {
+          $or: [
+            // No invitation record - direct add
+            { latestInvitation: { $size: 0 } },
+            // Accepted - confirmed member
+            { 'latestInvitation.0.status': 'accepted' },
+            // Pending and still within expiry window
+            {
+              'latestInvitation.0.status': 'pending',
+              'latestInvitation.0.expiresAt': { $gte: now },
+            },
+          ],
+        },
+      },
       { $count: 'count' },
     ])
     .toArray();
@@ -50,6 +109,8 @@ async function countNonMemberSeatsUsed(tenantId: string): Promise<number> {
 
 /**
  * Returns the current plan and seat usage for a tenant.
+ * The tenant creator (createdByIdentityId) is excluded from the seat count
+ * so they don't consume one of the billable non-member slots.
  * Input: tenant id string.
  * Output: plan tier, seats used, seat limit, remaining seats, and at-limit flag.
  */
@@ -57,13 +118,13 @@ export async function getTenantPlanSummary(tenantId: string): Promise<TenantPlan
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
 
-  const [tenant, seatsUsed] = await Promise.all([
-    tenantCollections.domainTenants.findOne(
-      { tenantId },
-      { projection: { plan: 1 } },
-    ),
-    countNonMemberSeatsUsed(tenantId),
-  ]);
+  // Fetch tenant first to get plan + creator id before counting seats.
+  const tenant = await tenantCollections.domainTenants.findOne(
+    { tenantId },
+    { projection: { plan: 1, createdByIdentityId: 1 } },
+  );
+
+  const seatsUsed = await countNonMemberSeatsUsed(tenantId, tenant?.createdByIdentityId);
 
   const plan: TenantPlan = (tenant?.plan ?? 'basic') as TenantPlan;
   const seatLimit = PLAN_SEAT_LIMITS[plan];

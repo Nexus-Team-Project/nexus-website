@@ -78,6 +78,22 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
+  // Cloudinary — backend-only media storage (offer images). Never expose to frontend.
+  // Format: cloudinary://api_key:api_secret@cloud_name
+  CLOUDINARY_URL: z.string().min(1).optional(),
+
+  // InforU - SMS OTP provider for wallet phone login. Backend-only.
+  // Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md
+  INFORU_USER: z.string().min(1).optional(),
+  INFORU_TOKEN: z.string().min(1).optional(),
+  INFORU_BASE_URL: z.string().trim().url().default('https://capi.inforu.co.il'),
+  // Sender ID shown on the OTP SMS (alphanumeric, must be approved by InforU for
+  // production; falls back to 'Nexus' if unset).
+  INFORU_SENDER: z.string().trim().min(1).optional(),
+
+  // Wallet - public URL for the wallet app (wallet.nexus-payment.com).
+  WALLET_URL: z.string().trim().url().optional(),
+
   // Nexus Agents — proxy to agent service (optional)
   AGENT_API_URL: z.string().url().optional(),  // e.g. https://nexus-agents-production-ed8b.up.railway.app
   AGENT_API_KEY: z.string().min(1).optional(), // must match SEO_AGENT_API_KEY on the agent service
@@ -86,6 +102,12 @@ const envSchema = z.object({
   // Generate with: npx web-push generate-vapid-keys
   VAPID_PUBLIC_KEY: z.string().min(1).optional(),
   VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+
+  // Member invite worker — bulk-async delivery tuning.
+  // Concurrency: in-flight SendPulse calls per backend process.
+  // Rate: global send token-bucket refill rate (per second).
+  INVITE_WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(5),
+  INVITE_SEND_RATE_PER_SEC: z.coerce.number().int().min(1).max(100).default(10),
 
 });
 
@@ -110,6 +132,8 @@ const optional = {
   'Email (SMTP)': env.SMTP_HOST,
   'Email (SendPulse API fallback)': env.SENDPULSE_CLIENT_ID,
   'Web Push Notifications': env.VAPID_PUBLIC_KEY,
+  'Cloudinary (offer image uploads)': env.CLOUDINARY_URL,
+  'InforU SMS (wallet phone OTP)': env.INFORU_USER,
 };
 for (const [feature, key] of Object.entries(optional)) {
   if (!key) console.warn(`⚠️  ${feature} disabled — env var not set`);
