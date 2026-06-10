@@ -18,6 +18,7 @@ import { Db, ObjectId } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
 import { inforuSendSms } from '../sms/inforu.client';
+import { buildOtpSms } from './otp-sms.helper';
 import { normalizeIsraeliPhone } from '../../utils/phone';
 import { assertRateLimit } from './wallet-rate-limit';
 import {
@@ -30,14 +31,6 @@ import { createPhoneSignupTicket } from './phone-signup-ticket.service';
 const TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const BCRYPT_ROUNDS = 10;
-
-/**
- * Builds the OTP SMS text. Short and link-free (InforU forbids URL shortening on
- * OTP). The code is placed clearly to aid one-time-code autofill.
- */
-function buildOtpSms(code: string): string {
-  return `קוד האימות שלך הוא: ${code}\nאין לשתף קוד זה עם אף אחד.`;
-}
 
 /**
  * The two shapes verifyPhoneOtp can return. logged_in carries an
