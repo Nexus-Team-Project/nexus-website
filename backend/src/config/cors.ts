@@ -12,6 +12,10 @@ const ALLOWED_BROWSER_ORIGINS = [
   'https://nexus-payment.com',
   'https://dashboard.nexus-payment.com',
   'https://wallet.nexus-payment.com',
+  // Railway-generated URL for the nexus-wallet service. Kept alongside the
+  // custom domain so the wallet works before/while its DNS (wallet.nexus-payment.com)
+  // is being set up.
+  'https://nexus-wallet-production-9aa0.up.railway.app',
 ] as const;
 
 const allowedBrowserOrigins = new Set<string>(ALLOWED_BROWSER_ORIGINS);
