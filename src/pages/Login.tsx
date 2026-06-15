@@ -11,6 +11,8 @@ import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { useInvitePreview } from '../hooks/useInvitePreview';
+import InviteBanner from '../components/InviteBanner';
 
 interface LoginPageError {
   status?: number;
@@ -52,6 +54,10 @@ export default function Login() {
 
   const searchParams = new URLSearchParams(search);
   const dashboardRedirect = searchParams.get('dashboardRedirect');
+
+  // When the visitor arrived from an invite email, look up the organization so
+  // the banner can tell them who invited them before they sign in.
+  const { loading: inviteLoading, preview: invitePreview } = useInvitePreview(dashboardRedirect);
 
   const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
@@ -195,6 +201,13 @@ export default function Login() {
               <h1 className="text-xl font-bold text-nx-dark mb-5">
                 {t.auth.signInToAccount}
               </h1>
+
+              <InviteBanner
+                loading={inviteLoading}
+                preview={invitePreview}
+                isHe={isHe}
+                mode="login"
+              />
 
               {unverifiedEmail && (
                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
