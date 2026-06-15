@@ -8,6 +8,8 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
+import { useInvitePreview } from '../hooks/useInvitePreview';
+import InviteBanner from '../components/InviteBanner';
 
 interface SignupPageError {
   field?: string;
@@ -80,6 +82,10 @@ export default function Signup() {
   const loginPath = isHe ? '/he/login' : '/login';
   const workspacePath = isHe ? '/he/workspace' : '/workspace';
   const dashboardRedirect = new URLSearchParams(window.location.search).get('dashboardRedirect');
+
+  // When the visitor arrived from an invite email, look up the organization so
+  // the banner can tell them who invited them before they create an account.
+  const { loading: inviteLoading, preview: invitePreview } = useInvitePreview(dashboardRedirect);
   const loginPathWithRedirect = dashboardRedirect
     ? `${loginPath}?dashboardRedirect=${encodeURIComponent(dashboardRedirect)}`
     : loginPath;
@@ -370,6 +376,15 @@ export default function Signup() {
                 <h1 className="text-xl font-bold text-nx-dark mb-5 max-w-sm mx-auto">
                   {t.auth.createAccount}
                 </h1>
+
+                <div className="max-w-sm mx-auto">
+                  <InviteBanner
+                    loading={inviteLoading}
+                    preview={invitePreview}
+                    isHe={isHe}
+                    mode="signup"
+                  />
+                </div>
 
                 <form className="space-y-3 max-w-sm mx-auto" onSubmit={handleSubmit}>
                   <div>
