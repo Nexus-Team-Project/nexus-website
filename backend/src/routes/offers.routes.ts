@@ -182,8 +182,10 @@ const updateOfferSchema = z.object({
     .optional(),
   statusReason: z.string().min(1).max(1000).optional(),
   executionType: z.enum(OFFER_EXECUTION_TYPES).optional(),
-  stockLimit: z.coerce.number().int().positive().nullable().optional(),
-  implementationLink: z.string().url().nullable().optional(),
+  // Empty string from the multipart edit form means "no value / clear it".
+  // Map it to null before validation so an untouched empty field does not 400.
+  stockLimit: z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().positive().nullable().optional()),
+  implementationLink: z.preprocess((v) => (v === '' ? null : v), z.string().url().nullable().optional()),
   implementationInstructions: z.string().max(1000).optional(),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
