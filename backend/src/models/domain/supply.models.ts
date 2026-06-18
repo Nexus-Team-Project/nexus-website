@@ -264,6 +264,19 @@ export const nexusOfferSchema = z.object({
    */
   voucherValidityValue: z.number().int().positive().nullable().optional(),
   voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  /**
+   * Whether the voucher may be combined with other promotions ("כפל מבצעים").
+   * Voucher-only and a deliberate supplier choice (the form has no default and
+   * the route requires it for vouchers). null for non-voucher offer types.
+   */
+  voucherStackable: z.boolean().nullable().optional(),
+  /**
+   * Optional solid background color ("#rrggbb") for the voucher card when the
+   * supplier picks "color" instead of an image. Voucher-only; null for other
+   * types and when the supplier uses an image or neither (the card then falls
+   * back to the tenant brand color + logo at render time).
+   */
+  voucherBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   /** Terms and conditions text. */
   terms: z.string().max(2000).optional().default(''),
   /** Display tags set by the offer creator (max 10, each max 50 chars). */

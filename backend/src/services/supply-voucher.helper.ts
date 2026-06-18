@@ -66,3 +66,37 @@ export function assertVoucherValidity(
 
   return { ok: true };
 }
+
+/** Strict "#rrggbb" hex color matcher (lower/upper case). */
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * True when `v` is a valid "#rrggbb" hex color string. Used to validate the
+ * optional voucher background color before it is ever used as a CSS value.
+ *
+ * Input:  any value.
+ * Output: boolean — true only for a 6-digit hex string with a leading '#'.
+ */
+export function isValidHexColor(v: unknown): v is string {
+  return typeof v === 'string' && HEX_COLOR_RE.test(v);
+}
+
+/**
+ * Validates the mandatory voucher combine-with-promotions ("כפל מבצעים") choice.
+ * A voucher MUST carry an explicit boolean; there is no default. Non-voucher
+ * offers are not subject to this rule (the caller skips it).
+ *
+ * Input:  value - the supplied voucherStackable (boolean | null | undefined).
+ * Output: { ok: true } when a boolean is present, else { ok: false, error,
+ *         errorHe } describing the missing mandatory choice.
+ */
+export function assertVoucherStackable(
+  value: boolean | null | undefined,
+): VoucherValidityResult {
+  if (typeof value === 'boolean') return { ok: true };
+  return {
+    ok: false,
+    error: 'Voucher offers require a combine-with-promotions choice',
+    errorHe: 'שובר מחייב בחירה אם ניתן לכפל מבצעים',
+  };
+}
