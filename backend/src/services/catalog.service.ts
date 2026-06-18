@@ -132,8 +132,12 @@ export interface CatalogItem {
   implementationInstructions?: string;
   /** Date the offer goes live. null = live immediately on approval. */
   validFrom?: Date | null;
-  /** Offer expiry date. null means no expiry. */
+  /** Offer expiry date. null means no expiry. Always null for vouchers. */
   validUntil?: Date | null;
+  /** Voucher redemption window amount (with voucherValidityUnit). null = never expires. Voucher-only. */
+  voucherValidityValue?: number | null;
+  /** Voucher redemption window unit. null = never expires. Voucher-only. */
+  voucherValidityUnit?: 'days' | 'months' | 'years' | null;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator. */
@@ -171,6 +175,10 @@ function toItem(
   },
 ): CatalogItem {
   const now = Date.now();
+  // Catalog "expired" is derived from the absolute validUntil. Vouchers never
+  // set validUntil (their expiry is a per-purchase window held in
+  // voucherValidityValue/Unit and applied at checkout), so a voucher is never
+  // marked expired here — which is the intended behavior.
   const isExpired =
     offer.status === 'active'
     && offer.validUntil != null
@@ -214,6 +222,8 @@ function toItem(
     implementationInstructions: offer.implementationInstructions ?? '',
     validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
+    voucherValidityValue: offer.voucherValidityValue ?? null,
+    voucherValidityUnit: offer.voucherValidityUnit ?? null,
     terms: offer.terms ?? '',
     tags: offer.tags ?? [],
   };

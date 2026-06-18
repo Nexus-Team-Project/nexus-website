@@ -19,6 +19,7 @@ import {
   type OfferExecutionType,
   type OfferVariantType,
   type OfferStatus,
+  type OfferVoucherValidityUnit,
 } from '../models/domain/supply.models';
 import { defaultOfferImageUrl } from '../utils/cloudinary';
 import {
@@ -61,8 +62,12 @@ export interface CreateOfferInput {
   implementationInstructions?: string;
   /** Offer goes live on this date. null means immediately available after approval. */
   validFrom?: Date | null;
-  /** Offer expiry date. null means no expiry. */
+  /** Offer expiry date. null means no expiry. Ignored for vouchers (forced null). */
   validUntil?: Date | null;
+  /** Voucher redemption window amount (with voucherValidityUnit). null = never expires. Voucher-only. */
+  voucherValidityValue?: number | null;
+  /** Voucher redemption window unit. null = never expires. Voucher-only. */
+  voucherValidityUnit?: OfferVoucherValidityUnit | null;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator (max 10, each max 50 chars). */
@@ -115,8 +120,12 @@ export interface UpdateOfferInput {
   implementationInstructions?: string;
   /** Updated offer go-live date. null clears the gate (immediately live). */
   validFrom?: Date | null;
-  /** Updated offer expiry date. null clears the expiry. */
+  /** Updated offer expiry date. null clears the expiry. Ignored for vouchers (forced null). */
   validUntil?: Date | null;
+  /** Updated voucher redemption window amount. null = never expires. Voucher-only. */
+  voucherValidityValue?: number | null;
+  /** Updated voucher redemption window unit. null = never expires. Voucher-only. */
+  voucherValidityUnit?: OfferVoucherValidityUnit | null;
   /** Updated terms and conditions text. */
   terms?: string;
   /** Updated display tags. */
@@ -180,11 +189,22 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
       ? input.nexus_cost
       : input.member_price;
 
+  // Voucher validity duration does NOT affect price, so computeDisplayPrice /
+  // supply-price.helper need no change for this feature.
   const displayPrice = computeDisplayPrice(
     executionType,
     resolvedMemberPrice,
     input.market_price,
   );
+
+  const isVoucher = executionType === 'voucher';
+  // Vouchers carry a purchase-anchored validity duration instead of absolute
+  // dates; their validFrom/validUntil are always null. Non-voucher offers keep
+  // their absolute dates and never carry a validity duration.
+  const resolvedValidFrom = isVoucher ? null : (input.validFrom ?? null);
+  const resolvedValidUntil = isVoucher ? null : (input.validUntil ?? null);
+  const resolvedValidityValue = isVoucher ? (input.voucherValidityValue ?? null) : null;
+  const resolvedValidityUnit = isVoucher ? (input.voucherValidityUnit ?? null) : null;
 
   // Voucher ecosystem offers enter pending_approval so a platform admin can review
   // pricing (especially nexus_cost) before the offer goes live to all tenants.
@@ -221,8 +241,10 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     stockUsed: 0,
     implementationLink: input.implementationLink ?? null,
     implementationInstructions: input.implementationInstructions ?? '',
-    validFrom: input.validFrom ?? null,
-    validUntil: input.validUntil ?? null,
+    validFrom: resolvedValidFrom,
+    validUntil: resolvedValidUntil,
+    voucherValidityValue: resolvedValidityValue,
+    voucherValidityUnit: resolvedValidityUnit,
     terms: input.terms ?? '',
     tags: input.tags ?? [],
     // Status reason / changedAt are set when a future PATCH transitions to disabled/archived.
@@ -321,6 +343,26 @@ export async function updateOffer(
   // denormalized column stays correct even when the caller only sends one of
   // the three inputs.
   const mergedExecutionType = input.executionType ?? currentOffer.executionType;
+  const isVoucherUpdate = mergedExecutionType === 'voucher';
+  // Voucher vs non-voucher normalization for the expiry/validity fields:
+  //   - voucher    -> absolute dates forced null; validity duration applied
+  //                   from input (when sent). Normalizes legacy vouchers that
+  //                   still carry an old validUntil.
+  //   - non-voucher -> keep absolute dates as sent; clear any stale validity
+  //                   duration left over from a previous voucher state.
+  const validityUpdate: Partial<NexusOffer> = isVoucherUpdate
+    ? {
+        validFrom: null,
+        validUntil: null,
+        ...(input.voucherValidityValue !== undefined && { voucherValidityValue: input.voucherValidityValue }),
+        ...(input.voucherValidityUnit !== undefined && { voucherValidityUnit: input.voucherValidityUnit }),
+      }
+    : {
+        ...(input.validFrom !== undefined && { validFrom: input.validFrom }),
+        ...(input.validUntil !== undefined && { validUntil: input.validUntil }),
+        voucherValidityValue: null,
+        voucherValidityUnit: null,
+      };
   const mergedMemberPrice =
     input.member_price !== undefined ? input.member_price : currentOffer.member_price;
   const mergedMarketPrice =
@@ -343,8 +385,8 @@ export async function updateOffer(
     ...(input.stockLimit !== undefined && { stockLimit: input.stockLimit }),
     ...(input.implementationLink !== undefined && { implementationLink: input.implementationLink }),
     ...(input.implementationInstructions !== undefined && { implementationInstructions: input.implementationInstructions }),
-    ...(input.validFrom !== undefined && { validFrom: input.validFrom }),
-    ...(input.validUntil !== undefined && { validUntil: input.validUntil }),
+    // Voucher/non-voucher expiry + validity normalization (computed above).
+    ...validityUpdate,
     ...(input.terms !== undefined && { terms: input.terms }),
     ...(input.tags !== undefined && { tags: input.tags }),
     ...(input.face_value !== undefined && { face_value: input.face_value }),
