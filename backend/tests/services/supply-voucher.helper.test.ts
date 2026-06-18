@@ -10,7 +10,11 @@ import {
   assertVoucherStackable,
   isValidHexColor,
 } from '../../src/services/supply-voucher.helper';
-import { VOUCHER_VALIDITY_MAX } from '../../src/models/domain/supply.models';
+import { VOUCHER_VALIDITY_MAX, SKU_REGEX, SKU_MIN_LENGTH, SKU_MAX_LENGTH } from '../../src/models/domain/supply.models';
+
+/** Mirrors the model + route SKU rule: regex AND length 4-20. */
+const isValidSku = (v: string): boolean =>
+  SKU_REGEX.test(v) && v.length >= SKU_MIN_LENGTH && v.length <= SKU_MAX_LENGTH;
 
 describe('assertVoucherValidity', () => {
   it('accepts both null/undefined (voucher never expires)', () => {
@@ -88,5 +92,26 @@ describe('isValidHexColor', () => {
     expect(isValidHexColor('#1234567')).toBe(false);    // too long
     expect(isValidHexColor(null)).toBe(false);
     expect(isValidHexColor(123)).toBe(false);
+  });
+});
+
+describe('SKU rule (regex + length 4-20)', () => {
+  it('accepts uppercase alnum, hyphen, underscore within length', () => {
+    expect(isValidSku('GIFT')).toBe(true);
+    expect(isValidSku('SUMMER-2026')).toBe(true);
+    expect(isValidSku('GIFT_100')).toBe(true);
+    expect(isValidSku('A1B2C3D4E5F6G7H8I9J0')).toBe(true); // exactly 20
+  });
+
+  it('rejects too short / too long', () => {
+    expect(isValidSku('ABC')).toBe(false);                 // 3 chars
+    expect(isValidSku('A1B2C3D4E5F6G7H8I9J0X')).toBe(false); // 21 chars
+  });
+
+  it('rejects lowercase, spaces, and special chars', () => {
+    expect(isValidSku('gift-100')).toBe(false);   // lowercase
+    expect(isValidSku('GIFT 100')).toBe(false);   // space
+    expect(isValidSku('GIFT@100')).toBe(false);   // special char
+    expect(isValidSku('GIFT.100')).toBe(false);   // dot
   });
 });

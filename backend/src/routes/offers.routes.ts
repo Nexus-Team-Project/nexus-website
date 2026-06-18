@@ -37,7 +37,7 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, getSupplyDomainCollections } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections } from '../models/domain/supply.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
@@ -117,6 +117,11 @@ const voucherBackgroundStackableFields = {
   voucherBackgroundColor: z.preprocess(
     (v) => (v === '' || v === null || v === undefined ? null : v),
     z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  ),
+  // Optional voucher SKU: blank -> null; otherwise uppercase alnum + - _ , 4-20.
+  sku: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : v),
+    z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   ),
 };
 

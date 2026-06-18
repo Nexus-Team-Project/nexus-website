@@ -142,6 +142,8 @@ export interface CatalogItem {
   voucherStackable?: boolean | null;
   /** Voucher card background color ("#rrggbb"). Voucher-only; null otherwise. */
   voucherBackgroundColor?: string | null;
+  /** Voucher SKU / internal company code. Voucher-only; null otherwise. */
+  sku?: string | null;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator. */
@@ -230,6 +232,7 @@ function toItem(
     voucherValidityUnit: offer.voucherValidityUnit ?? null,
     voucherStackable: offer.voucherStackable ?? null,
     voucherBackgroundColor: offer.voucherBackgroundColor ?? null,
+    sku: offer.sku ?? null,
     terms: offer.terms ?? '',
     tags: offer.tags ?? [],
   };
