@@ -282,7 +282,15 @@ const setTenantVoucherPriceSchema = z.object({
 const inventorySchema = z.object({
   kind: z.enum(VOUCHER_CODE_KINDS),
   quantity: z.coerce.number().int().min(1).max(VOUCHER_INVENTORY_MAX).optional(),
-  links: z.array(z.string().url()).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
+  // Each link must be a real http(s) URL. The scheme guard rejects javascript:,
+  // data:, and other URL schemes that z.string().url() would otherwise accept,
+  // so a stored value can never become an XSS vector if rendered as a link later.
+  links: z.array(
+    z.string().url().max(2048).refine(
+      (u) => /^https?:\/\//i.test(u),
+      { message: 'links must be http(s) URLs' },
+    ),
+  ).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
 });
 
 // ─── Static paths first ───────────────────────────────────────────────────────
