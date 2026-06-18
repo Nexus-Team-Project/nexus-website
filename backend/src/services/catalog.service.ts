@@ -138,6 +138,10 @@ export interface CatalogItem {
   voucherValidityValue?: number | null;
   /** Voucher redemption window unit. null = never expires. Voucher-only. */
   voucherValidityUnit?: 'days' | 'months' | 'years' | null;
+  /** Whether the voucher may be combined with other promotions. Voucher-only; null otherwise. */
+  voucherStackable?: boolean | null;
+  /** Voucher card background color ("#rrggbb"). Voucher-only; null otherwise. */
+  voucherBackgroundColor?: string | null;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator. */
@@ -224,6 +228,8 @@ function toItem(
     validUntil: offer.validUntil ?? null,
     voucherValidityValue: offer.voucherValidityValue ?? null,
     voucherValidityUnit: offer.voucherValidityUnit ?? null,
+    voucherStackable: offer.voucherStackable ?? null,
+    voucherBackgroundColor: offer.voucherBackgroundColor ?? null,
     terms: offer.terms ?? '',
     tags: offer.tags ?? [],
   };

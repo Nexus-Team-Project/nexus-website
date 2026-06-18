@@ -68,6 +68,10 @@ export interface CreateOfferInput {
   voucherValidityValue?: number | null;
   /** Voucher redemption window unit. null = never expires. Voucher-only. */
   voucherValidityUnit?: OfferVoucherValidityUnit | null;
+  /** Whether the voucher may be combined with other promotions. Voucher-only (required there). */
+  voucherStackable?: boolean | null;
+  /** Optional voucher card background color ("#rrggbb"). Voucher-only. */
+  voucherBackgroundColor?: string | null;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator (max 10, each max 50 chars). */
@@ -126,6 +130,10 @@ export interface UpdateOfferInput {
   voucherValidityValue?: number | null;
   /** Updated voucher redemption window unit. null = never expires. Voucher-only. */
   voucherValidityUnit?: OfferVoucherValidityUnit | null;
+  /** Updated combine-with-promotions choice. Voucher-only. */
+  voucherStackable?: boolean | null;
+  /** Updated voucher card background color ("#rrggbb"). Voucher-only. */
+  voucherBackgroundColor?: string | null;
   /** Updated terms and conditions text. */
   terms?: string;
   /** Updated display tags. */
@@ -205,6 +213,9 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   const resolvedValidUntil = isVoucher ? null : (input.validUntil ?? null);
   const resolvedValidityValue = isVoucher ? (input.voucherValidityValue ?? null) : null;
   const resolvedValidityUnit = isVoucher ? (input.voucherValidityUnit ?? null) : null;
+  // Combine-with-promotions + background color are voucher-only; null otherwise.
+  const resolvedStackable = isVoucher ? (input.voucherStackable ?? null) : null;
+  const resolvedBgColor = isVoucher ? (input.voucherBackgroundColor ?? null) : null;
 
   // Voucher ecosystem offers enter pending_approval so a platform admin can review
   // pricing (especially nexus_cost) before the offer goes live to all tenants.
@@ -245,6 +256,8 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     validUntil: resolvedValidUntil,
     voucherValidityValue: resolvedValidityValue,
     voucherValidityUnit: resolvedValidityUnit,
+    voucherStackable: resolvedStackable,
+    voucherBackgroundColor: resolvedBgColor,
     terms: input.terms ?? '',
     tags: input.tags ?? [],
     // Status reason / changedAt are set when a future PATCH transitions to disabled/archived.
@@ -356,12 +369,16 @@ export async function updateOffer(
         validUntil: null,
         ...(input.voucherValidityValue !== undefined && { voucherValidityValue: input.voucherValidityValue }),
         ...(input.voucherValidityUnit !== undefined && { voucherValidityUnit: input.voucherValidityUnit }),
+        ...(input.voucherStackable !== undefined && { voucherStackable: input.voucherStackable }),
+        ...(input.voucherBackgroundColor !== undefined && { voucherBackgroundColor: input.voucherBackgroundColor }),
       }
     : {
         ...(input.validFrom !== undefined && { validFrom: input.validFrom }),
         ...(input.validUntil !== undefined && { validUntil: input.validUntil }),
         voucherValidityValue: null,
         voucherValidityUnit: null,
+        voucherStackable: null,
+        voucherBackgroundColor: null,
       };
   const mergedMemberPrice =
     input.member_price !== undefined ? input.member_price : currentOffer.member_price;

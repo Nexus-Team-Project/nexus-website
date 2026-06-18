@@ -5,7 +5,11 @@
  * ceilings (VOUCHER_VALIDITY_MAX), and the accepted cases.
  */
 import { describe, it, expect } from 'vitest';
-import { assertVoucherValidity } from '../../src/services/supply-voucher.helper';
+import {
+  assertVoucherValidity,
+  assertVoucherStackable,
+  isValidHexColor,
+} from '../../src/services/supply-voucher.helper';
 import { VOUCHER_VALIDITY_MAX } from '../../src/models/domain/supply.models';
 
 describe('assertVoucherValidity', () => {
@@ -49,5 +53,40 @@ describe('assertVoucherValidity', () => {
 
     const rDays = assertVoucherValidity(VOUCHER_VALIDITY_MAX.days + 1, 'days');
     expect(rDays.ok).toBe(false);
+  });
+});
+
+describe('assertVoucherStackable', () => {
+  it('accepts an explicit boolean', () => {
+    expect(assertVoucherStackable(true)).toEqual({ ok: true });
+    expect(assertVoucherStackable(false)).toEqual({ ok: true });
+  });
+
+  it('rejects a missing choice (null/undefined)', () => {
+    const rNull = assertVoucherStackable(null);
+    const rUndef = assertVoucherStackable(undefined);
+    expect(rNull.ok).toBe(false);
+    expect(rUndef.ok).toBe(false);
+    if (!rNull.ok) {
+      expect(rNull.error).toMatch(/combine-with-promotions/i);
+      expect(rNull.errorHe).toBeTruthy();
+    }
+  });
+});
+
+describe('isValidHexColor', () => {
+  it('accepts 6-digit #rrggbb (any case)', () => {
+    expect(isValidHexColor('#635bff')).toBe(true);
+    expect(isValidHexColor('#ABCDEF')).toBe(true);
+    expect(isValidHexColor('#000000')).toBe(true);
+  });
+
+  it('rejects malformed colors', () => {
+    expect(isValidHexColor('#fff')).toBe(false);        // shorthand not allowed
+    expect(isValidHexColor('635bff')).toBe(false);      // missing #
+    expect(isValidHexColor('#12345g')).toBe(false);     // non-hex char
+    expect(isValidHexColor('#1234567')).toBe(false);    // too long
+    expect(isValidHexColor(null)).toBe(false);
+    expect(isValidHexColor(123)).toBe(false);
   });
 });

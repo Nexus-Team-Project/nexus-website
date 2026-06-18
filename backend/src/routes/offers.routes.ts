@@ -38,7 +38,7 @@ import {
   excludeOffer,
 } from '../services/catalog.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, getSupplyDomainCollections } from '../models/domain/supply.models';
-import { assertVoucherValidity } from '../services/supply-voucher.helper';
+import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
 import {
@@ -98,6 +98,25 @@ const voucherValiditySchemaFields = {
   voucherValidityUnit: z.preprocess(
     (v) => (v === '' || v === null || v === undefined ? null : v),
     z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  ),
+};
+
+/**
+ * Voucher combine-with-promotions + background-color fields shared by the
+ * create + update schemas. Multipart form-data sends scalars as strings:
+ *   - voucherStackable: 'true'/'false' -> boolean; '' -> null (no choice).
+ *   - voucherBackgroundColor: '' -> null; otherwise must be a #rrggbb hex.
+ * The "stackable is mandatory for vouchers" rule is enforced in the handlers
+ * (it cannot be expressed in Zod without knowing executionType).
+ */
+const voucherBackgroundStackableFields = {
+  voucherStackable: z.preprocess(
+    (v) => (v === 'true' || v === true ? true : v === 'false' || v === false ? false : null),
+    z.boolean().nullable().optional(),
+  ),
+  voucherBackgroundColor: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : v),
+    z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
   ),
 };
 
@@ -166,6 +185,8 @@ const createOfferSchema = z.object({
   ),
   // Voucher redemption window (amount + unit). Validated cross-field in handler.
   ...voucherValiditySchemaFields,
+  // Voucher combine-with-promotions + background color (voucher-only).
+  ...voucherBackgroundStackableFields,
   terms: z.string().max(2000).optional(),
   // JSON-encoded array string from multipart form.
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -212,6 +233,8 @@ const updateOfferSchema = z.object({
   validUntil: z.string().optional().nullable(),
   // Voucher redemption window (amount + unit). Validated cross-field in handler.
   ...voucherValiditySchemaFields,
+  // Voucher combine-with-promotions + background color (voucher-only).
+  ...voucherBackgroundStackableFields,
   terms: z.string().max(2000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
@@ -401,11 +424,17 @@ router.post(
         }
       }
 
-      // Voucher validity (amount + unit) cross-field check. Applies only to vouchers.
+      // Voucher cross-field checks. Apply only to vouchers.
       if (d.executionType === 'voucher') {
         const v = assertVoucherValidity(d.voucherValidityValue, d.voucherValidityUnit);
         if (!v.ok) {
           res.status(400).json({ error: v.error, errorHe: v.errorHe });
+          return;
+        }
+        // Combine-with-promotions is a mandatory, no-default choice for vouchers.
+        const s = assertVoucherStackable(d.voucherStackable);
+        if (!s.ok) {
+          res.status(400).json({ error: s.error, errorHe: s.errorHe });
           return;
         }
       }
@@ -569,11 +598,16 @@ router.patch(
         });
         return;
       }
-      // Voucher validity (amount + unit) cross-field check on update.
+      // Voucher cross-field checks on update.
       if (restParsed.executionType === 'voucher') {
         const v = assertVoucherValidity(restParsed.voucherValidityValue, restParsed.voucherValidityUnit);
         if (!v.ok) {
           res.status(400).json({ error: v.error, errorHe: v.errorHe });
+          return;
+        }
+        const s = assertVoucherStackable(restParsed.voucherStackable);
+        if (!s.ok) {
+          res.status(400).json({ error: s.error, errorHe: s.errorHe });
           return;
         }
       }
