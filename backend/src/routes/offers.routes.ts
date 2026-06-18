@@ -39,6 +39,8 @@ import {
 } from '../services/catalog.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections } from '../models/domain/supply.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
+import { generateBarcodes, addLinks } from '../services/voucher-inventory.service';
+import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX } from '../models/domain/voucher-codes.models';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
 import {
@@ -270,6 +272,17 @@ const updateOfferSchema = z.object({
  */
 const setTenantVoucherPriceSchema = z.object({
   memberPrice: z.coerce.number().positive(),
+});
+
+/**
+ * Validates the voucher inventory body. `kind` selects barcode generation
+ * (needs `quantity`) or link entry (needs `links`); the per-kind requirement is
+ * cross-checked in the handler. Quantity + link count are capped server-side.
+ */
+const inventorySchema = z.object({
+  kind: z.enum(VOUCHER_CODE_KINDS),
+  quantity: z.coerce.number().int().min(1).max(VOUCHER_INVENTORY_MAX).optional(),
+  links: z.array(z.string().url()).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
 });
 
 // ─── Static paths first ───────────────────────────────────────────────────────
@@ -968,6 +981,70 @@ router.patch(
       }
 
       res.json({ config: result.config });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/offers/:offerId/inventory
+ * Appends redeemable inventory (mock barcodes or real links) to a voucher the
+ * caller owns, and resyncs the offer's stockLimit to its total unit count.
+ *
+ * Authorization: supply.manage_offers; ownership enforced (creating tenant or
+ * platform admin). Voucher-only. Quantities capped server-side.
+ *
+ * Input body: { kind: 'barcode' | 'link', quantity?: int, links?: url[] }.
+ * Output: { created, stockLimit }.
+ *   404 - offer not found / not owned
+ *   400 - non-voucher, or missing the field required for the chosen kind
+ */
+router.post(
+  '/:offerId/inventory',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = inventorySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.flatten() });
+        return;
+      }
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+
+      // Ownership + voucher-only guard.
+      const db = await getMongoDb();
+      const { nexusOffers } = getSupplyDomainCollections(db);
+      const offer = await nexusOffers.findOne(
+        { offerId: req.params.offerId },
+        { projection: { createdByTenantId: 1, executionType: 1 } },
+      );
+      if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
+        res.status(404).json({ error: 'Offer not found or you do not own this offer' });
+        return;
+      }
+      if (offer.executionType !== 'voucher') {
+        res.status(400).json({ error: 'Inventory is only supported for voucher offers' });
+        return;
+      }
+
+      const { kind, quantity, links } = parsed.data;
+      let result;
+      if (kind === 'barcode') {
+        if (quantity === undefined) {
+          res.status(400).json({ error: 'quantity is required to generate barcodes' });
+          return;
+        }
+        result = await generateBarcodes(req.params.offerId, quantity);
+      } else {
+        if (!links || links.length === 0) {
+          res.status(400).json({ error: 'links is required to add link inventory' });
+          return;
+        }
+        result = await addLinks(req.params.offerId, links);
+      }
+
+      res.status(201).json(result);
     } catch (err) {
       next(err);
     }

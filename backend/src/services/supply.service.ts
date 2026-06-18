@@ -255,7 +255,9 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     currency: 'ILS',
     stockLimit: input.stockLimit ?? null,
     stockUsed: 0,
-    implementationLink: input.implementationLink ?? null,
+    // Vouchers redeem via their inventory (barcodes/links), not a single
+    // offer-level link, so implementationLink is never stored for vouchers.
+    implementationLink: isVoucher ? null : (input.implementationLink ?? null),
     implementationInstructions: input.implementationInstructions ?? '',
     validFrom: resolvedValidFrom,
     validUntil: resolvedValidUntil,
@@ -409,6 +411,9 @@ export async function updateOffer(
     ...(input.variantType !== undefined && { variantType: input.variantType }),
     ...(input.stockLimit !== undefined && { stockLimit: input.stockLimit }),
     ...(input.implementationLink !== undefined && { implementationLink: input.implementationLink }),
+    // Vouchers never keep an offer-level implementation link (inventory handles
+    // redemption); force it null when the merged type is voucher.
+    ...(isVoucherUpdate && { implementationLink: null }),
     ...(input.implementationInstructions !== undefined && { implementationInstructions: input.implementationInstructions }),
     // Voucher/non-voucher expiry + validity normalization (computed above).
     ...validityUpdate,
