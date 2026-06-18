@@ -19,6 +19,7 @@ export const DOMAIN_COLLECTIONS = {
   tenantContactFields: 'tenantContactFields',
   nexusOffers: 'nexusOffers',
   tenantOfferConfigs: 'tenantOfferConfigs',
+  voucherCodes: 'voucherCodes',
   tenantContacts: 'tenantContacts',
   platformEvents: 'platformEvents',
   sagaInstances: 'sagaInstances',

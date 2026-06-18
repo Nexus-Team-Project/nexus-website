@@ -7,6 +7,7 @@ import { getIdentityDomainCollections } from './identity.models';
 import { getOrchestrationDomainCollections } from './orchestration.models';
 import { getTenantDomainCollections } from './tenant.models';
 import { getSupplyDomainCollections } from './supply.models';
+import { ensureVoucherCodeIndexes } from './voucher-codes.models';
 import { ensureInviteJobIndexes } from './invite-jobs.models';
 import { ensurePhoneOtpIndexes } from '../auth/phone-otp.models';
 import { ensureEmailOtpIndexes } from '../auth/email-otp.models';
@@ -123,6 +124,7 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     ),
   ]);
 
+  await ensureVoucherCodeIndexes(db);
   await ensureInviteJobIndexes(db);
   await ensurePhoneOtpIndexes(db);
   await ensureEmailOtpIndexes(db);
