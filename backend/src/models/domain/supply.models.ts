@@ -131,6 +131,16 @@ export const VOUCHER_VALIDITY_MAX: Record<OfferVoucherValidityUnit, number> = {
 };
 
 /**
+ * Validation constants for the optional voucher SKU (internal company code).
+ * Allowed: uppercase letters, digits, hyphen, underscore. No spaces, lowercase,
+ * or other special characters. Length 4-20. Used by both the model schema and
+ * the offers route schemas so the rule lives in exactly one place.
+ */
+export const SKU_MIN_LENGTH = 4;
+export const SKU_MAX_LENGTH = 20;
+export const SKU_REGEX = /^[A-Z0-9_-]+$/;
+
+/**
  * Maximum number of images allowed per offer.
  * Enforced in supply.service.createOffer / updateOffer and in routes (multer cap).
  * Keep this in sync with `OFFER_IMAGES_MAX` in the dashboard (`OfferImageGallery`).
@@ -277,6 +287,11 @@ export const nexusOfferSchema = z.object({
    * back to the tenant brand color + logo at render time).
    */
   voucherBackgroundColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  /**
+   * Optional voucher SKU / internal company code. Voucher-only; null for other
+   * types. Uppercase alphanumeric + hyphen + underscore, length 4-20.
+   */
+  sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   /** Terms and conditions text. */
   terms: z.string().max(2000).optional().default(''),
   /** Display tags set by the offer creator (max 10, each max 50 chars). */
