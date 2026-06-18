@@ -32,6 +32,35 @@ export interface InventoryResult {
   stockLimit: number;
 }
 
+/** Read-side summary of an offer's inventory: link values + per-kind counts. */
+export interface InventorySummary {
+  /** All link-unit values for the offer (used to pre-fill the edit popup). */
+  links: string[];
+  /** Unit counts per kind. */
+  counts: { barcode: number; link: number };
+}
+
+/**
+ * Returns an offer's inventory summary: every link value + per-kind counts.
+ * Barcode values are intentionally not returned (mock placeholders; the edit
+ * popup only needs to re-show links). Caller enforces admin + ownership.
+ *
+ * Input:  offerId. Output: { links, counts }.
+ */
+export async function getInventorySummary(offerId: string): Promise<InventorySummary> {
+  const db = await getMongoDb();
+  const codes = getVoucherCodeCollection(db);
+  const [linkDocs, barcodeCount, linkCount] = await Promise.all([
+    codes.find({ offerId, kind: 'link' }, { projection: { value: 1, _id: 0 } }).toArray(),
+    codes.countDocuments({ offerId, kind: 'barcode' }),
+    codes.countDocuments({ offerId, kind: 'link' }),
+  ]);
+  return {
+    links: linkDocs.map((d) => d.value),
+    counts: { barcode: barcodeCount, link: linkCount },
+  };
+}
+
 /** MongoDB duplicate-key error code. */
 const DUPLICATE_KEY = 11000;
 
