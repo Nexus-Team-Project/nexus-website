@@ -112,6 +112,25 @@ export const OFFER_VARIANT_TYPES = ['fixed', 'flexible', 'subscription', 'bundle
 export const OFFER_FINANCIAL_MODELS = ['L1', 'L2', 'L3'] as const;
 
 /**
+ * Units a voucher validity duration can be expressed in.
+ * A voucher's expiry is a redemption window that starts when a customer BUYS
+ * the voucher (not an absolute calendar date), so it is stored as an
+ * amount + unit pair (e.g. 2 + 'years'). Only used when executionType === 'voucher'.
+ */
+export const VOUCHER_VALIDITY_UNITS = ['days', 'months', 'years'] as const;
+
+/**
+ * Sensible per-unit upper bounds for a voucher validity amount. Prevents
+ * absurd values (e.g. 999999 years) from being persisted. Enforced in the
+ * offers route handlers; kept here so the model and route agree on one source.
+ */
+export const VOUCHER_VALIDITY_MAX: Record<OfferVoucherValidityUnit, number> = {
+  days: 3650,
+  months: 120,
+  years: 10,
+};
+
+/**
  * Maximum number of images allowed per offer.
  * Enforced in supply.service.createOffer / updateOffer and in routes (multer cap).
  * Keep this in sync with `OFFER_IMAGES_MAX` in the dashboard (`OfferImageGallery`).
@@ -126,6 +145,7 @@ export type OfferExecutionType = typeof OFFER_EXECUTION_TYPES[number];
 export type OfferValueType = typeof OFFER_VALUE_TYPES[number];
 export type OfferVariantType = typeof OFFER_VARIANT_TYPES[number];
 export type OfferFinancialModel = typeof OFFER_FINANCIAL_MODELS[number];
+export type OfferVoucherValidityUnit = typeof VOUCHER_VALIDITY_UNITS[number];
 
 /**
  * Maps the friendly executionType used by the UI to the spec's value_type enum.
@@ -231,8 +251,19 @@ export const nexusOfferSchema = z.object({
    * until this date. null means the offer is live as soon as it is approved.
    */
   validFrom: z.date().nullable().optional(),
-  /** Offer expiry date. null means no expiry. */
+  /** Offer expiry date. null means no expiry. Vouchers do not use this (they
+   *  carry voucherValidityValue/Unit instead, applied at purchase time). */
   validUntil: z.date().nullable().optional(),
+  /**
+   * Voucher redemption window, measured from the moment a customer PURCHASES
+   * the voucher. amount (positive int) + unit ('days'|'months'|'years').
+   * Both null/absent = the voucher never expires. Only meaningful when
+   * executionType === 'voucher'; nulled for every other offer type.
+   * The actual per-purchase expiry date is computed later by the
+   * wallet/checkout phase; here we only persist the supplier's intent.
+   */
+  voucherValidityValue: z.number().int().positive().nullable().optional(),
+  voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
   /** Terms and conditions text. */
   terms: z.string().max(2000).optional().default(''),
   /** Display tags set by the offer creator (max 10, each max 50 chars). */

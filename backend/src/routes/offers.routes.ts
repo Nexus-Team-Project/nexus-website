@@ -37,7 +37,8 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, getSupplyDomainCollections } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, getSupplyDomainCollections } from '../models/domain/supply.models';
+import { assertVoucherValidity } from '../services/supply-voucher.helper';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
 import {
@@ -81,6 +82,24 @@ function parseKeptImageUrlsField(v: unknown): unknown {
 }
 
 // ─── Zod schemas ─────────────────────────────────────────────────────────────
+
+/**
+ * Voucher validity duration fields shared by the create + update schemas.
+ * Both are optional/nullable here; the cross-field rule (both-or-neither) and
+ * the per-unit ceiling are enforced in the handlers via assertVoucherValidity
+ * so we can return clean bilingual errors. Empty string from multipart is
+ * coerced to null so "field present but blank" means "no expiry".
+ */
+const voucherValiditySchemaFields = {
+  voucherValidityValue: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : v),
+    z.coerce.number().int().positive().nullable().optional(),
+  ),
+  voucherValidityUnit: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : v),
+    z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  ),
+};
 
 /**
  * Validates the query string for both list endpoints (admin /platform and
@@ -145,6 +164,8 @@ const createOfferSchema = z.object({
     (v) => !v || new Date(v) > new Date(),
     { message: 'validUntil must be a future date' }
   ),
+  // Voucher redemption window (amount + unit). Validated cross-field in handler.
+  ...voucherValiditySchemaFields,
   terms: z.string().max(2000).optional(),
   // JSON-encoded array string from multipart form.
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -189,6 +210,8 @@ const updateOfferSchema = z.object({
   implementationInstructions: z.string().max(1000).optional(),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
+  // Voucher redemption window (amount + unit). Validated cross-field in handler.
+  ...voucherValiditySchemaFields,
   terms: z.string().max(2000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
@@ -378,6 +401,27 @@ router.post(
         }
       }
 
+      // Voucher validity (amount + unit) cross-field check. Applies only to vouchers.
+      if (d.executionType === 'voucher') {
+        const v = assertVoucherValidity(d.voucherValidityValue, d.voucherValidityUnit);
+        if (!v.ok) {
+          res.status(400).json({ error: v.error, errorHe: v.errorHe });
+          return;
+        }
+      }
+
+      // Voucher single-image rule: a voucher carries exactly one card image.
+      // multer already caps total file count at OFFER_IMAGES_MAX; this narrows
+      // it to 1 for vouchers. Re-enforced server-side regardless of the UI.
+      const uploadedFileCount = Array.isArray(req.files) ? req.files.length : 0;
+      if (d.executionType === 'voucher' && uploadedFileCount > 1) {
+        res.status(400).json({
+          error: 'A voucher offer can have at most one image',
+          errorHe: 'שובר יכול לכלול תמונה אחת בלבד',
+        });
+        return;
+      }
+
       // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
       const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
       const validFromDate = validFromStr ? new Date(validFromStr) : null;
@@ -515,6 +559,23 @@ router.patch(
           error: `An offer can have at most ${OFFER_IMAGES_MAX} images.`,
         });
         return;
+      }
+      // Voucher single-image rule. The frontend always sends executionType on
+      // save; when it indicates a voucher, kept + uploaded must be at most 1.
+      if (restParsed.executionType === 'voucher' && keptCount + imageFiles.length > 1) {
+        res.status(400).json({
+          error: 'A voucher offer can have at most one image',
+          errorHe: 'שובר יכול לכלול תמונה אחת בלבד',
+        });
+        return;
+      }
+      // Voucher validity (amount + unit) cross-field check on update.
+      if (restParsed.executionType === 'voucher') {
+        const v = assertVoucherValidity(restParsed.voucherValidityValue, restParsed.voucherValidityUnit);
+        if (!v.ok) {
+          res.status(400).json({ error: v.error, errorHe: v.errorHe });
+          return;
+        }
       }
       const { keptImageUrls, ...restNoKept } = restParsed;
       const result = await updateOffer(req.params.offerId, ctx.tenantId, {
