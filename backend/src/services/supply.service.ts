@@ -13,6 +13,7 @@ import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
   deriveValueTypeFromExecutionType,
+  NOT_DELETED,
   type NexusOffer,
   type OfferCategory,
   type OfferVisibility,
@@ -323,7 +324,7 @@ export async function updateOffer(
 
   // Read current offer to detect denied status for resubmit flow.
   // Ownership is checked here to avoid a redundant DB round trip on not-found.
-  const currentOffer = await nexusOffers.findOne({ offerId, createdByTenantId: tenantId });
+  const currentOffer = await nexusOffers.findOne({ offerId, createdByTenantId: tenantId, ...NOT_DELETED });
   if (!currentOffer) return null;
 
   // When a denied offer is edited and saved, it re-enters the approval queue.
@@ -442,8 +443,9 @@ export async function updateOffer(
   };
 
   const result = await nexusOffers.findOneAndUpdate(
-    // Ownership guard: only the creating tenant can update this offer.
-    { offerId, createdByTenantId: tenantId },
+    // Ownership guard: only the creating tenant can update this offer. Deleted
+    // offers are excluded so an edit can never resurrect a deleted offer.
+    { offerId, createdByTenantId: tenantId, ...NOT_DELETED },
     { $set: update },
     { returnDocument: 'after' }
   );
@@ -463,7 +465,9 @@ export async function updateOffer(
 /**
  * Soft-deletes an offer and cascades removal from all tenant catalogs.
  *
- * - Sets offer.status = 'inactive' so purchase history references remain intact.
+ * - Sets offer.deletedAt (authoritative delete marker) and status = 'inactive'
+ *   so purchase history references remain intact while the offer is excluded
+ *   from every read and every status sweep.
  * - Deletes all TenantOfferConfig adoption records for this offer so it
  *   disappears from every tenant's member-facing catalog immediately.
  * - Attempts to remove the image from Cloudinary; errors are swallowed so that
@@ -492,9 +496,10 @@ export async function deleteOffer(
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
   // Platform admins can delete any offer; tenant admins only their own.
+  // Already-deleted offers are excluded so a repeat delete returns 404 cleanly.
   const ownerFilter = isPlatformAdmin
-    ? { offerId }
-    : { offerId, createdByTenantId: tenantId };
+    ? { offerId, ...NOT_DELETED }
+    : { offerId, createdByTenantId: tenantId, ...NOT_DELETED };
 
   const offer = await nexusOffers.findOne(ownerFilter);
   if (!offer) throw Object.assign(new Error('Offer not found'), { status: 404 });
@@ -508,10 +513,14 @@ export async function deleteOffer(
     : [];
   await deleteOrphanedImages([...gallery, ...legacyCover]);
 
-  // Soft delete - keeps the document so transaction/purchase history stays intact.
+  // Soft delete - keeps the document so transaction/purchase history stays
+  // intact. `deletedAt` is the authoritative deletion marker (orthogonal to
+  // status); status is also set inactive so the offer drops out of any
+  // status-based query. Reads + status sweeps both filter on `deletedAt`, so a
+  // deleted offer can never resurface (e.g. on service re-activation).
   await nexusOffers.updateOne(
     { offerId },
-    { $set: { status: 'inactive', updatedAt: new Date() } },
+    { $set: { status: 'inactive', deletedAt: new Date(), updatedAt: new Date() } },
   );
 
   // Cascade - remove every tenant's adoption record for this offer immediately.
@@ -547,6 +556,7 @@ export async function decrementStock(offerId: string): Promise<number> {
     {
       offerId,
       status: 'active',
+      ...NOT_DELETED,
       $or: [
         { stockLimit: null },
         { $expr: { $lt: ['$stockUsed', '$stockLimit'] } },

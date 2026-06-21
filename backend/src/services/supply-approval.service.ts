@@ -11,6 +11,7 @@
 import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
+  NOT_DELETED,
   type NexusOffer,
 } from '../models/domain/supply.models';
 
@@ -44,6 +45,7 @@ export async function listPlatformOffers(
 
   const filter: Record<string, unknown> = {
     status: statusFilter,
+    ...NOT_DELETED,
     $or: [
       { visibility: 'ecosystem' },
       { visibility: 'tenant_only', invitedByTenantId: tenantId },
@@ -71,7 +73,7 @@ export async function approveOffer(offerId: string): Promise<NexusOffer | null> 
   const { nexusOffers } = getSupplyDomainCollections(db);
 
   const result = await nexusOffers.findOneAndUpdate(
-    { offerId, status: 'pending_approval' },
+    { offerId, status: 'pending_approval', ...NOT_DELETED },
     { $set: { status: 'active', updatedAt: new Date() } },
     { returnDocument: 'after' },
   );
@@ -95,7 +97,7 @@ export async function denyOffer(offerId: string, reason: string): Promise<NexusO
   const { nexusOffers } = getSupplyDomainCollections(db);
 
   const result = await nexusOffers.findOneAndUpdate(
-    { offerId, status: 'pending_approval' },
+    { offerId, status: 'pending_approval', ...NOT_DELETED },
     { $set: { status: 'denied', denial_reason: reason, updatedAt: new Date() } },
     { returnDocument: 'after' },
   );

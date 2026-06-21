@@ -14,6 +14,7 @@
 import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
+  NOT_DELETED,
   type TenantOfferConfig,
 } from '../models/domain/supply.models';
 import { computeTenantDisplayPrice } from './supply-price.helper';
@@ -64,8 +65,8 @@ export async function setTenantVoucherPrice(
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  // 1. Offer must exist.
-  const offer = await nexusOffers.findOne({ offerId });
+  // 1. Offer must exist (and not be soft-deleted).
+  const offer = await nexusOffers.findOne({ offerId, ...NOT_DELETED });
   if (!offer) {
     return { ok: false, reason: 'offer_not_found' };
   }

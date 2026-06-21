@@ -308,6 +308,15 @@ export const nexusOfferSchema = z.object({
    * and future timeout-based workflows.
    */
   statusChangedAt: z.date().nullable().optional(),
+  /**
+   * Soft-delete marker. Set when the offer is deleted by its owner (or a
+   * platform admin). DELETION IS ORTHOGONAL TO `status`: a deleted offer must be
+   * excluded from every read AND from every status sweep (service
+   * deactivate/reactivate), so it can never be revived by a status toggle.
+   * null/absent = not deleted. The document is retained (not removed) so any
+   * transaction/purchase history referencing the offer stays intact.
+   */
+  deletedAt: z.date().nullable().optional(),
   createdByTenantId: z.string().min(1),
   createdByIdentityId: z.string().min(1),
   invitedByTenantId: z.string().min(1).optional(),
@@ -341,6 +350,15 @@ export const tenantOfferConfigSchema = z.object({
 });
 
 export type TenantOfferConfig = z.infer<typeof tenantOfferConfigSchema>;
+
+/**
+ * Reusable filter clause that excludes soft-deleted offers. `{ deletedAt: null }`
+ * matches BOTH an explicit null and a missing field, so documents created before
+ * the field existed are correctly treated as not-deleted. Spread into every
+ * NexusOffer read filter and every status sweep so a deleted offer can never be
+ * read or revived. See `deletedAt` on `nexusOfferSchema`.
+ */
+export const NOT_DELETED = { deletedAt: null } as const;
 
 /**
  * Returns typed MongoDB collection accessors for supply data.

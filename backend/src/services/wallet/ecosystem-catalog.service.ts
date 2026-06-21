@@ -6,6 +6,7 @@
  */
 import { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
+import { NOT_DELETED } from '../../models/domain/supply.models';
 
 export interface EcosystemCatalogItem {
   id: string;
@@ -63,6 +64,7 @@ export async function getEcosystemCatalogForWallet(
   const filter: Record<string, unknown> = {
     visibility: 'ecosystem',
     status: 'active',
+    ...NOT_DELETED,
   };
   if (adoptedOfferIds.length > 0) {
     filter.offerId = { $nin: adoptedOfferIds };

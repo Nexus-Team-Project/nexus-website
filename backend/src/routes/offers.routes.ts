@@ -37,7 +37,7 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED } from '../models/domain/supply.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
 import { generateBarcodes, addLinks, getInventorySummary } from '../services/voucher-inventory.service';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
@@ -939,7 +939,7 @@ router.post(
       const db = await getMongoDb();
       const { nexusOffers } = getSupplyDomainCollections(db);
       const targetOffer = await nexusOffers.findOne(
-        { offerId: req.params.offerId },
+        { offerId: req.params.offerId, ...NOT_DELETED },
         { projection: { createdByTenantId: 1 } },
       );
       const isOwnOffer = targetOffer?.createdByTenantId === tenantId;
@@ -1073,7 +1073,7 @@ router.post(
       const db = await getMongoDb();
       const { nexusOffers } = getSupplyDomainCollections(db);
       const offer = await nexusOffers.findOne(
-        { offerId: req.params.offerId },
+        { offerId: req.params.offerId, ...NOT_DELETED },
         { projection: { createdByTenantId: 1, executionType: 1 } },
       );
       if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
@@ -1126,7 +1126,7 @@ router.get(
       const db = await getMongoDb();
       const { nexusOffers } = getSupplyDomainCollections(db);
       const offer = await nexusOffers.findOne(
-        { offerId: req.params.offerId },
+        { offerId: req.params.offerId, ...NOT_DELETED },
         { projection: { createdByTenantId: 1 } },
       );
       if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
