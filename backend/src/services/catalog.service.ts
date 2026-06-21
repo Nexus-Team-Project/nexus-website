@@ -22,6 +22,7 @@ import { randomUUID } from 'node:crypto';
 import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
+  NOT_DELETED,
   type NexusOffer,
   type TenantOfferConfig,
 } from '../models/domain/supply.models';
@@ -275,7 +276,7 @@ export async function getTenantCatalogView(
     ...(options?.isPlatformAdmin ? [{ status: 'pending_approval' }] : []),
   ]};
 
-  const andClauses: Array<Record<string, unknown>> = [visibilityClause, baseStatusClause];
+  const andClauses: Array<Record<string, unknown>> = [visibilityClause, baseStatusClause, NOT_DELETED];
 
   if (query.category) andClauses.push({ category: query.category });
   const searchFilter = buildSearchFilter(query.search);
@@ -374,6 +375,7 @@ export async function getMemberCatalogView(
   const andClauses: Array<Record<string, unknown>> = [
     { offerId: { $in: adoptedConfigs.map((c) => c.offerId) } },
     { status: 'active' },
+    NOT_DELETED,
     { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
     { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
   ];
@@ -467,6 +469,7 @@ export async function adoptOffer(
   const offer = await nexusOffers.findOne({
     offerId,
     status: 'active',
+    ...NOT_DELETED,
     $or: [
       { visibility: 'ecosystem' },
       { visibility: 'tenant_only', invitedByTenantId: tenantId },

@@ -11,7 +11,7 @@ import {
   type CatalogAdoptionMode,
   type DefaultPricingRule,
 } from '../models/domain';
-import { getSupplyDomainCollections } from '../models/domain/supply.models';
+import { getSupplyDomainCollections, NOT_DELETED } from '../models/domain/supply.models';
 import { getOnboardingCollections } from '../models/onboarding.models';
 import type { BenefitsCatalogActivationInput } from '../schemas/domain-service-activation.schemas';
 import { getDomainAuthorizationContext, hasDomainPermission } from './domain-authorization.service';
@@ -203,14 +203,18 @@ export async function activateBenefitsCatalogForUser(
     { upsert: true },
   );
 
-  // Restore all inactive tenant-created offers when the service is re-activated.
+  // Restore inactive tenant-created offers when the service is re-activated.
   // NOTE: This also restores offers the admin may have manually deactivated before
   // the service was suspended. Re-activation is treated as a full service resume.
   // A future 'admin_deactivated' status field would allow distinguishing the two
   // cases if this becomes a product concern.
+  // CRITICAL: NOT_DELETED excludes soft-deleted offers. Deletion sets
+  // status:'inactive' too, so without this filter a deleted offer would be
+  // revived to 'active' on re-activation. `deletedAt` keeps deletion orthogonal
+  // to the status lifecycle so it survives status sweeps.
   const supplyCollections = getSupplyDomainCollections(db);
   await supplyCollections.nexusOffers.updateMany(
-    { createdByTenantId: access.tenantId, status: 'inactive' },
+    { createdByTenantId: access.tenantId, status: 'inactive', ...NOT_DELETED },
     {
       $set: {
         status: 'active',
@@ -261,9 +265,11 @@ export async function deactivateBenefitsCatalogForUser(
   );
 
   // Bulk-mark all active tenant-created offers as inactive.
-  // Platform offers (createdByTenantId === null) are not touched.
+  // Platform offers (createdByTenantId === null) are not touched. NOT_DELETED
+  // keeps deleted offers out of the sweep (defense-in-depth: they are already
+  // status:'inactive', but deletion must never depend on status).
   const offerResult = await supplyCollections.nexusOffers.updateMany(
-    { createdByTenantId: access.tenantId, status: 'active' },
+    { createdByTenantId: access.tenantId, status: 'active', ...NOT_DELETED },
     {
       $set: {
         status: 'inactive',
