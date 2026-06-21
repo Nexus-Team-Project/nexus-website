@@ -143,6 +143,73 @@ export async function uploadOfferImage(buffer: Buffer, filename: string): Promis
 }
 
 /**
+ * Cheap pre-check before asking Cloudinary to fetch a remote image: the value
+ * must be a non-empty http(s) URL string. This does NOT verify the URL points
+ * at a real image — Cloudinary's fetch decides that; callers fall back when the
+ * upload throws. Blocks free text and non-http schemes (e.g. javascript:, data:).
+ *
+ * Input:  any value (typically a CSV cell).
+ * Output: true only for a string that starts with http:// or https://.
+ */
+export function isUploadableImageUrl(value: unknown): value is string {
+  return typeof value === 'string' && /^https?:\/\/\S+$/i.test(value.trim());
+}
+
+/**
+ * Uploads an image to Cloudinary BY URL (Cloudinary downloads the remote file,
+ * stores it in our account, and returns a permanent secure_url) so the asset is
+ * owned/managed by us rather than the supplier's link. Same signed REST request
+ * as `uploadOfferImage`, but the `file` field is the remote URL string instead
+ * of a Blob. Lands in the `nexus/offers` folder.
+ *
+ * Input:  remoteUrl - a public http(s) image URL.
+ * Output: Promise resolving to the secure HTTPS Cloudinary URL.
+ * Throws:
+ *   - If remoteUrl is not a valid http(s) URL (caller should fall back).
+ *   - If CLOUDINARY_URL is not configured.
+ *   - If Cloudinary returns a non-2xx (e.g. the URL is unreachable / not an image).
+ */
+export async function uploadOfferImageFromUrl(remoteUrl: string): Promise<string> {
+  if (!isUploadableImageUrl(remoteUrl)) {
+    throw new Error('uploadOfferImageFromUrl requires an http(s) URL');
+  }
+  if (!env.CLOUDINARY_URL) {
+    throw new Error('CLOUDINARY_URL is not configured - offer image upload is unavailable');
+  }
+
+  const { apiKey, apiSecret, cloudName } = parseCloudinaryUrl(env.CLOUDINARY_URL);
+
+  const folder = 'nexus/offers';
+  const publicId = `${folder}/${Date.now()}-url`;
+  const timestamp = String(Math.round(Date.now() / 1000));
+
+  const signedParams: Record<string, string> = { folder, public_id: publicId, timestamp };
+  const signature = buildSignature(signedParams, apiSecret);
+
+  const form = new FormData();
+  // The remote URL goes in the `file` field; Cloudinary fetches it server-side.
+  form.append('file', remoteUrl.trim());
+  form.append('api_key', apiKey);
+  form.append('timestamp', timestamp);
+  form.append('signature', signature);
+  form.append('folder', folder);
+  form.append('public_id', publicId);
+
+  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Cloudinary upload-from-URL failed (HTTP ${res.status}): ${body}`);
+  }
+
+  const data = (await res.json()) as CloudinaryUploadResult;
+  return data.secure_url;
+}
+
+/**
  * Uploads a tenant (organization) logo to Cloudinary under the
  * `nexus/tenant-logos` folder using a signed REST request. A fresh unique
  * public_id is used each time; callers delete the previous logo via
