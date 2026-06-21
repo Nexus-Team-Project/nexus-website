@@ -39,7 +39,7 @@ import {
 } from '../services/catalog.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections } from '../models/domain/supply.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
-import { generateBarcodes, addLinks } from '../services/voucher-inventory.service';
+import { generateBarcodes, addLinks, getInventorySummary } from '../services/voucher-inventory.service';
 import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX } from '../models/domain/voucher-codes.models';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
@@ -1053,6 +1053,39 @@ router.post(
       }
 
       res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/offers/:offerId/inventory
+ * Returns the offer's link values + per-kind counts so the Edit popup can
+ * pre-fill existing links. Barcode values (mock placeholders) are not returned.
+ *
+ * Authorization: supply.manage_offers; ownership enforced (creating tenant or
+ * platform admin).
+ * Output: { links: string[], counts: { barcode, link } }, or 404 when not owned.
+ */
+router.get(
+  '/:offerId/inventory',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+      const db = await getMongoDb();
+      const { nexusOffers } = getSupplyDomainCollections(db);
+      const offer = await nexusOffers.findOne(
+        { offerId: req.params.offerId },
+        { projection: { createdByTenantId: 1 } },
+      );
+      if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
+        res.status(404).json({ error: 'Offer not found or you do not own this offer' });
+        return;
+      }
+      const summary = await getInventorySummary(req.params.offerId);
+      res.json(summary);
     } catch (err) {
       next(err);
     }
