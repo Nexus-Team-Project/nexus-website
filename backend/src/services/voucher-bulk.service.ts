@@ -19,6 +19,7 @@ import { SKU_REGEX, SKU_MIN_LENGTH, SKU_MAX_LENGTH } from '../models/domain/supp
 import { VOUCHER_INVENTORY_MAX } from '../models/domain/voucher-codes.models';
 import { createOffer, type CreateOfferInput } from './supply.service';
 import { generateBarcodes, addLinks } from './voucher-inventory.service';
+import { adoptOffer } from './catalog.service';
 import { isUploadableImageUrl, uploadOfferImageFromUrl } from '../utils/cloudinary';
 
 /** Max rows accepted per bulk request (synchronous v1 cap). */
@@ -73,18 +74,35 @@ const rowSchema = z
     visibility: z.preprocess(blank, z.enum(['tenant_only', 'ecosystem']).optional()),
     backgroundColor: z.preprocess(blank, z.string().regex(HEX).optional()),
     imageUrl: z.preprocess(blank, z.string().optional()),
-    barcodeQuantity: z.preprocess(blank, z.coerce.number().int().positive().max(VOUCHER_INVENTORY_MAX).optional()),
+    // Inventory cells stay raw strings: empty/invalid is tolerated (→ no
+    // inventory / out of stock), so they must not fail row parsing. The only
+    // hard inventory rule is barcodes-XOR-links, checked in the mapper.
+    barcodeQuantity: z.preprocess(blank, z.string().optional()),
     links: z.preprocess(blank, z.string().optional()),
   })
   .refine((d) => d.nexus_cost < d.face_value, { message: 'nexus_cost must be less than face_value', path: ['nexus_cost'] })
-  .refine((d) => !(d.barcodeQuantity !== undefined && (d.links ?? '').trim() !== ''), {
-    message: 'use barcodeQuantity OR links, not both',
-    path: ['links'],
-  })
   .refine((d) => (d.validityValue === undefined) === (d.validityUnit === undefined), {
     message: 'validityValue and validityUnit must be set together',
     path: ['validityValue'],
   });
+
+/** Parses a barcode-quantity cell; returns the count or null when empty/invalid. */
+function resolveBarcodeQuantity(raw: string): number | null {
+  if (!/^\d+$/.test(raw)) return null;
+  const n = Number(raw);
+  return n > 0 && n <= VOUCHER_INVENTORY_MAX ? n : null;
+}
+
+/**
+ * Parses a links cell into valid units. All-or-nothing: returns [] when empty
+ * OR when any entry is not an http(s) URL (treated as "no inventory" rather than
+ * failing the row). Deduped and capped.
+ */
+function resolveLinks(raw: string): string[] {
+  const parts = raw.split('|').map((s) => s.trim()).filter(Boolean);
+  if (parts.length === 0 || parts.some((p) => !isUploadableImageUrl(p))) return [];
+  return Array.from(new Set(parts)).slice(0, VOUCHER_INVENTORY_MAX);
+}
 
 /** Parses the combinable cell into a boolean; null when unrecognized. */
 function parseCombinable(raw: string): boolean | null {
@@ -92,20 +110,6 @@ function parseCombinable(raw: string): boolean | null {
   if (['yes', 'true', '1', 'y'].includes(v)) return true;
   if (['no', 'false', '0', 'n'].includes(v)) return false;
   return null;
-}
-
-/** Splits + validates a links cell. Returns the deduped URL list or an error. */
-function parseLinks(raw: string): { ok: true; links: string[] } | { ok: false; error: string } {
-  const parts = raw.split('|').map((s) => s.trim()).filter(Boolean);
-  if (parts.length === 0) return { ok: true, links: [] };
-  if (parts.some((p) => !isUploadableImageUrl(p))) {
-    return { ok: false, error: 'links must all be http(s) URLs' };
-  }
-  const deduped = Array.from(new Set(parts));
-  if (deduped.length > VOUCHER_INVENTORY_MAX) {
-    return { ok: false, error: `at most ${VOUCHER_INVENTORY_MAX} links` };
-  }
-  return { ok: true, links: deduped };
 }
 
 /**
@@ -141,13 +145,21 @@ export function validateAndMapRow(
     return { ok: false, error: 'ecosystem requires completed business setup' };
   }
 
+  // Inventory: barcodes XOR links. Both cells non-empty is the only hard error;
+  // an empty/invalid cell is tolerated → no inventory (the voucher is created
+  // out of stock), mirroring the lenient image fallback.
+  const barcodeRaw = (d.barcodeQuantity ?? '').trim();
+  const linksRaw = (d.links ?? '').trim();
+  if (barcodeRaw !== '' && linksRaw !== '') {
+    return { ok: false, error: 'use barcodeQuantity OR links, not both' };
+  }
   let inventory: RowInventory = null;
-  if ((d.links ?? '').trim() !== '') {
-    const r = parseLinks(d.links as string);
-    if (!r.ok) return { ok: false, error: r.error };
-    if (r.links.length > 0) inventory = { kind: 'link', links: r.links };
-  } else if (d.barcodeQuantity !== undefined) {
-    inventory = { kind: 'barcode', quantity: d.barcodeQuantity };
+  if (barcodeRaw !== '') {
+    const q = resolveBarcodeQuantity(barcodeRaw);
+    if (q !== null) inventory = { kind: 'barcode', quantity: q };
+  } else if (linksRaw !== '') {
+    const links = resolveLinks(linksRaw);
+    if (links.length > 0) inventory = { kind: 'link', links };
   }
 
   const tags = (d.tags ?? '').split(';').map((s) => s.trim()).filter(Boolean).slice(0, 10);
@@ -223,6 +235,15 @@ export async function createVouchersBulk(args: {
 
     try {
       const offer = await createOffer(input);
+      // Auto-adopt tenant_only offers for the creating tenant so they appear in
+      // the tenant's product catalog immediately — same as the manual create route.
+      if (offer.visibility === 'tenant_only') {
+        try {
+          await adoptOffer(tenantId, offer.offerId, identityId);
+        } catch (err) {
+          console.error(`[BULK] auto-adopt failed (row ${index}):`, err instanceof Error ? err.message : err);
+        }
+      }
       if (mapped.inventory?.kind === 'barcode') {
         await generateBarcodes(offer.offerId, mapped.inventory.quantity);
       } else if (mapped.inventory?.kind === 'link') {

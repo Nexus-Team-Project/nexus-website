@@ -82,10 +82,16 @@ describe('validateAndMapRow — inventory (barcodes XOR links)', () => {
     expect(r.ok).toBe(false);
   });
 
-  it('rejects a links cell with a non-http(s) / free-text entry', () => {
+  it('treats an invalid links cell as no inventory (created out of stock, not a row error)', () => {
     const r = validateAndMapRow(row({ links: 'https://a/1 | not-a-url' }), ctx);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(/http/i);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.inventory).toBeNull();
+  });
+
+  it('treats an invalid barcodeQuantity as no inventory (not a row error)', () => {
+    const r = validateAndMapRow(row({ barcodeQuantity: 'abc' }), ctx);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.inventory).toBeNull();
   });
 
   it('leaves inventory null when neither column is set', () => {
