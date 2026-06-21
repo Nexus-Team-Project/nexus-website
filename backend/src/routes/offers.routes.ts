@@ -40,6 +40,7 @@ import {
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections } from '../models/domain/supply.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
 import { generateBarcodes, addLinks, getInventorySummary } from '../services/voucher-inventory.service';
+import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
 import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX } from '../models/domain/voucher-codes.models';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
@@ -538,6 +539,54 @@ router.post(
       }
 
       res.status(201).json({ offer });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/offers/bulk
+ * Bulk-creates voucher offers from parsed CSV rows (one row = one voucher).
+ * Requires: supply.ingest permission. Tenant + identity derive from the session.
+ *
+ * The body is validated leniently here (array of string-maps, capped) so a
+ * single malformed row does not 400 the whole batch; each row's content is
+ * validated inside the bulk service, which returns a per-row result.
+ *
+ * Input body: { offers: Array<Record<string,string>> } (<= BULK_MAX_ROWS).
+ * Output: { results: [{ index, status, offerId?, error? }], created, failed }.
+ */
+router.post(
+  '/bulk',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const bodySchema = z.object({
+        offers: z.array(z.record(z.string(), z.string())).min(1).max(BULK_MAX_ROWS),
+      });
+      const parsed = bodySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.flatten() });
+        return;
+      }
+
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.ingest');
+
+      // Ecosystem rows are only allowed once business setup is complete (same
+      // rule as single create); computed once and applied per row in the service.
+      const { onboarding } = await getOnboardingStatus(req.user!.sub);
+      const businessSetupComplete = onboarding.step !== 'business_setup';
+
+      const result = await createVouchersBulk({
+        rows: parsed.data.offers,
+        tenantId: ctx.tenantId,
+        identityId: ctx.identityId,
+        isPlatformAdmin: ctx.isPlatformAdmin ?? false,
+        businessSetupComplete,
+      });
+
+      res.json(result);
     } catch (err) {
       next(err);
     }

@@ -91,6 +91,11 @@ export interface CreateOfferInput {
    * the cover. Empty/omitted = the default placeholder URL is used.
    */
   imageFiles?: ImageUploadFile[];
+  /**
+   * Pre-hosted image URLs (already on Cloudinary, e.g. bulk CSV upload-from-URL).
+   * When non-empty these are used as-is and `imageFiles` is ignored — no upload.
+   */
+  imageUrls?: string[];
   /** MongoDB tenantId of the creator (derived from server-side auth, not browser). */
   createdByTenantId: string;
   /** MongoDB identityId of the authenticated user creating the offer. */
@@ -183,11 +188,16 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   const db = await getMongoDb();
   const { nexusOffers } = getSupplyDomainCollections(db);
 
-  // Resolve gallery: upload every supplied file to Cloudinary in parallel.
-  // When no files are sent we fall back to the static placeholder so existing
-  // catalog cards still render correctly.
-  const uploaded = await uploadOfferImages(input.imageFiles ?? []);
-  const imageUrls = uploaded.length > 0 ? uploaded : [defaultOfferImageUrl()];
+  // Resolve gallery. Pre-hosted URLs (bulk CSV) are used as-is; otherwise upload
+  // every supplied file to Cloudinary. When neither is present we fall back to
+  // the static placeholder so existing catalog cards still render correctly.
+  let imageUrls: string[];
+  if (input.imageUrls && input.imageUrls.length > 0) {
+    imageUrls = input.imageUrls;
+  } else {
+    const uploaded = await uploadOfferImages(input.imageFiles ?? []);
+    imageUrls = uploaded.length > 0 ? uploaded : [defaultOfferImageUrl()];
+  }
   const imageUrl = imageUrls[0];
 
   const now = new Date();
