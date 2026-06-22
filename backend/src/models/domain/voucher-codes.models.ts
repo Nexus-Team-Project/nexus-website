@@ -9,9 +9,15 @@
  * atomically to a single buyer (the customer purchase/redemption flow is out
  * of scope for now; `status` defaults to 'available' and never advances yet).
  *
- * NOTE (mock): for now the barcode `value` is a simple placeholder string
- * (e.g. "MOCK-0001"), unique within an offer. A real Code128 / crypto-unique
- * minter replaces `mockBarcodeValue` later using the same collection + plumbing.
+ * Barcode `value`s created through the inventory popup / inventory route are the
+ * PROVIDER-supplied strings (stored verbatim; rendered client-side as a barcode +
+ * QR — the backend mints and renders nothing on that path). A link unit may also
+ * carry an optional `code` (a plain coupon/redemption string paired with the
+ * link, charset-restricted so it can never be an injection/XSS vector).
+ *
+ * NOTE (mock): the separate CSV bulk path still uses `mockBarcodeValue` to mint
+ * placeholder barcode values ("MOCK-0001"); aligning it to provider strings is a
+ * follow-up. The manual inventory route no longer mints anything.
  */
 import type { Db } from 'mongodb';
 import { z } from 'zod';
@@ -29,12 +35,22 @@ export const VOUCHER_CODE_STATUSES = ['available', 'assigned', 'redeemed'] as co
 /** Hard server-side cap on units created in a single inventory request. */
 export const VOUCHER_INVENTORY_MAX = 10000;
 
+/**
+ * Optional per-link redemption/coupon code. Restricted to a safe charset so a
+ * stored code can never carry script/markup or operator-injection payloads;
+ * it is only ever shown as text / passed to the barcode-QR libs as data.
+ */
+export const VOUCHER_CODE_MAX_LENGTH = 128;
+export const VOUCHER_CODE_REGEX = /^[A-Za-z0-9._\-/:+]{1,128}$/;
+
 export type VoucherCodeKind = typeof VOUCHER_CODE_KINDS[number];
 export type VoucherCodeStatus = typeof VOUCHER_CODE_STATUSES[number];
 
 /**
  * One redeemable voucher unit.
- *   value  - the barcode value (mock placeholder for now) or the link URL.
+ *   value  - the barcode string (provider-supplied) or the link URL.
+ *   code   - OPTIONAL plain coupon/redemption code paired with a link unit
+ *            (link kind only; charset-restricted). Unset for barcode units.
  *   status - 'available' on creation; advanced only by the future purchase flow.
  */
 export const voucherCodeSchema = z.object({
@@ -42,6 +58,7 @@ export const voucherCodeSchema = z.object({
   offerId: z.string().min(1),
   kind: z.enum(VOUCHER_CODE_KINDS),
   value: z.string().min(1).max(2048),
+  code: z.string().regex(VOUCHER_CODE_REGEX).optional(),
   status: z.enum(VOUCHER_CODE_STATUSES).default('available'),
   createdAt: z.date(),
 });

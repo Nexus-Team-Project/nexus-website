@@ -247,7 +247,8 @@ export async function createVouchersBulk(args: {
       if (mapped.inventory?.kind === 'barcode') {
         await generateBarcodes(offer.offerId, mapped.inventory.quantity);
       } else if (mapped.inventory?.kind === 'link') {
-        await addLinks(offer.offerId, mapped.inventory.links);
+        // CSV links carry no paired code; map to the {url} item shape addLinks expects.
+        await addLinks(offer.offerId, mapped.inventory.links.map((url) => ({ url })));
       }
       return { index, status: 'created', offerId: offer.offerId };
     } catch (err) {

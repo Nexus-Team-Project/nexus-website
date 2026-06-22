@@ -39,9 +39,9 @@ import {
 } from '../services/catalog.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED } from '../models/domain/supply.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
-import { generateBarcodes, addLinks, getInventorySummary } from '../services/voucher-inventory.service';
+import { addBarcodes, addLinks, getInventorySummary } from '../services/voucher-inventory.service';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
-import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX } from '../models/domain/voucher-codes.models';
+import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX, VOUCHER_CODE_REGEX } from '../models/domain/voucher-codes.models';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
 import { getDomainAuthorizationContext, hasDomainPermission } from '../services/domain-authorization.service';
 import {
@@ -282,15 +282,21 @@ const setTenantVoucherPriceSchema = z.object({
  */
 const inventorySchema = z.object({
   kind: z.enum(VOUCHER_CODE_KINDS),
-  quantity: z.coerce.number().int().min(1).max(VOUCHER_INVENTORY_MAX).optional(),
-  // Each link must be a real http(s) URL. The scheme guard rejects javascript:,
-  // data:, and other URL schemes that z.string().url() would otherwise accept,
-  // so a stored value can never become an XSS vector if rendered as a link later.
+  // Barcode units are the provider-supplied strings (rendered client-side as a
+  // barcode + QR). The backend stores them verbatim and mints nothing here.
+  values: z.array(z.string().trim().min(1).max(2048)).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
+  // Each link is a real http(s) URL with an OPTIONAL paired code. The scheme
+  // guard rejects javascript:, data:, etc. that z.string().url() would accept,
+  // and the code charset (VOUCHER_CODE_REGEX) keeps a stored code from ever
+  // becoming a script/markup/injection vector.
   links: z.array(
-    z.string().url().max(2048).refine(
-      (u) => /^https?:\/\//i.test(u),
-      { message: 'links must be http(s) URLs' },
-    ),
+    z.object({
+      url: z.string().url().max(2048).refine(
+        (u) => /^https?:\/\//i.test(u),
+        { message: 'links must be http(s) URLs' },
+      ),
+      code: z.string().regex(VOUCHER_CODE_REGEX).optional(),
+    }),
   ).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
 });
 
@@ -1085,14 +1091,14 @@ router.post(
         return;
       }
 
-      const { kind, quantity, links } = parsed.data;
+      const { kind, values, links } = parsed.data;
       let result;
       if (kind === 'barcode') {
-        if (quantity === undefined) {
-          res.status(400).json({ error: 'quantity is required to generate barcodes' });
+        if (!values || values.length === 0) {
+          res.status(400).json({ error: 'values is required to add barcode inventory' });
           return;
         }
-        result = await generateBarcodes(req.params.offerId, quantity);
+        result = await addBarcodes(req.params.offerId, values);
       } else {
         if (!links || links.length === 0) {
           res.status(400).json({ error: 'links is required to add link inventory' });

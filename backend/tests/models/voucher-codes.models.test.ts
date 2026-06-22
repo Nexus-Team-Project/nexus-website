@@ -7,9 +7,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   mockBarcodeValue,
+  voucherCodeSchema,
   VOUCHER_INVENTORY_MAX,
   VOUCHER_CODE_KINDS,
   VOUCHER_CODE_STATUSES,
+  VOUCHER_CODE_REGEX,
+  VOUCHER_CODE_MAX_LENGTH,
 } from '../../src/models/domain/voucher-codes.models';
 
 describe('mockBarcodeValue', () => {
@@ -43,5 +46,34 @@ describe('voucher inventory constants', () => {
   it('defines the expected kinds and statuses', () => {
     expect(VOUCHER_CODE_KINDS).toEqual(['barcode', 'link']);
     expect(VOUCHER_CODE_STATUSES).toEqual(['available', 'assigned', 'redeemed']);
+  });
+});
+
+describe('optional link code (VOUCHER_CODE_REGEX)', () => {
+  const base = {
+    codeId: 'c1', offerId: 'o1', kind: 'link' as const,
+    value: 'https://example.com/redeem', status: 'available' as const, createdAt: new Date(),
+  };
+
+  it('accepts a unit with no code (code is optional)', () => {
+    expect(voucherCodeSchema.safeParse(base).success).toBe(true);
+  });
+
+  it('accepts safe codes (alphanumerics + . _ - / : +)', () => {
+    for (const code of ['ABC123', 'SAVE-10', 'a.b_c/d:e+f', '0']) {
+      expect(voucherCodeSchema.safeParse({ ...base, code }).success).toBe(true);
+    }
+  });
+
+  it('rejects codes with unsafe characters (no injection/markup/space)', () => {
+    for (const code of ['<script>', 'a b', 'a,b', '"x"', "a'b", '$where', 'a;b', 'a&b']) {
+      expect(voucherCodeSchema.safeParse({ ...base, code }).success).toBe(false);
+    }
+  });
+
+  it('rejects an over-length code', () => {
+    const tooLong = 'A'.repeat(VOUCHER_CODE_MAX_LENGTH + 1);
+    expect(voucherCodeSchema.safeParse({ ...base, code: tooLong }).success).toBe(false);
+    expect(VOUCHER_CODE_REGEX.test('A'.repeat(VOUCHER_CODE_MAX_LENGTH))).toBe(true);
   });
 });
