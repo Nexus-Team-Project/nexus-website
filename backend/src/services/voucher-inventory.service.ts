@@ -113,9 +113,59 @@ async function appendUnits(offerId: string, docs: VoucherCode[]): Promise<Invent
 }
 
 /**
+ * One-kind-per-voucher guard. A voucher's inventory must be exactly one kind —
+ * links (with optional codes) OR barcodes, never both. Throws 409 when the
+ * offer already has units of the OTHER kind. First insert / same-kind append
+ * pass. This is the authoritative server-side enforcement (the popup mirrors it
+ * for UX). Called by both the manual route and the CSV path.
+ */
+async function assertKindMatches(offerId: string, kind: 'barcode' | 'link'): Promise<void> {
+  const db = await getMongoDb();
+  const codes = getVoucherCodeCollection(db);
+  const other = kind === 'barcode' ? 'link' : 'barcode';
+  const otherCount = await codes.countDocuments({ offerId, kind: other });
+  if (otherCount > 0) {
+    throw Object.assign(
+      new Error(`This voucher already has ${other} inventory; a voucher can hold only one kind (barcodes or links).`),
+      { status: 409 },
+    );
+  }
+}
+
+/**
+ * Appends provider-supplied barcode strings as barcode units. Mirrors addLinks:
+ * de-duplicates within the batch, skips values already present via the unique
+ * index, and caps at VOUCHER_INVENTORY_MAX. The backend stores the strings
+ * verbatim and renders nothing — the client renders the barcode + QR.
+ *
+ * Input:  offerId, values (1..VOUCHER_INVENTORY_MAX non-empty strings).
+ * Output: InventoryResult. Throws 400 when empty/over cap, 409 on kind mismatch.
+ */
+export async function addBarcodes(offerId: string, values: string[]): Promise<InventoryResult> {
+  if (!Array.isArray(values) || values.length < 1 || values.length > VOUCHER_INVENTORY_MAX) {
+    throw Object.assign(new Error(`barcodes must contain between 1 and ${VOUCHER_INVENTORY_MAX} values`), { status: 400 });
+  }
+  // Combine duplicate values into one (keep first occurrence) rather than failing.
+  const unique = Array.from(new Set(values.map((v) => v.trim()).filter(Boolean)));
+  await assertKindMatches(offerId, 'barcode');
+  const now = new Date();
+  const docs: VoucherCode[] = unique.map((value) => ({
+    codeId: randomUUID(),
+    offerId,
+    kind: 'barcode',
+    value,
+    status: 'available',
+    createdAt: now,
+  }));
+  return appendUnits(offerId, docs);
+}
+
+/**
  * Generates `n` mock barcode units for an offer and appends them.
  * Values continue numbering from the offer's current unit count so appended
  * units stay unique within `(offerId, value)`. Caps at VOUCHER_INVENTORY_MAX.
+ * Used only by the CSV bulk path; the manual route uses addBarcodes (provider
+ * strings). Kept for backward compatibility.
  *
  * Input:  offerId, n (1..VOUCHER_INVENTORY_MAX).
  * Output: InventoryResult. Throws Error(status 400) when n is out of range.
@@ -139,25 +189,37 @@ export async function generateBarcodes(offerId: string, n: number): Promise<Inve
   return appendUnits(offerId, docs);
 }
 
+/** A link inventory item: the URL plus an optional paired code. */
+export interface LinkItem {
+  url: string;
+  /** Optional coupon/redemption code paired with the link (charset-restricted upstream). */
+  code?: string;
+}
+
 /**
- * Appends link units (the real URLs the admin provided) to an offer. Input URLs
- * are de-duplicated within the batch; URLs already present on the offer are
- * skipped via the unique index.
+ * Appends link units (the URLs the admin provided, each with an optional paired
+ * `code`) to an offer. Items are de-duplicated by URL within the batch; URLs
+ * already present on the offer are skipped via the unique index.
  *
- * Input:  offerId, urls (1..VOUCHER_INVENTORY_MAX URLs).
- * Output: InventoryResult. Throws Error(status 400) when empty / over the cap.
+ * Input:  offerId, items (1..VOUCHER_INVENTORY_MAX link items).
+ * Output: InventoryResult. Throws 400 when empty/over cap, 409 on kind mismatch.
  */
-export async function addLinks(offerId: string, urls: string[]): Promise<InventoryResult> {
-  if (!Array.isArray(urls) || urls.length < 1 || urls.length > VOUCHER_INVENTORY_MAX) {
+export async function addLinks(offerId: string, items: LinkItem[]): Promise<InventoryResult> {
+  if (!Array.isArray(items) || items.length < 1 || items.length > VOUCHER_INVENTORY_MAX) {
     throw Object.assign(new Error(`links must contain between 1 and ${VOUCHER_INVENTORY_MAX} URLs`), { status: 400 });
   }
-  const unique = Array.from(new Set(urls));
+  // Combine duplicate URLs into one (first occurrence wins, keeping its code)
+  // rather than failing. Cross-batch re-adds are also tolerated by the unique index.
+  await assertKindMatches(offerId, 'link');
+  const byUrl = new Map<string, LinkItem>();
+  for (const item of items) { if (!byUrl.has(item.url)) byUrl.set(item.url, item); }
   const now = new Date();
-  const docs: VoucherCode[] = unique.map((url) => ({
+  const docs: VoucherCode[] = Array.from(byUrl.values()).map((item) => ({
     codeId: randomUUID(),
     offerId,
     kind: 'link',
-    value: url,
+    value: item.url,
+    ...(item.code ? { code: item.code } : {}),
     status: 'available',
     createdAt: now,
   }));
