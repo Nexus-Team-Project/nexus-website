@@ -389,13 +389,24 @@ export const tenantOfferConfigSchema = z.object({
   adoptedAt: z.date(),
   adoptedByIdentityId: z.string().min(1),
   /**
-   * Per-tenant voucher member price. Bounded by [offer.nexus_cost, offer.face_value].
-   * Optional: when undefined, members see offer.member_price as a fallback.
+   * Per-tenant voucher member price (offer-level / legacy single-variant).
+   * Bounded by [offer.nexus_cost, offer.face_value]. Optional: when undefined,
+   * members see offer.member_price as a fallback. For multi-variant vouchers the
+   * per-variant map below takes precedence.
    */
   memberPrice: z.number().positive().optional(),
   /**
+   * Per-tenant voucher member price PER VARIANT (variantId -> price). Each price
+   * is bounded by that variant's [nexus_cost, face_value] and takes precedence
+   * over the variant's own member_price for this tenant. Absent entry -> the
+   * variant's member_price fallback. Keys are server-validated variantIds
+   * (VARIANT_ID_REGEX), never raw user input, so they are safe as Mongo keys.
+   */
+  variantPrices: z.record(z.string(), z.number().positive()).optional(),
+  /**
    * Denormalized effective display price for catalog server-side sort + filter.
-   * Mirrors NexusOffer.displayPrice but scoped to this specific tenant.
+   * Mirrors NexusOffer.displayPrice but scoped to this specific tenant (lowest
+   * effective price across variants when per-variant prices are set).
    */
   displayPrice: z.number().positive().optional(),
 });

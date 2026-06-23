@@ -351,6 +351,8 @@ const updateOfferSchema = z.object({
  */
 const setTenantVoucherPriceSchema = z.object({
   memberPrice: z.coerce.number().positive(),
+  /** Optional: target a single variant's per-tenant price (multi-variant vouchers). */
+  variantId: z.string().min(1).optional(),
 });
 
 /**
@@ -1125,11 +1127,13 @@ router.patch(
         tenantId,
         offerId: req.params.offerId,
         memberPrice: parsed.data.memberPrice,
+        ...(parsed.data.variantId !== undefined && { variantId: parsed.data.variantId }),
       });
 
       if (!result.ok) {
         const code =
           result.reason === 'offer_not_found' ? 404 :
+          result.reason === 'variant_not_found' ? 404 :
           result.reason === 'not_adopted' ? 403 :
           400;
         res.status(code).json({ error: result.reason });
