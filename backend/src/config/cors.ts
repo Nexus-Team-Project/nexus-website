@@ -16,6 +16,12 @@ const ALLOWED_BROWSER_ORIGINS = [
   // custom domain so the wallet works before/while its DNS (wallet.nexus-payment.com)
   // is being set up.
   'https://nexus-wallet-production-9aa0.up.railway.app',
+  // Railway development-environment URLs, so the staging deploys can call the
+  // backend and talk to Socket.io while running on their generated domains.
+  'https://nexus-wallet-development.up.railway.app',
+  'https://nexus-dashboard-development.up.railway.app',
+  'https://nexus-website-development.up.railway.app',
+  'https://nexus-backend-development.up.railway.app',
 ] as const;
 
 const allowedBrowserOrigins = new Set<string>(ALLOWED_BROWSER_ORIGINS);
