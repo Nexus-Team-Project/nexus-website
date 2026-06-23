@@ -149,6 +149,33 @@ export interface CatalogItem {
   terms?: string;
   /** Display tags set by the offer creator. */
   tags: string[];
+  /** Whether redemption terms/method are shared across variants or per variant. */
+  redemptionScope?: 'shared' | 'per_variant';
+  /**
+   * Voucher variants (priced configurations). Present only for voucher offers
+   * that carry variants. Each variant's `nexus_cost` is included ONLY when the
+   * caller may see it (creating tenant / platform admin / active adoption) -
+   * stripped for everyone else, same rule as the offer-level nexus_cost.
+   */
+  variants?: CatalogVariant[];
+}
+
+/**
+ * A voucher variant as exposed in the catalog. Mirrors the stored OfferVariant
+ * but `nexus_cost` is present only for privileged callers (see CatalogItem.variants).
+ */
+export interface CatalogVariant {
+  variantId: string;
+  face_value?: number;
+  nexus_cost?: number;
+  member_price?: number;
+  voucherValidityValue?: number | null;
+  voucherValidityUnit?: 'days' | 'months' | 'years' | null;
+  voucherStackable?: boolean | null;
+  sku?: string | null;
+  tags?: string[];
+  terms?: string;
+  implementationInstructions?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,6 +263,24 @@ function toItem(
     sku: offer.sku ?? null,
     terms: offer.terms ?? '',
     tags: offer.tags ?? [],
+    ...(offer.redemptionScope && { redemptionScope: offer.redemptionScope }),
+    // Variants: strip nexus_cost per variant unless the caller may see it
+    // (same gate as the offer-level nexus_cost above).
+    ...(offer.variants && offer.variants.length > 0 && {
+      variants: offer.variants.map((v) => ({
+        variantId: v.variantId,
+        ...(v.face_value !== undefined && { face_value: v.face_value }),
+        ...(context.canSeeNexusCost && v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
+        ...(v.member_price !== undefined && { member_price: v.member_price }),
+        voucherValidityValue: v.voucherValidityValue ?? null,
+        voucherValidityUnit: v.voucherValidityUnit ?? null,
+        voucherStackable: v.voucherStackable ?? null,
+        sku: v.sku ?? null,
+        tags: v.tags ?? [],
+        ...(v.terms !== undefined && { terms: v.terms }),
+        ...(v.implementationInstructions !== undefined && { implementationInstructions: v.implementationInstructions }),
+      })),
+    }),
   };
 }
 
