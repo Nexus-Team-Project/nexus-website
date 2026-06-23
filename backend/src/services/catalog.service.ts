@@ -206,6 +206,8 @@ function toItem(
     isPlatformAdmin: boolean;
     canSeeNexusCost: boolean;
     effectiveMemberPrice?: number;
+    /** Per-tenant per-variant price overrides (variantId -> member price). */
+    effectiveVariantPrices?: Record<string, number>;
   },
 ): CatalogItem {
   const now = Date.now();
@@ -267,19 +269,32 @@ function toItem(
     // Variants: strip nexus_cost per variant unless the caller may see it
     // (same gate as the offer-level nexus_cost above).
     ...(offer.variants && offer.variants.length > 0 && {
-      variants: offer.variants.map((v) => ({
+      variants: offer.variants.map((v) => {
+        // Per-tenant per-variant price override wins over the variant's own
+        // member_price (the selling price members see for this tenant).
+        const effPrice = context.effectiveVariantPrices?.[v.variantId] ?? v.member_price;
+        // Redemption text is surfaced PER VARIANT so each variant is
+        // self-contained: a variant's own (custom) text wins; otherwise it
+        // inherits the offer's shared terms/method. Storage stays normalized
+        // (inherited variants persist no terms) - this is a read-time fill only.
+        const effTerms = (v.terms && v.terms.trim()) ? v.terms : (offer.terms || undefined);
+        const effMethod = (v.implementationInstructions && v.implementationInstructions.trim())
+          ? v.implementationInstructions
+          : (offer.implementationInstructions || undefined);
+        return ({
         variantId: v.variantId,
         ...(v.face_value !== undefined && { face_value: v.face_value }),
         ...(context.canSeeNexusCost && v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
-        ...(v.member_price !== undefined && { member_price: v.member_price }),
+        ...(effPrice !== undefined && { member_price: effPrice }),
         voucherValidityValue: v.voucherValidityValue ?? null,
         voucherValidityUnit: v.voucherValidityUnit ?? null,
         voucherStackable: v.voucherStackable ?? null,
         sku: v.sku ?? null,
         tags: v.tags ?? [],
-        ...(v.terms !== undefined && { terms: v.terms }),
-        ...(v.implementationInstructions !== undefined && { implementationInstructions: v.implementationInstructions }),
-      })),
+        ...(effTerms !== undefined && { terms: effTerms }),
+        ...(effMethod !== undefined && { implementationInstructions: effMethod }),
+        });
+      }),
     }),
   };
 }
@@ -380,6 +395,7 @@ export async function getTenantCatalogView(
       isOwnOffer,
       isPlatformAdmin,
       canSeeNexusCost,
+      ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
     });
 
     return {
@@ -483,6 +499,7 @@ export async function getMemberCatalogView(
       isPlatformAdmin: false,
       canSeeNexusCost: false,
       effectiveMemberPrice,
+      ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
     });
   });
 
