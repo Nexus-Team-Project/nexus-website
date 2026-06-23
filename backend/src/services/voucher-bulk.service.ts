@@ -244,11 +244,14 @@ export async function createVouchersBulk(args: {
           console.error(`[BULK] auto-adopt failed (row ${index}):`, err instanceof Error ? err.message : err);
         }
       }
-      if (mapped.inventory?.kind === 'barcode') {
-        await generateBarcodes(offer.offerId, mapped.inventory.quantity);
-      } else if (mapped.inventory?.kind === 'link') {
+      // A bulk voucher is a single-variant offer (createOffer synthesizes one
+      // variant from the flat fields); inventory attaches to that default variant.
+      const defaultVariantId = offer.variants?.[0]?.variantId;
+      if (defaultVariantId && mapped.inventory?.kind === 'barcode') {
+        await generateBarcodes(offer.offerId, defaultVariantId, mapped.inventory.quantity);
+      } else if (defaultVariantId && mapped.inventory?.kind === 'link') {
         // CSV links carry no paired code; map to the {url} item shape addLinks expects.
-        await addLinks(offer.offerId, mapped.inventory.links.map((url) => ({ url })));
+        await addLinks(offer.offerId, defaultVariantId, mapped.inventory.links.map((url) => ({ url })));
       }
       return { index, status: 'created', offerId: offer.offerId };
     } catch (err) {
