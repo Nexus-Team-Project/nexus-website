@@ -29,6 +29,7 @@
 import type { Db } from 'mongodb';
 import { z } from 'zod';
 import { DOMAIN_COLLECTIONS } from './collections';
+import { OFFER_REDEMPTION_SCOPES, VARIANT_ID_REGEX } from './supply-variants.models';
 
 /**
  * Lifecycle states an offer document can occupy.
@@ -185,6 +186,39 @@ export function deriveValueTypeFromExecutionType(
 }
 
 /**
+ * One priced configuration ("variant") under a parent voucher offer. Embedded on
+ * `NexusOffer.variants`. Co-located here (not in `supply-variants.models.ts`) so
+ * it can reuse the voucher validity/SKU primitives above without a circular
+ * import. See `supply-variants.models.ts` for the parent/variant rationale and
+ * `services/supply-variants.helper.ts` for representative-variant + dedupe logic.
+ *   variantId  - server-generated, stable across edits.
+ *   face_value / nexus_cost / member_price - the voucher three-level price.
+ *   voucherValidityValue + voucherValidityUnit - purchase-anchored expiry
+ *       (both null/absent = never expires).
+ *   voucherStackable - combine-with-promotions choice (deliberate, no default).
+ *   sku   - optional internal company code.
+ *   tags  - per-variant display tags.
+ *   terms / implementationInstructions - redemption terms (תנאי מימוש) and method
+ *       (אופן מימוש); populated only when the parent redemptionScope is
+ *       'per_variant' (seeded from the parent values as an editable template).
+ */
+export const offerVariantSchema = z.object({
+  variantId: z.string().regex(VARIANT_ID_REGEX),
+  face_value: z.number().positive().optional(),
+  nexus_cost: z.number().positive().optional(),
+  member_price: z.number().positive().optional(),
+  voucherValidityValue: z.number().int().positive().nullable().optional(),
+  voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  voucherStackable: z.boolean().nullable().optional(),
+  sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
+  tags: z.array(z.string().max(50)).max(10).default([]),
+  terms: z.string().max(2000).optional(),
+  implementationInstructions: z.string().max(1000).optional(),
+});
+
+export type OfferVariant = z.infer<typeof offerVariantSchema>;
+
+/**
  * Platform-level catalog item created by tenant admins or supply managers.
  * market_price is an optional display reference shown to members.
  */
@@ -297,6 +331,23 @@ export const nexusOfferSchema = z.object({
   /** Display tags set by the offer creator (max 10, each max 50 chars). */
   tags: z.array(z.string().max(50)).max(10).default([]),
   /**
+   * Whether redemption terms/method are authored once on the parent ('shared')
+   * or per variant ('per_variant'). Voucher-only; non-voucher offers leave it at
+   * the 'shared' default. See `supply-variants.models.ts`.
+   */
+  redemptionScope: z.enum(OFFER_REDEMPTION_SCOPES).default('shared'),
+  /**
+   * Voucher variants (priced configurations under this parent offer). Voucher-
+   * only and always at least one entry once a voucher is created through the
+   * variant-aware flow. The legacy top-level voucher fields (face_value,
+   * nexus_cost, member_price, voucherValidityValue/Unit, voucherStackable, sku,
+   * tags) are kept as a MIRROR of the representative (lowest member_price)
+   * variant so existing read sites keep working - see `representativeVariant` /
+   * `mirrorRepresentativeOntoOffer` in `services/supply-variants.helper.ts`.
+   * Absent/empty for non-voucher offers and for legacy vouchers not yet migrated.
+   */
+  variants: z.array(offerVariantSchema).optional(),
+  /**
    * Spec Offer.status_reason. Required when the status transitions to
    * 'disabled' or 'archived'; ignored for other states. Cleared on transition
    * back to 'active'.
@@ -338,13 +389,24 @@ export const tenantOfferConfigSchema = z.object({
   adoptedAt: z.date(),
   adoptedByIdentityId: z.string().min(1),
   /**
-   * Per-tenant voucher member price. Bounded by [offer.nexus_cost, offer.face_value].
-   * Optional: when undefined, members see offer.member_price as a fallback.
+   * Per-tenant voucher member price (offer-level / legacy single-variant).
+   * Bounded by [offer.nexus_cost, offer.face_value]. Optional: when undefined,
+   * members see offer.member_price as a fallback. For multi-variant vouchers the
+   * per-variant map below takes precedence.
    */
   memberPrice: z.number().positive().optional(),
   /**
+   * Per-tenant voucher member price PER VARIANT (variantId -> price). Each price
+   * is bounded by that variant's [nexus_cost, face_value] and takes precedence
+   * over the variant's own member_price for this tenant. Absent entry -> the
+   * variant's member_price fallback. Keys are server-validated variantIds
+   * (VARIANT_ID_REGEX), never raw user input, so they are safe as Mongo keys.
+   */
+  variantPrices: z.record(z.string(), z.number().positive()).optional(),
+  /**
    * Denormalized effective display price for catalog server-side sort + filter.
-   * Mirrors NexusOffer.displayPrice but scoped to this specific tenant.
+   * Mirrors NexusOffer.displayPrice but scoped to this specific tenant (lowest
+   * effective price across variants when per-variant prices are set).
    */
   displayPrice: z.number().positive().optional(),
 });

@@ -21,6 +21,7 @@ import multer from 'multer';
 import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
+import { createError } from '../middleware/errorHandler';
 import { getMongoDb } from '../config/mongo';
 import { prisma } from '../config/database';
 import { getTenantDomainCollections } from '../models/domain';
@@ -37,9 +38,11 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, type OfferVariant } from '../models/domain/supply.models';
+import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
-import { addBarcodes, addLinks, getInventorySummary } from '../services/voucher-inventory.service';
+import { addBarcodes, addLinks, getInventorySummary, type InventoryResult } from '../services/voucher-inventory.service';
+import type { OfferVariantInput } from '../services/supply-variants.helper';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
 import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX, VOUCHER_CODE_REGEX } from '../models/domain/voucher-codes.models';
 import { syncDomainIdentityForLoginUser } from '../services/domain-identity.service';
@@ -85,6 +88,77 @@ function parseKeptImageUrlsField(v: unknown): unknown {
 }
 
 // ─── Zod schemas ─────────────────────────────────────────────────────────────
+
+/**
+ * Parses a multipart `variants` field. The dashboard sends it as a JSON-encoded
+ * array of variant objects. Invalid JSON falls back to null so Zod array
+ * validation produces a clean 400 instead of a crash. A non-string (already
+ * parsed, e.g. JSON body) passes through unchanged.
+ */
+function parseVariantsField(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch { return null; }
+}
+
+/**
+ * One voucher variant as received from a client. Numbers arrive as real numbers
+ * (the array is JSON-encoded), so no coercion is needed. `variantId` is optional:
+ * present preserves an existing variant on edit; absent = the service generates one.
+ * Cross-field pricing/validity/stackable rules are checked per variant in the
+ * handler (validateVoucherVariants), mirroring the flat-field checks.
+ */
+const variantInputSchema = z.object({
+  variantId: z.string().regex(VARIANT_ID_REGEX).optional(),
+  face_value: z.number().positive().optional(),
+  nexus_cost: z.number().positive().optional(),
+  member_price: z.number().positive().optional(),
+  voucherValidityValue: z.number().int().positive().nullable().optional(),
+  voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  voucherStackable: z.boolean().nullable().optional(),
+  sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
+  tags: z.array(z.string().max(50)).max(10).optional(),
+  terms: z.string().max(2000).optional(),
+  implementationInstructions: z.string().max(1000).optional(),
+});
+
+/**
+ * Voucher variants + redemption-scope fields shared by the create + update
+ * schemas. Both optional: a pre-variant client omits them and the service
+ * synthesizes a single variant from the flat fields.
+ */
+const variantSchemaFields = {
+  variants: z.preprocess(
+    parseVariantsField,
+    z.array(variantInputSchema).min(1).max(MAX_VARIANTS_PER_OFFER).optional(),
+  ),
+  redemptionScope: z.enum(OFFER_REDEMPTION_SCOPES).optional(),
+};
+
+/**
+ * Per-variant cross-field validation, mirroring the flat-field voucher checks
+ * (face/nexus/member bounds, validity both-or-neither + ceiling, mandatory
+ * stackable). Returns the first failure with bilingual text, or ok.
+ */
+function validateVoucherVariants(
+  variants: OfferVariantInput[],
+): { ok: true } | { ok: false; error: string; errorHe?: string } {
+  for (const v of variants) {
+    if (!v.face_value || !v.nexus_cost) {
+      return { ok: false, error: 'Each voucher variant requires face_value and nexus_cost' };
+    }
+    if (v.nexus_cost >= v.face_value) {
+      return { ok: false, error: 'nexus_cost must be less than face_value' };
+    }
+    if (v.member_price !== undefined && (v.member_price < v.nexus_cost || v.member_price > v.face_value)) {
+      return { ok: false, error: 'member_price must be between nexus_cost and face_value (inclusive)' };
+    }
+    const val = assertVoucherValidity(v.voucherValidityValue, v.voucherValidityUnit);
+    if (!val.ok) return { ok: false, error: val.error, errorHe: val.errorHe };
+    const s = assertVoucherStackable(v.voucherStackable);
+    if (!s.ok) return { ok: false, error: s.error, errorHe: s.errorHe };
+  }
+  return { ok: true };
+}
 
 /**
  * Voucher validity duration fields shared by the create + update schemas.
@@ -195,6 +269,8 @@ const createOfferSchema = z.object({
   ...voucherValiditySchemaFields,
   // Voucher combine-with-promotions + background color (voucher-only).
   ...voucherBackgroundStackableFields,
+  // Voucher variants + redemption scope (voucher-only; optional for pre-variant clients).
+  ...variantSchemaFields,
   terms: z.string().max(2000).optional(),
   // JSON-encoded array string from multipart form.
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -243,6 +319,8 @@ const updateOfferSchema = z.object({
   ...voucherValiditySchemaFields,
   // Voucher combine-with-promotions + background color (voucher-only).
   ...voucherBackgroundStackableFields,
+  // Voucher variants + redemption scope (voucher-only; replaces the array wholesale when sent).
+  ...variantSchemaFields,
   terms: z.string().max(2000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
@@ -273,6 +351,8 @@ const updateOfferSchema = z.object({
  */
 const setTenantVoucherPriceSchema = z.object({
   memberPrice: z.coerce.number().positive(),
+  /** Optional: target a single variant's per-tenant price (multi-variant vouchers). */
+  variantId: z.string().min(1).optional(),
 });
 
 /**
@@ -439,36 +519,42 @@ router.post(
         }
       }
 
-      // Cross-field validation for voucher pricing.
+      // Cross-field validation for voucher pricing/validity/stackable. With a
+      // variant-aware client every variant is checked; a pre-variant client is
+      // checked on its flat fields (the service synthesizes one variant from them).
       // These checks cannot be expressed in Zod without knowing the final visibility.
       const d = parsed.data;
       if (d.executionType === 'voucher') {
-        if (!d.face_value || !d.nexus_cost) {
-          res.status(400).json({ error: 'Voucher offers require face_value and nexus_cost' });
-          return;
-        }
-        if (d.nexus_cost >= d.face_value) {
-          res.status(400).json({ error: 'nexus_cost must be less than face_value' });
-          return;
-        }
-        if (d.member_price !== undefined && (d.member_price < d.nexus_cost || d.member_price > d.face_value)) {
-          res.status(400).json({ error: 'member_price must be between nexus_cost and face_value (inclusive)' });
-          return;
-        }
-      }
-
-      // Voucher cross-field checks. Apply only to vouchers.
-      if (d.executionType === 'voucher') {
-        const v = assertVoucherValidity(d.voucherValidityValue, d.voucherValidityUnit);
-        if (!v.ok) {
-          res.status(400).json({ error: v.error, errorHe: v.errorHe });
-          return;
-        }
-        // Combine-with-promotions is a mandatory, no-default choice for vouchers.
-        const s = assertVoucherStackable(d.voucherStackable);
-        if (!s.ok) {
-          res.status(400).json({ error: s.error, errorHe: s.errorHe });
-          return;
+        if (d.variants && d.variants.length > 0) {
+          const vr = validateVoucherVariants(d.variants);
+          if (!vr.ok) {
+            res.status(400).json({ error: vr.error, ...(vr.errorHe && { errorHe: vr.errorHe }) });
+            return;
+          }
+        } else {
+          if (!d.face_value || !d.nexus_cost) {
+            res.status(400).json({ error: 'Voucher offers require face_value and nexus_cost' });
+            return;
+          }
+          if (d.nexus_cost >= d.face_value) {
+            res.status(400).json({ error: 'nexus_cost must be less than face_value' });
+            return;
+          }
+          if (d.member_price !== undefined && (d.member_price < d.nexus_cost || d.member_price > d.face_value)) {
+            res.status(400).json({ error: 'member_price must be between nexus_cost and face_value (inclusive)' });
+            return;
+          }
+          const v = assertVoucherValidity(d.voucherValidityValue, d.voucherValidityUnit);
+          if (!v.ok) {
+            res.status(400).json({ error: v.error, errorHe: v.errorHe });
+            return;
+          }
+          // Combine-with-promotions is a mandatory, no-default choice for vouchers.
+          const s = assertVoucherStackable(d.voucherStackable);
+          if (!s.ok) {
+            res.status(400).json({ error: s.error, errorHe: s.errorHe });
+            return;
+          }
         }
       }
 
@@ -679,17 +765,26 @@ router.patch(
         });
         return;
       }
-      // Voucher cross-field checks on update.
+      // Voucher cross-field checks on update. A variant-aware client is checked
+      // per variant; a pre-variant client on its flat fields.
       if (restParsed.executionType === 'voucher') {
-        const v = assertVoucherValidity(restParsed.voucherValidityValue, restParsed.voucherValidityUnit);
-        if (!v.ok) {
-          res.status(400).json({ error: v.error, errorHe: v.errorHe });
-          return;
-        }
-        const s = assertVoucherStackable(restParsed.voucherStackable);
-        if (!s.ok) {
-          res.status(400).json({ error: s.error, errorHe: s.errorHe });
-          return;
+        if (restParsed.variants && restParsed.variants.length > 0) {
+          const vr = validateVoucherVariants(restParsed.variants);
+          if (!vr.ok) {
+            res.status(400).json({ error: vr.error, ...(vr.errorHe && { errorHe: vr.errorHe }) });
+            return;
+          }
+        } else {
+          const v = assertVoucherValidity(restParsed.voucherValidityValue, restParsed.voucherValidityUnit);
+          if (!v.ok) {
+            res.status(400).json({ error: v.error, errorHe: v.errorHe });
+            return;
+          }
+          const s = assertVoucherStackable(restParsed.voucherStackable);
+          if (!s.ok) {
+            res.status(400).json({ error: s.error, errorHe: s.errorHe });
+            return;
+          }
         }
       }
       const { keptImageUrls, ...restNoKept } = restParsed;
@@ -699,7 +794,7 @@ router.patch(
         ...(validUntilDate !== undefined && { validUntil: validUntilDate }),
         imageFiles,
         ...(keptImageUrls !== undefined && { keptImageUrls }),
-      });
+      }, ctx.isPlatformAdmin === true);
 
       if (!result) {
         res.status(404).json({ error: 'Offer not found or you do not own this offer' });
@@ -1032,11 +1127,13 @@ router.patch(
         tenantId,
         offerId: req.params.offerId,
         memberPrice: parsed.data.memberPrice,
+        ...(parsed.data.variantId !== undefined && { variantId: parsed.data.variantId }),
       });
 
       if (!result.ok) {
         const code =
           result.reason === 'offer_not_found' ? 404 :
+          result.reason === 'variant_not_found' ? 404 :
           result.reason === 'not_adopted' ? 403 :
           400;
         res.status(code).json({ error: result.reason });
@@ -1051,17 +1148,131 @@ router.patch(
 );
 
 /**
- * POST /api/v1/offers/:offerId/inventory
- * Appends redeemable inventory (mock barcodes or real links) to a voucher the
- * caller owns, and resyncs the offer's stockLimit to its total unit count.
+ * Loads a voucher offer the caller owns for an inventory operation, returning
+ * its variants on success or an { error, status } to send. Centralizes the
+ * not-found / not-owned / non-voucher guards shared by the inventory routes.
+ */
+async function loadOwnedVoucherForInventory(
+  offerId: string,
+  ctx: { tenantId: string; isPlatformAdmin?: boolean },
+): Promise<
+  | { ok: true; variants: OfferVariant[] }
+  | { ok: false; status: number; error: string }
+> {
+  const db = await getMongoDb();
+  const { nexusOffers } = getSupplyDomainCollections(db);
+  const offer = await nexusOffers.findOne(
+    { offerId, ...NOT_DELETED },
+    { projection: { createdByTenantId: 1, executionType: 1, variants: 1 } },
+  );
+  if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
+    return { ok: false, status: 404, error: 'Offer not found or you do not own this offer' };
+  }
+  if (offer.executionType !== 'voucher') {
+    return { ok: false, status: 400, error: 'Inventory is only supported for voucher offers' };
+  }
+  return { ok: true, variants: offer.variants ?? [] };
+}
+
+/**
+ * Dispatches a validated inventory body to the right service call for a variant.
+ * Throws createError(400) when the field required by the chosen kind is missing.
+ */
+async function applyInventoryUnits(
+  offerId: string,
+  variantId: string,
+  data: z.infer<typeof inventorySchema>,
+): Promise<InventoryResult> {
+  if (data.kind === 'barcode') {
+    if (!data.values || data.values.length === 0) {
+      throw createError('values is required to add barcode inventory', 400);
+    }
+    return addBarcodes(offerId, variantId, data.values);
+  }
+  if (!data.links || data.links.length === 0) {
+    throw createError('links is required to add link inventory', 400);
+  }
+  return addLinks(offerId, variantId, data.links);
+}
+
+/**
+ * Resolves the default variant for the offer-level compatibility routes: the
+ * sole variant when there is exactly one. Multiple variants are ambiguous (the
+ * caller must use the variant-scoped route); zero means an unmigrated offer.
+ */
+function resolveDefaultVariantId(
+  variants: OfferVariant[],
+): { ok: true; variantId: string } | { ok: false; status: number; error: string } {
+  if (variants.length === 1) return { ok: true, variantId: variants[0].variantId };
+  if (variants.length === 0) {
+    return { ok: false, status: 400, error: 'This voucher has no variant to attach inventory to' };
+  }
+  return { ok: false, status: 400, error: 'This voucher has multiple variants; specify a variant id' };
+}
+
+/**
+ * POST /api/v1/offers/:offerId/variants/:variantId/inventory
+ * Appends redeemable inventory (provider barcode strings or links) to ONE variant
+ * the caller owns, and resyncs the offer's stockLimit to its total unit count.
  *
- * Authorization: supply.manage_offers; ownership enforced (creating tenant or
- * platform admin). Voucher-only. Quantities capped server-side.
- *
- * Input body: { kind: 'barcode' | 'link', quantity?: int, links?: url[] }.
- * Output: { created, stockLimit }.
- *   404 - offer not found / not owned
- *   400 - non-voucher, or missing the field required for the chosen kind
+ * Authorization: supply.manage_offers; ownership enforced. Voucher-only.
+ * Output: { created, variantCount, stockLimit }. 404 not found/owned, 404 unknown
+ * variant, 400 non-voucher / missing field, 409 kind mismatch / barcode collision.
+ */
+router.post(
+  '/:offerId/variants/:variantId/inventory',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = inventorySchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: parsed.error.flatten() });
+        return;
+      }
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      if (!guard.variants.some((v) => v.variantId === req.params.variantId)) {
+        res.status(404).json({ error: 'Variant not found on this offer' });
+        return;
+      }
+      const result = await applyInventoryUnits(req.params.offerId, req.params.variantId, parsed.data);
+      res.status(201).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/offers/:offerId/variants/:variantId/inventory
+ * Returns one variant's link values + per-kind counts to pre-fill the Edit popup.
+ */
+router.get(
+  '/:offerId/variants/:variantId/inventory',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      if (!guard.variants.some((v) => v.variantId === req.params.variantId)) {
+        res.status(404).json({ error: 'Variant not found on this offer' });
+        return;
+      }
+      const summary = await getInventorySummary(req.params.offerId, req.params.variantId);
+      res.json(summary);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/offers/:offerId/inventory  (DEPRECATED compatibility wrapper)
+ * Offer-level inventory route, retained for the pre-variant client. Resolves the
+ * offer's single default variant and delegates to the variant-scoped logic.
+ * 400 when the offer has zero or multiple variants (use the variant route).
  */
 router.post(
   '/:offerId/inventory',
@@ -1074,39 +1285,11 @@ router.post(
         return;
       }
       const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
-
-      // Ownership + voucher-only guard.
-      const db = await getMongoDb();
-      const { nexusOffers } = getSupplyDomainCollections(db);
-      const offer = await nexusOffers.findOne(
-        { offerId: req.params.offerId, ...NOT_DELETED },
-        { projection: { createdByTenantId: 1, executionType: 1 } },
-      );
-      if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
-        res.status(404).json({ error: 'Offer not found or you do not own this offer' });
-        return;
-      }
-      if (offer.executionType !== 'voucher') {
-        res.status(400).json({ error: 'Inventory is only supported for voucher offers' });
-        return;
-      }
-
-      const { kind, values, links } = parsed.data;
-      let result;
-      if (kind === 'barcode') {
-        if (!values || values.length === 0) {
-          res.status(400).json({ error: 'values is required to add barcode inventory' });
-          return;
-        }
-        result = await addBarcodes(req.params.offerId, values);
-      } else {
-        if (!links || links.length === 0) {
-          res.status(400).json({ error: 'links is required to add link inventory' });
-          return;
-        }
-        result = await addLinks(req.params.offerId, links);
-      }
-
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      const def = resolveDefaultVariantId(guard.variants);
+      if (!def.ok) { res.status(def.status).json({ error: def.error }); return; }
+      const result = await applyInventoryUnits(req.params.offerId, def.variantId, parsed.data);
       res.status(201).json(result);
     } catch (err) {
       next(err);
@@ -1115,13 +1298,8 @@ router.post(
 );
 
 /**
- * GET /api/v1/offers/:offerId/inventory
- * Returns the offer's link values + per-kind counts so the Edit popup can
- * pre-fill existing links. Barcode values (mock placeholders) are not returned.
- *
- * Authorization: supply.manage_offers; ownership enforced (creating tenant or
- * platform admin).
- * Output: { links: string[], counts: { barcode, link } }, or 404 when not owned.
+ * GET /api/v1/offers/:offerId/inventory  (DEPRECATED compatibility wrapper)
+ * Returns the single default variant's link values + per-kind counts.
  */
 router.get(
   '/:offerId/inventory',
@@ -1129,17 +1307,11 @@ router.get(
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
-      const db = await getMongoDb();
-      const { nexusOffers } = getSupplyDomainCollections(db);
-      const offer = await nexusOffers.findOne(
-        { offerId: req.params.offerId, ...NOT_DELETED },
-        { projection: { createdByTenantId: 1 } },
-      );
-      if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
-        res.status(404).json({ error: 'Offer not found or you do not own this offer' });
-        return;
-      }
-      const summary = await getInventorySummary(req.params.offerId);
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      const def = resolveDefaultVariantId(guard.variants);
+      if (!def.ok) { res.status(def.status).json({ error: def.error }); return; }
+      const summary = await getInventorySummary(req.params.offerId, def.variantId);
       res.json(summary);
     } catch (err) {
       next(err);

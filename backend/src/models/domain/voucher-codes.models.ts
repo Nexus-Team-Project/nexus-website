@@ -56,6 +56,13 @@ export type VoucherCodeStatus = typeof VOUCHER_CODE_STATUSES[number];
 export const voucherCodeSchema = z.object({
   codeId: z.string().min(1),
   offerId: z.string().min(1),
+  /**
+   * The variant this unit belongs to (a voucher offer is a parent that holds one
+   * or more variants; inventory is owned per variant). See `supply-variants.models.ts`.
+   * Optional only so legacy units created before variants validate until the
+   * migration stamps them; new units always set it.
+   */
+  variantId: z.string().min(1).optional(),
   kind: z.enum(VOUCHER_CODE_KINDS),
   value: z.string().min(1).max(2048),
   code: z.string().regex(VOUCHER_CODE_REGEX).optional(),
@@ -90,15 +97,44 @@ export function getVoucherCodeCollection(db: Db) {
 }
 
 /**
- * Idempotent indexes for voucherCodes:
- *   (offerId, status) - fast availability counts per offer.
- *   (offerId, value)  - unique; the hard guard against duplicate values per offer.
+ * Idempotent indexes for voucherCodes (variant-scoped):
+ *   (offerId, variantId, status)   - fast availability counts per variant.
+ *   value (kind: 'barcode') unique - GLOBAL barcode uniqueness: a barcode string
+ *       is a real-world redeemable code, so it must never exist twice anywhere
+ *       (any variant/offer/tenant). Partial index so it applies only to barcodes.
+ *   (offerId, variantId, value) (kind: 'link') unique - links are unique within a
+ *       variant pool; the same URL may legitimately recur across variants/offers.
+ *
+ * NOTE (migration): the legacy `offer_value_unique` (offerId+value, all kinds) and
+ * `offer_status` indexes are dropped by the variant backfill script after every
+ * existing unit has a `variantId`. Creating these new indexes on a collection that
+ * still holds duplicate barcodes across offers will fail - the backfill reports
+ * such collisions for manual resolution first.
+ *
  * Input: Mongo database handle. Output: indexes exist.
  */
 export async function ensureVoucherCodeIndexes(db: Db): Promise<void> {
   const col = getVoucherCodeCollection(db);
   await Promise.all([
-    col.createIndex({ offerId: 1, status: 1 }, { name: 'offer_status' }),
-    col.createIndex({ offerId: 1, value: 1 }, { name: 'offer_value_unique', unique: true }),
+    col.createIndex(
+      { offerId: 1, variantId: 1, status: 1 },
+      { name: 'offer_variant_status' },
+    ),
+    col.createIndex(
+      { value: 1 },
+      {
+        name: 'barcode_value_global_unique',
+        unique: true,
+        partialFilterExpression: { kind: 'barcode' },
+      },
+    ),
+    col.createIndex(
+      { offerId: 1, variantId: 1, value: 1 },
+      {
+        name: 'link_offer_variant_value_unique',
+        unique: true,
+        partialFilterExpression: { kind: 'link' },
+      },
+    ),
   ]);
 }

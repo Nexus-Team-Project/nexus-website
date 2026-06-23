@@ -24,6 +24,12 @@ export type MongoDeletionTargets = {
   domainOwnedTenantIds: string[];
   domainTenantMemberIds: string[];
   domainMemberTenantIds: string[];
+  /**
+   * offerIds of every NexusOffer created by a tenant the user owns. Captured at
+   * target-resolution time so voucher inventory (`voucherCodes`, keyed by
+   * offerId) can be counted and deleted alongside the offers.
+   */
+  domainOwnedOfferIds: string[];
   legacyOwnedTenantIds: ObjectId[];
   legacyMemberTenantIds: string[];
   /**

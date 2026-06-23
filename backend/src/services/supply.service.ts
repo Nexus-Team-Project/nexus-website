@@ -10,11 +10,13 @@
 
 import { randomUUID } from 'node:crypto';
 import { getMongoDb } from '../config/mongo';
+import { createError } from '../middleware/errorHandler';
 import {
   getSupplyDomainCollections,
   deriveValueTypeFromExecutionType,
   NOT_DELETED,
   type NexusOffer,
+  type OfferVariant,
   type OfferCategory,
   type OfferVisibility,
   type OfferExecutionType,
@@ -22,6 +24,13 @@ import {
   type OfferStatus,
   type OfferVoucherValidityUnit,
 } from '../models/domain/supply.models';
+import type { OfferRedemptionScope } from '../models/domain/supply-variants.models';
+import {
+  buildVoucherVariants,
+  mirrorRepresentativeOntoOffer,
+  lowestMemberPrice,
+  type OfferVariantInput,
+} from './supply-variants.helper';
 import { defaultOfferImageUrl } from '../utils/cloudinary';
 import {
   assertStatusReasonProvided,
@@ -87,6 +96,16 @@ export interface CreateOfferInput {
   member_price?: number;
   /** Variant pricing shape; only 'fixed' exposed in v1 UI. Defaults to 'fixed'. */
   variantType?: OfferVariantType;
+  /**
+   * Voucher variants. When provided (and executionType === 'voucher') the offer
+   * is persisted with these variants; the price/validity/etc. flat fields above
+   * are then a mirror of the representative (lowest member_price) variant. When
+   * omitted, a single variant is synthesized from the flat fields so the
+   * pre-variant frontend keeps working. Ignored for non-voucher types.
+   */
+  variants?: OfferVariantInput[];
+  /** Whether redemption terms/method are shared or per-variant. Voucher-only. */
+  redemptionScope?: OfferRedemptionScope;
   /**
    * Up to OFFER_IMAGES_MAX in-memory image files (from multer). Index 0 becomes
    * the cover. Empty/omitted = the default placeholder URL is used.
@@ -157,6 +176,15 @@ export interface UpdateOfferInput {
   /** Updated variant type. Only 'fixed' is exposed in v1 UI. */
   variantType?: OfferVariantType;
   /**
+   * Updated voucher variants. When provided (voucher), the variant array is
+   * replaced wholesale and the flat mirror + displayPrice recomputed. Incoming
+   * variants may carry an existing `variantId` to preserve it (and its inventory)
+   * or omit it for a new variant. Omitted = variants left unchanged.
+   */
+  variants?: OfferVariantInput[];
+  /** Updated redemption scope (shared vs per-variant). Voucher-only. */
+  redemptionScope?: OfferRedemptionScope;
+  /**
    * Brand-new image files to append to the gallery. Combined with
    * `keptImageUrls` they form the final ordered gallery.
    */
@@ -204,34 +232,55 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   const now = new Date();
 
   const executionType = input.executionType ?? 'voucher';
+  const isVoucher = executionType === 'voucher';
 
-  // Voucher offers default member_price to nexus_cost when not provided.
-  // Each adopting tenant later sets their own price via TenantOfferConfig.
-  const resolvedMemberPrice =
-    executionType === 'voucher' && input.member_price === undefined
-      ? input.nexus_cost
-      : input.member_price;
+  // Vouchers are a parent + one-or-more variants. Build the variant array (from
+  // the client array, or synthesize one from the flat fields for the pre-variant
+  // form), then MIRROR the representative (lowest member_price) variant onto the
+  // legacy top-level fields so existing read sites + displayPrice keep working.
+  const voucherVariants: OfferVariant[] | undefined = isVoucher
+    ? buildVoucherVariants(input.variants, {
+        face_value: input.face_value,
+        nexus_cost: input.nexus_cost,
+        // Default member_price to nexus_cost when omitted (per-variant); each
+        // adopting tenant later sets their own price via TenantOfferConfig.
+        member_price: input.member_price,
+        voucherValidityValue: input.voucherValidityValue,
+        voucherValidityUnit: input.voucherValidityUnit,
+        voucherStackable: input.voucherStackable,
+        sku: input.sku,
+        tags: input.tags,
+        terms: input.terms,
+        implementationInstructions: input.implementationInstructions,
+      })
+    : undefined;
+  const mirror = mirrorRepresentativeOntoOffer(voucherVariants);
 
-  // Voucher validity duration does NOT affect price, so computeDisplayPrice /
-  // supply-price.helper need no change for this feature.
+  // Pricing: vouchers take the mirrored representative values; others take the
+  // flat inputs unchanged. displayPrice for a voucher is the LOWEST variant
+  // member price (the catalog "from"/sort price).
+  const resolvedMemberPrice = isVoucher ? mirror.member_price : input.member_price;
   const displayPrice = computeDisplayPrice(
     executionType,
-    resolvedMemberPrice,
+    isVoucher ? lowestMemberPrice(voucherVariants) : resolvedMemberPrice,
     input.market_price,
   );
+  const resolvedFaceValue = isVoucher ? mirror.face_value : input.face_value;
+  const resolvedNexusCost = isVoucher ? mirror.nexus_cost : input.nexus_cost;
+  const resolvedTags = isVoucher ? (mirror.tags ?? []) : (input.tags ?? []);
 
-  const isVoucher = executionType === 'voucher';
   // Vouchers carry a purchase-anchored validity duration instead of absolute
   // dates; their validFrom/validUntil are always null. Non-voucher offers keep
-  // their absolute dates and never carry a validity duration.
+  // their absolute dates and never carry a validity duration. Validity/stackable/
+  // sku come from the mirrored representative variant for vouchers.
   const resolvedValidFrom = isVoucher ? null : (input.validFrom ?? null);
   const resolvedValidUntil = isVoucher ? null : (input.validUntil ?? null);
-  const resolvedValidityValue = isVoucher ? (input.voucherValidityValue ?? null) : null;
-  const resolvedValidityUnit = isVoucher ? (input.voucherValidityUnit ?? null) : null;
-  // Combine-with-promotions + background color are voucher-only; null otherwise.
-  const resolvedStackable = isVoucher ? (input.voucherStackable ?? null) : null;
+  const resolvedValidityValue = isVoucher ? (mirror.voucherValidityValue ?? null) : null;
+  const resolvedValidityUnit = isVoucher ? (mirror.voucherValidityUnit ?? null) : null;
+  const resolvedStackable = isVoucher ? (mirror.voucherStackable ?? null) : null;
   const resolvedBgColor = isVoucher ? (input.voucherBackgroundColor ?? null) : null;
-  const resolvedSku = isVoucher ? (input.sku ?? null) : null;
+  const resolvedSku = isVoucher ? (mirror.sku ?? null) : null;
+  const resolvedRedemptionScope = isVoucher ? (input.redemptionScope ?? 'shared') : 'shared';
 
   // Voucher ecosystem offers enter pending_approval so a platform admin can review
   // pricing (especially nexus_cost) before the offer goes live to all tenants.
@@ -249,9 +298,10 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     category: input.category,
     market_price: input.market_price,
     ...(displayPrice !== undefined && { displayPrice }),
-    // Voucher pricing fields - only populated when executionType === 'voucher'.
-    ...(input.face_value !== undefined && { face_value: input.face_value }),
-    ...(input.nexus_cost !== undefined && { nexus_cost: input.nexus_cost }),
+    // Voucher pricing fields - only populated when executionType === 'voucher'
+    // (mirrored from the representative variant).
+    ...(resolvedFaceValue !== undefined && { face_value: resolvedFaceValue }),
+    ...(resolvedNexusCost !== undefined && { nexus_cost: resolvedNexusCost }),
     ...(resolvedMemberPrice !== undefined && { member_price: resolvedMemberPrice }),
     status,
     visibility: input.visibility,
@@ -278,7 +328,9 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     voucherBackgroundColor: resolvedBgColor,
     sku: resolvedSku,
     terms: input.terms ?? '',
-    tags: input.tags ?? [],
+    tags: resolvedTags,
+    redemptionScope: resolvedRedemptionScope,
+    ...(voucherVariants !== undefined && { variants: voucherVariants }),
     // Status reason / changedAt are set when a future PATCH transitions to disabled/archived.
     statusReason: null,
     statusChangedAt: now,
@@ -317,7 +369,8 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
 export async function updateOffer(
   offerId: string,
   tenantId: string,
-  input: UpdateOfferInput
+  input: UpdateOfferInput,
+  isPlatformAdmin = false,
 ): Promise<{ offer: NexusOffer; wasResubmitted: boolean; wasUpdatedWhilePending: boolean } | null> {
   const db = await getMongoDb();
   const { nexusOffers } = getSupplyDomainCollections(db);
@@ -411,6 +464,51 @@ export async function updateOffer(
     mergedMarketPrice,
   );
 
+  // Variant update (voucher only). When the client sends a `variants` array the
+  // whole array is replaced; the representative variant is then mirrored onto the
+  // flat top-level fields and displayPrice is recomputed as the lowest member
+  // price. These mirrored values are spread LAST in `update` so they win over the
+  // per-field flat spreads. When `variants` is omitted, variants are left
+  // untouched (the pre-variant form keeps editing the flat fields directly).
+  let variantMirror: Partial<NexusOffer> = {};
+  let variantSet: Partial<NexusOffer> = {};
+  let variantDisplayPrice: number | undefined;
+  if (isVoucherUpdate && input.variants !== undefined) {
+    const built = buildVoucherVariants(input.variants, {
+      face_value: input.face_value ?? currentOffer.face_value,
+      nexus_cost: input.nexus_cost ?? currentOffer.nexus_cost,
+      member_price: input.member_price ?? currentOffer.member_price,
+      voucherValidityValue: input.voucherValidityValue,
+      voucherValidityUnit: input.voucherValidityUnit,
+      voucherStackable: input.voucherStackable,
+      sku: input.sku,
+      tags: input.tags,
+      terms: input.terms,
+      implementationInstructions: input.implementationInstructions,
+    });
+    // Pricing lock: face_value + nexus_cost are the Nexus<->supplier deal and are
+    // platform-admin-only after create. A non-admin may not add a variant or
+    // change an existing variant's face_value/nexus_cost (which would move the
+    // Nexus margin). Each built variant must match a stored variant by id with
+    // identical face_value + nexus_cost. Removing variants and editing non-price
+    // fields stays allowed. (Members adjust their own price via TenantOfferConfig.)
+    if (!isPlatformAdmin) {
+      const stored = new Map((currentOffer.variants ?? []).map((v) => [v.variantId, v]));
+      for (const v of built) {
+        const prev = stored.get(v.variantId);
+        if (!prev || prev.face_value !== v.face_value || prev.nexus_cost !== v.nexus_cost) {
+          throw createError('voucher_pricing_locked', 403);
+        }
+      }
+    }
+    variantSet = { variants: built };
+    variantMirror = mirrorRepresentativeOntoOffer(built);
+    variantDisplayPrice = computeDisplayPrice('voucher', lowestMemberPrice(built), mergedMarketPrice);
+  }
+  if (isVoucherUpdate && input.redemptionScope !== undefined) {
+    variantSet.redemptionScope = input.redemptionScope;
+  }
+
   const update: Partial<NexusOffer> = {
     updatedAt: now,
     ...(input.title !== undefined && { title: input.title }),
@@ -440,6 +538,10 @@ export async function updateOffer(
     ...(resolvedStatusReason !== undefined && { statusReason: resolvedStatusReason }),
     // Resubmit: clear denial and move back to approval queue.
     ...(wasResubmitted && { status: 'pending_approval', denial_reason: '' }),
+    // Variant mirror + array win over the flat spreads above (voucher edit only).
+    ...variantMirror,
+    ...variantSet,
+    ...(variantDisplayPrice !== undefined && { displayPrice: variantDisplayPrice }),
   };
 
   const result = await nexusOffers.findOneAndUpdate(
