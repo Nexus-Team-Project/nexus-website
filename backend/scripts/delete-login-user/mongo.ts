@@ -9,7 +9,9 @@ import { getMongoDb } from '../../src/config/mongo';
 import { getIdentityDomainCollections } from '../../src/models/domain/identity.models';
 import { getOrchestrationDomainCollections } from '../../src/models/domain/orchestration.models';
 import { getSupplyDomainCollections } from '../../src/models/domain/supply.models';
+import { getVoucherCodeCollection } from '../../src/models/domain/voucher-codes.models';
 import { getTenantDomainCollections } from '../../src/models/domain/tenant.models';
+import { getInviteJobCollections } from '../../src/models/domain/invite-jobs.models';
 import { getOnboardingCollections } from '../../src/models/onboarding.models';
 import { deleteOfferImage } from '../../src/utils/cloudinary';
 import { PHONE_OTP_COLLECTION } from '../../src/models/auth/phone-otp.models';
@@ -59,6 +61,8 @@ export async function collectMongoCounts(
   const identity = getIdentityDomainCollections(db);
   const tenants = getTenantDomainCollections(db);
   const supply = getSupplyDomainCollections(db);
+  const voucherCodesCol = getVoucherCodeCollection(db);
+  const inviteJobs = getInviteJobCollections(db);
   const orchestration = getOrchestrationDomainCollections(db);
   const onboarding = getOnboardingCollections(db);
   const targets = await resolveMongoDeletionTargets(email, prismaUser);
@@ -94,6 +98,10 @@ export async function collectMongoCounts(
     processedSteps,
     nexusOffers,
     tenantOfferConfigs,
+    voucherCodes,
+    tenantContactFields,
+    memberInviteJobs,
+    memberInviteJobItems,
     phoneOtpChallenges,
     emailOtpChallenges,
     phoneSignupTickets,
@@ -191,6 +199,14 @@ export async function collectMongoCounts(
     supply.tenantOfferConfigs.countDocuments({
       tenantId: { $in: targets.domainOwnedTenantIds },
     }),
+    // Voucher inventory units (barcodes/links) for the owned tenants' offers.
+    // Keyed by offerId, so it follows the offers, not the tenant directly.
+    voucherCodesCol.countDocuments({ offerId: { $in: targets.domainOwnedOfferIds } }),
+    // Custom contact-column definitions for the owned tenants.
+    tenants.tenantContactFields.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
+    // Bulk member-invite jobs + their items for the owned tenants.
+    inviteJobs.memberInviteJobs.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
+    inviteJobs.memberInviteJobItems.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
     // Plan #1: phone-OTP challenges keyed by the user's phone.
     db.collection(PHONE_OTP_COLLECTION).countDocuments({
       phone: { $in: targets.walletPhones },
@@ -252,6 +268,10 @@ export async function collectMongoCounts(
     processedSteps,
     nexusOffers,
     tenantOfferConfigs,
+    voucherCodes,
+    tenantContactFields,
+    memberInviteJobs,
+    memberInviteJobItems,
     phoneOtpChallenges,
     emailOtpChallenges,
     phoneSignupTickets,
@@ -276,6 +296,8 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   const identity = getIdentityDomainCollections(db);
   const tenants = getTenantDomainCollections(db);
   const supply = getSupplyDomainCollections(db);
+  const voucherCodesCol = getVoucherCodeCollection(db);
+  const inviteJobs = getInviteJobCollections(db);
   const orchestration = getOrchestrationDomainCollections(db);
   const onboarding = getOnboardingCollections(db);
   const targets = await resolveMongoDeletionTargets(email, prismaUser);
@@ -344,6 +366,10 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
       { tenantId: { $in: targets.domainOwnedTenantIds } },
     ],
   });
+  // Bulk member-invite job items + jobs for the owned tenants (items first so no
+  // item ever outlives its parent job).
+  await inviteJobs.memberInviteJobItems.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
+  await inviteJobs.memberInviteJobs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   // Delete adoption records (tenant chose to show these platform offers to members).
   await supply.tenantOfferConfigs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   // Collect image URLs before deleting offer documents so we can clean up Cloudinary.
@@ -356,6 +382,11 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
     )
     .toArray();
   await supply.nexusOffers.deleteMany({ createdByTenantId: { $in: targets.domainOwnedTenantIds } });
+  // Voucher inventory units belong to those offers (keyed by offerId), so remove
+  // them too - otherwise they linger as orphans after the offers are gone.
+  if (targets.domainOwnedOfferIds.length > 0) {
+    await voucherCodesCol.deleteMany({ offerId: { $in: targets.domainOwnedOfferIds } });
+  }
   // Delete Cloudinary images after DB rows are gone. Errors are swallowed per deleteOfferImage contract.
   // Each offer can have a gallery (imageUrls) plus a legacy cover (imageUrl) that may not be in the gallery.
   await Promise.all(
@@ -366,6 +397,8 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
     }),
   );
   await tenants.tenantCatalogPolicies.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
+  // Custom contact-column definitions for the owned tenants.
+  await tenants.tenantContactFields.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.memberGroups.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.tenantServiceActivations.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await tenants.tenantProfiles.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
