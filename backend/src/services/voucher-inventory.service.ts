@@ -43,8 +43,10 @@ export interface InventoryResult {
   stockLimit: number;
 }
 
-/** Read-side summary of a VARIANT's inventory: link values + per-kind counts. */
+/** Read-side summary of a VARIANT's inventory: code values + per-kind counts. */
 export interface InventorySummary {
+  /** All barcode-unit values for the variant (used to pre-fill the edit popup). */
+  barcodes: string[];
   /** All link-unit values for the variant (used to pre-fill the edit popup). */
   links: string[];
   /** Unit counts per kind for the variant. */
@@ -52,11 +54,12 @@ export interface InventorySummary {
 }
 
 /**
- * Returns a variant's inventory summary: every link value + per-kind counts.
- * Barcode values are intentionally not returned (the edit popup only needs to
- * re-show links). Caller enforces admin + ownership + voucher-only.
+ * Returns a variant's inventory summary: every barcode + link value + per-kind
+ * counts, so the Edit popup can re-show the existing inventory (codes and
+ * quantity) instead of resetting it. Caller enforces admin + ownership +
+ * voucher-only; the values are the tenant's own provider strings (not secrets).
  *
- * Input:  offerId, variantId. Output: { links, counts }.
+ * Input:  offerId, variantId. Output: { barcodes, links, counts }.
  */
 export async function getInventorySummary(
   offerId: string,
@@ -64,14 +67,14 @@ export async function getInventorySummary(
 ): Promise<InventorySummary> {
   const db = await getMongoDb();
   const codes = getVoucherCodeCollection(db);
-  const [linkDocs, barcodeCount, linkCount] = await Promise.all([
+  const [barcodeDocs, linkDocs] = await Promise.all([
+    codes.find({ offerId, variantId, kind: 'barcode' }, { projection: { value: 1, _id: 0 } }).toArray(),
     codes.find({ offerId, variantId, kind: 'link' }, { projection: { value: 1, _id: 0 } }).toArray(),
-    codes.countDocuments({ offerId, variantId, kind: 'barcode' }),
-    codes.countDocuments({ offerId, variantId, kind: 'link' }),
   ]);
   return {
+    barcodes: barcodeDocs.map((d) => d.value),
     links: linkDocs.map((d) => d.value),
-    counts: { barcode: barcodeCount, link: linkCount },
+    counts: { barcode: barcodeDocs.length, link: linkDocs.length },
   };
 }
 
