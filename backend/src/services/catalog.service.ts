@@ -47,6 +47,12 @@ export interface CatalogQuery {
   category?: string;
   approvalStatus?: 'active' | 'pending_approval' | 'denied' | 'expired';
   adoptionStatus?: 'adopted' | 'not_adopted';
+  /**
+   * When true, return ONLY offers this tenant created (createdByTenantId ===
+   * tenantId), in any status/visibility - not offers adopted from the ecosystem.
+   * Used by the Product Catalog page (a tenant's own uploaded offers).
+   */
+  ownedOnly?: boolean;
 
   /** ANY-of match against NexusOffer.executionType. Empty array = no filter. */
   offerTypes?: string[];
@@ -326,17 +332,21 @@ export async function getTenantCatalogView(
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  const visibilityClause = { $or: [
-    { visibility: 'ecosystem' },
-    { visibility: 'tenant_only', invitedByTenantId: tenantId },
-  ]};
+  // ownedOnly: restrict to offers this tenant created (the Product Catalog page).
+  // Otherwise scope to what is visible to the tenant (ecosystem + own tenant_only).
+  const scopeClause = query.ownedOnly
+    ? { createdByTenantId: tenantId }
+    : { $or: [
+        { visibility: 'ecosystem' },
+        { visibility: 'tenant_only', invitedByTenantId: tenantId },
+      ]};
   const baseStatusClause = { $or: [
     { status: 'active' },
     { status: { $in: ['pending_approval', 'denied'] }, createdByTenantId: tenantId },
     ...(options?.isPlatformAdmin ? [{ status: 'pending_approval' }] : []),
   ]};
 
-  const andClauses: Array<Record<string, unknown>> = [visibilityClause, baseStatusClause, NOT_DELETED];
+  const andClauses: Array<Record<string, unknown>> = [scopeClause, baseStatusClause, NOT_DELETED];
 
   if (query.category) andClauses.push({ category: query.category });
   const searchFilter = buildSearchFilter(query.search);
