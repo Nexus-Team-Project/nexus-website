@@ -256,13 +256,94 @@ export interface LinkItem {
   code?: string;
 }
 
+/** A stored link unit reduced to the fields needed for conflict detection. */
+interface ExistingLinkCode {
+  /** The stored link URL (VoucherCode.value for a link unit). */
+  value: string;
+  /** The paired code, if any. */
+  code?: string;
+}
+
+/**
+ * Pure helper: maps each non-empty trimmed code to the set of distinct URLs that
+ * use it, across both the incoming items and any already-stored link units, and
+ * returns the codes paired with two or more distinct URLs. A code reused across
+ * DIFFERENT links is a conflict; the same code on the same URL (idempotent
+ * re-add) is not. Matching is exact after trim. Exported for unit testing.
+ *
+ * Input:  incoming link items, existing stored link units ({value,code}).
+ * Output: sorted array of conflicting codes (empty when none).
+ */
+export function findConflictingCodes(
+  items: LinkItem[],
+  existing: ExistingLinkCode[],
+): string[] {
+  const urlsByCode = new Map<string, Set<string>>();
+  const add = (rawCode: string | undefined, rawUrl: string): void => {
+    const code = (rawCode ?? '').trim();
+    if (!code) return;
+    const url = rawUrl.trim();
+    let urls = urlsByCode.get(code);
+    if (!urls) { urls = new Set<string>(); urlsByCode.set(code, urls); }
+    urls.add(url);
+  };
+  for (const item of items) add(item.code, item.url);
+  for (const e of existing) add(e.code, e.value);
+  const conflicts: string[] = [];
+  for (const [code, urls] of urlsByCode) {
+    if (urls.size > 1) conflicts.push(code);
+  }
+  return conflicts.sort();
+}
+
+/**
+ * Authoritative server-side guard: a non-empty code may not be paired with more
+ * than one distinct link. Checks the incoming batch AND existing link units on
+ * the same variant (so adding a link on Edit cannot reuse a code already taken
+ * by a different stored link). Throws 409 listing the offending codes.
+ *
+ * Input:  offerId, variantId, the (URL-deduped) incoming link items.
+ * Output: void. Throws createError(409) when any code spans multiple links.
+ */
+async function assertNoLinkCodeConflicts(
+  offerId: string,
+  variantId: string,
+  items: LinkItem[],
+): Promise<void> {
+  const incomingCodes = Array.from(
+    new Set(items.map((i) => i.code?.trim()).filter((c): c is string => !!c)),
+  );
+  let existing: ExistingLinkCode[] = [];
+  if (incomingCodes.length > 0) {
+    const db = await getMongoDb();
+    const codes = getVoucherCodeCollection(db);
+    existing = await codes
+      .find(
+        { offerId, variantId, kind: 'link', code: { $in: incomingCodes } },
+        { projection: { value: 1, code: 1, _id: 0 } },
+      )
+      .toArray();
+  }
+  const conflicts = findConflictingCodes(items, existing);
+  if (conflicts.length > 0) {
+    throw createError(
+      `These codes are each used by more than one link and must be unique: ${conflicts.join(', ')}`,
+      409,
+    );
+  }
+}
+
 /**
  * Appends link units (each with an optional paired `code`) to a variant. Items
  * are de-duplicated by URL within the batch; URLs already present on the variant
  * are skipped via the unique index.
  *
+ * A non-empty `code` may not be shared across different links (checked within the
+ * batch and against existing variant links) - that is a 409 conflict, not a skip.
+ *
  * Input:  offerId, variantId, items (1..VOUCHER_INVENTORY_MAX link items).
- * Output: InventoryResult. Throws 400 when empty/over cap, 409 on kind mismatch.
+ * Output: InventoryResult. Throws 400 when empty/over cap, 409 on kind mismatch
+ *         or a code reused across multiple links.
  */
 export async function addLinks(
   offerId: string,
@@ -275,8 +356,12 @@ export async function addLinks(
   await assertKindMatches(offerId, variantId, 'link');
   const byUrl = new Map<string, LinkItem>();
   for (const item of items) { if (!byUrl.has(item.url)) byUrl.set(item.url, item); }
+  const deduped = Array.from(byUrl.values());
+  // A non-empty code may not be shared across different links (within this batch
+  // or against links already on the variant). Reject before inserting anything.
+  await assertNoLinkCodeConflicts(offerId, variantId, deduped);
   const now = new Date();
-  const docs: VoucherCode[] = Array.from(byUrl.values()).map((item) => ({
+  const docs: VoucherCode[] = deduped.map((item) => ({
     codeId: randomUUID(),
     offerId,
     variantId,
