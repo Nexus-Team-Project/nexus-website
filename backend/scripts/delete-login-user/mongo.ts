@@ -410,7 +410,20 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
       ...(targets.domainOwnedTenantIds.length ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }] : []),
     ],
   });
+  // Collect each owned tenant's logo URL before deleting the docs so the
+  // uploaded Cloudinary logo (folder nexus/tenant-logos) can be cleaned up too.
+  const tenantsToDelete = await tenants.domainTenants
+    .find({ tenantId: { $in: targets.domainOwnedTenantIds } }, { projection: { logoUrl: 1 } })
+    .toArray();
   await tenants.domainTenants.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
+  // Delete tenant logos from Cloudinary after the DB rows are gone. deleteOfferImage
+  // works for any Cloudinary URL and swallows errors / skips non-Cloudinary URLs.
+  await Promise.all(
+    tenantsToDelete
+      .map((t) => t.logoUrl)
+      .filter((url): url is string => typeof url === 'string' && url.length > 0)
+      .map((url) => deleteOfferImage(url)),
+  );
 
   await onboarding.businessSetups.deleteMany({ tenantId: { $in: targets.legacyOwnedTenantIds } });
   await onboarding.tenantMembers.deleteMany({
