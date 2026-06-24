@@ -8,25 +8,64 @@ import { CONTACT_ROLES, USE_CASES } from '../models/onboarding.models';
 const domainPattern = /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?::\d{2,5})?(?:\/.*)?$/i;
 const phonePattern = /^[+()\d\s.-]{7,20}$/;
 
+// HTML-injection characters that a real URL would percent-encode. Rejecting
+// them is defense in depth in case the website is later rendered as a link or
+// embedded in an email template.
+const UNSAFE_URL_CHARS = '<>"\'`\\';
+
+/**
+ * Reports whether a string is free of injection-prone characters for a URL.
+ * Input: a trimmed website string.
+ * Output: false if it contains a control character, whitespace, or an
+ * HTML-injection character; true otherwise.
+ */
+function hasOnlySafeUrlChars(value: string): boolean {
+  for (const ch of value) {
+    const code = ch.charCodeAt(0);
+    if (code <= 0x20 || code === 0x7f) return false; // control chars + space
+    if (UNSAFE_URL_CHARS.includes(ch)) return false;
+  }
+  return true;
+}
+
 /**
  * Validates that a string is a usable URL or domain-like website value.
  * Input: raw website string.
- * Output: true for valid URL/domain values.
+ * Output: true for valid URL/domain values with no injection-prone characters.
  */
 function isValidWebsite(value: string): boolean {
-  if (!domainPattern.test(value.trim())) return false;
+  const trimmed = value.trim();
+  if (!hasOnlySafeUrlChars(trimmed)) return false;
+  if (!domainPattern.test(trimmed)) return false;
   try {
-    const url = new URL(value.startsWith('http') ? value : `https://${value}`);
+    const url = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
     return url.hostname.includes('.') && url.hostname.length >= 4;
   } catch {
     return false;
   }
 }
 
+/**
+ * Rejects free-text values that contain disallowed control characters.
+ * Tab, newline, and carriage return are allowed so multi-line text still
+ * works; every other C0 control character and DEL is rejected to block
+ * null-byte / control-character payload smuggling.
+ * Input: raw free-text string (e.g. business description).
+ * Output: true when the value has no disallowed control characters.
+ */
+function hasNoControlChars(value: string): boolean {
+  for (const ch of value) {
+    const code = ch.charCodeAt(0);
+    if (code === 0x09 || code === 0x0a || code === 0x0d) continue; // tab, LF, CR
+    if (code < 0x20 || code === 0x7f) return false;
+  }
+  return true;
+}
+
 export const workspaceSetupBodySchema = z.object({
-  organizationName: z.string().trim().min(2).max(120),
+  organizationName: z.string().trim().min(2).max(120).refine(hasNoControlChars, 'Invalid organization name'),
   website: z.string().trim().min(3).max(200).refine(isValidWebsite, 'Invalid website'),
-  businessDescription: z.string().trim().min(20).max(1000),
+  businessDescription: z.string().trim().min(20).max(1000).refine(hasNoControlChars, 'Invalid description'),
   selectedUseCases: z.array(z.enum(USE_CASES)).min(1),
   contactPhone: z.string().trim().min(7).max(20).regex(phonePattern),
   contactRole: z.enum(CONTACT_ROLES),
