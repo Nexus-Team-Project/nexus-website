@@ -23,6 +23,8 @@ import {
   type OfferVariantType,
   type OfferStatus,
   type OfferVoucherValidityUnit,
+  type ImageCrop,
+  type ImageCropEntry,
 } from '../models/domain/supply.models';
 import type { OfferRedemptionScope } from '../models/domain/supply-variants.models';
 import {
@@ -39,6 +41,7 @@ import {
 import {
   uploadOfferImages,
   reconcileImageUrls,
+  reconcileImageCrops,
   deleteOrphanedImages,
   type ImageUploadFile,
 } from './supply-images.helper';
@@ -116,6 +119,12 @@ export interface CreateOfferInput {
    * When non-empty these are used as-is and `imageFiles` is ignored — no upload.
    */
   imageUrls?: string[];
+  /**
+   * Per-new-file crop metadata, aligned to `imageFiles` order (one entry per
+   * file; null = full image). The file is uploaded pristine; the crop is stored
+   * as metadata and applied at display time via Cloudinary transform URLs.
+   */
+  newImageCrops?: (ImageCrop | null)[];
   /** MongoDB tenantId of the creator (derived from server-side auth, not browser). */
   createdByTenantId: string;
   /** MongoDB identityId of the authenticated user creating the offer. */
@@ -195,6 +204,17 @@ export interface UpdateOfferInput {
    * prevent cross-offer URL injection. Omit/undefined = keep all existing.
    */
   keptImageUrls?: string[];
+  /**
+   * Current crop metadata for kept images (keyed by URL). The client sends the
+   * full crop state for images it kept; undefined falls back to the offer's
+   * existing `imageCrops` so a crop is never silently lost on an unrelated edit.
+   */
+  keptImageCrops?: ImageCropEntry[];
+  /**
+   * Per-new-file crop metadata, aligned to `imageFiles` upload order (null =
+   * full image). Combined with `keptImageCrops` to rebuild the gallery's crops.
+   */
+  newImageCrops?: (ImageCrop | null)[];
 }
 
 // ---------------------------------------------------------------------------
@@ -221,11 +241,16 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   // every supplied file to Cloudinary. When neither is present we fall back to
   // the static placeholder so existing catalog cards still render correctly.
   let imageUrls: string[];
+  // Crop metadata for freshly uploaded files (the original is stored pristine;
+  // the crop is applied at display time). Pre-hosted URLs (bulk CSV) carry no
+  // crops, so this stays empty on that path.
+  let imageCrops: ImageCropEntry[] = [];
   if (input.imageUrls && input.imageUrls.length > 0) {
     imageUrls = input.imageUrls;
   } else {
     const uploaded = await uploadOfferImages(input.imageFiles ?? []);
     imageUrls = uploaded.length > 0 ? uploaded : [defaultOfferImageUrl()];
+    imageCrops = reconcileImageCrops(imageUrls, uploaded, undefined, input.newImageCrops);
   }
   const imageUrl = imageUrls[0];
 
@@ -295,6 +320,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     description: input.description,
     imageUrl,
     imageUrls,
+    ...(imageCrops.length > 0 && { imageCrops }),
     category: input.category,
     market_price: input.market_price,
     ...(displayPrice !== undefined && { displayPrice }),
@@ -395,8 +421,13 @@ export async function updateOffer(
   // existing imageUrls + imageUrl are left intact.
   let nextImageUrls: string[] | undefined;
   let nextImageUrl: string | undefined;
+  // Crop metadata follows the gallery (keyed by URL). Recomputed whenever the
+  // gallery changes OR a crop-only change is sent (e.g. re-cropping an existing
+  // image without adding/removing/reordering). undefined = leave crops intact.
+  let nextImageCrops: ImageCropEntry[] | undefined;
   const galleryTouched = input.keptImageUrls !== undefined
     || (input.imageFiles && input.imageFiles.length > 0);
+  const cropsTouched = input.keptImageCrops !== undefined || input.newImageCrops !== undefined;
   if (galleryTouched) {
     const uploaded = await uploadOfferImages(input.imageFiles ?? []);
     const kept = input.keptImageUrls ?? currentOffer.imageUrls ?? [];
@@ -411,6 +442,21 @@ export async function updateOffer(
     );
     nextImageUrls = finalUrls;
     nextImageUrl = finalUrls[0] ?? defaultOfferImageUrl();
+    nextImageCrops = reconcileImageCrops(
+      finalUrls,
+      uploaded,
+      input.keptImageCrops ?? currentOffer.imageCrops,
+      input.newImageCrops,
+    );
+  } else if (cropsTouched) {
+    // Crop-only edit: no URL/file change. Recompute against the existing gallery.
+    const finalUrls = currentOffer.imageUrls ?? [];
+    nextImageCrops = reconcileImageCrops(
+      finalUrls,
+      [],
+      input.keptImageCrops ?? currentOffer.imageCrops,
+      undefined,
+    );
   }
 
   const now = new Date();
@@ -534,6 +580,7 @@ export async function updateOffer(
     ...(nextDisplayPrice !== undefined && { displayPrice: nextDisplayPrice }),
     ...(nextImageUrls !== undefined && { imageUrls: nextImageUrls }),
     ...(nextImageUrl !== undefined && { imageUrl: nextImageUrl }),
+    ...(nextImageCrops !== undefined && { imageCrops: nextImageCrops }),
     ...(statusActuallyChanged && { statusChangedAt: now }),
     ...(resolvedStatusReason !== undefined && { statusReason: resolvedStatusReason }),
     // Resubmit: clear denial and move back to approval queue.

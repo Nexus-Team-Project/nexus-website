@@ -223,6 +223,48 @@ export const offerVariantSchema = z.object({
 
 export type OfferVariant = z.infer<typeof offerVariantSchema>;
 
+/** Tolerance for crop-fraction bounds checks (the editor rounds fractions). */
+export const CROP_EPSILON = 0.001;
+
+/**
+ * A normalized crop rectangle relative to the ORIGINAL image, expressed as
+ * fractions of the image width/height (each in [0,1]). The crop is the canonical
+ * region shown to users everywhere; the pristine original is always kept in
+ * Cloudinary as the base the transform crops from (so the crop stays editable
+ * forever). `aspect` records the locked ratio when one was used; the optional
+ * natural dimensions let a non-Cloudinary CSS fallback compute the exact
+ * full-view pixel box. A null crop entry = no crop (the whole image is shown).
+ */
+export const imageCropSchema = z
+  .object({
+    x: z.number().min(0).max(1),
+    y: z.number().min(0).max(1),
+    width: z.number().gt(0).max(1),
+    height: z.number().gt(0).max(1),
+    aspect: z.number().positive().optional(),
+    naturalWidth: z.number().int().positive().optional(),
+    naturalHeight: z.number().int().positive().optional(),
+  })
+  .refine((c) => c.x + c.width <= 1 + CROP_EPSILON, {
+    message: 'crop x + width exceeds image bounds',
+  })
+  .refine((c) => c.y + c.height <= 1 + CROP_EPSILON, {
+    message: 'crop y + height exceeds image bounds',
+  });
+
+export type ImageCrop = z.infer<typeof imageCropSchema>;
+
+/**
+ * One crop entry keyed to its original image URL (NOT positional, so it survives
+ * reorder and the kept/orphan reconcile). `crop: null` = the full image is shown.
+ */
+export const imageCropEntrySchema = z.object({
+  url: z.string().url(),
+  crop: imageCropSchema.nullable(),
+});
+
+export type ImageCropEntry = z.infer<typeof imageCropEntrySchema>;
+
 /**
  * Platform-level catalog item created by tenant admins or supply managers.
  * market_price is an optional display reference shown to members.
@@ -243,6 +285,15 @@ export const nexusOfferSchema = z.object({
    * means the offer falls back to the default placeholder URL.
    */
   imageUrls: z.array(z.string().url()).max(OFFER_IMAGES_MAX).default([]).optional(),
+  /**
+   * Per-image crop metadata, keyed by original URL (not positional, so it
+   * survives reorder + reconcile). The URLs in `imageUrls` always point at the
+   * pristine originals; the crop here is applied at display time via Cloudinary
+   * transform URLs (dashboard `lib/cloudinaryImage.ts`), never re-uploaded. A
+   * missing entry or `crop: null` means the whole image is shown. Capped at
+   * OFFER_IMAGES_MAX. Absent for offers created before this field existed.
+   */
+  imageCrops: z.array(imageCropEntrySchema).max(OFFER_IMAGES_MAX).optional(),
   category: z.enum(OFFER_CATEGORIES),
   market_price: z.number().positive().optional(),
   /**

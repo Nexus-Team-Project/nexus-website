@@ -25,6 +25,7 @@ import {
   NOT_DELETED,
   type NexusOffer,
   type TenantOfferConfig,
+  type ImageCropEntry,
 } from '../models/domain/supply.models';
 import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
 import { computeTenantDisplayPrice } from './supply-price.helper';
@@ -91,6 +92,12 @@ export interface CatalogItem {
   imageUrl?: string;
   /** Ordered gallery of public image URLs. Index 0 is the cover. */
   imageUrls?: string[];
+  /**
+   * Per-image crop metadata keyed by original URL. The URLs above point at the
+   * pristine originals; clients apply the crop at display time (Cloudinary
+   * transform URLs). Missing entry / crop=null = show the whole image.
+   */
+  imageCrops?: ImageCropEntry[];
   /** Top-level offer category (e.g. "health", "food"). */
   category: string;
   /**
@@ -242,6 +249,7 @@ function toItem(
     imageUrls: offer.imageUrls && offer.imageUrls.length > 0
       ? offer.imageUrls
       : (offer.imageUrl ? [offer.imageUrl] : []),
+    ...(offer.imageCrops && offer.imageCrops.length > 0 && { imageCrops: offer.imageCrops }),
     category: offer.category,
     visibility: offer.visibility,
     market_price: offer.market_price,
