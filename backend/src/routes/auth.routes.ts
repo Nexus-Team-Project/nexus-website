@@ -75,6 +75,7 @@ const registerSchema = z.object({
     country: z.string().length(2).optional(),
     emailUpdates: z.boolean().optional(),
     dashboardRedirect: z.string().min(1).max(500).optional(),
+    language: z.enum(['he', 'en']).optional(),
   }),
 });
 
@@ -86,7 +87,12 @@ router.post(
     try {
       const result = await AuthService.register(req.body);
       // Send verification email instead of welcome email — account is not active until verified
-      EmailService.sendVerificationEmail(result.email, result.fullName, result.rawVerificationToken).catch(console.error);
+      EmailService.sendVerificationEmail(
+        result.email,
+        result.fullName,
+        result.rawVerificationToken,
+        req.body.language ?? 'en',
+      ).catch(console.error);
       res.status(201).json({ requiresVerification: true, email: result.email });
     } catch (err) {
       next(err);
@@ -188,7 +194,10 @@ router.post(
 );
 
 const resendVerificationSchema = z.object({
-  body: z.object({ email: z.string().email() }),
+  body: z.object({
+    email: z.string().email(),
+    language: z.enum(['he', 'en']).optional(),
+  }),
 });
 
 router.post(
@@ -199,7 +208,12 @@ router.post(
     try {
       const result = await AuthService.resendVerification(req.body.email);
       if (result) {
-        EmailService.sendVerificationEmail(result.email, result.fullName, result.rawToken).catch(console.error);
+        EmailService.sendVerificationEmail(
+          result.email,
+          result.fullName,
+          result.rawToken,
+          req.body.language ?? 'en',
+        ).catch(console.error);
       }
       // Always return 200 to avoid leaking which emails are registered
       res.json({ message: 'If your email is registered and unverified, a new link has been sent.' });
