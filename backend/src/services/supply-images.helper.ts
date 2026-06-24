@@ -13,7 +13,7 @@
  * It must never be referenced by frontend code.
  */
 import { uploadOfferImage, deleteOfferImage } from '../utils/cloudinary';
-import { OFFER_IMAGES_MAX } from '../models/domain/supply.models';
+import { OFFER_IMAGES_MAX, type ImageCrop, type ImageCropEntry } from '../models/domain/supply.models';
 
 /**
  * In-memory image file received via multer (`memoryStorage`).
@@ -71,6 +71,45 @@ export function reconcileImageUrls(
   const orphanedUrls = (previous ?? []).filter((u) => !safeKeptSet.has(u));
   const finalUrls = [...safeKept, ...uploaded].slice(0, OFFER_IMAGES_MAX);
   return { finalUrls, orphanedUrls };
+}
+
+/**
+ * Builds the final per-image crop metadata for an offer, aligned to the final
+ * gallery URLs. Crop metadata is stored keyed by URL (not positionally), so this
+ * follows reorder and drops entries for orphaned images automatically.
+ *
+ * - Kept images take their crop from `keptCrops` (the client's current crop
+ *   state for images it kept), matched by URL.
+ * - Newly uploaded images take their crop from `newCrops`, aligned to the
+ *   `uploaded` URL order (which mirrors the `images[]` upload order).
+ * - Only entries with a non-null crop are stored; a missing entry means "show
+ *   the whole image", so uncropped images add no metadata.
+ *
+ * Input:
+ *   finalUrls - the reconciled gallery (kept + uploaded), in final order.
+ *   uploaded  - the freshly uploaded Cloudinary URLs, in upload order.
+ *   keptCrops - crop entries for kept images (keyed by URL); may be undefined.
+ *   newCrops  - crops aligned to `uploaded` order (null = full image); optional.
+ * Output: ImageCropEntry[] containing only images that actually carry a crop.
+ */
+export function reconcileImageCrops(
+  finalUrls: string[],
+  uploaded: string[],
+  keptCrops: ImageCropEntry[] | undefined,
+  newCrops: (ImageCrop | null)[] | undefined,
+): ImageCropEntry[] {
+  const keptByUrl = new Map<string, ImageCrop | null>();
+  for (const entry of keptCrops ?? []) keptByUrl.set(entry.url, entry.crop);
+
+  const uploadedByUrl = new Map<string, ImageCrop | null>();
+  uploaded.forEach((url, i) => uploadedByUrl.set(url, newCrops?.[i] ?? null));
+
+  const result: ImageCropEntry[] = [];
+  for (const url of finalUrls) {
+    const crop = uploadedByUrl.has(url) ? uploadedByUrl.get(url)! : keptByUrl.get(url) ?? null;
+    if (crop) result.push({ url, crop });
+  }
+  return result;
 }
 
 /**

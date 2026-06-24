@@ -38,7 +38,7 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, type OfferVariant } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
 import { addBarcodes, addLinks, getInventorySummary, type InventoryResult } from '../services/voucher-inventory.service';
@@ -83,6 +83,17 @@ const upload = multer({
  * Output: the parsed array, the original value if already an array, or null.
  */
 function parseKeptImageUrlsField(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  try { return JSON.parse(v); } catch { return null; }
+}
+
+/**
+ * Preprocessor for the multipart `keptImageCrops` / `newImageCrops` fields, both
+ * JSON-encoded. Mirrors `parseKeptImageUrlsField`: invalid JSON falls back to
+ * null so downstream Zod validation returns a clean 400 instead of crashing. A
+ * non-string passes through unchanged (already-parsed JSON body).
+ */
+function parseImageCropsField(v: unknown): unknown {
   if (typeof v !== 'string') return v;
   try { return JSON.parse(v); } catch { return null; }
 }
@@ -326,6 +337,18 @@ const createOfferSchema = z.object({
     parseKeptImageUrlsField,
     z.array(z.string().url()).max(OFFER_IMAGES_MAX).optional(),
   ),
+  // Per-new-file crop metadata, aligned to the `images[]` upload order (one
+  // entry per file; null = full image). The original file is uploaded as-is;
+  // the crop is stored as metadata and applied at display time. keptImageCrops
+  // is accepted for symmetry with update (create keeps no prior images).
+  newImageCrops: z.preprocess(
+    parseImageCropsField,
+    z.array(imageCropSchema.nullable()).max(OFFER_IMAGES_MAX).optional(),
+  ),
+  keptImageCrops: z.preprocess(
+    parseImageCropsField,
+    z.array(imageCropEntrySchema).max(OFFER_IMAGES_MAX).optional(),
+  ),
 });
 
 /**
@@ -376,6 +399,17 @@ const updateOfferSchema = z.object({
   keptImageUrls: z.preprocess(
     parseKeptImageUrlsField,
     z.array(z.string().url()).max(OFFER_IMAGES_MAX).optional(),
+  ),
+  // Crop metadata: `keptImageCrops` carries the current crop for each kept image
+  // (keyed by URL); `newImageCrops` aligns to the `images[]` upload order. Both
+  // optional - undefined leaves existing crops untouched (gallery untouched).
+  keptImageCrops: z.preprocess(
+    parseImageCropsField,
+    z.array(imageCropEntrySchema).max(OFFER_IMAGES_MAX).optional(),
+  ),
+  newImageCrops: z.preprocess(
+    parseImageCropsField,
+    z.array(imageCropSchema.nullable()).max(OFFER_IMAGES_MAX).optional(),
   ),
 });
 
@@ -624,7 +658,7 @@ router.post(
             mimetype: f.mimetype,
           }))
         : [];
-      const { keptImageUrls: _ignoredKept, ...createPayload } = restParsed;
+      const { keptImageUrls: _ignoredKept, keptImageCrops: _ignoredKeptCrops, ...createPayload } = restParsed;
       const offer = await createOffer({
         ...createPayload,
         visibility: finalVisibility,

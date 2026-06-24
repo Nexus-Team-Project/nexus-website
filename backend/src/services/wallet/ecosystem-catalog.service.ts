@@ -6,7 +6,7 @@
  */
 import { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
-import { NOT_DELETED } from '../../models/domain/supply.models';
+import { NOT_DELETED, type ImageCropEntry } from '../../models/domain/supply.models';
 
 export interface EcosystemCatalogItem {
   id: string;
@@ -15,6 +15,8 @@ export interface EcosystemCatalogItem {
   category?: string;
   imageUrls?: string[];
   imageUrl?: string;
+  /** Per-image crop metadata keyed by original URL (full image when absent). */
+  imageCrops?: ImageCropEntry[];
   market_price?: number;
   member_price?: number;
   face_value?: number;
@@ -87,6 +89,7 @@ export async function getEcosystemCatalogForWallet(
           category: 1,
           imageUrls: 1,
           imageUrl: 1,
+          imageCrops: 1,
           market_price: 1,
           member_price: 1,
           face_value: 1,
@@ -108,6 +111,7 @@ export async function getEcosystemCatalogForWallet(
     category: o.category,
     imageUrls: o.imageUrls,
     imageUrl: o.imageUrl,
+    imageCrops: o.imageCrops,
     market_price: o.market_price,
     member_price: o.member_price,
     face_value: o.face_value,
