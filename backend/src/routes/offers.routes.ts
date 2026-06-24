@@ -125,6 +125,10 @@ const variantInputSchema = z.object({
   member_price: z.number().positive().optional(),
   voucherValidityValue: z.number().int().positive().nullable().optional(),
   voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  // Absolute date-range validity (mutually exclusive with the duration above).
+  // Variants are JSON-encoded, so dates arrive as ISO strings -> coerce to Date.
+  validFrom: z.coerce.date().nullable().optional(),
+  validUntil: z.coerce.date().nullable().optional(),
   voucherStackable: z.boolean().nullable().optional(),
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
@@ -163,8 +167,35 @@ function validateVoucherVariants(
     if (v.member_price !== undefined && (v.member_price < v.nexus_cost || v.member_price > v.face_value)) {
       return { ok: false, error: 'member_price must be between nexus_cost and face_value (inclusive)' };
     }
-    const val = assertVoucherValidity(v.voucherValidityValue, v.voucherValidityUnit);
-    if (!val.ok) return { ok: false, error: val.error, errorHe: val.errorHe };
+    // Validity is per variant: a duration OR an absolute date range, never both.
+    const hasDuration = v.voucherValidityValue != null || v.voucherValidityUnit != null;
+    const hasDateRange = v.validFrom != null || v.validUntil != null;
+    if (hasDuration && hasDateRange) {
+      return {
+        ok: false,
+        error: 'A variant cannot set both a validity duration and a date range',
+        errorHe: 'לא ניתן להגדיר לאותו וריאנט גם משך תוקף וגם טווח תאריכים',
+      };
+    }
+    if (hasDateRange) {
+      if (v.validFrom == null || v.validUntil == null) {
+        return {
+          ok: false,
+          error: 'Date-range validity requires both a from and an until date',
+          errorHe: 'טווח תאריכים מחייב גם תאריך התחלה וגם תאריך סיום',
+        };
+      }
+      if (new Date(v.validUntil).getTime() < new Date(v.validFrom).getTime()) {
+        return {
+          ok: false,
+          error: 'validUntil must be on or after validFrom',
+          errorHe: 'תאריך הסיום חייב להיות באותו יום או אחרי תאריך ההתחלה',
+        };
+      }
+    } else {
+      const val = assertVoucherValidity(v.voucherValidityValue, v.voucherValidityUnit);
+      if (!val.ok) return { ok: false, error: val.error, errorHe: val.errorHe };
+    }
     const s = assertVoucherStackable(v.voucherStackable);
     if (!s.ok) return { ok: false, error: s.error, errorHe: s.errorHe };
   }
@@ -228,6 +259,10 @@ const catalogListQuerySchema = z.object({
   category: z.enum(OFFER_CATEGORIES).optional(),
   approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
   adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
+  ownedOnly: z.preprocess(
+    (val) => val === 'true' || val === true ? true : val === 'false' || val === false ? false : val,
+    z.boolean().optional(),
+  ),
   offerTypes: z.preprocess(
     (val) => typeof val === 'string' ? val.split(',').map((s) => s.trim()).filter(Boolean) : val,
     z.array(z.enum(OFFER_EXECUTION_TYPES)).max(10).optional(),

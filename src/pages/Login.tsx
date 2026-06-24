@@ -50,7 +50,6 @@ export default function Login() {
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
   const signupPath = isHe ? '/he/signup' : '/signup';
-  const workspacePath = isHe ? '/he/workspace' : '/workspace';
 
   const searchParams = new URLSearchParams(search);
   const dashboardRedirect = searchParams.get('dashboardRedirect');
@@ -88,7 +87,7 @@ export default function Login() {
   }, [dashboardRedirect]);
   const googleDashboardRedirect = dashboardRedirect && dashboardRedirect.startsWith('/') && !dashboardRedirect.startsWith('//')
     ? dashboardRedirect
-    : workspacePath;
+    : '/';
 
   /**
    * Sends an authenticated website user to the dashboard with a fresh SSO code.

@@ -227,7 +227,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (registerData: RegisterData) => {
-    const data = await api.post<{ requiresVerification?: boolean; email?: string; accessToken?: string }>('/api/auth/register', registerData);
+    const data = await api.post<{ requiresVerification?: boolean; email?: string; accessToken?: string }>(
+      '/api/auth/register',
+      { ...registerData, language: getCurrentWebsiteLanguage() },
+    );
     if (data.requiresVerification) {
       return { requiresVerification: true as const, email: data.email! };
     }

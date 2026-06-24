@@ -27,6 +27,9 @@ export interface OfferVariantInput {
   member_price?: number;
   voucherValidityValue?: number | null;
   voucherValidityUnit?: OfferVoucherValidityUnit | null;
+  /** Absolute validity window (date-range mode); mutually exclusive with the duration above. */
+  validFrom?: Date | null;
+  validUntil?: Date | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -126,6 +129,8 @@ export function variantSignature(v: OfferVariant): string {
     v.member_price ?? null,
     v.voucherValidityValue ?? null,
     v.voucherValidityUnit ?? null,
+    v.validFrom ? new Date(v.validFrom).toISOString() : null,
+    v.validUntil ? new Date(v.validUntil).toISOString() : null,
     v.voucherStackable ?? null,
     (v.sku ?? '').trim().toUpperCase() || null,
     (v.terms ?? '').trim() || null,
@@ -158,13 +163,18 @@ export function hasDuplicateVariants(variants: OfferVariant[]): boolean {
  */
 function finalizeVariant(v: OfferVariantInput): OfferVariant {
   const member = v.member_price === undefined ? v.nexus_cost : v.member_price;
+  // Validity is EITHER an absolute date range OR a purchase-anchored duration,
+  // never both. Date range wins when present; otherwise keep the duration.
+  const hasDateRange = v.validFrom != null || v.validUntil != null;
   return {
     variantId: v.variantId && VARIANT_ID_REGEX.test(v.variantId) ? v.variantId : generateVariantId(),
     ...(v.face_value !== undefined && { face_value: v.face_value }),
     ...(v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
     ...(member !== undefined && { member_price: member }),
-    voucherValidityValue: v.voucherValidityValue ?? null,
-    voucherValidityUnit: v.voucherValidityUnit ?? null,
+    voucherValidityValue: hasDateRange ? null : (v.voucherValidityValue ?? null),
+    voucherValidityUnit: hasDateRange ? null : (v.voucherValidityUnit ?? null),
+    validFrom: hasDateRange ? (v.validFrom ?? null) : null,
+    validUntil: hasDateRange ? (v.validUntil ?? null) : null,
     voucherStackable: v.voucherStackable ?? null,
     sku: v.sku ?? null,
     tags: v.tags ?? [],

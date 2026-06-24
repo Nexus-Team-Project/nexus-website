@@ -34,6 +34,22 @@ function consumeSavedDashboardRedirect(): string | null {
   return saved;
 }
 
+/**
+ * Resolves the dashboard path to hand off to after verification.
+ * Inputs: the invite redirect saved during signup, and the redirect returned
+ * by the verify-email response.
+ * Output: a safe local dashboard path; defaults to '/' so the dashboard opens
+ * the workspace-setup wizard. Only local paths (a single leading '/') are
+ * allowed, to prevent open redirects.
+ */
+function resolveDashboardRedirect(saved: string | null, fromResponse: string | null | undefined): string {
+  const isSafe = (p: string | null | undefined): p is string =>
+    !!p && p.startsWith('/') && !p.startsWith('//');
+  if (isSafe(saved)) return saved;
+  if (isSafe(fromResponse)) return fromResponse;
+  return '/';
+}
+
 export default function VerifyEmailPage() {
   const initialToken = new URLSearchParams(window.location.search).get('token');
   const [status, setStatus] = useState<Status>(initialToken ? 'verifying' : 'error');
@@ -57,18 +73,15 @@ export default function VerifyEmailPage() {
           sessionStorage.setItem('auth_first_name', profile.fullName.split(' ')[0]);
         }
         setStatus('success');
-        const dashboardRedirect = consumeSavedDashboardRedirect() ?? (
-          data.dashboardRedirect && data.dashboardRedirect.startsWith('/') && !data.dashboardRedirect.startsWith('//')
-            ? data.dashboardRedirect
-            : null
+        const redirectPath = resolveDashboardRedirect(
+          consumeSavedDashboardRedirect(),
+          data.dashboardRedirect,
         );
-        if (dashboardRedirect) {
-          const { code } = await api.post<{ code: string }>('/api/auth/create-code');
-          setTimeout(() => window.location.replace(buildDashboardCallbackUrl(code, dashboardRedirect, language)), 1200);
-          return;
-        }
-        const dest = window.location.pathname.startsWith('/he') ? '/he/workspace' : '/workspace';
-        setTimeout(() => window.location.replace(dest), 2500);
+        const { code } = await api.post<{ code: string }>('/api/auth/create-code');
+        setTimeout(
+          () => window.location.replace(buildDashboardCallbackUrl(code, redirectPath, language)),
+          1200,
+        );
       })
       .catch((err) => {
         if (err?.status === 400) {
