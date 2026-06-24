@@ -217,6 +217,10 @@ const catalogListQuerySchema = z.object({
   category: z.enum(OFFER_CATEGORIES).optional(),
   approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
   adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
+  ownedOnly: z.preprocess(
+    (val) => val === 'true' || val === true ? true : val === 'false' || val === false ? false : val,
+    z.boolean().optional(),
+  ),
   offerTypes: z.preprocess(
     (val) => typeof val === 'string' ? val.split(',').map((s) => s.trim()).filter(Boolean) : val,
     z.array(z.enum(OFFER_EXECUTION_TYPES)).max(10).optional(),
