@@ -177,6 +177,9 @@ export interface CatalogVariant {
   member_price?: number;
   voucherValidityValue?: number | null;
   voucherValidityUnit?: 'days' | 'months' | 'years' | null;
+  /** Absolute validity window (date-range mode). Mutually exclusive with the duration. */
+  validFrom?: string | null;
+  validUntil?: string | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -294,6 +297,8 @@ function toItem(
         ...(effPrice !== undefined && { member_price: effPrice }),
         voucherValidityValue: v.voucherValidityValue ?? null,
         voucherValidityUnit: v.voucherValidityUnit ?? null,
+        validFrom: v.validFrom ? new Date(v.validFrom).toISOString() : null,
+        validUntil: v.validUntil ? new Date(v.validUntil).toISOString() : null,
         voucherStackable: v.voucherStackable ?? null,
         sku: v.sku ?? null,
         tags: v.tags ?? [],
