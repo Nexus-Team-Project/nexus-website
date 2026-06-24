@@ -257,14 +257,32 @@ export async function uploadTenantLogo(buffer: Buffer, filename: string): Promis
 }
 
 /**
- * Returns a static default placeholder image URL for offers that have no
- * uploaded image.
+ * Fixed Cloudinary public_id of the default offer placeholder. The asset is
+ * uploaded to each environment's Cloudinary account at this same id via
+ * scripts/upload-default-offer-image.ts, so the delivery URL only differs by
+ * cloud name between dev and prod.
+ */
+const DEFAULT_OFFER_IMAGE_PUBLIC_ID = 'nexus/defaults/offer-placeholder';
+
+/** Dev-account cloud name, used only as a fallback when CLOUDINARY_URL is unset. */
+const FALLBACK_CLOUD_NAME = 'dyqjvjdlq';
+
+/**
+ * Returns the default placeholder image URL for offers that have no uploaded
+ * image. The cloud name is derived from the environment's CLOUDINARY_URL, so
+ * dev serves the dev account's copy and prod serves the prod account's copy
+ * with no hardcoded environment URL. Only the cloud name (which is public,
+ * appearing in every delivery URL) is read - never the api key or secret.
+ * Version-less so re-uploading the asset swaps the image with no code change.
  *
  * Input:  none.
- * Output: absolute HTTPS URL string pointing to the default offer image.
+ * Output: absolute HTTPS Cloudinary URL string pointing to the default image.
  */
 export function defaultOfferImageUrl(): string {
-  return 'https://res.cloudinary.com/dyqjvjdlq/image/upload/v1778753218/9c6425d4-63bb-48ef-9a95-f6c48911e8ee_mj6eqm.png';
+  const cloudName = env.CLOUDINARY_URL
+    ? parseCloudinaryUrl(env.CLOUDINARY_URL).cloudName
+    : FALLBACK_CLOUD_NAME;
+  return `https://res.cloudinary.com/${cloudName}/image/upload/${DEFAULT_OFFER_IMAGE_PUBLIC_ID}.png`;
 }
 
 /**
