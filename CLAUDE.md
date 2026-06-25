@@ -33,6 +33,7 @@ Frontends must not connect directly to MongoDB. Dashboard context comes through 
 **Catalog rules:**
 - Every offer must have a public image URL; backend applies a Cloudinary default if missing. `CLOUDINARY_URL` is backend-only — never expose to frontend.
 - Public contracts use `subOffers` = internal `Variant`. `subOfferId` = `variant_id`. Never add a SubOffer DB entity.
+- **Voucher validity is UNIT-LEVEL (2026-06-25, OpenSpec `voucher-unit-level-dating`).** The validity TYPE is `NexusOffer.defaultValidityType` (`limit` | `from_until`) with an optional per-variant `OfferVariant.validityTypeOverride` (null = inherit). The validity VALUE lives on each `voucherCodes` unit: `validityValue`/`validityUnit` (the limit recipe) + `validFrom`/`validUntil` (the actual window - authored for `from_until`, empty for `limit` until purchase). Validity was removed from `offerVariantSchema`, from `variantSignature` (dedupe), and from `validateVoucherVariants`; per-unit completeness lives in `services/voucher-validity.helper.ts`. Inventory routes stamp per-batch validity (`addBarcodes`/`addLinks` take a `BatchValidity`), and expose `GET .../inventory/units` (paged + date filter), `PATCH`/`DELETE .../inventory/:codeId` (admin + ownership + voucher-only). No "never expires". Migration: `scripts/backfill-voucher-unit-dating.ts`. The purchase-time fill of `validFrom`/`validUntil` for `limit` units is the future redemption flow (nexus-wallet, out of scope here).
 
 ## Current User Flow
 
