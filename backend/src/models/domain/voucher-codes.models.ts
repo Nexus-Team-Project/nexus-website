@@ -130,6 +130,13 @@ export function getVoucherCodeCollection(db: Db) {
  * still holds duplicate barcodes across offers will fail - the backfill reports
  * such collisions for manual resolution first.
  *
+ * NOTE (validity dating, v1): the per-unit validity fields (validityValue/Unit,
+ * validFrom/validUntil) need NO new index in v1 - the management read filters by
+ * date within a single (offerId, variantId) pool that is already small and
+ * served by `offer_variant_status`. If expiring-soon filtering ever spans many
+ * variants/offers, add a partial index on `(validUntil)` filtered to
+ * `status: 'available'`; deferred until a query proves it necessary.
+ *
  * Input: Mongo database handle. Output: indexes exist.
  */
 export async function ensureVoucherCodeIndexes(db: Db): Promise<void> {
