@@ -440,6 +440,19 @@ export interface UnitDateFilter {
   expiringWithin?: ExpiringWindow;
   /** Only units with no window yet (unsold limit units: validFrom + validUntil null). */
   noWindow?: boolean;
+  /** Units created within [createdFrom, createdTo]. */
+  createdFrom?: Date;
+  createdTo?: Date;
+  /** Units last updated within [updatedFrom, updatedTo]. */
+  updatedFrom?: Date;
+  updatedTo?: Date;
+  /** Case-insensitive substring match on the unit `value` (barcode/link) or `code`. */
+  search?: string;
+}
+
+/** Escapes a user string for safe use inside a RegExp (search filter). */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** A page of a variant's inventory units plus the total matching the filter. */
@@ -515,6 +528,21 @@ export async function listVariantUnits(
       query.validUntil = validUntil;
     }
     if (Object.keys(validFrom).length > 0) query.validFrom = validFrom;
+  }
+  // Created / updated ranges (independent of the window filter above).
+  const createdAt: Record<string, Date> = {};
+  if (filter.createdFrom) createdAt.$gte = filter.createdFrom;
+  if (filter.createdTo) createdAt.$lte = filter.createdTo;
+  if (Object.keys(createdAt).length > 0) query.createdAt = createdAt;
+  const updatedAt: Record<string, Date> = {};
+  if (filter.updatedFrom) updatedAt.$gte = filter.updatedFrom;
+  if (filter.updatedTo) updatedAt.$lte = filter.updatedTo;
+  if (Object.keys(updatedAt).length > 0) query.updatedAt = updatedAt;
+  // Code search: substring match on value or the optional link code.
+  const term = filter.search?.trim();
+  if (term) {
+    const rx = { $regex: escapeRegExp(term), $options: 'i' };
+    query.$or = [{ value: rx }, { code: rx }];
   }
   const size = Math.min(Math.max(1, Math.floor(pageSize)), UNIT_PAGE_SIZE_MAX);
   const current = Math.max(1, Math.floor(page));

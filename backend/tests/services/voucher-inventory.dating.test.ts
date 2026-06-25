@@ -103,6 +103,21 @@ describe('listVariantUnits filters + pages', () => {
     expect(p2.units).toHaveLength(1);
     expect(p1.total).toBe(3);
   });
+
+  it('searches by code value (case-insensitive substring, regex-safe)', async () => {
+    const page = await listVariantUnits(OFFER, VARIANT, { search: 'w1' }, 1, 50);
+    expect(page.units.map((u) => u.value)).toEqual(['W1']);
+    const none = await listVariantUnits(OFFER, VARIANT, { search: 'zz(' }, 1, 50);
+    expect(none.total).toBe(0);
+  });
+
+  it('filters by created range', async () => {
+    const future = new Date(Date.now() + 86_400_000);
+    const all = await listVariantUnits(OFFER, VARIANT, { createdTo: future }, 1, 50);
+    expect(all.total).toBe(3);
+    const past = await listVariantUnits(OFFER, VARIANT, { createdTo: new Date('2000-01-01') }, 1, 50);
+    expect(past.total).toBe(0);
+  });
 });
 
 describe('updateUnitValidity is lossless + delete', () => {

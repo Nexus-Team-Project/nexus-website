@@ -1347,6 +1347,11 @@ const unitListQuerySchema = z.object({
   until: z.coerce.date().optional(),
   expiringWithin: z.enum(['1m', '3m', '1y']).optional(),
   noWindow: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
+  createdFrom: z.coerce.date().optional(),
+  createdTo: z.coerce.date().optional(),
+  updatedFrom: z.coerce.date().optional(),
+  updatedTo: z.coerce.date().optional(),
+  search: z.string().trim().max(200).optional(),
   page: z.coerce.number().int().positive().optional(),
   pageSize: z.coerce.number().int().positive().max(200).optional(),
 });
