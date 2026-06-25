@@ -25,6 +25,16 @@ export const OFFER_REDEMPTION_SCOPES = ['shared', 'per_variant'] as const;
 export type OfferRedemptionScope = typeof OFFER_REDEMPTION_SCOPES[number];
 
 /**
+ * Voucher validity TYPE (see the `voucher-validity-dating` capability). The type
+ * selects how a unit's expiry works; the VALUE lives on each inventory unit, not
+ * here. `limit` = a purchase-anchored duration (N units from the buy date);
+ * `from_until` = an absolute redeemable window. A voucher offer sets a parent
+ * `defaultValidityType`; a variant MAY override it (null = inherit the parent).
+ */
+export const VALIDITY_TYPES = ['limit', 'from_until'] as const;
+export type ValidityType = typeof VALIDITY_TYPES[number];
+
+/**
  * Soft upper bound on variants per offer. Guards the UI and the embedded-array
  * document size (each variant is small, so this is far below Mongo's 16 MB cap).
  */
