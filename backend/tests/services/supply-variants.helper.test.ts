@@ -22,8 +22,7 @@ const v = (over: Partial<OfferVariant> = {}): OfferVariant => ({
   face_value: 100,
   nexus_cost: 60,
   member_price: 80,
-  voucherValidityValue: null,
-  voucherValidityUnit: null,
+  validityTypeOverride: null,
   voucherStackable: false,
   sku: null,
   tags: [],
@@ -130,43 +129,37 @@ describe('buildVoucherVariants', () => {
   });
 });
 
-describe('per-variant validity (duration vs date range)', () => {
-  it('signature distinguishes variants differing only by validity date range', () => {
-    const a = v({ validFrom: new Date('2026-01-01'), validUntil: new Date('2026-03-31') });
-    const b = v({ validFrom: new Date('2026-01-01'), validUntil: new Date('2026-06-30') });
-    expect(variantSignature(a)).not.toBe(variantSignature(b));
-    expect(hasDuplicateVariants([a, b])).toBe(false);
+describe('validity type override (value is per unit, not the variant)', () => {
+  it('signature ignores the validity type override - it does not distinguish variants', () => {
+    const a = v({ validityTypeOverride: 'limit' });
+    const b = v({ validityTypeOverride: 'from_until' });
+    // Same price/stackable/sku/redemption => same signature, regardless of type.
+    expect(variantSignature(a)).toBe(variantSignature(b));
+    expect(hasDuplicateVariants([a, b])).toBe(true);
   });
 
-  it('date-range and duration variants are distinct even with the same price', () => {
-    const dates = v({ validFrom: new Date('2026-01-01'), validUntil: new Date('2026-12-31') });
-    const duration = v({ voucherValidityValue: 1, voucherValidityUnit: 'years' });
-    expect(variantSignature(dates)).not.toBe(variantSignature(duration));
+  it('two variants intended to differ only by date are duplicates (date is per unit now)', () => {
+    // No date fields exist on a variant anymore; identical priced variants collide.
+    const a = v({ member_price: 80 });
+    const b = v({ member_price: 80 });
+    expect(hasDuplicateVariants([a, b])).toBe(true);
   });
 
-  it('buildVoucherVariants keeps date range and nulls the duration (mutually exclusive)', () => {
+  it('buildVoucherVariants carries the type override and stores no validity value', () => {
     const [out] = buildVoucherVariants(
-      [{
-        face_value: 100, nexus_cost: 60, member_price: 80,
-        validFrom: new Date('2026-01-01'), validUntil: new Date('2026-03-31'),
-        voucherValidityValue: 2, voucherValidityUnit: 'years',
-      }],
+      [{ face_value: 100, nexus_cost: 60, member_price: 80, validityTypeOverride: 'from_until' }],
       {},
     );
-    expect(out.validFrom).toEqual(new Date('2026-01-01'));
-    expect(out.validUntil).toEqual(new Date('2026-03-31'));
-    expect(out.voucherValidityValue).toBeNull();
-    expect(out.voucherValidityUnit).toBeNull();
+    expect(out.validityTypeOverride).toBe('from_until');
+    expect(out).not.toHaveProperty('voucherValidityValue');
+    expect(out).not.toHaveProperty('validFrom');
   });
 
-  it('buildVoucherVariants keeps duration and nulls the dates when no range given', () => {
+  it('buildVoucherVariants defaults the type override to null (inherit parent)', () => {
     const [out] = buildVoucherVariants(
-      [{ face_value: 100, nexus_cost: 60, member_price: 80, voucherValidityValue: 3, voucherValidityUnit: 'months' }],
+      [{ face_value: 100, nexus_cost: 60, member_price: 80 }],
       {},
     );
-    expect(out.voucherValidityValue).toBe(3);
-    expect(out.voucherValidityUnit).toBe('months');
-    expect(out.validFrom).toBeNull();
-    expect(out.validUntil).toBeNull();
+    expect(out.validityTypeOverride).toBeNull();
   });
 });
