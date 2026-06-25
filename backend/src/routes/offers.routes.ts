@@ -39,9 +39,10 @@ import {
   excludeOffer,
 } from '../services/catalog.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
-import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
+import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES, type ValidityType } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
-import { addBarcodes, addLinks, getInventorySummary, type InventoryResult } from '../services/voucher-inventory.service';
+import { addBarcodes, addLinks, getInventorySummary, listVariantUnits, updateUnitValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
+import { effectiveValidityType } from '../services/voucher-validity.helper';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
 import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX, VOUCHER_CODE_REGEX } from '../models/domain/voucher-codes.models';
@@ -406,6 +407,13 @@ const inventorySchema = z.object({
       code: z.string().regex(VOUCHER_CODE_REGEX).optional(),
     }),
   ).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
+  // Per-batch validity stamped onto every unit (voucher-validity-dating). The set
+  // that must be supplied depends on the variant's effective type; cross-checked
+  // in the handler via resolveBatchValidity. Dates arrive as ISO strings -> coerce.
+  validityValue: z.coerce.number().int().positive().nullable().optional(),
+  validityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  validFrom: z.coerce.date().nullable().optional(),
+  validUntil: z.coerce.date().nullable().optional(),
 });
 
 // ─── Static paths first ───────────────────────────────────────────────────────
@@ -1183,14 +1191,14 @@ async function loadOwnedVoucherForInventory(
   offerId: string,
   ctx: { tenantId: string; isPlatformAdmin?: boolean },
 ): Promise<
-  | { ok: true; variants: OfferVariant[] }
+  | { ok: true; variants: OfferVariant[]; defaultValidityType: ValidityType | null }
   | { ok: false; status: number; error: string }
 > {
   const db = await getMongoDb();
   const { nexusOffers } = getSupplyDomainCollections(db);
   const offer = await nexusOffers.findOne(
     { offerId, ...NOT_DELETED },
-    { projection: { createdByTenantId: 1, executionType: 1, variants: 1 } },
+    { projection: { createdByTenantId: 1, executionType: 1, variants: 1, defaultValidityType: 1 } },
   );
   if (!offer || (!ctx.isPlatformAdmin && offer.createdByTenantId !== ctx.tenantId)) {
     return { ok: false, status: 404, error: 'Offer not found or you do not own this offer' };
@@ -1198,7 +1206,46 @@ async function loadOwnedVoucherForInventory(
   if (offer.executionType !== 'voucher') {
     return { ok: false, status: 400, error: 'Inventory is only supported for voucher offers' };
   }
-  return { ok: true, variants: offer.variants ?? [] };
+  return { ok: true, variants: offer.variants ?? [], defaultValidityType: offer.defaultValidityType ?? null };
+}
+
+/**
+ * Validates a batch validity against a variant's effective type, then builds the
+ * BatchValidity to stamp onto the new units (voucher-validity-dating):
+ *   - 'limit'      -> requires validityValue + validityUnit (ceiling-checked);
+ *                     validFrom/validUntil must NOT be supplied (filled at purchase).
+ *   - 'from_until' -> requires validFrom + validUntil (validUntil on/after validFrom);
+ *                     validityValue/validityUnit must NOT be supplied.
+ * Returns the BatchValidity on success, or a bilingual error to send as 400.
+ */
+function resolveBatchValidity(
+  effectiveType: ValidityType,
+  data: BatchValidity,
+): { ok: true; validity: BatchValidity } | { ok: false; error: string; errorHe: string } {
+  const hasDuration = data.validityValue != null || data.validityUnit != null;
+  const hasWindow = data.validFrom != null || data.validUntil != null;
+  if (effectiveType === 'limit') {
+    if (hasWindow) {
+      return { ok: false, error: 'A limit-type batch must not carry from/until dates', errorHe: 'אצווה מסוג הגבלת זמן לא יכולה לכלול תאריכי התחלה/סיום' };
+    }
+    const v = assertVoucherValidity(data.validityValue, data.validityUnit);
+    if (!v.ok) return { ok: false, error: v.error, errorHe: v.errorHe };
+    if (data.validityValue == null || data.validityUnit == null) {
+      return { ok: false, error: 'A limit-type batch requires a validity amount and unit', errorHe: 'אצווה מסוג הגבלת זמן מחייבת כמות ויחידת זמן' };
+    }
+    return { ok: true, validity: { validityValue: data.validityValue, validityUnit: data.validityUnit } };
+  }
+  // from_until
+  if (hasDuration) {
+    return { ok: false, error: 'A from-until batch must not carry a validity duration', errorHe: 'אצווה מסוג טווח תאריכים לא יכולה לכלול משך תוקף' };
+  }
+  if (data.validFrom == null || data.validUntil == null) {
+    return { ok: false, error: 'A from-until batch requires both a from and an until date', errorHe: 'אצווה מסוג טווח תאריכים מחייבת תאריך התחלה ותאריך סיום' };
+  }
+  if (new Date(data.validUntil).getTime() < new Date(data.validFrom).getTime()) {
+    return { ok: false, error: 'validUntil must be on or after validFrom', errorHe: 'תאריך הסיום חייב להיות באותו יום או אחרי תאריך ההתחלה' };
+  }
+  return { ok: true, validity: { validFrom: data.validFrom, validUntil: data.validUntil } };
 }
 
 /**
@@ -1209,17 +1256,18 @@ async function applyInventoryUnits(
   offerId: string,
   variantId: string,
   data: z.infer<typeof inventorySchema>,
+  validity: BatchValidity,
 ): Promise<InventoryResult> {
   if (data.kind === 'barcode') {
     if (!data.values || data.values.length === 0) {
       throw createError('values is required to add barcode inventory', 400);
     }
-    return addBarcodes(offerId, variantId, data.values);
+    return addBarcodes(offerId, variantId, data.values, validity);
   }
   if (!data.links || data.links.length === 0) {
     throw createError('links is required to add link inventory', 400);
   }
-  return addLinks(offerId, variantId, data.links);
+  return addLinks(offerId, variantId, data.links, validity);
 }
 
 /**
@@ -1259,11 +1307,19 @@ router.post(
       const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
       const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
       if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
-      if (!guard.variants.some((v) => v.variantId === req.params.variantId)) {
+      const variant = guard.variants.find((v) => v.variantId === req.params.variantId);
+      if (!variant) {
         res.status(404).json({ error: 'Variant not found on this offer' });
         return;
       }
-      const result = await applyInventoryUnits(req.params.offerId, req.params.variantId, parsed.data);
+      const effType = effectiveValidityType(guard.defaultValidityType, variant.validityTypeOverride);
+      if (!effType) {
+        res.status(400).json({ error: 'This voucher has no validity type set', errorHe: 'לא הוגדר סוג תוקף לשובר זה' });
+        return;
+      }
+      const vr = resolveBatchValidity(effType, parsed.data);
+      if (!vr.ok) { res.status(400).json({ error: vr.error, errorHe: vr.errorHe }); return; }
+      const result = await applyInventoryUnits(req.params.offerId, req.params.variantId, parsed.data, vr.validity);
       res.status(201).json(result);
     } catch (err) {
       next(err);
@@ -1295,6 +1351,109 @@ router.get(
   },
 );
 
+/** Query for the management units list: date filter (range / expiring / no-window) + paging. */
+const unitListQuerySchema = z.object({
+  from: z.coerce.date().optional(),
+  until: z.coerce.date().optional(),
+  expiringWithin: z.enum(['1m', '3m', '1y']).optional(),
+  noWindow: z.preprocess((v) => v === 'true' || v === true, z.boolean()).optional(),
+  page: z.coerce.number().int().positive().optional(),
+  pageSize: z.coerce.number().int().positive().max(200).optional(),
+});
+
+/**
+ * GET /api/v1/offers/:offerId/variants/:variantId/inventory/units
+ * Paged, date-filterable list of a variant's units for the management surface.
+ * Authorization: supply.manage_offers; ownership enforced; voucher-only.
+ */
+router.get(
+  '/:offerId/variants/:variantId/inventory/units',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = unitListQuerySchema.safeParse(req.query);
+      if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      if (!guard.variants.some((v) => v.variantId === req.params.variantId)) {
+        res.status(404).json({ error: 'Variant not found on this offer' });
+        return;
+      }
+      const { page, pageSize, ...filter } = parsed.data;
+      const result = await listVariantUnits(req.params.offerId, req.params.variantId, filter, page, pageSize);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/** PATCH body: the validity to set on one unit (for its variant's effective type). */
+const unitValidityPatchSchema = z.object({
+  validityValue: z.coerce.number().int().positive().nullable().optional(),
+  validityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  validFrom: z.coerce.date().nullable().optional(),
+  validUntil: z.coerce.date().nullable().optional(),
+});
+
+/**
+ * PATCH /api/v1/offers/:offerId/variants/:variantId/inventory/:codeId
+ * Edits ONE unit's validity (only). Rejects any attempt to change value/kind
+ * (those are not in the schema). Validates the supplied validity against the
+ * unit's effective type. Authorization: supply.manage_offers; ownership; voucher-only.
+ */
+router.patch(
+  '/:offerId/variants/:variantId/inventory/:codeId',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = unitValidityPatchSchema.safeParse(req.body);
+      if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      const variant = guard.variants.find((v) => v.variantId === req.params.variantId);
+      if (!variant) { res.status(404).json({ error: 'Variant not found on this offer' }); return; }
+      const effType = effectiveValidityType(guard.defaultValidityType, variant.validityTypeOverride);
+      if (!effType) { res.status(400).json({ error: 'This voucher has no validity type set' }); return; }
+      const vr = resolveBatchValidity(effType, parsed.data);
+      if (!vr.ok) { res.status(400).json({ error: vr.error, errorHe: vr.errorHe }); return; }
+      const updated = await updateUnitValidity(req.params.offerId, req.params.variantId, req.params.codeId, vr.validity);
+      if (!updated) { res.status(404).json({ error: 'Inventory unit not found' }); return; }
+      res.json({ unit: updated });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /api/v1/offers/:offerId/variants/:variantId/inventory/:codeId
+ * Removes ONE inventory unit and re-syncs the offer's derived stock.
+ * Authorization: supply.manage_offers; ownership enforced; voucher-only.
+ */
+router.delete(
+  '/:offerId/variants/:variantId/inventory/:codeId',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      if (!guard.variants.some((v) => v.variantId === req.params.variantId)) {
+        res.status(404).json({ error: 'Variant not found on this offer' });
+        return;
+      }
+      const result = await deleteUnit(req.params.offerId, req.params.variantId, req.params.codeId);
+      if (!result.deleted) { res.status(404).json({ error: 'Inventory unit not found' }); return; }
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 /**
  * POST /api/v1/offers/:offerId/inventory  (DEPRECATED compatibility wrapper)
  * Offer-level inventory route, retained for the pre-variant client. Resolves the
@@ -1316,7 +1475,15 @@ router.post(
       if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
       const def = resolveDefaultVariantId(guard.variants);
       if (!def.ok) { res.status(def.status).json({ error: def.error }); return; }
-      const result = await applyInventoryUnits(req.params.offerId, def.variantId, parsed.data);
+      const defVariant = guard.variants.find((v) => v.variantId === def.variantId);
+      const effType = effectiveValidityType(guard.defaultValidityType, defVariant?.validityTypeOverride ?? null);
+      if (!effType) {
+        res.status(400).json({ error: 'This voucher has no validity type set', errorHe: 'לא הוגדר סוג תוקף לשובר זה' });
+        return;
+      }
+      const vr = resolveBatchValidity(effType, parsed.data);
+      if (!vr.ok) { res.status(400).json({ error: vr.error, errorHe: vr.errorHe }); return; }
+      const result = await applyInventoryUnits(req.params.offerId, def.variantId, parsed.data, vr.validity);
       res.status(201).json(result);
     } catch (err) {
       next(err);

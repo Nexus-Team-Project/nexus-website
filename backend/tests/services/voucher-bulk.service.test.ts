@@ -111,10 +111,14 @@ describe('validateAndMapRow — optional fields', () => {
     expect(validateAndMapRow(row({ backgroundColor: '#635bff' }), ctx).ok).toBe(true);
   });
 
-  it('requires validity value + unit together', () => {
-    expect(validateAndMapRow(row({ validityValue: '2' }), ctx).ok).toBe(false);
+  it('maps a bulk row to a limit-type offer (validity VALUE is now per unit, not per offer)', () => {
+    // Voucher validity value moved onto inventory units (voucher-validity-dating);
+    // the legacy CSV bulk path defaults the offer validity TYPE to 'limit' and no
+    // longer sets a per-offer validity value.
     const r = validateAndMapRow(row({ validityValue: '2', validityUnit: 'years' }), ctx);
-    expect(r.ok && r.input.voucherValidityValue).toBe(2);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.input.defaultValidityType).toBe('limit');
+    expect(r.ok && (r.input as Record<string, unknown>).voucherValidityValue).toBeUndefined();
   });
 
   it('rejects an unknown category and defaults blank to other', () => {
