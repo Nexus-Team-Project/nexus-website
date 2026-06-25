@@ -1426,7 +1426,8 @@ router.patch(
       const vr = resolveBatchValidity(effType, validityBody);
       if (!vr.ok) { res.status(400).json({ error: vr.error, errorHe: vr.errorHe }); return; }
       const result = await updateUnitsValidity(req.params.offerId, req.params.variantId, codeIds, vr.validity);
-      res.json(result);
+      // Audit: report who made the change and when, alongside the per-unit from -> to.
+      res.json({ ...result, updatedBy: { identityId: ctx.identityId, tenantId: ctx.tenantId }, updatedAt: new Date().toISOString() });
     } catch (err) {
       next(err);
     }

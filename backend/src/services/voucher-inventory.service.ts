@@ -563,13 +563,37 @@ export async function updateUnitValidity(
  * Input:  offerId, variantId, codeIds (1..VOUCHER_INVENTORY_MAX), validity.
  * Output: { updated } - the number of units modified.
  */
+/** One unit's validity before and after a bulk update (for the audit/response). */
+export interface UnitValidityChange {
+  codeId: string;
+  value: string;
+  before: BatchValidity;
+  after: BatchValidity;
+}
+
+export interface BulkUpdateResult {
+  updated: number;
+  /** Per-unit before -> after validity for the units that were changed. */
+  changes: UnitValidityChange[];
+}
+
+/** Reduces a stored unit to its validity fields (for before/after reporting). */
+function unitValidity(u: Pick<VoucherCode, 'validityValue' | 'validityUnit' | 'validFrom' | 'validUntil'>): BatchValidity {
+  return {
+    validityValue: u.validityValue ?? null,
+    validityUnit: u.validityUnit ?? null,
+    validFrom: u.validFrom ?? null,
+    validUntil: u.validUntil ?? null,
+  };
+}
+
 export async function updateUnitsValidity(
   offerId: string,
   variantId: string,
   codeIds: string[],
   validity: BatchValidity,
-): Promise<{ updated: number }> {
-  if (codeIds.length === 0) return { updated: 0 };
+): Promise<BulkUpdateResult> {
+  if (codeIds.length === 0) return { updated: 0, changes: [] };
   const db = await getMongoDb();
   const codes = getVoucherCodeCollection(db);
   const $set: Partial<VoucherCode> = {};
@@ -577,9 +601,19 @@ export async function updateUnitsValidity(
   if (validity.validityUnit !== undefined) $set.validityUnit = validity.validityUnit;
   if (validity.validFrom !== undefined) $set.validFrom = validity.validFrom;
   if (validity.validUntil !== undefined) $set.validUntil = validity.validUntil;
-  if (Object.keys($set).length === 0) return { updated: 0 };
+  if (Object.keys($set).length === 0) return { updated: 0, changes: [] };
+  // Snapshot the targeted units BEFORE the write so we can report from -> to.
+  const targets = await codes
+    .find({ offerId, variantId, codeId: { $in: codeIds } }, { projection: { codeId: 1, value: 1, validityValue: 1, validityUnit: 1, validFrom: 1, validUntil: 1, _id: 0 } })
+    .toArray();
   const res = await codes.updateMany({ offerId, variantId, codeId: { $in: codeIds } }, { $set });
-  return { updated: res.modifiedCount };
+  const changes: UnitValidityChange[] = targets.map((u) => ({
+    codeId: u.codeId,
+    value: u.value,
+    before: unitValidity(u),
+    after: { ...unitValidity(u), ...validity }, // $set only changed the supplied keys
+  }));
+  return { updated: res.modifiedCount, changes };
 }
 
 /**
