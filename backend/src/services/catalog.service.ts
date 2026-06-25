@@ -148,10 +148,9 @@ export interface CatalogItem {
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Always null for vouchers. */
   validUntil?: Date | null;
-  /** Voucher redemption window amount (with voucherValidityUnit). null = never expires. Voucher-only. */
-  voucherValidityValue?: number | null;
-  /** Voucher redemption window unit. null = never expires. Voucher-only. */
-  voucherValidityUnit?: 'days' | 'months' | 'years' | null;
+  /** Voucher validity TYPE default ('limit' | 'from_until'). Voucher-only; null
+   *  otherwise. The validity VALUE is per inventory unit. See voucher-validity-dating. */
+  defaultValidityType?: 'limit' | 'from_until' | null;
   /** Whether the voucher may be combined with other promotions. Voucher-only; null otherwise. */
   voucherStackable?: boolean | null;
   /** Voucher card background color ("#rrggbb"). Voucher-only; null otherwise. */
@@ -182,11 +181,9 @@ export interface CatalogVariant {
   face_value?: number;
   nexus_cost?: number;
   member_price?: number;
-  voucherValidityValue?: number | null;
-  voucherValidityUnit?: 'days' | 'months' | 'years' | null;
-  /** Absolute validity window (date-range mode). Mutually exclusive with the duration. */
-  validFrom?: string | null;
-  validUntil?: string | null;
+  /** Per-variant validity TYPE override (null = inherit the offer default). The
+   *  validity VALUE is per inventory unit. See voucher-validity-dating. */
+  validityTypeOverride?: 'limit' | 'from_until' | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -275,8 +272,7 @@ function toItem(
     implementationInstructions: offer.implementationInstructions ?? '',
     validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
-    voucherValidityValue: offer.voucherValidityValue ?? null,
-    voucherValidityUnit: offer.voucherValidityUnit ?? null,
+    defaultValidityType: offer.defaultValidityType ?? null,
     voucherStackable: offer.voucherStackable ?? null,
     voucherBackgroundColor: offer.voucherBackgroundColor ?? null,
     sku: offer.sku ?? null,
@@ -303,10 +299,7 @@ function toItem(
         ...(v.face_value !== undefined && { face_value: v.face_value }),
         ...(context.canSeeNexusCost && v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
         ...(effPrice !== undefined && { member_price: effPrice }),
-        voucherValidityValue: v.voucherValidityValue ?? null,
-        voucherValidityUnit: v.voucherValidityUnit ?? null,
-        validFrom: v.validFrom ? new Date(v.validFrom).toISOString() : null,
-        validUntil: v.validUntil ? new Date(v.validUntil).toISOString() : null,
+        validityTypeOverride: v.validityTypeOverride ?? null,
         voucherStackable: v.voucherStackable ?? null,
         sku: v.sku ?? null,
         tags: v.tags ?? [],

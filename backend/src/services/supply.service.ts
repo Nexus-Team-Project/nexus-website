@@ -22,11 +22,10 @@ import {
   type OfferExecutionType,
   type OfferVariantType,
   type OfferStatus,
-  type OfferVoucherValidityUnit,
   type ImageCrop,
   type ImageCropEntry,
 } from '../models/domain/supply.models';
-import type { OfferRedemptionScope } from '../models/domain/supply-variants.models';
+import type { OfferRedemptionScope, ValidityType } from '../models/domain/supply-variants.models';
 import {
   buildVoucherVariants,
   mirrorRepresentativeOntoOffer,
@@ -77,10 +76,9 @@ export interface CreateOfferInput {
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Ignored for vouchers (forced null). */
   validUntil?: Date | null;
-  /** Voucher redemption window amount (with voucherValidityUnit). null = never expires. Voucher-only. */
-  voucherValidityValue?: number | null;
-  /** Voucher redemption window unit. null = never expires. Voucher-only. */
-  voucherValidityUnit?: OfferVoucherValidityUnit | null;
+  /** Voucher validity TYPE default for the offer ('limit' | 'from_until'). The
+   *  validity VALUE is set per inventory unit. Voucher-only. See voucher-validity-dating. */
+  defaultValidityType?: ValidityType | null;
   /** Whether the voucher may be combined with other promotions. Voucher-only (required there). */
   voucherStackable?: boolean | null;
   /** Optional voucher card background color ("#rrggbb"). Voucher-only. */
@@ -162,10 +160,9 @@ export interface UpdateOfferInput {
   validFrom?: Date | null;
   /** Updated offer expiry date. null clears the expiry. Ignored for vouchers (forced null). */
   validUntil?: Date | null;
-  /** Updated voucher redemption window amount. null = never expires. Voucher-only. */
-  voucherValidityValue?: number | null;
-  /** Updated voucher redemption window unit. null = never expires. Voucher-only. */
-  voucherValidityUnit?: OfferVoucherValidityUnit | null;
+  /** Updated voucher validity TYPE default ('limit' | 'from_until'). The validity
+   *  VALUE is set per inventory unit. Voucher-only. See voucher-validity-dating. */
+  defaultValidityType?: ValidityType | null;
   /** Updated combine-with-promotions choice. Voucher-only. */
   voucherStackable?: boolean | null;
   /** Updated voucher card background color ("#rrggbb"). Voucher-only. */
@@ -270,8 +267,8 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
         // Default member_price to nexus_cost when omitted (per-variant); each
         // adopting tenant later sets their own price via TenantOfferConfig.
         member_price: input.member_price,
-        voucherValidityValue: input.voucherValidityValue,
-        voucherValidityUnit: input.voucherValidityUnit,
+        // Validity VALUE is per inventory unit, not the variant. The flat
+        // single-variant inherits the offer's defaultValidityType (override null).
         voucherStackable: input.voucherStackable,
         sku: input.sku,
         tags: input.tags,
@@ -300,12 +297,14 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   // sku come from the mirrored representative variant for vouchers.
   const resolvedValidFrom = isVoucher ? null : (input.validFrom ?? null);
   const resolvedValidUntil = isVoucher ? null : (input.validUntil ?? null);
-  const resolvedValidityValue = isVoucher ? (mirror.voucherValidityValue ?? null) : null;
-  const resolvedValidityUnit = isVoucher ? (mirror.voucherValidityUnit ?? null) : null;
+  // Voucher validity VALUE now lives per inventory unit; the legacy parent mirror
+  // fields are always null. The validity TYPE default lives on the offer. See
+  // voucher-validity-dating.
   const resolvedStackable = isVoucher ? (mirror.voucherStackable ?? null) : null;
   const resolvedBgColor = isVoucher ? (input.voucherBackgroundColor ?? null) : null;
   const resolvedSku = isVoucher ? (mirror.sku ?? null) : null;
   const resolvedRedemptionScope = isVoucher ? (input.redemptionScope ?? 'shared') : 'shared';
+  const resolvedDefaultValidityType = isVoucher ? (input.defaultValidityType ?? null) : null;
 
   // Voucher ecosystem offers enter pending_approval so a platform admin can review
   // pricing (especially nexus_cost) before the offer goes live to all tenants.
@@ -348,14 +347,16 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     implementationInstructions: input.implementationInstructions ?? '',
     validFrom: resolvedValidFrom,
     validUntil: resolvedValidUntil,
-    voucherValidityValue: resolvedValidityValue,
-    voucherValidityUnit: resolvedValidityUnit,
+    // Legacy parent validity mirror is no longer populated (per-unit now).
+    voucherValidityValue: null,
+    voucherValidityUnit: null,
     voucherStackable: resolvedStackable,
     voucherBackgroundColor: resolvedBgColor,
     sku: resolvedSku,
     terms: input.terms ?? '',
     tags: resolvedTags,
     redemptionScope: resolvedRedemptionScope,
+    defaultValidityType: resolvedDefaultValidityType,
     ...(voucherVariants !== undefined && { variants: voucherVariants }),
     // Status reason / changedAt are set when a future PATCH transitions to disabled/archived.
     statusReason: null,
@@ -485,8 +486,11 @@ export async function updateOffer(
     ? {
         validFrom: null,
         validUntil: null,
-        ...(input.voucherValidityValue !== undefined && { voucherValidityValue: input.voucherValidityValue }),
-        ...(input.voucherValidityUnit !== undefined && { voucherValidityUnit: input.voucherValidityUnit }),
+        // Validity VALUE is per inventory unit; the legacy parent mirror stays null.
+        // The validity TYPE default is applied from input when sent.
+        voucherValidityValue: null,
+        voucherValidityUnit: null,
+        ...(input.defaultValidityType !== undefined && { defaultValidityType: input.defaultValidityType }),
         ...(input.voucherStackable !== undefined && { voucherStackable: input.voucherStackable }),
         ...(input.voucherBackgroundColor !== undefined && { voucherBackgroundColor: input.voucherBackgroundColor }),
         ...(input.sku !== undefined && { sku: input.sku }),
@@ -496,6 +500,7 @@ export async function updateOffer(
         ...(input.validUntil !== undefined && { validUntil: input.validUntil }),
         voucherValidityValue: null,
         voucherValidityUnit: null,
+        defaultValidityType: null,
         voucherStackable: null,
         voucherBackgroundColor: null,
         sku: null,
@@ -524,8 +529,6 @@ export async function updateOffer(
       face_value: input.face_value ?? currentOffer.face_value,
       nexus_cost: input.nexus_cost ?? currentOffer.nexus_cost,
       member_price: input.member_price ?? currentOffer.member_price,
-      voucherValidityValue: input.voucherValidityValue,
-      voucherValidityUnit: input.voucherValidityUnit,
       voucherStackable: input.voucherStackable,
       sku: input.sku,
       tags: input.tags,

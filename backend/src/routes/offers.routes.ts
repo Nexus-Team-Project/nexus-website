@@ -39,7 +39,7 @@ import {
   excludeOffer,
 } from '../services/catalog.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
-import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX } from '../models/domain/supply-variants.models';
+import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
 import { addBarcodes, addLinks, getInventorySummary, type InventoryResult } from '../services/voucher-inventory.service';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
@@ -123,12 +123,9 @@ const variantInputSchema = z.object({
   face_value: z.number().positive().optional(),
   nexus_cost: z.number().positive().optional(),
   member_price: z.number().positive().optional(),
-  voucherValidityValue: z.number().int().positive().nullable().optional(),
-  voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
-  // Absolute date-range validity (mutually exclusive with the duration above).
-  // Variants are JSON-encoded, so dates arrive as ISO strings -> coerce to Date.
-  validFrom: z.coerce.date().nullable().optional(),
-  validUntil: z.coerce.date().nullable().optional(),
+  // Per-variant validity TYPE override (null = inherit the offer default). The
+  // validity VALUE lives on inventory units, not the variant. See voucher-validity-dating.
+  validityTypeOverride: z.enum(VALIDITY_TYPES).nullable().optional(),
   voucherStackable: z.boolean().nullable().optional(),
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
@@ -147,6 +144,13 @@ const variantSchemaFields = {
     z.array(variantInputSchema).min(1).max(MAX_VARIANTS_PER_OFFER).optional(),
   ),
   redemptionScope: z.enum(OFFER_REDEMPTION_SCOPES).optional(),
+  // Voucher validity TYPE default for the whole offer (voucher-validity-dating).
+  // Empty string from multipart -> null. Cross-checked as required for vouchers
+  // in the handler; the validity VALUE is set at the inventory route, not here.
+  defaultValidityType: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? null : v),
+    z.enum(VALIDITY_TYPES).nullable().optional(),
+  ),
 };
 
 /**
@@ -167,58 +171,15 @@ function validateVoucherVariants(
     if (v.member_price !== undefined && (v.member_price < v.nexus_cost || v.member_price > v.face_value)) {
       return { ok: false, error: 'member_price must be between nexus_cost and face_value (inclusive)' };
     }
-    // Validity is per variant: a duration OR an absolute date range, never both.
-    const hasDuration = v.voucherValidityValue != null || v.voucherValidityUnit != null;
-    const hasDateRange = v.validFrom != null || v.validUntil != null;
-    if (hasDuration && hasDateRange) {
-      return {
-        ok: false,
-        error: 'A variant cannot set both a validity duration and a date range',
-        errorHe: 'לא ניתן להגדיר לאותו וריאנט גם משך תוקף וגם טווח תאריכים',
-      };
-    }
-    if (hasDateRange) {
-      if (v.validFrom == null || v.validUntil == null) {
-        return {
-          ok: false,
-          error: 'Date-range validity requires both a from and an until date',
-          errorHe: 'טווח תאריכים מחייב גם תאריך התחלה וגם תאריך סיום',
-        };
-      }
-      if (new Date(v.validUntil).getTime() < new Date(v.validFrom).getTime()) {
-        return {
-          ok: false,
-          error: 'validUntil must be on or after validFrom',
-          errorHe: 'תאריך הסיום חייב להיות באותו יום או אחרי תאריך ההתחלה',
-        };
-      }
-    } else {
-      const val = assertVoucherValidity(v.voucherValidityValue, v.voucherValidityUnit);
-      if (!val.ok) return { ok: false, error: val.error, errorHe: val.errorHe };
-    }
+    // Validity is no longer a variant field: the validity VALUE lives on inventory
+    // units (validated at the inventory route), and the validity TYPE is the parent
+    // default plus an optional per-variant override (Zod-enum checked above). See
+    // voucher-validity-dating. Only price + mandatory stackable are checked here.
     const s = assertVoucherStackable(v.voucherStackable);
     if (!s.ok) return { ok: false, error: s.error, errorHe: s.errorHe };
   }
   return { ok: true };
 }
-
-/**
- * Voucher validity duration fields shared by the create + update schemas.
- * Both are optional/nullable here; the cross-field rule (both-or-neither) and
- * the per-unit ceiling are enforced in the handlers via assertVoucherValidity
- * so we can return clean bilingual errors. Empty string from multipart is
- * coerced to null so "field present but blank" means "no expiry".
- */
-const voucherValiditySchemaFields = {
-  voucherValidityValue: z.preprocess(
-    (v) => (v === '' || v === null || v === undefined ? null : v),
-    z.coerce.number().int().positive().nullable().optional(),
-  ),
-  voucherValidityUnit: z.preprocess(
-    (v) => (v === '' || v === null || v === undefined ? null : v),
-    z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
-  ),
-};
 
 /**
  * Voucher combine-with-promotions + background-color fields shared by the
@@ -311,11 +272,10 @@ const createOfferSchema = z.object({
     (v) => !v || new Date(v) > new Date(),
     { message: 'validUntil must be a future date' }
   ),
-  // Voucher redemption window (amount + unit). Validated cross-field in handler.
-  ...voucherValiditySchemaFields,
   // Voucher combine-with-promotions + background color (voucher-only).
   ...voucherBackgroundStackableFields,
-  // Voucher variants + redemption scope (voucher-only; optional for pre-variant clients).
+  // Voucher variants + redemption scope + validity-type default (voucher-only;
+  // optional for pre-variant clients). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
   terms: z.string().max(2000).optional(),
   // JSON-encoded array string from multipart form.
@@ -373,11 +333,10 @@ const updateOfferSchema = z.object({
   implementationInstructions: z.string().max(1000).optional(),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
-  // Voucher redemption window (amount + unit). Validated cross-field in handler.
-  ...voucherValiditySchemaFields,
   // Voucher combine-with-promotions + background color (voucher-only).
   ...voucherBackgroundStackableFields,
-  // Voucher variants + redemption scope (voucher-only; replaces the array wholesale when sent).
+  // Voucher variants + redemption scope + validity-type default (voucher-only;
+  // replaces the array wholesale when sent). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
   terms: z.string().max(2000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -594,6 +553,15 @@ router.post(
       // These checks cannot be expressed in Zod without knowing the final visibility.
       const d = parsed.data;
       if (d.executionType === 'voucher') {
+        // Every voucher offer must declare its validity TYPE default; the per-unit
+        // validity VALUE is set later at the inventory route. See voucher-validity-dating.
+        if (!d.defaultValidityType) {
+          res.status(400).json({
+            error: 'Voucher offers require a validity type (limit or from_until)',
+            errorHe: 'שובר מחייב בחירת סוג תוקף (הגבלת זמן או טווח תאריכים)',
+          });
+          return;
+        }
         if (d.variants && d.variants.length > 0) {
           const vr = validateVoucherVariants(d.variants);
           if (!vr.ok) {
@@ -611,11 +579,6 @@ router.post(
           }
           if (d.member_price !== undefined && (d.member_price < d.nexus_cost || d.member_price > d.face_value)) {
             res.status(400).json({ error: 'member_price must be between nexus_cost and face_value (inclusive)' });
-            return;
-          }
-          const v = assertVoucherValidity(d.voucherValidityValue, d.voucherValidityUnit);
-          if (!v.ok) {
-            res.status(400).json({ error: v.error, errorHe: v.errorHe });
             return;
           }
           // Combine-with-promotions is a mandatory, no-default choice for vouchers.
@@ -844,11 +807,6 @@ router.patch(
             return;
           }
         } else {
-          const v = assertVoucherValidity(restParsed.voucherValidityValue, restParsed.voucherValidityUnit);
-          if (!v.ok) {
-            res.status(400).json({ error: v.error, errorHe: v.errorHe });
-            return;
-          }
           const s = assertVoucherStackable(restParsed.voucherStackable);
           if (!s.ok) {
             res.status(400).json({ error: s.error, errorHe: s.errorHe });

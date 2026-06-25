@@ -174,8 +174,11 @@ export function validateAndMapRow(
     face_value: d.face_value,
     nexus_cost: d.nexus_cost,
     voucherStackable: stackable,
-    voucherValidityValue: d.validityValue ?? null,
-    voucherValidityUnit: d.validityUnit ?? null,
+    // Voucher validity VALUE moved to per inventory unit (voucher-validity-dating).
+    // This legacy CSV bulk path is slated for removal/rework; default the offer
+    // validity TYPE to 'limit' so the parent is valid. Per-unit dates are not set
+    // on this path (acknowledged: revisit when the bulk/xlsx feature is re-planned).
+    defaultValidityType: 'limit',
     voucherBackgroundColor: d.backgroundColor ?? null,
     sku: d.sku ?? null,
     tags,
