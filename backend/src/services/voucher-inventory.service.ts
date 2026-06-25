@@ -240,6 +240,7 @@ export async function addBarcodes(
     status: 'available',
     ...validityStamp,
     createdAt: now,
+    updatedAt: now,
   }));
   return appendUnits(offerId, variantId, docs);
 }
@@ -277,6 +278,7 @@ export async function generateBarcodes(
     value: `${prefix}-${mockBarcodeValue(existing + i + 1)}`,
     status: 'available',
     createdAt: now,
+    updatedAt: now,
   }));
   return appendUnits(offerId, variantId, docs);
 }
@@ -405,6 +407,7 @@ export async function addLinks(
     status: 'available',
     ...validityStamp,
     createdAt: now,
+    updatedAt: now,
   }));
   return appendUnits(offerId, variantId, docs);
 }
@@ -420,6 +423,8 @@ export interface InventoryUnitView {
   validityUnit?: 'days' | 'months' | 'years' | null;
   validFrom?: string | null;
   validUntil?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 /** Expiring-soon choices for the management filter (fixed, not a free day count). */
@@ -469,6 +474,8 @@ function toUnitView(d: VoucherCode): InventoryUnitView {
     validityUnit: d.validityUnit ?? null,
     validFrom: d.validFrom ? new Date(d.validFrom).toISOString() : null,
     validUntil: d.validUntil ? new Date(d.validUntil).toISOString() : null,
+    createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : null,
+    updatedAt: d.updatedAt ? new Date(d.updatedAt).toISOString() : null,
   };
 }
 
@@ -544,6 +551,7 @@ export async function updateUnitValidity(
     const doc = await codes.findOne({ offerId, variantId, codeId });
     return doc ? toUnitView(doc) : null;
   }
+  $set.updatedAt = new Date();
   const updated = await codes.findOneAndUpdate(
     { offerId, variantId, codeId },
     { $set },
@@ -602,6 +610,7 @@ export async function updateUnitsValidity(
   if (validity.validFrom !== undefined) $set.validFrom = validity.validFrom;
   if (validity.validUntil !== undefined) $set.validUntil = validity.validUntil;
   if (Object.keys($set).length === 0) return { updated: 0, changes: [] };
+  $set.updatedAt = new Date();
   // Snapshot the targeted units BEFORE the write so we can report from -> to.
   const targets = await codes
     .find({ offerId, variantId, codeId: { $in: codeIds } }, { projection: { codeId: 1, value: 1, validityValue: 1, validityUnit: 1, validFrom: 1, validUntil: 1, _id: 0 } })

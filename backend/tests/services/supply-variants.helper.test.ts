@@ -22,7 +22,6 @@ const v = (over: Partial<OfferVariant> = {}): OfferVariant => ({
   face_value: 100,
   nexus_cost: 60,
   member_price: 80,
-  validityTypeOverride: null,
   voucherStackable: false,
   sku: null,
   tags: [],
@@ -129,37 +128,22 @@ describe('buildVoucherVariants', () => {
   });
 });
 
-describe('validity type override (value is per unit, not the variant)', () => {
-  it('signature ignores the validity type override - it does not distinguish variants', () => {
-    const a = v({ validityTypeOverride: 'limit' });
-    const b = v({ validityTypeOverride: 'from_until' });
-    // Same price/stackable/sku/redemption => same signature, regardless of type.
+describe('validity is not a variant field (value + type are per inventory unit)', () => {
+  it('two variants intended to differ only by date are duplicates (date is per unit now)', () => {
+    // No validity fields exist on a variant anymore; identical priced variants collide.
+    const a = v({ member_price: 80 });
+    const b = v({ member_price: 80 });
     expect(variantSignature(a)).toBe(variantSignature(b));
     expect(hasDuplicateVariants([a, b])).toBe(true);
   });
 
-  it('two variants intended to differ only by date are duplicates (date is per unit now)', () => {
-    // No date fields exist on a variant anymore; identical priced variants collide.
-    const a = v({ member_price: 80 });
-    const b = v({ member_price: 80 });
-    expect(hasDuplicateVariants([a, b])).toBe(true);
-  });
-
-  it('buildVoucherVariants carries the type override and stores no validity value', () => {
-    const [out] = buildVoucherVariants(
-      [{ face_value: 100, nexus_cost: 60, member_price: 80, validityTypeOverride: 'from_until' }],
-      {},
-    );
-    expect(out.validityTypeOverride).toBe('from_until');
-    expect(out).not.toHaveProperty('voucherValidityValue');
-    expect(out).not.toHaveProperty('validFrom');
-  });
-
-  it('buildVoucherVariants defaults the type override to null (inherit parent)', () => {
+  it('buildVoucherVariants stores no validity on the variant', () => {
     const [out] = buildVoucherVariants(
       [{ face_value: 100, nexus_cost: 60, member_price: 80 }],
       {},
     );
-    expect(out.validityTypeOverride).toBeNull();
+    expect(out).not.toHaveProperty('validityTypeOverride');
+    expect(out).not.toHaveProperty('voucherValidityValue');
+    expect(out).not.toHaveProperty('validFrom');
   });
 });

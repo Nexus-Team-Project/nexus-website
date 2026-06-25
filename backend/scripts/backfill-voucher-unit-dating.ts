@@ -49,7 +49,6 @@ interface BackfillStats {
   offersNeedingMigration: number;
   offersMigrated: number;
   unitsStamped: number;
-  variantsOverridden: number;
   neverExpiresVariants: number;
 }
 
@@ -75,14 +74,14 @@ function majorityMode(modes: (ValidityType | null)[]): ValidityType {
   return (modes.find((m): m is ValidityType => m != null)) ?? 'limit';
 }
 
-/** Builds the rebuilt (post-migration) variant subdoc: old validity removed, override set. */
-function rebuildVariant(v: RawVariant, parentDefault: ValidityType): { variant: OfferVariant; overridden: boolean; mode: ValidityType | null } {
+/** Strips the obsolete variant-level validity fields; keeps everything else.
+ *  (Type is no longer a variant field - each unit is self-typed; the offer keeps a
+ *  defaultValidityType as the upload-modal default only.) Returns the cleaned
+ *  variant + the variant's prior mode (used to stamp its own units). */
+function rebuildVariant(v: RawVariant): { variant: OfferVariant; mode: ValidityType | null } {
   const mode = priorMode(v);
-  const override = mode != null && mode !== parentDefault ? mode : null;
-  // Strip the obsolete validity fields; keep everything else.
   const { voucherValidityValue: _a, voucherValidityUnit: _b, validFrom: _c, validUntil: _d, ...rest } = v;
-  const variant: OfferVariant = { ...rest, validityTypeOverride: override };
-  return { variant, overridden: override != null, mode };
+  return { variant: rest as OfferVariant, mode };
 }
 
 async function backfill(apply: boolean): Promise<BackfillStats> {
@@ -95,7 +94,6 @@ async function backfill(apply: boolean): Promise<BackfillStats> {
     offersNeedingMigration: 0,
     offersMigrated: 0,
     unitsStamped: 0,
-    variantsOverridden: 0,
     neverExpiresVariants: 0,
   };
 
@@ -109,12 +107,12 @@ async function backfill(apply: boolean): Promise<BackfillStats> {
     stats.offersNeedingMigration += 1;
 
     const modes = rawVariants.map(priorMode);
-    const parentDefault = majorityMode(modes);
-    const rebuilt = rawVariants.map((v) => rebuildVariant(v, parentDefault));
+    const parentDefault = majorityMode(modes); // offer-level upload default (UI hint only)
+    const rebuilt = rawVariants.map((v) => rebuildVariant(v));
 
     for (const r of rebuilt) {
-      if (r.overridden) stats.variantsOverridden += 1;
-      const effType = r.variant.validityTypeOverride ?? parentDefault;
+      // Stamp each variant's units with that VARIANT's own prior validity (units are
+      // self-typed now; the offer default does not constrain them).
       const raw = rawVariants.find((rv) => rv.variantId === r.variant.variantId)!;
       if (r.mode == null) {
         // Legacy never-expires: report, do not stamp (manual resolution needed).
@@ -125,11 +123,11 @@ async function backfill(apply: boolean): Promise<BackfillStats> {
         }
         continue;
       }
-      const stamp = effType === 'from_until'
+      const stamp = r.mode === 'from_until'
         ? { validFrom: raw.validFrom ?? null, validUntil: raw.validUntil ?? null }
         : { validityValue: raw.voucherValidityValue ?? null, validityUnit: raw.voucherValidityUnit ?? null };
       // Only stamp units that lack the relevant field (idempotent).
-      const lackFilter = effType === 'from_until'
+      const lackFilter = r.mode === 'from_until'
         ? { validUntil: { $exists: false } }
         : { validityValue: { $exists: false } };
       if (apply) {
@@ -174,7 +172,6 @@ async function main(): Promise<void> {
   console.log(`Offers needing migration:     ${stats.offersNeedingMigration}`);
   console.log(apply ? `Offers migrated:              ${stats.offersMigrated}` : `Offers to migrate:            ${stats.offersMigrated}`);
   console.log(apply ? `Units stamped with validity:  ${stats.unitsStamped}` : `Units to stamp with validity: ${stats.unitsStamped}`);
-  console.log(`Variants given a type override: ${stats.variantsOverridden}`);
   console.log(`Never-expires variants (manual review): ${stats.neverExpiresVariants}`);
 }
 

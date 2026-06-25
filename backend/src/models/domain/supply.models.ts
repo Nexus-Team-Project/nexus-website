@@ -193,10 +193,9 @@ export function deriveValueTypeFromExecutionType(
  * `services/supply-variants.helper.ts` for representative-variant + dedupe logic.
  *   variantId  - server-generated, stable across edits.
  *   face_value / nexus_cost / member_price - the voucher three-level price.
- *   validityTypeOverride - optional per-variant validity TYPE override
- *       (null = inherit the parent's defaultValidityType). The validity VALUE is
- *       NOT on the variant; it lives on each inventory unit (voucher-validity-dating).
  *   voucherStackable - combine-with-promotions choice (deliberate, no default).
+ *   (Validity is NOT on the variant: the offer carries a defaultValidityType used
+ *    as the upload-modal default, and each inventory unit stores its own validity.)
  *   sku   - optional internal company code.
  *   tags  - per-variant display tags.
  *   terms / implementationInstructions - redemption terms (תנאי מימוש) and method
@@ -208,10 +207,6 @@ export const offerVariantSchema = z.object({
   face_value: z.number().positive().optional(),
   nexus_cost: z.number().positive().optional(),
   member_price: z.number().positive().optional(),
-  // Validity TYPE only (the VALUE lives on each inventory unit - see
-  // `voucher-validity-dating`). null = inherit the parent's defaultValidityType;
-  // a non-null value overrides it for this variant.
-  validityTypeOverride: z.enum(VALIDITY_TYPES).nullable().optional(),
   voucherStackable: z.boolean().nullable().optional(),
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   tags: z.array(z.string().max(50)).max(10).default([]),

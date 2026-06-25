@@ -181,9 +181,6 @@ export interface CatalogVariant {
   face_value?: number;
   nexus_cost?: number;
   member_price?: number;
-  /** Per-variant validity TYPE override (null = inherit the offer default). The
-   *  validity VALUE is per inventory unit. See voucher-validity-dating. */
-  validityTypeOverride?: 'limit' | 'from_until' | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -299,7 +296,6 @@ function toItem(
         ...(v.face_value !== undefined && { face_value: v.face_value }),
         ...(context.canSeeNexusCost && v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
         ...(effPrice !== undefined && { member_price: effPrice }),
-        validityTypeOverride: v.validityTypeOverride ?? null,
         voucherStackable: v.voucherStackable ?? null,
         sku: v.sku ?? null,
         tags: v.tags ?? [],

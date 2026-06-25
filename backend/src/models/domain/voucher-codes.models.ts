@@ -87,6 +87,9 @@ export const voucherCodeSchema = z.object({
   validFrom: z.date().nullable().optional(),
   validUntil: z.date().nullable().optional(),
   createdAt: z.date(),
+  /** Last time the unit's validity was changed (set on create = createdAt, and on
+   *  every validity edit). Optional so legacy units validate until first touched. */
+  updatedAt: z.date().optional(),
 });
 
 export type VoucherCode = z.infer<typeof voucherCodeSchema>;

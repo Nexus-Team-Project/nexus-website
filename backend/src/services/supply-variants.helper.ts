@@ -13,7 +13,6 @@ import { randomBytes } from 'node:crypto';
 import { createError } from '../middleware/errorHandler';
 import type { NexusOffer, OfferVariant } from '../models/domain/supply.models';
 import { VARIANT_ID_REGEX, MAX_VARIANTS_PER_OFFER } from '../models/domain/supply-variants.models';
-import type { ValidityType } from '../models/domain/supply-variants.models';
 
 /**
  * A variant as received from a client (create/update). `variantId` is optional:
@@ -25,9 +24,6 @@ export interface OfferVariantInput {
   face_value?: number;
   nexus_cost?: number;
   member_price?: number;
-  /** Per-variant validity TYPE override (null = inherit the parent default). The
-   *  validity VALUE lives on inventory units, not here. See voucher-validity-dating. */
-  validityTypeOverride?: ValidityType | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -44,7 +40,6 @@ export interface FlatVoucherFields {
   face_value?: number;
   nexus_cost?: number;
   member_price?: number;
-  validityTypeOverride?: ValidityType | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -169,9 +164,8 @@ function finalizeVariant(v: OfferVariantInput): OfferVariant {
     ...(v.face_value !== undefined && { face_value: v.face_value }),
     ...(v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
     ...(member !== undefined && { member_price: member }),
-    // Validity TYPE override only (null = inherit parent). The validity VALUE is
-    // per inventory unit, not stored on the variant. See voucher-validity-dating.
-    validityTypeOverride: v.validityTypeOverride ?? null,
+    // No validity on the variant: the offer carries defaultValidityType (the upload
+    // default) and each inventory unit stores its own validity. See voucher-validity-dating.
     voucherStackable: v.voucherStackable ?? null,
     sku: v.sku ?? null,
     tags: v.tags ?? [],
