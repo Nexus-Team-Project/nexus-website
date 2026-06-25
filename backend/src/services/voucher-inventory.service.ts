@@ -553,6 +553,36 @@ export async function updateUnitValidity(
 }
 
 /**
+ * Updates the validity of MANY units in ONE request (the bulk re-stamp path).
+ * Sets only the supplied validity keys via a single `updateMany`, leaving each
+ * unit's value/kind/status and any non-supplied validity set untouched (lossless
+ * flip). Scoped to the offer+variant so only that variant's units are touched.
+ * Caller enforces admin + ownership + voucher-only and validates the validity
+ * against the variant's effective type.
+ *
+ * Input:  offerId, variantId, codeIds (1..VOUCHER_INVENTORY_MAX), validity.
+ * Output: { updated } - the number of units modified.
+ */
+export async function updateUnitsValidity(
+  offerId: string,
+  variantId: string,
+  codeIds: string[],
+  validity: BatchValidity,
+): Promise<{ updated: number }> {
+  if (codeIds.length === 0) return { updated: 0 };
+  const db = await getMongoDb();
+  const codes = getVoucherCodeCollection(db);
+  const $set: Partial<VoucherCode> = {};
+  if (validity.validityValue !== undefined) $set.validityValue = validity.validityValue;
+  if (validity.validityUnit !== undefined) $set.validityUnit = validity.validityUnit;
+  if (validity.validFrom !== undefined) $set.validFrom = validity.validFrom;
+  if (validity.validUntil !== undefined) $set.validUntil = validity.validUntil;
+  if (Object.keys($set).length === 0) return { updated: 0 };
+  const res = await codes.updateMany({ offerId, variantId, codeId: { $in: codeIds } }, { $set });
+  return { updated: res.modifiedCount };
+}
+
+/**
  * Deletes ONE inventory unit and re-syncs the offer's derived stock. Caller
  * enforces admin + ownership + voucher-only.
  *

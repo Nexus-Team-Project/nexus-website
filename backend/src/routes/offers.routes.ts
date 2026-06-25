@@ -41,7 +41,7 @@ import {
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES, type ValidityType } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
-import { addBarcodes, addLinks, getInventorySummary, listVariantUnits, updateUnitValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
+import { addBarcodes, addLinks, getInventorySummary, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
 import { effectiveValidityType } from '../services/voucher-validity.helper';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
@@ -1396,6 +1396,42 @@ const unitValidityPatchSchema = z.object({
   validFrom: z.coerce.date().nullable().optional(),
   validUntil: z.coerce.date().nullable().optional(),
 });
+
+/** Bulk PATCH body: a list of unit ids + the one validity to stamp on all of them. */
+const bulkValidityPatchSchema = unitValidityPatchSchema.extend({
+  codeIds: z.array(z.string().min(1)).min(1).max(VOUCHER_INVENTORY_MAX),
+});
+
+/**
+ * PATCH /api/v1/offers/:offerId/variants/:variantId/inventory  (BULK)
+ * Re-stamps the validity of MANY units in one request (body carries `codeIds` +
+ * the validity). Validates the validity against the variant's effective type.
+ * Authorization: supply.manage_offers; ownership; voucher-only.
+ */
+router.patch(
+  '/:offerId/variants/:variantId/inventory',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = bulkValidityPatchSchema.safeParse(req.body);
+      if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+      const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
+      const guard = await loadOwnedVoucherForInventory(req.params.offerId, ctx);
+      if (!guard.ok) { res.status(guard.status).json({ error: guard.error }); return; }
+      const variant = guard.variants.find((v) => v.variantId === req.params.variantId);
+      if (!variant) { res.status(404).json({ error: 'Variant not found on this offer' }); return; }
+      const effType = effectiveValidityType(guard.defaultValidityType, variant.validityTypeOverride);
+      if (!effType) { res.status(400).json({ error: 'This voucher has no validity type set' }); return; }
+      const { codeIds, ...validityBody } = parsed.data;
+      const vr = resolveBatchValidity(effType, validityBody);
+      if (!vr.ok) { res.status(400).json({ error: vr.error, errorHe: vr.errorHe }); return; }
+      const result = await updateUnitsValidity(req.params.offerId, req.params.variantId, codeIds, vr.validity);
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 /**
  * PATCH /api/v1/offers/:offerId/variants/:variantId/inventory/:codeId

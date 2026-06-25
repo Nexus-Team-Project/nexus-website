@@ -16,6 +16,7 @@ import {
   addBarcodes,
   listVariantUnits,
   updateUnitValidity,
+  updateUnitsValidity,
   deleteUnit,
 } from '../../src/services/voucher-inventory.service';
 import { getVoucherCodeCollection } from '../../src/models/domain/voucher-codes.models';
@@ -117,6 +118,25 @@ describe('updateUnitValidity is lossless + delete', () => {
   it('returns null for an unknown unit', async () => {
     const r = await updateUnitValidity(OFFER, VARIANT, 'nope', { validityValue: 1, validityUnit: 'days' });
     expect(r).toBeNull();
+  });
+
+  it('bulk-updates many units in one call, preserving the dormant set', async () => {
+    await addBarcodes(OFFER, VARIANT, ['M1', 'M2', 'M3'], { validFrom: new Date('2026-01-01'), validUntil: new Date('2031-01-01') });
+    const all = await getVoucherCodeCollection(db).find({ offerId: OFFER }).toArray();
+    const ids = all.map((u) => u.codeId);
+    const res = await updateUnitsValidity(OFFER, VARIANT, ids, { validityValue: 2, validityUnit: 'years' });
+    expect(res.updated).toBe(3);
+    const after = await getVoucherCodeCollection(db).find({ offerId: OFFER }).toArray();
+    for (const u of after) {
+      expect(u.validityValue).toBe(2);
+      // from/until preserved (only the supplied keys were set).
+      expect(u.validFrom).toEqual(new Date('2026-01-01'));
+    }
+  });
+
+  it('bulk update with an empty id list is a no-op', async () => {
+    const res = await updateUnitsValidity(OFFER, VARIANT, [], { validityValue: 1, validityUnit: 'years' });
+    expect(res.updated).toBe(0);
   });
 
   it('deletes a unit and reports it', async () => {
