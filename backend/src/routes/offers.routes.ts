@@ -161,8 +161,8 @@ function validateVoucherVariants(
     if (!v.face_value || !v.nexus_cost) {
       return { ok: false, error: 'Each voucher variant requires face_value and nexus_cost' };
     }
-    if (v.nexus_cost >= v.face_value) {
-      return { ok: false, error: 'nexus_cost must be less than face_value' };
+    if (v.nexus_cost > v.face_value) {
+      return { ok: false, error: 'nexus_cost must not be greater than face_value' };
     }
     if (v.member_price !== undefined && (v.member_price < v.nexus_cost || v.member_price > v.face_value)) {
       return { ok: false, error: 'member_price must be between nexus_cost and face_value (inclusive)' };
