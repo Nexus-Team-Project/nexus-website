@@ -429,7 +429,14 @@ router.get(
         res.status(400).json({ error: parsed.error.flatten() });
         return;
       }
-      const ctx = await resolveTenantContextWithPermission(req, 'catalog.view');
+      // The ownedOnly view (Product Catalog page) returns the tenant's OWN
+      // uploaded offers, including non-active (pending/denied) ones and their
+      // nexus_cost - so it requires catalog-edit authority (supply.manage_offers:
+      // owner, admin, supply_manager, platform admin). The browse/adopt view
+      // (ownedOnly absent) stays on the broad catalog.view used by adopters.
+      const ctx = parsed.data.ownedOnly
+        ? await resolveTenantContextWithPermission(req, 'supply.manage_offers')
+        : await resolveTenantContextWithPermission(req, 'catalog.view');
       const result = await getTenantCatalogView(ctx.tenantId, parsed.data, {
         isPlatformAdmin: ctx.isPlatformAdmin,
       });
