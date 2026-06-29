@@ -434,16 +434,13 @@ const inventorySchema = z.object({
   // Barcode units are the provider-supplied strings (rendered client-side as a
   // barcode + QR). The backend stores them verbatim and mints nothing here.
   values: z.array(z.string().trim().min(1).max(2048)).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
-  // Each link is a real http(s) URL with an OPTIONAL paired code. The scheme
-  // guard rejects javascript:, data:, etc. that z.string().url() would accept,
-  // and the code charset (VOUCHER_CODE_REGEX) keeps a stored code from ever
-  // becoming a script/markup/injection vector.
+  // Each link is a free-text value (any string) with an OPTIONAL paired code. The
+  // URL/scheme requirement was removed - a "link" may be any non-empty string. The
+  // code charset (VOUCHER_CODE_REGEX) still keeps a stored code from ever becoming
+  // a script/markup/injection vector, and the value is never rendered as HTML.
   links: z.array(
     z.object({
-      url: z.string().url().max(2048).refine(
-        (u) => /^https?:\/\//i.test(u),
-        { message: 'links must be http(s) URLs' },
-      ),
+      url: z.string().trim().min(1).max(2048),
       code: z.string().regex(VOUCHER_CODE_REGEX).optional(),
     }),
   ).min(1).max(VOUCHER_INVENTORY_MAX).optional(),
