@@ -309,6 +309,12 @@ export async function deleteOfferImage(imageUrl: string): Promise<void> {
   if (!match) return;
 
   const publicId = match[1];
+  // NEVER delete the shared default placeholder: many offers reference it as their
+  // cover (no uploaded image), so deleting one such offer - or a user - must not
+  // remove the asset others still rely on. It lives outside nexus/offers and is
+  // uploaded once per environment, so it is safe to keep forever.
+  if (publicId === DEFAULT_OFFER_IMAGE_PUBLIC_ID) return;
+
   const timestamp = Math.round(Date.now() / 1000);
 
   // Cloudinary signed destroy requires: public_id + timestamp + api_secret concatenated.
