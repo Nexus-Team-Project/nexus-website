@@ -22,6 +22,7 @@
 import type { Db } from 'mongodb';
 import { z } from 'zod';
 import { DOMAIN_COLLECTIONS } from './collections';
+import { VOUCHER_VALIDITY_UNITS } from './supply.models';
 
 /** A unit is either a generated barcode or a supplier-provided redemption link. */
 export const VOUCHER_CODE_KINDS = ['barcode', 'link'] as const;
@@ -52,6 +53,18 @@ export type VoucherCodeStatus = typeof VOUCHER_CODE_STATUSES[number];
  *   code   - OPTIONAL plain coupon/redemption code paired with a link unit
  *            (link kind only; charset-restricted). Unset for barcode units.
  *   status - 'available' on creation; advanced only by the future purchase flow.
+ *
+ * Validity (see the `voucher-validity-dating` capability). The validity VALUE
+ * lives on the unit, not the variant. `validFrom`/`validUntil` are the single
+ * source of truth for the actual redeemable window:
+ *   - effective type `from_until`: the admin authors `validFrom`/`validUntil` at
+ *     inventory time; `validityValue`/`validityUnit` are unused.
+ *   - effective type `limit`: the admin authors `validityValue`/`validityUnit`
+ *     (the "N units from purchase" recipe); `validFrom`/`validUntil` stay empty
+ *     while `available` and are filled at purchase (purchase date + the limit) by
+ *     the future redemption flow. Switching a variant's type never deletes the
+ *     other set - both may coexist on a unit, dormant until that type is active.
+ * The unit's effective type is resolved from the parent/variant, not stored here.
  */
 export const voucherCodeSchema = z.object({
   codeId: z.string().min(1),
@@ -67,7 +80,16 @@ export const voucherCodeSchema = z.object({
   value: z.string().min(1).max(2048),
   code: z.string().regex(VOUCHER_CODE_REGEX).optional(),
   status: z.enum(VOUCHER_CODE_STATUSES).default('available'),
+  // Validity value (per unit). The "limit" recipe:
+  validityValue: z.number().int().positive().nullable().optional(),
+  validityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
+  // The actual redeemable window (authored for from_until; purchase-filled for limit):
+  validFrom: z.date().nullable().optional(),
+  validUntil: z.date().nullable().optional(),
   createdAt: z.date(),
+  /** Last time the unit's validity was changed (set on create = createdAt, and on
+   *  every validity edit). Optional so legacy units validate until first touched. */
+  updatedAt: z.date().optional(),
 });
 
 export type VoucherCode = z.infer<typeof voucherCodeSchema>;
@@ -110,6 +132,13 @@ export function getVoucherCodeCollection(db: Db) {
  * existing unit has a `variantId`. Creating these new indexes on a collection that
  * still holds duplicate barcodes across offers will fail - the backfill reports
  * such collisions for manual resolution first.
+ *
+ * NOTE (validity dating, v1): the per-unit validity fields (validityValue/Unit,
+ * validFrom/validUntil) need NO new index in v1 - the management read filters by
+ * date within a single (offerId, variantId) pool that is already small and
+ * served by `offer_variant_status`. If expiring-soon filtering ever spans many
+ * variants/offers, add a partial index on `(validUntil)` filtered to
+ * `status: 'available'`; deferred until a query proves it necessary.
  *
  * Input: Mongo database handle. Output: indexes exist.
  */

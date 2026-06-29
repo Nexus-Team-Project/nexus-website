@@ -13,7 +13,6 @@ import { randomBytes } from 'node:crypto';
 import { createError } from '../middleware/errorHandler';
 import type { NexusOffer, OfferVariant } from '../models/domain/supply.models';
 import { VARIANT_ID_REGEX, MAX_VARIANTS_PER_OFFER } from '../models/domain/supply-variants.models';
-import type { OfferVoucherValidityUnit } from '../models/domain/supply.models';
 
 /**
  * A variant as received from a client (create/update). `variantId` is optional:
@@ -25,11 +24,6 @@ export interface OfferVariantInput {
   face_value?: number;
   nexus_cost?: number;
   member_price?: number;
-  voucherValidityValue?: number | null;
-  voucherValidityUnit?: OfferVoucherValidityUnit | null;
-  /** Absolute validity window (date-range mode); mutually exclusive with the duration above. */
-  validFrom?: Date | null;
-  validUntil?: Date | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -46,8 +40,6 @@ export interface FlatVoucherFields {
   face_value?: number;
   nexus_cost?: number;
   member_price?: number;
-  voucherValidityValue?: number | null;
-  voucherValidityUnit?: OfferVoucherValidityUnit | null;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -103,8 +95,11 @@ export function mirrorRepresentativeOntoOffer(
     face_value: rep.face_value,
     nexus_cost: rep.nexus_cost,
     member_price: rep.member_price,
-    voucherValidityValue: rep.voucherValidityValue ?? null,
-    voucherValidityUnit: rep.voucherValidityUnit ?? null,
+    // Validity VALUE no longer lives on the variant (it is per inventory unit);
+    // actively clear the legacy parent mirror fields so stale values do not
+    // linger after an edit. See voucher-validity-dating.
+    voucherValidityValue: null,
+    voucherValidityUnit: null,
     voucherStackable: rep.voucherStackable ?? null,
     sku: rep.sku ?? null,
     tags: rep.tags ?? [],
@@ -118,19 +113,20 @@ export function mirrorRepresentativeOntoOffer(
  * are functionally the same variant.
  *
  * Input:  v - a variant.
- * Output: a stable string key over face/nexus/member price, validity amount +
- *         unit, stackable, normalized SKU, and (when present) redemption
- *         terms/method.
+ * Output: a stable string key over face/nexus/member price, stackable,
+ *         normalized SKU, and (when present) redemption terms/method.
+ *
+ * Validity is deliberately NOT part of the signature: the validity value lives
+ * on inventory units, so two variants that would differ only by date are the
+ * SAME variant (which lets one variant hold differently-dated batches). The
+ * validity TYPE override is also excluded - it does not make a variant a
+ * distinct priced product. See voucher-validity-dating.
  */
 export function variantSignature(v: OfferVariant): string {
   return JSON.stringify([
     v.face_value ?? null,
     v.nexus_cost ?? null,
     v.member_price ?? null,
-    v.voucherValidityValue ?? null,
-    v.voucherValidityUnit ?? null,
-    v.validFrom ? new Date(v.validFrom).toISOString() : null,
-    v.validUntil ? new Date(v.validUntil).toISOString() : null,
     v.voucherStackable ?? null,
     (v.sku ?? '').trim().toUpperCase() || null,
     (v.terms ?? '').trim() || null,
@@ -163,18 +159,13 @@ export function hasDuplicateVariants(variants: OfferVariant[]): boolean {
  */
 function finalizeVariant(v: OfferVariantInput): OfferVariant {
   const member = v.member_price === undefined ? v.nexus_cost : v.member_price;
-  // Validity is EITHER an absolute date range OR a purchase-anchored duration,
-  // never both. Date range wins when present; otherwise keep the duration.
-  const hasDateRange = v.validFrom != null || v.validUntil != null;
   return {
     variantId: v.variantId && VARIANT_ID_REGEX.test(v.variantId) ? v.variantId : generateVariantId(),
     ...(v.face_value !== undefined && { face_value: v.face_value }),
     ...(v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
     ...(member !== undefined && { member_price: member }),
-    voucherValidityValue: hasDateRange ? null : (v.voucherValidityValue ?? null),
-    voucherValidityUnit: hasDateRange ? null : (v.voucherValidityUnit ?? null),
-    validFrom: hasDateRange ? (v.validFrom ?? null) : null,
-    validUntil: hasDateRange ? (v.validUntil ?? null) : null,
+    // No validity on the variant: the offer carries defaultValidityType (the upload
+    // default) and each inventory unit stores its own validity. See voucher-validity-dating.
     voucherStackable: v.voucherStackable ?? null,
     sku: v.sku ?? null,
     tags: v.tags ?? [],

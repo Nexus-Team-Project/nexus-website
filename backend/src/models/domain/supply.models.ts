@@ -29,7 +29,7 @@
 import type { Db } from 'mongodb';
 import { z } from 'zod';
 import { DOMAIN_COLLECTIONS } from './collections';
-import { OFFER_REDEMPTION_SCOPES, VARIANT_ID_REGEX } from './supply-variants.models';
+import { OFFER_REDEMPTION_SCOPES, VARIANT_ID_REGEX, VALIDITY_TYPES } from './supply-variants.models';
 
 /**
  * Lifecycle states an offer document can occupy.
@@ -193,9 +193,9 @@ export function deriveValueTypeFromExecutionType(
  * `services/supply-variants.helper.ts` for representative-variant + dedupe logic.
  *   variantId  - server-generated, stable across edits.
  *   face_value / nexus_cost / member_price - the voucher three-level price.
- *   voucherValidityValue + voucherValidityUnit - purchase-anchored expiry
- *       (both null/absent = never expires).
  *   voucherStackable - combine-with-promotions choice (deliberate, no default).
+ *   (Validity is NOT on the variant: the offer carries a defaultValidityType used
+ *    as the upload-modal default, and each inventory unit stores its own validity.)
  *   sku   - optional internal company code.
  *   tags  - per-variant display tags.
  *   terms / implementationInstructions - redemption terms (תנאי מימוש) and method
@@ -207,13 +207,6 @@ export const offerVariantSchema = z.object({
   face_value: z.number().positive().optional(),
   nexus_cost: z.number().positive().optional(),
   member_price: z.number().positive().optional(),
-  // Validity is per variant and EITHER a purchase-anchored duration
-  // (voucherValidityValue + Unit) OR an absolute date range (validFrom +
-  // validUntil), never both - enforced in validateVoucherVariants.
-  voucherValidityValue: z.number().int().positive().nullable().optional(),
-  voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
-  validFrom: z.date().nullable().optional(),
-  validUntil: z.date().nullable().optional(),
   voucherStackable: z.boolean().nullable().optional(),
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   tags: z.array(z.string().max(50)).max(10).default([]),
@@ -355,12 +348,11 @@ export const nexusOfferSchema = z.object({
    *  carry voucherValidityValue/Unit instead, applied at purchase time). */
   validUntil: z.date().nullable().optional(),
   /**
-   * Voucher redemption window, measured from the moment a customer PURCHASES
-   * the voucher. amount (positive int) + unit ('days'|'months'|'years').
-   * Both null/absent = the voucher never expires. Only meaningful when
-   * executionType === 'voucher'; nulled for every other offer type.
-   * The actual per-purchase expiry date is computed later by the
-   * wallet/checkout phase; here we only persist the supplier's intent.
+   * DEPRECATED legacy mirror fields. Voucher validity VALUE now lives per
+   * inventory unit (see `voucher-validity-dating`); the variant carries only a
+   * validity TYPE and the parent a `defaultValidityType`. These remain in the
+   * schema for backward-compatible reads of pre-migration documents but are no
+   * longer populated for new/updated offers. Kept nullable/optional.
    */
   voucherValidityValue: z.number().int().positive().nullable().optional(),
   voucherValidityUnit: z.enum(VOUCHER_VALIDITY_UNITS).nullable().optional(),
@@ -392,6 +384,13 @@ export const nexusOfferSchema = z.object({
    * the 'shared' default. See `supply-variants.models.ts`.
    */
   redemptionScope: z.enum(OFFER_REDEMPTION_SCOPES).default('shared'),
+  /**
+   * Voucher validity TYPE default for the whole offer ('limit' | 'from_until').
+   * Applies to every variant unless that variant sets a `validityTypeOverride`.
+   * Voucher-only; null for non-voucher offers. The validity VALUE is stored per
+   * inventory unit, never here. See `voucher-validity-dating`.
+   */
+  defaultValidityType: z.enum(VALIDITY_TYPES).nullable().optional(),
   /**
    * Voucher variants (priced configurations under this parent offer). Voucher-
    * only and always at least one entry once a voucher is created through the

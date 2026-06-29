@@ -33,6 +33,35 @@ import {
   type VoucherCode,
 } from '../models/domain/voucher-codes.models';
 
+/**
+ * Per-batch validity stamped onto every unit created in one inventory request
+ * (voucher-validity-dating). The shape carries whichever set matches the variant's
+ * effective type: `limit` -> validityValue + validityUnit (the window is filled at
+ * purchase); `from_until` -> validFrom + validUntil. The route validates that the
+ * supplied set matches the variant's effective type before calling the service.
+ */
+export interface BatchValidity {
+  validityValue?: number | null;
+  validityUnit?: 'days' | 'months' | 'years' | null;
+  validFrom?: Date | null;
+  validUntil?: Date | null;
+}
+
+/**
+ * Builds the validity fields to stamp on a unit doc from a batch validity, keeping
+ * only the present values (so a `limit` batch leaves validFrom/validUntil unset and
+ * a `from_until` batch leaves the duration unset). Pure.
+ */
+function validityFields(validity?: BatchValidity): Partial<VoucherCode> {
+  if (!validity) return {};
+  const out: Partial<VoucherCode> = {};
+  if (validity.validityValue != null) out.validityValue = validity.validityValue;
+  if (validity.validityUnit != null) out.validityUnit = validity.validityUnit;
+  if (validity.validFrom != null) out.validFrom = validity.validFrom;
+  if (validity.validUntil != null) out.validUntil = validity.validUntil;
+  return out;
+}
+
 /** Result of an inventory operation. */
 export interface InventoryResult {
   /** Units actually created by this call (duplicates skipped). */
@@ -174,6 +203,7 @@ export async function addBarcodes(
   offerId: string,
   variantId: string,
   values: string[],
+  validity?: BatchValidity,
 ): Promise<InventoryResult> {
   if (!Array.isArray(values) || values.length < 1 || values.length > VOUCHER_INVENTORY_MAX) {
     throw createError(`barcodes must contain between 1 and ${VOUCHER_INVENTORY_MAX} values`, 400);
@@ -200,6 +230,7 @@ export async function addBarcodes(
   const own = new Set(existing.map((e) => e.value));
   const toInsert = unique.filter((v) => !own.has(v));
   const now = new Date();
+  const validityStamp = validityFields(validity);
   const docs: VoucherCode[] = toInsert.map((value) => ({
     codeId: randomUUID(),
     offerId,
@@ -207,7 +238,9 @@ export async function addBarcodes(
     kind: 'barcode',
     value,
     status: 'available',
+    ...validityStamp,
     createdAt: now,
+    updatedAt: now,
   }));
   return appendUnits(offerId, variantId, docs);
 }
@@ -245,6 +278,7 @@ export async function generateBarcodes(
     value: `${prefix}-${mockBarcodeValue(existing + i + 1)}`,
     status: 'available',
     createdAt: now,
+    updatedAt: now,
   }));
   return appendUnits(offerId, variantId, docs);
 }
@@ -349,6 +383,7 @@ export async function addLinks(
   offerId: string,
   variantId: string,
   items: LinkItem[],
+  validity?: BatchValidity,
 ): Promise<InventoryResult> {
   if (!Array.isArray(items) || items.length < 1 || items.length > VOUCHER_INVENTORY_MAX) {
     throw createError(`links must contain between 1 and ${VOUCHER_INVENTORY_MAX} URLs`, 400);
@@ -361,6 +396,7 @@ export async function addLinks(
   // or against links already on the variant). Reject before inserting anything.
   await assertNoLinkCodeConflicts(offerId, variantId, deduped);
   const now = new Date();
+  const validityStamp = validityFields(validity);
   const docs: VoucherCode[] = deduped.map((item) => ({
     codeId: randomUUID(),
     offerId,
@@ -369,7 +405,269 @@ export async function addLinks(
     value: item.url,
     ...(item.code ? { code: item.code } : {}),
     status: 'available',
+    ...validityStamp,
     createdAt: now,
+    updatedAt: now,
   }));
   return appendUnits(offerId, variantId, docs);
+}
+
+/** One inventory unit as exposed to the management surface. Dates are ISO strings. */
+export interface InventoryUnitView {
+  codeId: string;
+  kind: 'barcode' | 'link';
+  value: string;
+  code?: string;
+  status: 'available' | 'assigned' | 'redeemed';
+  validityValue?: number | null;
+  validityUnit?: 'days' | 'months' | 'years' | null;
+  validFrom?: string | null;
+  validUntil?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
+/** Expiring-soon choices for the management filter (fixed, not a free day count). */
+export type ExpiringWindow = '1m' | '3m' | '1y';
+
+/** Date filter for listing a variant's units. All optional and combined with AND. */
+export interface UnitDateFilter {
+  /** Units whose window starts on or after this date (validFrom >= from). */
+  from?: Date;
+  /** Units whose window ends on or before this date (validUntil <= until). */
+  until?: Date;
+  /** Units expiring within a fixed window from now (validUntil <= now + window). */
+  expiringWithin?: ExpiringWindow;
+  /** Only units with no window yet (unsold limit units: validFrom + validUntil null). */
+  noWindow?: boolean;
+  /** Units created within [createdFrom, createdTo]. */
+  createdFrom?: Date;
+  createdTo?: Date;
+  /** Units last updated within [updatedFrom, updatedTo]. */
+  updatedFrom?: Date;
+  updatedTo?: Date;
+  /** Case-insensitive substring match on the unit `value` (barcode/link) or `code`. */
+  search?: string;
+}
+
+/** Escapes a user string for safe use inside a RegExp (search filter). */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** A page of a variant's inventory units plus the total matching the filter. */
+export interface InventoryUnitPage {
+  units: InventoryUnitView[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+const UNIT_PAGE_SIZE_DEFAULT = 50;
+const UNIT_PAGE_SIZE_MAX = 200;
+
+/** Adds a fixed expiring-soon window to `now`, returning the cutoff date. */
+function expiringCutoff(now: Date, window: ExpiringWindow): Date {
+  const d = new Date(now);
+  if (window === '1m') d.setMonth(d.getMonth() + 1);
+  else if (window === '3m') d.setMonth(d.getMonth() + 3);
+  else d.setFullYear(d.getFullYear() + 1);
+  return d;
+}
+
+/** Maps a stored unit doc to the management view shape (dates -> ISO strings). */
+function toUnitView(d: VoucherCode): InventoryUnitView {
+  return {
+    codeId: d.codeId,
+    kind: d.kind,
+    value: d.value,
+    ...(d.code ? { code: d.code } : {}),
+    status: d.status,
+    validityValue: d.validityValue ?? null,
+    validityUnit: d.validityUnit ?? null,
+    validFrom: d.validFrom ? new Date(d.validFrom).toISOString() : null,
+    validUntil: d.validUntil ? new Date(d.validUntil).toISOString() : null,
+    createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : null,
+    updatedAt: d.updatedAt ? new Date(d.updatedAt).toISOString() : null,
+  };
+}
+
+/**
+ * Lists a variant's inventory units (paged + date-filtered) for the management
+ * surface. Filtering is resolved server-side so it scales with paging. Caller
+ * enforces admin + ownership + voucher-only.
+ *
+ * Input:  offerId, variantId, filter (date range / expiring-soon / no-window),
+ *         page (1-based), pageSize (clamped), and `now` for the expiring cutoff.
+ * Output: InventoryUnitPage. Newest units first.
+ */
+export async function listVariantUnits(
+  offerId: string,
+  variantId: string,
+  filter: UnitDateFilter = {},
+  page = 1,
+  pageSize = UNIT_PAGE_SIZE_DEFAULT,
+  now: Date = new Date(),
+): Promise<InventoryUnitPage> {
+  const db = await getMongoDb();
+  const codes = getVoucherCodeCollection(db);
+  const query: Record<string, unknown> = { offerId, variantId };
+  if (filter.noWindow) {
+    query.validFrom = null;
+    query.validUntil = null;
+  } else {
+    const validUntil: Record<string, Date> = {};
+    const validFrom: Record<string, Date> = {};
+    if (filter.from) validFrom.$gte = filter.from;
+    if (filter.until) validUntil.$lte = filter.until;
+    if (filter.expiringWithin) {
+      validUntil.$lte = expiringCutoff(now, filter.expiringWithin);
+      // expiring filter implies a set window
+      query.validUntil = { ...validUntil, $ne: null };
+    } else if (Object.keys(validUntil).length > 0) {
+      query.validUntil = validUntil;
+    }
+    if (Object.keys(validFrom).length > 0) query.validFrom = validFrom;
+  }
+  // Created / updated ranges (independent of the window filter above).
+  const createdAt: Record<string, Date> = {};
+  if (filter.createdFrom) createdAt.$gte = filter.createdFrom;
+  if (filter.createdTo) createdAt.$lte = filter.createdTo;
+  if (Object.keys(createdAt).length > 0) query.createdAt = createdAt;
+  const updatedAt: Record<string, Date> = {};
+  if (filter.updatedFrom) updatedAt.$gte = filter.updatedFrom;
+  if (filter.updatedTo) updatedAt.$lte = filter.updatedTo;
+  if (Object.keys(updatedAt).length > 0) query.updatedAt = updatedAt;
+  // Code search: substring match on value or the optional link code.
+  const term = filter.search?.trim();
+  if (term) {
+    const rx = { $regex: escapeRegExp(term), $options: 'i' };
+    query.$or = [{ value: rx }, { code: rx }];
+  }
+  const size = Math.min(Math.max(1, Math.floor(pageSize)), UNIT_PAGE_SIZE_MAX);
+  const current = Math.max(1, Math.floor(page));
+  const [docs, total] = await Promise.all([
+    codes.find(query).sort({ createdAt: -1 }).skip((current - 1) * size).limit(size).toArray(),
+    codes.countDocuments(query),
+  ]);
+  return { units: docs.map(toUnitView), total, page: current, pageSize: size };
+}
+
+/**
+ * Updates ONE unit's validity fields (only). Sets the supplied validity keys via
+ * $set, leaving the unit's `value`/`kind`/`status` untouched and preserving any
+ * validity set not included (lossless flip). Caller enforces admin + ownership +
+ * voucher-only and validates the validity against the unit's effective type.
+ *
+ * Input:  offerId, variantId, codeId, validity (the fields to set).
+ * Output: the updated InventoryUnitView, or null when no such unit exists.
+ */
+export async function updateUnitValidity(
+  offerId: string,
+  variantId: string,
+  codeId: string,
+  validity: BatchValidity,
+): Promise<InventoryUnitView | null> {
+  const db = await getMongoDb();
+  const codes = getVoucherCodeCollection(db);
+  const $set: Partial<VoucherCode> = {};
+  if (validity.validityValue !== undefined) $set.validityValue = validity.validityValue;
+  if (validity.validityUnit !== undefined) $set.validityUnit = validity.validityUnit;
+  if (validity.validFrom !== undefined) $set.validFrom = validity.validFrom;
+  if (validity.validUntil !== undefined) $set.validUntil = validity.validUntil;
+  if (Object.keys($set).length === 0) {
+    const doc = await codes.findOne({ offerId, variantId, codeId });
+    return doc ? toUnitView(doc) : null;
+  }
+  $set.updatedAt = new Date();
+  const updated = await codes.findOneAndUpdate(
+    { offerId, variantId, codeId },
+    { $set },
+    { returnDocument: 'after' },
+  );
+  return updated ? toUnitView(updated) : null;
+}
+
+/**
+ * Updates the validity of MANY units in ONE request (the bulk re-stamp path).
+ * Sets only the supplied validity keys via a single `updateMany`, leaving each
+ * unit's value/kind/status and any non-supplied validity set untouched (lossless
+ * flip). Scoped to the offer+variant so only that variant's units are touched.
+ * Caller enforces admin + ownership + voucher-only and validates the validity
+ * against the variant's effective type.
+ *
+ * Input:  offerId, variantId, codeIds (1..VOUCHER_INVENTORY_MAX), validity.
+ * Output: { updated } - the number of units modified.
+ */
+/** One unit's validity before and after a bulk update (for the audit/response). */
+export interface UnitValidityChange {
+  codeId: string;
+  value: string;
+  before: BatchValidity;
+  after: BatchValidity;
+}
+
+export interface BulkUpdateResult {
+  updated: number;
+  /** Per-unit before -> after validity for the units that were changed. */
+  changes: UnitValidityChange[];
+}
+
+/** Reduces a stored unit to its validity fields (for before/after reporting). */
+function unitValidity(u: Pick<VoucherCode, 'validityValue' | 'validityUnit' | 'validFrom' | 'validUntil'>): BatchValidity {
+  return {
+    validityValue: u.validityValue ?? null,
+    validityUnit: u.validityUnit ?? null,
+    validFrom: u.validFrom ?? null,
+    validUntil: u.validUntil ?? null,
+  };
+}
+
+export async function updateUnitsValidity(
+  offerId: string,
+  variantId: string,
+  codeIds: string[],
+  validity: BatchValidity,
+): Promise<BulkUpdateResult> {
+  if (codeIds.length === 0) return { updated: 0, changes: [] };
+  const db = await getMongoDb();
+  const codes = getVoucherCodeCollection(db);
+  const $set: Partial<VoucherCode> = {};
+  if (validity.validityValue !== undefined) $set.validityValue = validity.validityValue;
+  if (validity.validityUnit !== undefined) $set.validityUnit = validity.validityUnit;
+  if (validity.validFrom !== undefined) $set.validFrom = validity.validFrom;
+  if (validity.validUntil !== undefined) $set.validUntil = validity.validUntil;
+  if (Object.keys($set).length === 0) return { updated: 0, changes: [] };
+  $set.updatedAt = new Date();
+  // Snapshot the targeted units BEFORE the write so we can report from -> to.
+  const targets = await codes
+    .find({ offerId, variantId, codeId: { $in: codeIds } }, { projection: { codeId: 1, value: 1, validityValue: 1, validityUnit: 1, validFrom: 1, validUntil: 1, _id: 0 } })
+    .toArray();
+  const res = await codes.updateMany({ offerId, variantId, codeId: { $in: codeIds } }, { $set });
+  const changes: UnitValidityChange[] = targets.map((u) => ({
+    codeId: u.codeId,
+    value: u.value,
+    before: unitValidity(u),
+    after: { ...unitValidity(u), ...validity }, // $set only changed the supplied keys
+  }));
+  return { updated: res.modifiedCount, changes };
+}
+
+/**
+ * Deletes ONE inventory unit and re-syncs the offer's derived stock. Caller
+ * enforces admin + ownership + voucher-only.
+ *
+ * Input:  offerId, variantId, codeId.
+ * Output: { deleted, stockLimit } - deleted=false when no such unit existed.
+ */
+export async function deleteUnit(
+  offerId: string,
+  variantId: string,
+  codeId: string,
+): Promise<{ deleted: boolean; stockLimit: number }> {
+  const db = await getMongoDb();
+  const codes = getVoucherCodeCollection(db);
+  const res = await codes.deleteOne({ offerId, variantId, codeId });
+  const stockLimit = await syncStockFromInventory(offerId);
+  return { deleted: res.deletedCount === 1, stockLimit };
 }
