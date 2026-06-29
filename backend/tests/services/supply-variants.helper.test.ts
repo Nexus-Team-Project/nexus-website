@@ -22,8 +22,6 @@ const v = (over: Partial<OfferVariant> = {}): OfferVariant => ({
   face_value: 100,
   nexus_cost: 60,
   member_price: 80,
-  voucherValidityValue: null,
-  voucherValidityUnit: null,
   voucherStackable: false,
   sku: null,
   tags: [],
@@ -130,43 +128,22 @@ describe('buildVoucherVariants', () => {
   });
 });
 
-describe('per-variant validity (duration vs date range)', () => {
-  it('signature distinguishes variants differing only by validity date range', () => {
-    const a = v({ validFrom: new Date('2026-01-01'), validUntil: new Date('2026-03-31') });
-    const b = v({ validFrom: new Date('2026-01-01'), validUntil: new Date('2026-06-30') });
-    expect(variantSignature(a)).not.toBe(variantSignature(b));
-    expect(hasDuplicateVariants([a, b])).toBe(false);
+describe('validity is not a variant field (value + type are per inventory unit)', () => {
+  it('two variants intended to differ only by date are duplicates (date is per unit now)', () => {
+    // No validity fields exist on a variant anymore; identical priced variants collide.
+    const a = v({ member_price: 80 });
+    const b = v({ member_price: 80 });
+    expect(variantSignature(a)).toBe(variantSignature(b));
+    expect(hasDuplicateVariants([a, b])).toBe(true);
   });
 
-  it('date-range and duration variants are distinct even with the same price', () => {
-    const dates = v({ validFrom: new Date('2026-01-01'), validUntil: new Date('2026-12-31') });
-    const duration = v({ voucherValidityValue: 1, voucherValidityUnit: 'years' });
-    expect(variantSignature(dates)).not.toBe(variantSignature(duration));
-  });
-
-  it('buildVoucherVariants keeps date range and nulls the duration (mutually exclusive)', () => {
+  it('buildVoucherVariants stores no validity on the variant', () => {
     const [out] = buildVoucherVariants(
-      [{
-        face_value: 100, nexus_cost: 60, member_price: 80,
-        validFrom: new Date('2026-01-01'), validUntil: new Date('2026-03-31'),
-        voucherValidityValue: 2, voucherValidityUnit: 'years',
-      }],
+      [{ face_value: 100, nexus_cost: 60, member_price: 80 }],
       {},
     );
-    expect(out.validFrom).toEqual(new Date('2026-01-01'));
-    expect(out.validUntil).toEqual(new Date('2026-03-31'));
-    expect(out.voucherValidityValue).toBeNull();
-    expect(out.voucherValidityUnit).toBeNull();
-  });
-
-  it('buildVoucherVariants keeps duration and nulls the dates when no range given', () => {
-    const [out] = buildVoucherVariants(
-      [{ face_value: 100, nexus_cost: 60, member_price: 80, voucherValidityValue: 3, voucherValidityUnit: 'months' }],
-      {},
-    );
-    expect(out.voucherValidityValue).toBe(3);
-    expect(out.voucherValidityUnit).toBe('months');
-    expect(out.validFrom).toBeNull();
-    expect(out.validUntil).toBeNull();
+    expect(out).not.toHaveProperty('validityTypeOverride');
+    expect(out).not.toHaveProperty('voucherValidityValue');
+    expect(out).not.toHaveProperty('validFrom');
   });
 });
