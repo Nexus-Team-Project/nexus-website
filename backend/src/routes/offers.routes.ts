@@ -1230,7 +1230,9 @@ function resolveBatchValidity(
     if (data.validityValue == null || data.validityUnit == null) {
       return { ok: false, error: 'A duration validity requires both an amount and a unit', errorHe: 'תוקף מסוג משך זמן מחייב כמות ויחידת זמן' };
     }
-    return { ok: true, validity: { validityValue: data.validityValue, validityUnit: data.validityUnit } };
+    // A unit is exactly one type: clear any prior date window so editing a
+    // from_until unit back to a limit does not leave the old validFrom/validUntil.
+    return { ok: true, validity: { validityValue: data.validityValue, validityUnit: data.validityUnit, validFrom: null, validUntil: null } };
   }
   if (data.validFrom == null || data.validUntil == null) {
     return { ok: false, error: 'A date-range validity requires both a from and an until date', errorHe: 'תוקף מסוג טווח תאריכים מחייב תאריך התחלה ותאריך סיום' };
@@ -1238,7 +1240,8 @@ function resolveBatchValidity(
   if (new Date(data.validUntil).getTime() < new Date(data.validFrom).getTime()) {
     return { ok: false, error: 'validUntil must be on or after validFrom', errorHe: 'תאריך הסיום חייב להיות באותו יום או אחרי תאריך ההתחלה' };
   }
-  return { ok: true, validity: { validFrom: data.validFrom, validUntil: data.validUntil } };
+  // Mirror of the limit branch: clear the duration so a unit is exactly one type.
+  return { ok: true, validity: { validFrom: data.validFrom, validUntil: data.validUntil, validityValue: null, validityUnit: null } };
 }
 
 /**
