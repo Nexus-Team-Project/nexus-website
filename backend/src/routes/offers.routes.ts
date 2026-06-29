@@ -574,8 +574,8 @@ router.post(
             res.status(400).json({ error: 'Voucher offers require face_value and nexus_cost' });
             return;
           }
-          if (d.nexus_cost >= d.face_value) {
-            res.status(400).json({ error: 'nexus_cost must be less than face_value' });
+          if (d.nexus_cost > d.face_value) {
+            res.status(400).json({ error: 'nexus_cost must not be greater than face_value' });
             return;
           }
           if (d.member_price !== undefined && (d.member_price < d.nexus_cost || d.member_price > d.face_value)) {
