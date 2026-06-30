@@ -65,6 +65,131 @@ function lowestEffectiveVariantPrice(
 }
 
 /**
+ * Re-clamp every per-tenant member-price override for an offer back into each
+ * variant's [nexus_cost, face_value] window after the offer's deal pricing was
+ * edited (tenant_only offers, where the owning tenant may change nexus_cost /
+ * face_value). For each TenantOfferConfig that carries variantPrices:
+ *   - raise an override up to a higher new nexus_cost (so the displayed sale price
+ *     never sits below the agreed floor - the "bump member price" rule), and
+ *   - pull an override down to a lowered new face_value.
+ * Recomputes the row's denormalized displayPrice when anything changed.
+ *
+ * Input:  offerId, the freshly-built variant array (carrying the new bounds).
+ * Output: resolves when all affected configs are updated (no-op when none).
+ */
+export async function clampTenantVariantPricesToBounds(
+  offerId: string,
+  variants: OfferVariant[],
+): Promise<void> {
+  const bounds = new Map<string, { floor: number; ceil: number }>();
+  for (const v of variants) {
+    if (typeof v.nexus_cost === 'number' && typeof v.face_value === 'number') {
+      bounds.set(v.variantId, { floor: v.nexus_cost, ceil: v.face_value });
+    }
+  }
+  if (bounds.size === 0) return;
+
+  const db = await getMongoDb();
+  const { tenantOfferConfigs } = getSupplyDomainCollections(db);
+  // Only rows that actually hold per-variant overrides can be out of bounds.
+  const configs = await tenantOfferConfigs
+    .find({ offerId, variantPrices: { $exists: true } })
+    .toArray();
+
+  for (const cfg of configs) {
+    const current = cfg.variantPrices ?? {};
+    const next: Record<string, number> = { ...current };
+    let changed = false;
+    for (const [variantId, price] of Object.entries(current)) {
+      const b = bounds.get(variantId);
+      if (!b) continue;
+      const clamped = Math.min(Math.max(price, b.floor), b.ceil);
+      if (clamped !== price) {
+        next[variantId] = clamped;
+        changed = true;
+      }
+    }
+    if (!changed) continue;
+    const displayPrice = lowestEffectiveVariantPrice(variants, next);
+    await tenantOfferConfigs.updateOne(
+      { configId: cfg.configId },
+      { $set: { variantPrices: next, ...(displayPrice !== undefined ? { displayPrice } : {}) } },
+    );
+  }
+}
+
+/**
+ * Re-sync per-tenant price overrides after a tenant_only offer's OWNER edited its
+ * OWN sale price (nexus_cost) in the Edit Offer modal. The displayed Sale Price must
+ * SNAP to the new value, so for every TenantOfferConfig of the offer:
+ *   - DROP the per-variant override (`variantPrices[vid]`) for each changed variant,
+ *     so its effective price falls back to the freshly-reseeded base member_price
+ *     (= the new sale price); any prior slider margin on that variant is reset.
+ *   - CLAMP any remaining (unchanged-variant) overrides into their new
+ *     [nexus_cost, face_value] window (handles a simultaneous face_value edit).
+ *   - CLEAR the legacy offer-level `memberPrice` override so a single-variant card
+ *     (which reads it first) stops showing a stale value and falls back to the base.
+ *   - Recompute the denormalized `displayPrice`.
+ * Differs from clampTenantVariantPricesToBounds (used for ecosystem/admin edits),
+ * which PRESERVES adopters' margins and only clamps.
+ *
+ * Input:  offerId, the freshly-built variant array (new bounds + base prices), and
+ *         the set of variant ids whose nexus_cost changed.
+ * Output: resolves when all affected configs are updated (no-op when nothing changed).
+ */
+export async function resetTenantPricesForChangedVariants(
+  offerId: string,
+  variants: OfferVariant[],
+  changedVariantIds: Set<string>,
+): Promise<void> {
+  if (changedVariantIds.size === 0) return;
+
+  const bounds = new Map<string, { floor: number; ceil: number }>();
+  for (const v of variants) {
+    if (typeof v.nexus_cost === 'number' && typeof v.face_value === 'number') {
+      bounds.set(v.variantId, { floor: v.nexus_cost, ceil: v.face_value });
+    }
+  }
+
+  const db = await getMongoDb();
+  const { tenantOfferConfigs } = getSupplyDomainCollections(db);
+  // Rows carrying EITHER kind of per-tenant override can be out of sync.
+  const configs = await tenantOfferConfigs
+    .find({ offerId, $or: [{ variantPrices: { $exists: true } }, { memberPrice: { $exists: true } }] })
+    .toArray();
+
+  for (const cfg of configs) {
+    const next: Record<string, number> = { ...(cfg.variantPrices ?? {}) };
+    let changed = false;
+    // Drop overrides for variants whose sale price changed (snap to new base).
+    for (const vid of changedVariantIds) {
+      if (vid in next) { delete next[vid]; changed = true; }
+    }
+    // Clamp the overrides that remain into their (possibly new) bounds.
+    for (const [vid, price] of Object.entries(next)) {
+      const b = bounds.get(vid);
+      if (!b) continue;
+      const clamped = Math.min(Math.max(price, b.floor), b.ceil);
+      if (clamped !== price) { next[vid] = clamped; changed = true; }
+    }
+    // The legacy offer-level memberPrice is no longer authoritative once the owner
+    // edits per-variant deal pricing; clear it so the base price shows through.
+    const clearMember = cfg.memberPrice !== undefined;
+    if (!changed && !clearMember) continue;
+
+    const displayPrice = lowestEffectiveVariantPrice(variants, next);
+    const setDoc: Record<string, unknown> = {
+      variantPrices: next,
+      ...(displayPrice !== undefined ? { displayPrice } : {}),
+    };
+    await tenantOfferConfigs.updateOne(
+      { configId: cfg.configId },
+      clearMember ? { $set: setDoc, $unset: { memberPrice: '' } } : { $set: setDoc },
+    );
+  }
+}
+
+/**
  * Set the per-tenant voucher member price.
  *
  * Steps:
