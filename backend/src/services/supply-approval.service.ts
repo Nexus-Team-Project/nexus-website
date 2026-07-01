@@ -61,6 +61,19 @@ export async function listPlatformOffers(
 }
 
 /**
+ * Counts the platform-wide offers currently awaiting admin approval
+ * (status 'pending_approval', not soft-deleted). Used for the admin sidebar
+ * badge. Platform-admin gating is enforced at the route layer.
+ *
+ * Output: Promise resolving to the number of pending offers.
+ */
+export async function countPendingApprovalOffers(): Promise<number> {
+  const db = await getMongoDb();
+  const { nexusOffers } = getSupplyDomainCollections(db);
+  return nexusOffers.countDocuments({ status: 'pending_approval', ...NOT_DELETED });
+}
+
+/**
  * Approves a voucher offer that is currently in pending_approval status.
  * Sets the offer status to 'active' so it becomes visible to all adopting tenants.
  *
