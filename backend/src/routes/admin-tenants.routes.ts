@@ -10,6 +10,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
+import { env } from '../config/env';
 import { resolveTenantContext } from '../utils/resolve-tenant-context';
 import { listAllTenants, setTenantAutoApprove } from '../services/admin-tenants.service';
 
@@ -36,18 +37,24 @@ const listQuery = z.object({
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = listQuery.parse(req.query);
-    res.json(await listAllTenants(q));
+    // In production, scope the list to organizations that passed business setup;
+    // in development show everyone who opened an org.
+    res.json(await listAllTenants({ ...q, businessSetupPassedOnly: env.NODE_ENV === 'production' }));
   } catch (e) {
     next(e);
   }
 });
 
-const toggleBody = z.object({ enabled: z.boolean() });
+const toggleBody = z.object({
+  enabled: z.boolean(),
+  // Language for the org-approved email; mirrors the admin's dashboard language.
+  language: z.enum(['he', 'en']).optional(),
+});
 
 router.patch('/:tenantId/auto-approve', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { enabled } = toggleBody.parse(req.body);
-    res.json(await setTenantAutoApprove(req.params.tenantId, enabled));
+    const { enabled, language } = toggleBody.parse(req.body);
+    res.json(await setTenantAutoApprove(req.params.tenantId, enabled, language ?? 'he'));
   } catch (e) {
     next(e);
   }

@@ -6,10 +6,12 @@
  */
 import { getMongoDb } from '../config/mongo';
 import { getTenantDomainCollections, getIdentityDomainCollections } from '../models/domain';
+import { getOnboardingCollections } from '../models/onboarding.models';
 import { getSupplyDomainCollections, NOT_DELETED, type NexusOffer } from '../models/domain/supply.models';
 import { createError } from '../middleware/errorHandler';
 import { approveOffer } from './supply-approval.service';
 import { sendVoucherApprovedEmail } from './voucher-approval-email.service';
+import { sendOrgApprovedEmail, type EmailLanguage } from './org-approval-email.service';
 
 export interface AdminTenantRow {
   tenantId: string;
@@ -51,16 +53,42 @@ export async function isTenantAutoApprove(tenantId: string): Promise<boolean> {
   return t?.autoApproveOffers === true;
 }
 
-/** List all tenants (paginated, org-name search) with a pending-offer count each. */
+/**
+ * Resolves the set of tenantIds that have SUBMITTED business setup.
+ * Domain tenantId === the legacy onboarding tenant's _id (hex), so this reads
+ * the legacy onboarding tenants whose businessSetupStatus reached 'submitted'
+ * (or 'approved') and returns their hex ids. Used to scope the trusted-tenants
+ * list in production to organizations past business setup.
+ */
+async function businessSetupPassedTenantIds(db: Awaited<ReturnType<typeof getMongoDb>>): Promise<string[]> {
+  const { tenants } = getOnboardingCollections(db);
+  const docs = await tenants
+    .find({ businessSetupStatus: { $in: ['submitted', 'approved'] } }, { projection: { _id: 1 } })
+    .toArray();
+  return docs.map((d) => d._id.toHexString());
+}
+
+/**
+ * List tenants (paginated, org-name search) with a pending-offer count each.
+ * When `businessSetupPassedOnly` is set (production), only organizations that
+ * have submitted business setup are returned; in development every tenant is
+ * listed. The exact production audience is refined in a later milestone.
+ */
 export async function listAllTenants(
-  opts: { search?: string; page: number; limit: number },
+  opts: { search?: string; page: number; limit: number; businessSetupPassedOnly?: boolean },
 ): Promise<{ tenants: AdminTenantRow[]; total: number }> {
   const db = await getMongoDb();
   const { domainTenants } = getTenantDomainCollections(db);
   const { nexusOffers } = getSupplyDomainCollections(db);
-  const filter = opts.search
+  const filter: Record<string, unknown> = opts.search
     ? { organizationName: { $regex: opts.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
     : {};
+  if (opts.businessSetupPassedOnly) {
+    const passedIds = await businessSetupPassedTenantIds(db);
+    // No tenant past business setup -> empty page (avoids an unbounded $in:[]).
+    if (passedIds.length === 0) return { total: 0, tenants: [] };
+    filter.tenantId = { $in: passedIds };
+  }
   const total = await domainTenants.countDocuments(filter);
   const docs = await domainTenants
     .find(filter, { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, status: 1, autoApproveOffers: 1 } })
@@ -98,10 +126,39 @@ async function emailSupplierApproved(offer: NexusOffer): Promise<void> {
   }
 }
 
-/** Set a tenant's trust; on enable, retroactively approve its pending offers. */
+/**
+ * Best-effort: email the organization admin that their org is now trusted and
+ * may post global offers freely. Recipient = the tenant creator's identity email.
+ * Rendered in the sender's dashboard language. Never throws.
+ */
+async function emailOrgAdminApproved(
+  db: Awaited<ReturnType<typeof getMongoDb>>,
+  tenantId: string,
+  language: EmailLanguage,
+): Promise<void> {
+  try {
+    const tc = getTenantDomainCollections(db);
+    const idc = getIdentityDomainCollections(db);
+    const tenant = await tc.domainTenants.findOne({ tenantId });
+    if (!tenant) return;
+    const identity = await idc.nexusIdentities.findOne({ nexusIdentityId: tenant.createdByIdentityId });
+    if (identity?.normalizedEmail) {
+      const name = tenant.organizationName ?? tenantId;
+      void sendOrgApprovedEmail(identity.normalizedEmail, name, language);
+    }
+  } catch (e) {
+    console.error('[ADMIN-TENANTS] org-approved email failed:', e);
+  }
+}
+
+/**
+ * Set a tenant's trust; on enable, retroactively approve its pending offers and
+ * email the org admin (in `language`) that the org can now post global offers.
+ */
 export async function setTenantAutoApprove(
   tenantId: string,
   enabled: boolean,
+  language: EmailLanguage = 'he',
 ): Promise<{ approvedOfferIds: string[] }> {
   const db = await getMongoDb();
   const { domainTenants } = getTenantDomainCollections(db);
@@ -113,6 +170,7 @@ export async function setTenantAutoApprove(
 
   const approvedOfferIds: string[] = [];
   if (enabled) {
+    void emailOrgAdminApproved(db, tenantId, language);
     const { nexusOffers } = getSupplyDomainCollections(db);
     const pending = await nexusOffers
       .find({ createdByTenantId: tenantId, status: 'pending_approval', ...NOT_DELETED })
