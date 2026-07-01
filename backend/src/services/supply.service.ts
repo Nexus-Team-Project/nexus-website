@@ -45,6 +45,8 @@ import {
   type ImageUploadFile,
 } from './supply-images.helper';
 import { computeDisplayPrice } from './supply-price.helper';
+import { isTenantAutoApprove } from './admin-tenants.service';
+import { getVoucherCodeCollection } from '../models/domain/voucher-codes.models';
 import { clampTenantVariantPricesToBounds, resetTenantPricesForChangedVariants } from './tenant-pricing.service';
 
 // ---------------------------------------------------------------------------
@@ -309,10 +311,14 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
 
   // Voucher ecosystem offers enter pending_approval so a platform admin can review
   // pricing (especially nexus_cost) before the offer goes live to all tenants.
-  const status =
+  let status: NexusOffer['status'] =
     executionType === 'voucher' && input.visibility === 'ecosystem'
       ? 'pending_approval'
       : 'active';
+  // Trusted tenants (autoApproveOffers) skip approval: their ecosystem offers go live.
+  if (status === 'pending_approval' && await isTenantAutoApprove(input.createdByTenantId)) {
+    status = 'active';
+  }
 
   const offer: NexusOffer = {
     offerId: randomUUID(),
@@ -587,6 +593,12 @@ export async function updateOffer(
     variantSet.redemptionScope = input.redemptionScope;
   }
 
+  // Resubmit target: a trusted tenant's re-submitted (previously denied) offer goes
+  // straight back to 'active'; otherwise it re-enters the approval queue.
+  const resubmitStatus = wasResubmitted
+    ? ((await isTenantAutoApprove(tenantId)) ? 'active' : 'pending_approval')
+    : undefined;
+
   const update: Partial<NexusOffer> = {
     updatedAt: now,
     ...(input.title !== undefined && { title: input.title }),
@@ -615,8 +627,9 @@ export async function updateOffer(
     ...(nextImageCrops !== undefined && { imageCrops: nextImageCrops }),
     ...(statusActuallyChanged && { statusChangedAt: now }),
     ...(resolvedStatusReason !== undefined && { statusReason: resolvedStatusReason }),
-    // Resubmit: clear denial and move back to approval queue.
-    ...(wasResubmitted && { status: 'pending_approval', denial_reason: '' }),
+    // Resubmit: clear denial and move to the resubmit target status (queue, or
+    // live for a trusted tenant).
+    ...(wasResubmitted && { status: resubmitStatus, denial_reason: '' }),
     // Variant mirror + array win over the flat spreads above (voucher edit only).
     ...variantMirror,
     ...variantSet,
@@ -728,6 +741,12 @@ export async function deleteOffer(
 
   // Cascade - remove every tenant's adoption record for this offer immediately.
   await tenantOfferConfigs.deleteMany({ offerId });
+
+  // Cascade - hard-delete this offer's voucher inventory (barcodes/links). Barcode
+  // values are GLOBALLY unique (partial unique index), so leaving them behind would
+  // block ever reusing that barcode. The offer doc is soft-deleted for history, but
+  // its inventory has no such need and must free the unique values.
+  await getVoucherCodeCollection(db).deleteMany({ offerId });
 
   return offer;
 }

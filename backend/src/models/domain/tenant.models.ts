@@ -98,6 +98,12 @@ export const domainTenantSchema = z.object({
    * dashboard. Absent on tenants created before this field = treated as true.
    */
   autoAcceptJoinRequests: z.boolean().default(true),
+  /**
+   * When true, this tenant is TRUSTED: its global (ecosystem) offer create/edit
+   * skips platform-admin approval and goes straight to 'active'. Default false.
+   * Absent on tenants created before this field = treated as false (not trusted).
+   */
+  autoApproveOffers: z.boolean().default(false),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
