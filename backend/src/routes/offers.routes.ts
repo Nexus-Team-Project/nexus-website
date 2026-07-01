@@ -370,13 +370,13 @@ const updateOfferSchema = z.object({
 });
 
 /**
- * Validates the body for setting a tenant's per-offer voucher member price.
- * memberPrice is coerced from string to support form-data submissions while
- * the dominant client (dashboard) sends JSON.
+ * Validates the body for setting a tenant's per-offer voucher markup percentage.
+ * markupPct is coerced from string to support form-data submissions while the
+ * dominant client (dashboard) sends JSON.
  */
 const setTenantVoucherPriceSchema = z.object({
-  memberPrice: z.coerce.number().positive(),
-  /** Optional: target a single variant's per-tenant price (multi-variant vouchers). */
+  markupPct: z.coerce.number().nonnegative(),
+  /** Optional: target a single variant's per-tenant markup (multi-variant vouchers). */
   variantId: z.string().min(1).optional(),
 });
 
@@ -1126,7 +1126,7 @@ router.delete(
  * Requires: catalog.adopt_offer permission (same surface as adopt/unadopt -
  * pricing is part of the per-tenant catalog configuration).
  *
- * Input body: { memberPrice: number } (positive).
+ * Input body: { markupPct: number (>= 0), variantId?: string }.
  * Output: { config: TenantOfferConfig } on 200; error JSON otherwise.
  *   404 - offer_not_found
  *   403 - not_adopted
@@ -1139,7 +1139,7 @@ router.patch(
     try {
       const parsed = setTenantVoucherPriceSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: 'memberPrice required and must be positive' });
+        res.status(400).json({ error: 'markupPct required and must be >= 0' });
         return;
       }
 
@@ -1151,7 +1151,7 @@ router.patch(
       const result = await setTenantVoucherPrice({
         tenantId,
         offerId: req.params.offerId,
-        memberPrice: parsed.data.memberPrice,
+        markupPct: parsed.data.markupPct,
         ...(parsed.data.variantId !== undefined && { variantId: parsed.data.variantId }),
       });
 

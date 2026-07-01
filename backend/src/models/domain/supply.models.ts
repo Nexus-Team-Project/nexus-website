@@ -451,6 +451,11 @@ export const tenantOfferConfigSchema = z.object({
    */
   memberPrice: z.number().positive().optional(),
   /**
+   * Offer-level (legacy single-variant) markup % on the base sale price. The
+   * `memberPrice` above is its cached absolute projection.
+   */
+  markupPct: z.number().nonnegative().optional(),
+  /**
    * Per-tenant voucher member price PER VARIANT (variantId -> price). Each price
    * is bounded by that variant's [nexus_cost, face_value] and takes precedence
    * over the variant's own member_price for this tenant. Absent entry -> the
@@ -458,6 +463,15 @@ export const tenantOfferConfigSchema = z.object({
    * (VARIANT_ID_REGEX), never raw user input, so they are safe as Mongo keys.
    */
   variantPrices: z.record(z.string(), z.number().positive()).optional(),
+  /**
+   * Per-tenant voucher markup PERCENTAGE per variant (variantId -> pct >= 0).
+   * The tenant's intent: `effective = min(base*(1+pct/100), face_value)` where
+   * base = the variant's current member_price. `variantPrices` above is the
+   * cached absolute projection of this % (recomputed whenever the base changes),
+   * so the catalog read/sort/filter path stays unchanged. Keys are
+   * server-validated variantIds (VARIANT_ID_REGEX), safe as Mongo keys.
+   */
+  variantMarkupPct: z.record(z.string(), z.number().nonnegative()).optional(),
   /**
    * Denormalized effective display price for catalog server-side sort + filter.
    * Mirrors NexusOffer.displayPrice but scoped to this specific tenant (lowest
