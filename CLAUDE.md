@@ -78,6 +78,7 @@ Identity has two layers:
   - Member list includes `invitationStatus` + `invitationExpiresAt`; must include pending-only rows even without a `TenantMember` record.
 - `regular_user` — skipped workspace setup; member-only screen.
 - `workspace_setup_deferred` — chose complete later; locked/deferred screen.
+- `platform_admin` — (2026-07-01, Phase 2 M1) a NEXUS platform admin (`isPlatformAdminEmail`) with NO tenant + NO member. `getMe` overrides the mode to `platform_admin` and returns `onboarding.required=false` (pure decision in `services/onboarding-admin.helper.ts` `isNoTenantPlatformAdmin`), so the dashboard skips the workspace wizard and the admin uses the full dashboard. An admin who IS a tenant member still resolves as `tenant`.
 
 **Workspace setup** (`POST /api/onboarding/workspace`): creates Mongo `tenants` + `tenantMembers` (role `admin`) + `onboardingStates` (`business_setup_required`).
 
