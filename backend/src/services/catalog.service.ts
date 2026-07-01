@@ -29,6 +29,8 @@ import {
 } from '../models/domain/supply.models';
 import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
 import { computeTenantDisplayPrice } from './supply-price.helper';
+import { getTenantDomainCollections } from '../models/domain';
+import { uploaderFieldsFromTenant, type UploaderTenantDoc } from './catalog-uploader.helper';
 
 // ---------------------------------------------------------------------------
 // Public contract
@@ -132,6 +134,12 @@ export interface CatalogItem {
   adoptedAt?: Date;
   /** TenantId of the supply manager who created the offer. */
   createdByTenantId: string;
+  /** Creating tenant's org name (NEXUS for platform-created offers). */
+  createdByTenantName?: string;
+  /** Creating tenant's logo URL, when set. */
+  createdByTenantLogoUrl?: string;
+  /** Creating tenant's brand color (#rrggbb), for an initials avatar fallback. */
+  createdByTenantBrandColor?: string;
   /** How the offer is fulfilled/redeemed (voucher, coupon, gift_card, product, service). */
   executionType: string;
   /** Maximum total units available (null = unlimited). */
@@ -224,6 +232,8 @@ function toItem(
     effectiveVariantPrices?: Record<string, number>;
     /** Per-tenant per-variant markup % (variantId -> pct). */
     effectiveVariantMarkup?: Record<string, number>;
+    /** Creating tenant's branding for the uploader badge (name/logo/brandColor). */
+    uploaderTenant?: UploaderTenantDoc;
   },
 ): CatalogItem {
   const now = Date.now();
@@ -264,6 +274,7 @@ function toItem(
     isAdopted: config?.adoptionStatus === 'active',
     adoptedAt: config?.adoptedAt,
     createdByTenantId: offer.createdByTenantId,
+    ...uploaderFieldsFromTenant(context.uploaderTenant),
     executionType: offer.executionType ?? 'voucher',
     stockLimit: offer.stockLimit ?? null,
     stockAvailable: offer.stockLimit === null
@@ -404,6 +415,19 @@ export async function getTenantCatalogView(
     : await tenantOfferConfigs.find({ tenantId, offerId: { $in: pageOfferIds } }).toArray();
   const configMap = new Map<string, TenantOfferConfig>(configs.map((c) => [c.offerId, c]));
 
+  // Uploader identity: batch-fetch the creating tenants for this page in ONE query
+  // (avoid N+1), so each card/row can show "uploaded by <org> + logo".
+  const uploaderTenantIds = [...new Set(offers.map((o) => o.createdByTenantId).filter(Boolean))];
+  const uploaderTenants = uploaderTenantIds.length === 0
+    ? []
+    : await getTenantDomainCollections(db).domainTenants
+        .find(
+          { tenantId: { $in: uploaderTenantIds } },
+          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1 } },
+        )
+        .toArray();
+  const uploaderMap = new Map(uploaderTenants.map((tn) => [tn.tenantId, tn]));
+
   const items = offers.map((o) => {
     const toc = configMap.get(o.offerId);
     const isOwnOffer = o.createdByTenantId === tenantId;
@@ -417,6 +441,7 @@ export async function getTenantCatalogView(
       canSeeNexusCost,
       ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
       ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+      uploaderTenant: uploaderMap.get(o.createdByTenantId) ?? undefined,
     });
 
     return {
