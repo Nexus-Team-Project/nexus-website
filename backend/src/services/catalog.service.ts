@@ -30,6 +30,7 @@ import {
 import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
+import type { LogoCrop } from '../models/domain/tenant.models';
 import { uploaderFieldsFromTenant, type UploaderTenantDoc } from './catalog-uploader.helper';
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,8 @@ export interface CatalogItem {
   createdByTenantLogoUrl?: string;
   /** Creating tenant's brand color (#rrggbb), for an initials avatar fallback. */
   createdByTenantBrandColor?: string;
+  /** Crop of the creating tenant's logo (normalized fractions), applied at display time. */
+  createdByTenantLogoCrop?: LogoCrop | null;
   /** How the offer is fulfilled/redeemed (voucher, coupon, gift_card, product, service). */
   executionType: string;
   /** Maximum total units available (null = unlimited). */
@@ -423,7 +426,7 @@ export async function getTenantCatalogView(
     : await getTenantDomainCollections(db).domainTenants
         .find(
           { tenantId: { $in: uploaderTenantIds } },
-          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1 } },
+          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } },
         )
         .toArray();
   const uploaderMap = new Map(uploaderTenants.map((tn) => [tn.tenantId, tn]));

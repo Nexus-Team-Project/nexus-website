@@ -6,16 +6,19 @@
  */
 import { Db } from 'mongodb';
 import { getTenantDomainCollections } from '../models/domain';
+import type { LogoCrop } from '../models/domain/tenant.models';
 import { uploadTenantLogo, deleteOfferImage } from '../utils/cloudinary';
 
 /**
- * Upload a new logo and set it on the tenant.
- * @returns the new secure logo URL.
+ * Upload a new (pristine) logo and set it on the tenant, along with an optional
+ * initial crop (applied at display time). A new upload always replaces the stored
+ * crop: the provided crop is set, or the crop is cleared when none is given.
+ * @returns the new secure logo URL + the stored crop.
  */
 export async function setTenantLogo(
   db: Db,
-  args: { tenantId: string; buffer: Buffer; filename: string },
-): Promise<{ logoUrl: string }> {
+  args: { tenantId: string; buffer: Buffer; filename: string; crop?: LogoCrop | null },
+): Promise<{ logoUrl: string; logoCrop: LogoCrop | null }> {
   const { domainTenants } = getTenantDomainCollections(db);
   const existing = await domainTenants.findOne(
     { tenantId: args.tenantId },
@@ -23,16 +26,38 @@ export async function setTenantLogo(
   );
 
   const logoUrl = await uploadTenantLogo(args.buffer, args.filename);
+  const crop = args.crop ?? null;
   await domainTenants.updateOne(
     { tenantId: args.tenantId },
-    { $set: { logoUrl, updatedAt: new Date() } },
+    crop
+      ? { $set: { logoUrl, logoCrop: crop, updatedAt: new Date() } }
+      : { $set: { logoUrl, updatedAt: new Date() }, $unset: { logoCrop: '' } },
   );
 
   // Best-effort: drop the previous Cloudinary asset (never blocks the response).
   if (existing?.logoUrl && existing.logoUrl !== logoUrl) {
     void deleteOfferImage(existing.logoUrl);
   }
-  return { logoUrl };
+  return { logoUrl, logoCrop: crop };
+}
+
+/**
+ * Set or clear the tenant logo's crop WITHOUT re-uploading the image (adjust the
+ * crop, or revert to the full photo). crop=null clears it (full logo shown).
+ * @returns the stored crop (or null when cleared).
+ */
+export async function setTenantLogoCrop(
+  db: Db,
+  args: { tenantId: string; crop: LogoCrop | null },
+): Promise<{ logoCrop: LogoCrop | null }> {
+  const { domainTenants } = getTenantDomainCollections(db);
+  await domainTenants.updateOne(
+    { tenantId: args.tenantId },
+    args.crop
+      ? { $set: { logoCrop: args.crop, updatedAt: new Date() } }
+      : { $unset: { logoCrop: '' }, $set: { updatedAt: new Date() } },
+  );
+  return { logoCrop: args.crop };
 }
 
 /**
@@ -68,7 +93,7 @@ export async function removeTenantLogo(db: Db, args: { tenantId: string }): Prom
   );
   await domainTenants.updateOne(
     { tenantId: args.tenantId },
-    { $unset: { logoUrl: '' }, $set: { updatedAt: new Date() } },
+    { $unset: { logoUrl: '', logoCrop: '' }, $set: { updatedAt: new Date() } },
   );
   if (existing?.logoUrl) void deleteOfferImage(existing.logoUrl);
 }
