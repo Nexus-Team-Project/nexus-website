@@ -838,7 +838,9 @@ router.patch(
 
       // Notify admins when a denied offer is resubmitted OR when a pending offer is updated.
       // Both cases require admins to re-review; isUpdate distinguishes the subject line.
-      if (wasResubmitted || wasUpdatedWhilePending) {
+      // Skip when the offer ended up 'active' (e.g. a trusted / autoApproveOffers tenant),
+      // since there is nothing left to review.
+      if ((wasResubmitted || wasUpdatedWhilePending) && offer.status === 'pending_approval') {
         const adminEmails = getConfiguredAdminEmails();
         try {
           const db = await getMongoDb();
