@@ -338,8 +338,11 @@ function toItem(
  * per-tenant adoption status. Honors search, category, approval, and adoption
  * filters server-side.
  *
- * Visibility rules: ecosystem offers visible to everyone; tenant_only offers
- * visible only to the matching invitedByTenantId.
+ * Visibility rules: the browse (non-owned) view is the tenant's GLOBAL catalog,
+ * so it returns ONLY ecosystem offers (from any uploader, including this tenant's
+ * own). A tenant's own tenant_only offers belong to Product Catalog (the
+ * ownedOnly view) and are not surfaced here. tenant_only offers are never shown
+ * in the browse view - even to the invited tenant - since it is global-only (M5).
  *
  * Status rules: 'active' offers always visible. 'pending_approval' / 'denied'
  * visible to their creator and to platform admins.
@@ -357,13 +360,11 @@ export async function getTenantCatalogView(
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
   // ownedOnly: restrict to offers this tenant created (the Product Catalog page).
-  // Otherwise scope to what is visible to the tenant (ecosystem + own tenant_only).
+  // Otherwise this is the Benefits Partnerships GLOBAL catalog: ecosystem-only
+  // (M5). The tenant's own tenant_only offers live in Product Catalog, not here.
   const scopeClause = query.ownedOnly
     ? { createdByTenantId: tenantId }
-    : { $or: [
-        { visibility: 'ecosystem' },
-        { visibility: 'tenant_only', invitedByTenantId: tenantId },
-      ]};
+    : { visibility: 'ecosystem' };
   const baseStatusClause = { $or: [
     { status: 'active' },
     { status: { $in: ['pending_approval', 'denied'] }, createdByTenantId: tenantId },
@@ -455,6 +456,61 @@ export async function getTenantCatalogView(
   });
 
   return { items, total };
+}
+
+/**
+ * Fetches a SINGLE offer's detail for a tenant, by offerId (robust regardless of
+ * how many offers exist - it queries the one document directly rather than
+ * scanning a page of the browse view).
+ *
+ * Visibility: the tenant always sees its OWN offers of ANY visibility/status
+ * (needed for the edit-offer flow, including tenant_only and pending/denied);
+ * platform admins see any offer; everyone else sees an ecosystem offer only when
+ * it is active. Returns null when not found or not visible.
+ *
+ * Enrichment mirrors getTenantCatalogView (adoption config + uploader identity +
+ * nexus_cost gating) so the detail shape matches the list.
+ */
+export async function getTenantOfferDetail(
+  tenantId: string,
+  offerId: string,
+  options?: { isPlatformAdmin?: boolean },
+): Promise<CatalogItem | null> {
+  const db = await getMongoDb();
+  const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
+  const isPlatformAdmin = options?.isPlatformAdmin ?? false;
+
+  const offer = await nexusOffers.findOne({ offerId, ...NOT_DELETED });
+  if (!offer) return null;
+
+  const isOwnOffer = offer.createdByTenantId === tenantId;
+  const visible = isOwnOffer || isPlatformAdmin
+    || (offer.visibility === 'ecosystem' && offer.status === 'active');
+  if (!visible) return null;
+
+  const toc = await tenantOfferConfigs.findOne({ tenantId, offerId }) ?? undefined;
+  const uploaderTenant = offer.createdByTenantId
+    ? await getTenantDomainCollections(db).domainTenants.findOne(
+        { tenantId: offer.createdByTenantId },
+        { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } },
+      ) ?? undefined
+    : undefined;
+
+  const hasActiveToc = toc?.adoptionStatus === 'active';
+  const canSeeNexusCost = isOwnOffer || isPlatformAdmin || hasActiveToc;
+  const base = toItem(offer, toc, {
+    isOwnOffer,
+    isPlatformAdmin,
+    canSeeNexusCost,
+    ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+    ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+    uploaderTenant: uploaderTenant ?? undefined,
+  });
+  return {
+    ...base,
+    ...(toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
+    ...(toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
+  };
 }
 
 /**

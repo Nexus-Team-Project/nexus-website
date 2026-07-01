@@ -400,6 +400,62 @@ export async function sendVoucherWithdrawnEmail(
 }
 
 /**
+ * Sends a "not approved" notification to the offer's SUPPLIER when a NEXUS
+ * platform admin deletes their pending offer (admin-delete of a pending offer
+ * acts as a soft denial). Supplier-facing, so it does NOT expose the offer id.
+ *
+ * Input:
+ *   to    - supplier's email address (offer creator's identity email).
+ *   offer - the deleted NexusOffer (captured before soft-delete).
+ * Output: Promise<void>. Errors are logged but do not throw.
+ */
+export async function sendOfferRemovedByAdminEmail(
+  to: string,
+  offer: NexusOffer,
+): Promise<void> {
+  const bannerHtml = buildAuthEmailBannerHtml();
+  const offerTitle = escapeHtml(offer.title);
+  const dashboardUrl = env.DASHBOARD_URL ?? 'https://dashboard.nexus-payment.com';
+
+  const html = `<!doctype html>
+<html lang="he" dir="rtl">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;direction:rtl;">
+<table width="100%" cellpadding="0" cellspacing="0">
+<tr><td align="center" style="padding:40px 20px;">
+<table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:white;border-radius:14px;padding:40px;box-shadow:0 10px 30px rgba(0,0,0,0.06);">
+<tr><td align="center">
+  ${bannerHtml}
+  <h1 style="margin:0;color:#dc2626;font-size:24px;">הצעת השובר בוטלה</h1>
+  <p style="color:#888;font-size:13px;margin-top:4px;">Your voucher offer was removed</p>
+  <p style="margin:18px 0 8px 0;color:#555;font-size:15px;line-height:1.6;">
+    אדמין נקסוס לא אישר את ההצעה שלך <strong>"${offerTitle}"</strong>.
+  </p>
+  <p style="color:#888;font-size:13px;line-height:1.6;">
+    A NEXUS admin did not approve your offer <strong>"${offerTitle}"</strong>.
+  </p>
+</td></tr>
+<tr><td align="center" style="padding:24px 0 8px 0;">
+  <a href="${escapeHtml(dashboardUrl)}" style="background:#111;color:white;padding:15px 36px;border-radius:10px;font-size:16px;font-weight:bold;text-decoration:none;display:inline-block;">
+    לדשבורד / Open Dashboard
+  </a>
+</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+  const text = `הצעת השובר בוטלה\nאדמין נקסוס לא אישר את ההצעה שלך "${offer.title}".\nA NEXUS admin did not approve your offer.\n${dashboardUrl}`;
+
+  try {
+    await sendMail({ to, subject: 'הצעת השובר בוטלה', html, text, _label: 'OFFER-REMOVED-BY-ADMIN' });
+  } catch (err) {
+    console.error(`[VOUCHER-APPROVAL] Failed to send offer-removed email to ${to}:`, err);
+  }
+}
+
+/**
  * Convenience helper: reads NEXUS_ADMIN_EMAILS from env and returns the list.
  * Used by offer routes so they don't need to import env directly.
  *
