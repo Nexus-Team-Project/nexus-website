@@ -16,7 +16,7 @@ import {
   getOnboardingCollections,
 } from '../models/onboarding.models';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
-import { DEFAULT_MEMBER_SERVICES } from '../models/domain/tenant.models';
+import { DEFAULT_MEMBER_SERVICES, type LogoCrop } from '../models/domain/tenant.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
 import { getDomainAuthorizationContext, getPrimaryTenantRole, hasDomainPermission } from './domain-authorization.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
@@ -89,6 +89,8 @@ export interface MeResponse {
     /** Cloudinary URL of the tenant's logo, or null -> the dashboard shows the
      *  tenant-name initials. */
     tenantLogoUrl?: string | null;
+    /** Crop of the logo (normalized fractions), or null -> show the full logo. */
+    tenantLogoCrop?: LogoCrop | null;
     /** Org brand color ("#rrggbb"), or null -> wallet derives one from the id. */
     tenantBrandColor?: string | null;
   };
@@ -476,7 +478,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const tenantBrandingDoc = context.tenantId
     ? await getTenantDomainCollections(db).domainTenants.findOne(
         { tenantId: context.tenantId },
-        { projection: { logoUrl: 1, brandColor: 1 } },
+        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1 } },
       )
     : null;
 
@@ -486,6 +488,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
       ...context,
       mode: resolvedMode,
       tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
+      tenantLogoCrop: tenantBrandingDoc?.logoCrop ?? null,
       tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
       ...(planSummary && {
         plan: planSummary.plan,

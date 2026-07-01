@@ -55,12 +55,31 @@ export type CatalogAdoptionMode = typeof CATALOG_ADOPTION_MODES[number];
 export type DefaultPricingRule = typeof DEFAULT_PRICING_RULES[number];
 export type TenantMemberInvitationStatus = typeof TENANT_MEMBER_INVITATION_STATUSES[number];
 
+/**
+ * Normalized crop of the tenant logo relative to the PRISTINE original (fractions
+ * 0..1). Applied at display time (Cloudinary transform), so the crop can be changed
+ * or reverted (cleared) without re-uploading the image. Mirrors the offer imageCrop shape.
+ */
+export const logoCropSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  width: z.number().gt(0).max(1),
+  height: z.number().gt(0).max(1),
+  aspect: z.number().positive().optional(),
+  naturalWidth: z.number().positive().optional(),
+  naturalHeight: z.number().positive().optional(),
+});
+export type LogoCrop = z.infer<typeof logoCropSchema>;
+
 export const domainTenantSchema = z.object({
   tenantId: z.string().min(1),
   organizationName: z.string().min(1).max(255),
-  // Cloudinary URL of the organization logo. Absent -> the UI shows the
-  // tenant-name initials (only the Nexus ecosystem catalog uses the Nexus logo).
+  // Cloudinary URL of the organization logo (the PRISTINE original). Absent -> the
+  // UI shows the tenant-name initials (only the Nexus ecosystem catalog uses Nexus logo).
   logoUrl: z.string().url().optional(),
+  // Crop of the logo (normalized fractions), applied at display time. Absent/null =
+  // show the full logo. Lets the crop be adjusted or reverted without re-upload.
+  logoCrop: logoCropSchema.nullable().optional(),
   // Organization brand color as a 6-digit hex (e.g. "#635bff"). This is the
   // accent color wallet members see the first time they sign in to this
   // tenant's benefits. Absent -> the wallet derives a deterministic color from
