@@ -561,15 +561,10 @@ router.post(
       // These checks cannot be expressed in Zod without knowing the final visibility.
       const d = parsed.data;
       if (d.executionType === 'voucher') {
-        // Every voucher offer must declare its validity TYPE default; the per-unit
-        // validity VALUE is set later at the inventory route. See voucher-validity-dating.
-        if (!d.defaultValidityType) {
-          res.status(400).json({
-            error: 'Voucher offers require a validity type (limit or from_until)',
-            errorHe: 'שובר מחייב בחירת סוג תוקף (הגבלת זמן או טווח תאריכים)',
-          });
-          return;
-        }
+        // Validity TYPE is no longer chosen at the offer level - it is set per
+        // inventory BATCH at the inventory route (see voucher-unit-level-dating).
+        // `defaultValidityType` remains an optional stored hint only; it is NOT
+        // required to publish. Do not re-add an offer-level validity-type gate here.
         if (d.variants && d.variants.length > 0) {
           const vr = validateVoucherVariants(d.variants);
           if (!vr.ok) {
