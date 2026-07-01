@@ -56,6 +56,8 @@ import {
 } from '../services/voucher-approval-email.service';
 import { getIdentityDomainCollections } from '../models/domain/identity.models';
 import { getOnboardingStatus } from '../services/onboarding.service';
+import { env } from '../config/env';
+import { isEcosystemBusinessSetupGateEnforced } from '../services/supply-ecosystem-gate.helper';
 
 const router = Router();
 
@@ -544,7 +546,13 @@ router.post(
       // Ecosystem offers require business setup to be complete so the tenant has
       // a valid business profile before advertising to the entire platform.
       // Uses getOnboardingStatus (same logic as /api/me) for consistency across all tenant types.
-      if (finalVisibility === 'ecosystem' && !ctx.isPlatformAdmin) {
+      // DEV ONLY: outside production the gate is relaxed so the global-upload flow can be
+      // tested locally without completing business setup. Production always enforces it.
+      if (
+        finalVisibility === 'ecosystem'
+        && !ctx.isPlatformAdmin
+        && isEcosystemBusinessSetupGateEnforced(env.NODE_ENV)
+      ) {
         const { onboarding } = await getOnboardingStatus(req.user!.sub);
         if (onboarding.step === 'business_setup') {
           res.status(403).json({
@@ -1070,7 +1078,9 @@ router.post(
       );
       const isOwnOffer = targetOffer?.createdByTenantId === tenantId;
 
-      if (!isOwnOffer) {
+      // DEV ONLY: outside production the business-setup gate is relaxed so the
+      // global adopt flow can be tested locally. Production always enforces it.
+      if (!isOwnOffer && isEcosystemBusinessSetupGateEnforced(env.NODE_ENV)) {
         const { onboarding } = await getOnboardingStatus(req.user!.sub);
         if (onboarding.step === 'business_setup') {
           res.status(403).json({
