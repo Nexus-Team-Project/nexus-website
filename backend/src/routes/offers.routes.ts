@@ -34,6 +34,7 @@ import { setTenantVoucherPrice } from '../services/tenant-pricing.service';
 import { approveOffer, denyOffer } from '../services/supply-approval.service';
 import {
   getTenantCatalogView,
+  getTenantOfferDetail,
   getMemberCatalogView,
   adoptOffer,
   excludeOffer,
@@ -52,6 +53,7 @@ import {
   sendVoucherApprovedEmail,
   sendVoucherDeniedEmail,
   sendVoucherWithdrawnEmail,
+  sendOfferRemovedByAdminEmail,
   getConfiguredAdminEmails,
 } from '../services/voucher-approval-email.service';
 import { getIdentityDomainCollections } from '../models/domain/identity.models';
@@ -1022,19 +1024,36 @@ router.delete(
       const ctx = await resolveTenantContextWithPermission(req, 'supply.manage_offers');
       const deletedOffer = await deleteOffer(req.params.offerId, ctx.tenantId, ctx.isPlatformAdmin ?? false);
 
-      // If the offer was pending admin review, notify them that it was withdrawn.
+      // Notify about a deleted pending offer. Two cases:
+      //  - A platform admin removed it -> tell the SUPPLIER their offer was not
+      //    approved (admin-delete of a pending offer acts as a soft denial).
+      //  - The supplier withdrew their own -> tell the admins they need not review.
       if (deletedOffer.status === 'pending_approval') {
-        const adminEmails = getConfiguredAdminEmails();
         try {
           const db = await getMongoDb();
-          const tenantCollections = getTenantDomainCollections(db);
-          const tenantDoc = await tenantCollections.domainTenants.findOne({ tenantId: ctx.tenantId });
-          const supplierName = tenantDoc?.organizationName ?? ctx.tenantId;
-          sendVoucherWithdrawnEmail(adminEmails, deletedOffer, supplierName).catch((err) => {
-            console.error('[OFFERS] Withdrawn email failed:', err);
-          });
+          if (ctx.isPlatformAdmin) {
+            // Admin removed a SUPPLIER's offer -> tell that supplier it was not
+            // approved. An admin deleting their own offer notifies no one.
+            if (deletedOffer.createdByTenantId !== ctx.tenantId) {
+              const identityCollections = getIdentityDomainCollections(db);
+              const identity = await identityCollections.nexusIdentities.findOne({ nexusIdentityId: deletedOffer.createdByIdentityId });
+              if (identity?.normalizedEmail) {
+                sendOfferRemovedByAdminEmail(identity.normalizedEmail, deletedOffer).catch((err) => {
+                  console.error('[OFFERS] Offer-removed email failed:', err);
+                });
+              }
+            }
+          } else {
+            // Supplier withdrew their own pending offer: notify platform admins.
+            const tenantCollections = getTenantDomainCollections(db);
+            const tenantDoc = await tenantCollections.domainTenants.findOne({ tenantId: ctx.tenantId });
+            const supplierName = tenantDoc?.organizationName ?? ctx.tenantId;
+            sendVoucherWithdrawnEmail(getConfiguredAdminEmails(), deletedOffer, supplierName).catch((err) => {
+              console.error('[OFFERS] Withdrawn email failed:', err);
+            });
+          }
         } catch (err) {
-          console.error('[OFFERS] Could not resolve supplier name for withdrawn email:', err);
+          console.error('[OFFERS] Could not send pending-offer deletion email:', err);
         }
       }
 
@@ -1557,13 +1576,11 @@ router.get(
   authenticate,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { tenantId } = await resolveTenantContext(req);
-      // Detail view: fetch a single page large enough that the target offer
-      // will be on it for typical catalogs. We pass page=1, limit=100 so the
-      // existing in-memory find works without changing the contract. Once we
-      // have a dedicated single-offer endpoint we can drop this.
-      const result = await getTenantCatalogView(tenantId, { page: 1, limit: 100 });
-      const offer = result.items.find((i) => i.offerId === req.params.offerId);
+      const { tenantId, isPlatformAdmin } = await resolveTenantContext(req);
+      // Direct single-offer lookup: includes the tenant's OWN offers of any
+      // visibility (ecosystem or tenant_only) so the edit flow works, and is not
+      // limited to a page of the ecosystem-only browse view.
+      const offer = await getTenantOfferDetail(tenantId, req.params.offerId, { isPlatformAdmin });
       if (!offer) {
         res.status(404).json({ error: 'Offer not found' });
         return;
