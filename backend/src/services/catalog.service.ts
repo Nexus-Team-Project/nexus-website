@@ -181,6 +181,10 @@ export interface CatalogVariant {
   face_value?: number;
   nexus_cost?: number;
   member_price?: number;
+  /** Raw offer base sale price (member_price) before this tenant's markup. */
+  baseMemberPrice?: number;
+  /** This tenant's stored markup % for the variant (0 when none). */
+  tenantMarkupPct?: number;
   voucherStackable?: boolean | null;
   sku?: string | null;
   tags?: string[];
@@ -218,6 +222,8 @@ function toItem(
     effectiveMemberPrice?: number;
     /** Per-tenant per-variant price overrides (variantId -> member price). */
     effectiveVariantPrices?: Record<string, number>;
+    /** Per-tenant per-variant markup % (variantId -> pct). */
+    effectiveVariantMarkup?: Record<string, number>;
   },
 ): CatalogItem {
   const now = Date.now();
@@ -296,6 +302,8 @@ function toItem(
         ...(v.face_value !== undefined && { face_value: v.face_value }),
         ...(context.canSeeNexusCost && v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
         ...(effPrice !== undefined && { member_price: effPrice }),
+        ...(v.member_price !== undefined && { baseMemberPrice: v.member_price }),
+        tenantMarkupPct: context.effectiveVariantMarkup?.[v.variantId] ?? 0,
         voucherStackable: v.voucherStackable ?? null,
         sku: v.sku ?? null,
         tags: v.tags ?? [],
@@ -408,6 +416,7 @@ export async function getTenantCatalogView(
       isPlatformAdmin,
       canSeeNexusCost,
       ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+      ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
     });
 
     return {

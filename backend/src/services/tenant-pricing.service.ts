@@ -19,17 +19,22 @@ import {
   type OfferVariant,
 } from '../models/domain/supply.models';
 import { VARIANT_ID_REGEX } from '../models/domain/supply-variants.models';
-import { computeTenantDisplayPrice } from './supply-price.helper';
+import { computeTenantDisplayPrice, markupToPrice, clampMarkupPct } from './supply-price.helper';
 
 /** Input contract for setTenantVoucherPrice. */
 export interface SetTenantVoucherPriceInput {
   tenantId: string;
   offerId: string;
-  memberPrice: number;
   /**
-   * When set, the price is stored for THIS variant only (per-variant per-tenant
-   * pricing). Omitted -> the legacy offer-level memberPrice path. Required for
-   * multi-variant vouchers; the bounds come from the variant, not the offer.
+   * Markup percentage on the base sale price (>= 0). The effective price is
+   * `min(base*(1+pct/100), face_value)`; the % is clamped into the offer/variant
+   * headroom before it is applied and stored.
+   */
+  markupPct: number;
+  /**
+   * When set, the % is stored for THIS variant only (per-variant per-tenant
+   * pricing). Omitted -> the legacy offer-level path. Required for
+   * multi-variant vouchers; the base/ceiling come from the variant, not the offer.
    */
   variantId?: string;
 }
@@ -65,6 +70,51 @@ function lowestEffectiveVariantPrice(
 }
 
 /**
+ * Build a per-variant bounds map { variantId -> { base, face } } from the offer's
+ * variants. base = member_price (the number the markup % applies to), falling back
+ * to nexus_cost; face = face_value. Variants missing either are skipped.
+ */
+function boundsByVariant(
+  variants: OfferVariant[],
+): Map<string, { base: number; face: number }> {
+  const m = new Map<string, { base: number; face: number }>();
+  for (const v of variants) {
+    const base = v.member_price ?? v.nexus_cost;
+    if (typeof base === 'number' && typeof v.face_value === 'number') {
+      m.set(v.variantId, { base, face: v.face_value });
+    }
+  }
+  return m;
+}
+
+/**
+ * Recompute one config's cached voucher prices from its stored markup % after the
+ * offer's variant bounds changed. For each variant the config has a % for:
+ *   - clamp the % into the variant's new [0, maxMarkupPct] headroom, and
+ *   - set price = markupToPrice(newBase, newFace, clampedPct).
+ * Variants with no stored % are left untouched (handled by the caller's legacy
+ * clamp/snap). Pure: no I/O. Returns the next maps + whether anything changed.
+ */
+export function recomputeConfigMarkup(
+  markup: Record<string, number>,
+  prices: Record<string, number>,
+  bounds: Map<string, { base: number; face: number }>,
+): { markup: Record<string, number>; prices: Record<string, number>; changed: boolean } {
+  const nextMarkup = { ...markup };
+  const nextPrices = { ...prices };
+  let changed = false;
+  for (const [vid, pct] of Object.entries(markup)) {
+    const b = bounds.get(vid);
+    if (!b) continue;
+    const clamped = clampMarkupPct(pct, b.base, b.face);
+    const price = markupToPrice(b.base, b.face, clamped);
+    if (clamped !== nextMarkup[vid]) { nextMarkup[vid] = clamped; changed = true; }
+    if (price !== nextPrices[vid]) { nextPrices[vid] = price; changed = true; }
+  }
+  return { markup: nextMarkup, prices: nextPrices, changed };
+}
+
+/**
  * Re-clamp every per-tenant member-price override for an offer back into each
  * variant's [nexus_cost, face_value] window after the offer's deal pricing was
  * edited (tenant_only offers, where the owning tenant may change nexus_cost /
@@ -81,39 +131,39 @@ export async function clampTenantVariantPricesToBounds(
   offerId: string,
   variants: OfferVariant[],
 ): Promise<void> {
-  const bounds = new Map<string, { floor: number; ceil: number }>();
-  for (const v of variants) {
-    if (typeof v.nexus_cost === 'number' && typeof v.face_value === 'number') {
-      bounds.set(v.variantId, { floor: v.nexus_cost, ceil: v.face_value });
-    }
-  }
+  const bounds = boundsByVariant(variants);
   if (bounds.size === 0) return;
 
   const db = await getMongoDb();
   const { tenantOfferConfigs } = getSupplyDomainCollections(db);
-  // Only rows that actually hold per-variant overrides can be out of bounds.
+  // Rows holding a per-variant markup % OR an absolute override can be out of sync.
   const configs = await tenantOfferConfigs
-    .find({ offerId, variantPrices: { $exists: true } })
+    .find({ offerId, $or: [{ variantMarkupPct: { $exists: true } }, { variantPrices: { $exists: true } }] })
     .toArray();
 
   for (const cfg of configs) {
-    const current = cfg.variantPrices ?? {};
-    const next: Record<string, number> = { ...current };
-    let changed = false;
-    for (const [variantId, price] of Object.entries(current)) {
-      const b = bounds.get(variantId);
-      if (!b) continue;
-      const clamped = Math.min(Math.max(price, b.floor), b.ceil);
-      if (clamped !== price) {
-        next[variantId] = clamped;
-        changed = true;
-      }
+    // 1. Recompute %-backed prices from the new base + clamp the % to new headroom.
+    const rec = recomputeConfigMarkup(cfg.variantMarkupPct ?? {}, cfg.variantPrices ?? {}, bounds);
+    const nextMarkup = rec.markup;
+    const nextPrices = rec.prices;
+    let changed = rec.changed;
+
+    // 2. Legacy: clamp any absolute override that has NO stored % into its
+    //    [nexus_cost, face_value] window (preserves the adopter's margin).
+    for (const [variantId, price] of Object.entries(nextPrices)) {
+      if (variantId in nextMarkup) continue; // handled by the markup recompute above
+      const v = variants.find((x) => x.variantId === variantId);
+      if (!v || typeof v.face_value !== 'number') continue;
+      const floor = v.nexus_cost ?? v.member_price ?? 0;
+      const clamped = Math.min(Math.max(price, floor), v.face_value);
+      if (clamped !== price) { nextPrices[variantId] = clamped; changed = true; }
     }
+
     if (!changed) continue;
-    const displayPrice = lowestEffectiveVariantPrice(variants, next);
+    const displayPrice = lowestEffectiveVariantPrice(variants, nextPrices);
     await tenantOfferConfigs.updateOne(
       { configId: cfg.configId },
-      { $set: { variantPrices: next, ...(displayPrice !== undefined ? { displayPrice } : {}) } },
+      { $set: { variantMarkupPct: nextMarkup, variantPrices: nextPrices, ...(displayPrice !== undefined ? { displayPrice } : {}) } },
     );
   }
 }
@@ -144,61 +194,68 @@ export async function resetTenantPricesForChangedVariants(
 ): Promise<void> {
   if (changedVariantIds.size === 0) return;
 
-  const bounds = new Map<string, { floor: number; ceil: number }>();
-  for (const v of variants) {
-    if (typeof v.nexus_cost === 'number' && typeof v.face_value === 'number') {
-      bounds.set(v.variantId, { floor: v.nexus_cost, ceil: v.face_value });
-    }
-  }
+  const bounds = boundsByVariant(variants);
 
   const db = await getMongoDb();
   const { tenantOfferConfigs } = getSupplyDomainCollections(db);
-  // Rows carrying EITHER kind of per-tenant override can be out of sync.
+  // Rows carrying a per-variant % / absolute override, or a legacy offer-level
+  // cache, can be out of sync after the owner changed the sale price.
   const configs = await tenantOfferConfigs
-    .find({ offerId, $or: [{ variantPrices: { $exists: true } }, { memberPrice: { $exists: true } }] })
+    .find({ offerId, $or: [{ variantMarkupPct: { $exists: true } }, { variantPrices: { $exists: true } }, { memberPrice: { $exists: true } }] })
     .toArray();
 
   for (const cfg of configs) {
-    const next: Record<string, number> = { ...(cfg.variantPrices ?? {}) };
-    let changed = false;
-    // Drop overrides for variants whose sale price changed (snap to new base).
-    for (const vid of changedVariantIds) {
-      if (vid in next) { delete next[vid]; changed = true; }
-    }
-    // Clamp the overrides that remain into their (possibly new) bounds.
-    for (const [vid, price] of Object.entries(next)) {
-      const b = bounds.get(vid);
-      if (!b) continue;
-      const clamped = Math.min(Math.max(price, b.floor), b.ceil);
-      if (clamped !== price) { next[vid] = clamped; changed = true; }
-    }
-    // The legacy offer-level memberPrice is no longer authoritative once the owner
-    // edits per-variant deal pricing; clear it so the base price shows through.
-    const clearMember = cfg.memberPrice !== undefined;
-    if (!changed && !clearMember) continue;
+    // 1. Recompute %-backed prices from the new base (the % persists; the cached
+    //    price snaps to base*(1+pct/100)).
+    const rec = recomputeConfigMarkup(cfg.variantMarkupPct ?? {}, cfg.variantPrices ?? {}, bounds);
+    const nextMarkup = rec.markup;
+    const nextPrices = rec.prices;
+    let changed = rec.changed;
 
-    const displayPrice = lowestEffectiveVariantPrice(variants, next);
+    // 2. Legacy absolute-only variants (no stored %): drop the override for a
+    //    variant whose sale price changed (snap to new base), clamp the rest.
+    for (const vid of changedVariantIds) {
+      if (vid in nextMarkup) continue; // handled by the markup recompute above
+      if (vid in nextPrices) { delete nextPrices[vid]; changed = true; }
+    }
+    for (const [vid, price] of Object.entries(nextPrices)) {
+      if (vid in nextMarkup) continue;
+      const v = variants.find((x) => x.variantId === vid);
+      if (!v || typeof v.face_value !== 'number') continue;
+      const floor = v.nexus_cost ?? v.member_price ?? 0;
+      const clamped = Math.min(Math.max(price, floor), v.face_value);
+      if (clamped !== price) { nextPrices[vid] = clamped; changed = true; }
+    }
+
+    // 3. Clear the legacy offer-level cache (memberPrice + markupPct) so the base
+    //    price shows through once the owner edits per-variant deal pricing.
+    const clearLegacy = cfg.memberPrice !== undefined || cfg.markupPct !== undefined;
+    if (!changed && !clearLegacy) continue;
+
+    const displayPrice = lowestEffectiveVariantPrice(variants, nextPrices);
     const setDoc: Record<string, unknown> = {
-      variantPrices: next,
+      variantMarkupPct: nextMarkup,
+      variantPrices: nextPrices,
       ...(displayPrice !== undefined ? { displayPrice } : {}),
     };
     await tenantOfferConfigs.updateOne(
       { configId: cfg.configId },
-      clearMember ? { $set: setDoc, $unset: { memberPrice: '' } } : { $set: setDoc },
+      clearLegacy ? { $set: setDoc, $unset: { memberPrice: '', markupPct: '' } } : { $set: setDoc },
     );
   }
 }
 
 /**
- * Set the per-tenant voucher member price.
+ * Set the per-tenant voucher markup percentage.
  *
  * Steps:
  *   1. Load offer by offerId; ensure it exists and is a voucher.
- *   2. Bounds-check memberPrice against [nexus_cost, face_value].
+ *   2. Resolve base (member_price) + ceiling (face_value); clamp the % into
+ *      [0, maxMarkupPct] and compute the cached effective price.
  *   3. Verify an active TenantOfferConfig row exists for this tenant.
- *   4. Recompute displayPrice via computeTenantDisplayPrice.
- *   5. Persist memberPrice (+ displayPrice when defined) and return the
- *      refreshed config row.
+ *   4. Recompute displayPrice from the cached price.
+ *   5. Persist the % + its cached price (+ displayPrice when defined) and return
+ *      the refreshed config row.
  *
  * Output:
  *   { ok: true, config }  - updated TenantOfferConfig row
@@ -210,7 +267,7 @@ export async function setTenantVoucherPrice(
   | { ok: true; config: TenantOfferConfig }
   | { ok: false; reason: SetTenantVoucherPriceError }
 > {
-  const { tenantId, offerId, memberPrice, variantId } = input;
+  const { tenantId, offerId, markupPct, variantId } = input;
 
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
@@ -227,10 +284,11 @@ export async function setTenantVoucherPrice(
     return { ok: false, reason: 'not_voucher' };
   }
 
-  // 3. Resolve the price bounds. Per-variant: the bounds come from the named
-  //    variant. Offer-level (legacy): from the offer's mirrored fields. The
-  //    variantId is format-checked so it is always safe as a Mongo dot-path key.
-  let floor: number | null | undefined;
+  // 3. Resolve base (the number the % applies to = member_price) + ceiling
+  //    (face_value). Per-variant: from the named variant. Offer-level (legacy):
+  //    from the offer's mirrored fields. The variantId is format-checked so it is
+  //    always safe as a Mongo dot-path key.
+  let base: number | null | undefined;
   let ceiling: number | null | undefined;
   if (variantId !== undefined) {
     if (!VARIANT_ID_REGEX.test(variantId)) {
@@ -240,25 +298,18 @@ export async function setTenantVoucherPrice(
     if (!variant) {
       return { ok: false, reason: 'variant_not_found' };
     }
-    floor = variant.nexus_cost;
+    base = variant.member_price ?? variant.nexus_cost;
     ceiling = variant.face_value;
   } else {
-    floor = offer.nexus_cost;
+    base = offer.member_price ?? offer.nexus_cost;
     ceiling = offer.face_value;
   }
 
-  // 4. Bounds-check. nexus_cost is the floor (we never sell below cost) and
-  //    face_value is the ceiling (we never sell above the printed value of
-  //    the voucher). Missing either bound means it is misconfigured for
-  //    per-tenant pricing - reject conservatively.
-  if (
-    floor === undefined ||
-    floor === null ||
-    ceiling === undefined ||
-    ceiling === null ||
-    memberPrice < floor ||
-    memberPrice > ceiling
-  ) {
+  // 4. Base + ceiling must be configured. The markup floor is 0% (= base sale
+  //    price); face_value is the ceiling (the effective price is capped there).
+  //    Missing either means the offer/variant is misconfigured for per-tenant
+  //    pricing - reject conservatively.
+  if (base === undefined || base === null || ceiling === undefined || ceiling === null) {
     return { ok: false, reason: 'out_of_bounds' };
   }
 
@@ -273,28 +324,34 @@ export async function setTenantVoucherPrice(
     return { ok: false, reason: 'not_adopted' };
   }
 
-  // 6. Recompute denormalized displayPrice so catalog server-side sort/filter
-  //    sees the tenant override immediately, and build the $set.
+  // 6. Clamp the % into the headroom, compute the cached effective price, and
+  //    build the $set. The stored % is the tenant's intent; variantPrices /
+  //    memberPrice is its cached projection so the catalog read/sort/filter path
+  //    is unchanged.
+  const pct = clampMarkupPct(markupPct, base, ceiling);
+  const price = markupToPrice(base, ceiling, pct);
   let update: Record<string, unknown>;
   if (variantId !== undefined) {
-    // Per-variant: merge into the variantPrices map and derive displayPrice from
-    // the lowest effective price across all variants.
-    const nextOverrides = { ...(existing.variantPrices ?? {}), [variantId]: memberPrice };
+    // Per-variant: store the % + its cached price, derive displayPrice from the
+    // lowest effective price across all variants.
+    const nextOverrides = { ...(existing.variantPrices ?? {}), [variantId]: price };
     const displayPrice = lowestEffectiveVariantPrice(offer.variants, nextOverrides);
     update = {
-      [`variantPrices.${variantId}`]: memberPrice,
+      [`variantMarkupPct.${variantId}`]: pct,
+      [`variantPrices.${variantId}`]: price,
       ...(displayPrice !== undefined ? { displayPrice } : {}),
     };
   } else {
     const displayPrice = computeTenantDisplayPrice(
       offer.executionType,
-      memberPrice,
+      price,
       offer.displayPrice,
       offer.member_price,
       offer.market_price,
     );
     update = {
-      memberPrice,
+      memberPrice: price,
+      markupPct: pct,
       ...(displayPrice !== undefined ? { displayPrice } : {}),
     };
   }
