@@ -24,11 +24,12 @@ import { syncDomainTenantMembership } from './domain-tenant-sync.service';
 import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 import type { DomainPermission } from './domain-permissions.service';
 import { getTenantPlanSummary, type TenantPlanSummary } from './domain-tenant-plan.service';
+import { isNoTenantPlatformAdmin } from './onboarding-admin.helper';
 
 export interface UserContext {
   isTenant: boolean;
   isMember: boolean;
-  mode: 'tenant' | 'regular_user' | 'workspace_setup_deferred' | 'needs_workspace_setup';
+  mode: 'tenant' | 'regular_user' | 'workspace_setup_deferred' | 'needs_workspace_setup' | 'platform_admin';
   tenantId: string | null;
   tenantName: string | null;
   memberId: string | null;
@@ -437,6 +438,14 @@ export async function getMe(userId: string): Promise<MeResponse> {
 
   const baseAuthorization = getDashboardAuthorization(user.email, context, domainAuthorization.permissions);
 
+  // A NEXUS platform admin with no tenant/member has nothing to onboard: report a
+  // terminal 'platform_admin' mode and clear onboarding so the dashboard lands them
+  // on Home instead of the workspace-setup wizard. Admins who ARE tenant members
+  // keep their normal 'tenant' mode.
+  const noTenantAdmin = isNoTenantPlatformAdmin(baseAuthorization.isPlatformAdmin === true, context);
+  const resolvedMode = noTenantAdmin ? ('platform_admin' as const) : context.mode;
+  const resolvedOnboarding = noTenantAdmin ? { required: false, step: null } : status.onboarding;
+
   // Wallet RouterScreen payload - cards the user sees right after login.
   // Lives in its own helper so getMe does not grow further (file is already
   // at the size cap; new auth logic goes in services/auth/).
@@ -475,6 +484,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
     user: { id: user.id, email: user.email, name: user.fullName, avatarUrl: user.avatarUrl ?? null },
     context: {
       ...context,
+      mode: resolvedMode,
       tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
       tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
       ...(planSummary && {
@@ -495,7 +505,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
       memberServices,
       businessSetupComplete,
     },
-    onboarding: status.onboarding,
+    onboarding: resolvedOnboarding,
     memberships: walletRouter.memberships,
     isPlatformAdmin: walletRouter.isPlatformAdmin,
     canOpenDashboard: walletRouter.canOpenDashboard,
