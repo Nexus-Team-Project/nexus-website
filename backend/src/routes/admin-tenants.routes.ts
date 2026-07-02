@@ -10,7 +10,6 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
-import { env } from '../config/env';
 import { resolveTenantContext } from '../utils/resolve-tenant-context';
 import { listAllTenants, setTenantAutoApprove } from '../services/admin-tenants.service';
 
@@ -37,9 +36,9 @@ const listQuery = z.object({
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = listQuery.parse(req.query);
-    // In production, scope the list to organizations that passed business setup;
-    // in development show everyone who opened an org.
-    res.json(await listAllTenants({ ...q, businessSetupPassedOnly: env.NODE_ENV === 'production' }));
+    // The list is scoped to business-setup-APPROVED tenants (M8) in the service,
+    // in dev and prod alike.
+    res.json(await listAllTenants(q));
   } catch (e) {
     next(e);
   }

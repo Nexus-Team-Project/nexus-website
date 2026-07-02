@@ -104,6 +104,21 @@ export const domainTenantSchema = z.object({
    * Absent on tenants created before this field = treated as false (not trusted).
    */
   autoApproveOffers: z.boolean().default(false),
+  /**
+   * NEXUS-admin approval of this tenant's business setup (Phase 2 M8). Absent =
+   * never submitted. Set to 'pending' when business setup is submitted (or via
+   * the dev-only shortcut, which also sets devMode:true); a platform admin moves
+   * it to 'approved' or 'denied' (denied carries a free-text reason). Production
+   * global-offer publish + Go Live require status 'approved'.
+   */
+  businessSetupApproval: z.object({
+    status: z.enum(['pending', 'approved', 'denied']),
+    reason: z.string().max(1000).optional(),
+    devMode: z.boolean().optional(),
+    submittedAt: z.date().optional(),
+    reviewedByEmail: z.string().optional(),
+    reviewedAt: z.date().optional(),
+  }).optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

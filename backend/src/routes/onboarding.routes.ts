@@ -12,6 +12,7 @@ import {
   workspaceSetupRequestSchema,
 } from '../schemas/onboarding.schemas';
 import * as onboardingService from '../services/onboarding.service';
+import { env } from '../config/env';
 
 const router = Router();
 
@@ -97,6 +98,19 @@ router.post(
     }
   },
 );
+
+// DEV-ONLY: send a business-setup approval request without completing the full
+// form (M8), so the global-upload / Go-Live gates can be exercised locally.
+// HARD-DISABLED in production so it can never bypass real business setup.
+router.post('/business-setup/dev-request', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (env.NODE_ENV === 'production') { res.status(404).json({ error: 'not_found' }); return; }
+    await onboardingService.submitDevBusinessSetupRequest(req.user!.sub);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/onboarding/wizard-draft', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
