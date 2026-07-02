@@ -425,6 +425,12 @@ export const nexusOfferSchema = z.object({
   deletedAt: z.date().nullable().optional(),
   createdByTenantId: z.string().min(1),
   createdByIdentityId: z.string().min(1),
+  /**
+   * M9: the ACTING uploader's identity when a platform admin uploaded this offer
+   * ON BEHALF of the tenant (createdByIdentityId is the tenant owner). Absent for
+   * self-uploaded offers. Drives the admin's Product Catalog view.
+   */
+  uploadedByIdentityId: z.string().min(1).optional(),
   invitedByTenantId: z.string().min(1).optional(),
   createdAt: z.date(),
   updatedAt: z.date(),

@@ -78,6 +78,13 @@ describe('getTenantCatalogView browse scope (global-only)', () => {
     const ids = res.items.map((i) => i.offerId);
     expect(ids.sort()).toEqual(['eco_own', 'ten_own']);
   });
+
+  it('admin ownedOnly view returns on-behalf-uploaded offers (uploadedByIdentityId set)', async () => {
+    // M9: a platform admin's Product Catalog lists offers uploaded on behalf.
+    await seedOffer({ offerId: 'ob1', visibility: 'ecosystem', createdByTenantId: CALLER, uploadedByIdentityId: 'admin1' });
+    const res = await getTenantCatalogView('nexus_platform', { page: 1, limit: 50, ownedOnly: true }, { isPlatformAdmin: true });
+    expect(res.items.map((i) => i.offerId)).toEqual(['ob1']);
+  });
 });
 
 describe('getTenantOfferDetail (single-offer, edit flow)', () => {

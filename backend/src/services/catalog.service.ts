@@ -359,11 +359,14 @@ export async function getTenantCatalogView(
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  // ownedOnly: restrict to offers this tenant created (the Product Catalog page).
-  // Otherwise this is the Benefits Partnerships GLOBAL catalog: ecosystem-only
-  // (M5). The tenant's own tenant_only offers live in Product Catalog, not here.
+  // ownedOnly: the Product Catalog page. For a tenant, its own offers. For a
+  // PLATFORM ADMIN (M9), the offers they uploaded ON BEHALF of tenants
+  // (uploadedByIdentityId set) - admins have no own-tenant offers. Otherwise this
+  // is the Benefits Partnerships GLOBAL catalog: ecosystem-only (M5).
   const scopeClause = query.ownedOnly
-    ? { createdByTenantId: tenantId }
+    ? (options?.isPlatformAdmin
+        ? { uploadedByIdentityId: { $exists: true } }
+        : { createdByTenantId: tenantId })
     : { visibility: 'ecosystem' };
   const baseStatusClause = { $or: [
     { status: 'active' },
