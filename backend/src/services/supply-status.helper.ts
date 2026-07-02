@@ -65,3 +65,22 @@ export function resolveStatusReasonValue(
     (STATUS_TRANSITIONS_REQUIRING_REASON as readonly string[]).includes(nextStatus);
   return requiresReason ? undefined : null;
 }
+
+/**
+ * Decides a newly-created offer's status (M7).
+ * Ecosystem offers enter 'pending_approval' unless the creating tenant is
+ * trusted (auto-approve) OR forceActive is set (an admin uploading on behalf
+ * implicitly approves). Non-ecosystem offers are always 'active'.
+ *
+ * Input: visibility, whether the tenant is trusted, and the forceActive flag.
+ * Output: 'active' | 'pending_approval'.
+ */
+export function resolveCreateStatus(input: {
+  visibility: 'ecosystem' | 'tenant_only';
+  trusted: boolean;
+  forceActive: boolean;
+}): 'active' | 'pending_approval' {
+  if (input.visibility !== 'ecosystem') return 'active';
+  if (input.forceActive || input.trusted) return 'active';
+  return 'pending_approval';
+}

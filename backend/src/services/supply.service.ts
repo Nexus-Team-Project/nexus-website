@@ -36,6 +36,7 @@ import { defaultOfferImageUrl } from '../utils/cloudinary';
 import {
   assertStatusReasonProvided,
   resolveStatusReasonValue,
+  resolveCreateStatus,
 } from './supply-status.helper';
 import {
   uploadOfferImages,
@@ -130,6 +131,11 @@ export interface CreateOfferInput {
   createdByTenantId: string;
   /** MongoDB identityId of the authenticated user creating the offer. */
   createdByIdentityId: string;
+  /**
+   * M7: force an ecosystem offer to 'active' instead of 'pending_approval' - set
+   * when a platform admin uploads on behalf of a tenant (implicit approval).
+   */
+  forceActiveStatus?: boolean;
 }
 
 /**
@@ -310,14 +316,14 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   const resolvedDefaultValidityType = isVoucher ? (input.defaultValidityType ?? null) : null;
 
   // Voucher ecosystem offers enter pending_approval so a platform admin can review
-  // pricing (especially nexus_cost) before the offer goes live to all tenants.
-  let status: NexusOffer['status'] =
-    executionType === 'voucher' && input.visibility === 'ecosystem'
-      ? 'pending_approval'
-      : 'active';
-  // Trusted tenants (autoApproveOffers) skip approval: their ecosystem offers go live.
-  if (status === 'pending_approval' && await isTenantAutoApprove(input.createdByTenantId)) {
-    status = 'active';
+  // pricing (especially nexus_cost) before the offer goes live to all tenants -
+  // unless the creating tenant is trusted (autoApproveOffers) OR forceActiveStatus
+  // is set (M7: an admin uploading on behalf implicitly approves). Every other
+  // offer is 'active'.
+  let status: NexusOffer['status'] = 'active';
+  if (executionType === 'voucher' && input.visibility === 'ecosystem') {
+    const trusted = await isTenantAutoApprove(input.createdByTenantId);
+    status = resolveCreateStatus({ visibility: 'ecosystem', trusted, forceActive: input.forceActiveStatus === true });
   }
 
   const offer: NexusOffer = {
