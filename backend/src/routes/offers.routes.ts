@@ -379,15 +379,23 @@ const updateOfferSchema = z.object({
 });
 
 /**
- * Validates the body for setting a tenant's per-offer voucher markup percentage.
- * markupPct is coerced from string to support form-data submissions while the
- * dominant client (dashboard) sends JSON.
+ * Validates the body for setting a tenant's per-offer voucher sale price.
+ * The dashboard now sends `memberPrice` (the absolute shekel price customers
+ * pay, clamped server-side into [0, face_value]); the legacy `markupPct` field
+ * (a percentage on the base price) is still accepted for backward compatibility.
+ * At least one must be present. Both are coerced from string to tolerate
+ * form-data submissions while the dominant client (dashboard) sends JSON.
  */
-const setTenantVoucherPriceSchema = z.object({
-  markupPct: z.coerce.number().nonnegative(),
-  /** Optional: target a single variant's per-tenant markup (multi-variant vouchers). */
-  variantId: z.string().min(1).optional(),
-});
+const setTenantVoucherPriceSchema = z
+  .object({
+    memberPrice: z.coerce.number().nonnegative().optional(),
+    markupPct: z.coerce.number().nonnegative().optional(),
+    /** Optional: target a single variant's per-tenant price (multi-variant vouchers). */
+    variantId: z.string().min(1).optional(),
+  })
+  .refine((d) => d.memberPrice !== undefined || d.markupPct !== undefined, {
+    message: 'memberPrice or markupPct required',
+  });
 
 /**
  * Validates the voucher inventory body. `kind` selects barcode generation
@@ -1184,7 +1192,7 @@ router.delete(
  * Requires: catalog.adopt_offer permission (same surface as adopt/unadopt -
  * pricing is part of the per-tenant catalog configuration).
  *
- * Input body: { markupPct: number (>= 0), variantId?: string }.
+ * Input body: { memberPrice?: number (>= 0), markupPct?: number (>= 0, legacy), variantId?: string }.
  * Output: { config: TenantOfferConfig } on 200; error JSON otherwise.
  *   404 - offer_not_found
  *   403 - not_adopted
@@ -1197,7 +1205,7 @@ router.patch(
     try {
       const parsed = setTenantVoucherPriceSchema.safeParse(req.body);
       if (!parsed.success) {
-        res.status(400).json({ error: 'markupPct required and must be >= 0' });
+        res.status(400).json({ error: 'memberPrice or markupPct required and must be >= 0' });
         return;
       }
 
@@ -1209,7 +1217,8 @@ router.patch(
       const result = await setTenantVoucherPrice({
         tenantId,
         offerId: req.params.offerId,
-        markupPct: parsed.data.markupPct,
+        ...(parsed.data.memberPrice !== undefined && { memberPrice: parsed.data.memberPrice }),
+        ...(parsed.data.markupPct !== undefined && { markupPct: parsed.data.markupPct }),
         ...(parsed.data.variantId !== undefined && { variantId: parsed.data.variantId }),
       });
 

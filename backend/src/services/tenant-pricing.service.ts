@@ -8,7 +8,8 @@
  * Security: the route layer is responsible for verifying that the
  * caller belongs to `tenantId`. This service additionally validates
  * the offer exists, is a voucher, is adopted by that tenant, and that
- * the new price falls within [nexus_cost, face_value].
+ * the new price falls within [0, face_value] (below the base cost is a
+ * tenant-funded member subsidy; 0 is free).
  */
 
 import { getMongoDb } from '../config/mongo';
@@ -19,18 +20,31 @@ import {
   type OfferVariant,
 } from '../models/domain/supply.models';
 import { VARIANT_ID_REGEX } from '../models/domain/supply-variants.models';
-import { computeTenantDisplayPrice, markupToPrice, clampMarkupPct } from './supply-price.helper';
+import {
+  computeTenantDisplayPrice,
+  markupToPrice,
+  clampMarkupPct,
+  roundAgorot,
+} from './supply-price.helper';
 
 /** Input contract for setTenantVoucherPrice. */
 export interface SetTenantVoucherPriceInput {
   tenantId: string;
   offerId: string;
   /**
-   * Markup percentage on the base sale price (>= 0). The effective price is
-   * `min(base*(1+pct/100), face_value)`; the % is clamped into the offer/variant
-   * headroom before it is applied and stored.
+   * Absolute sale price (>= 0), the shekel price customers pay. Clamped into
+   * [0, face_value]: 0 is free and any value below the base cost is a subsidy
+   * the tenant gives the member. Preferred over markupPct; when set, the stored
+   * markup % for the target variant/offer is cleared.
    */
-  markupPct: number;
+  memberPrice?: number;
+  /**
+   * Legacy: markup percentage on the base sale price (>= 0). The effective price
+   * is `min(base*(1+pct/100), face_value)`; the % is clamped into the
+   * offer/variant headroom before it is applied and stored. Used only when
+   * memberPrice is omitted.
+   */
+  markupPct?: number;
   /**
    * When set, the % is stored for THIS variant only (per-variant per-tenant
    * pricing). Omitted -> the legacy offer-level path. Required for
@@ -116,12 +130,12 @@ export function recomputeConfigMarkup(
 
 /**
  * Re-clamp every per-tenant member-price override for an offer back into each
- * variant's [nexus_cost, face_value] window after the offer's deal pricing was
- * edited (tenant_only offers, where the owning tenant may change nexus_cost /
+ * variant's [0, face_value] window after the offer's deal pricing was edited
+ * (tenant_only offers, where the owning tenant may change nexus_cost /
  * face_value). For each TenantOfferConfig that carries variantPrices:
- *   - raise an override up to a higher new nexus_cost (so the displayed sale price
- *     never sits below the agreed floor - the "bump member price" rule), and
- *   - pull an override down to a lowered new face_value.
+ *   - pull an override down to a lowered new face_value (the only ceiling), and
+ *   - leave a below-cost override alone (a tenant may sell below cost - down to
+ *     free - as a member subsidy, so the floor is 0, not nexus_cost).
  * Recomputes the row's denormalized displayPrice when anything changed.
  *
  * Input:  offerId, the freshly-built variant array (carrying the new bounds).
@@ -149,13 +163,15 @@ export async function clampTenantVariantPricesToBounds(
     let changed = rec.changed;
 
     // 2. Legacy: clamp any absolute override that has NO stored % into its
-    //    [nexus_cost, face_value] window (preserves the adopter's margin).
+    //    [0, face_value] window (preserves the adopter's margin / subsidy).
     for (const [variantId, price] of Object.entries(nextPrices)) {
       if (variantId in nextMarkup) continue; // handled by the markup recompute above
       const v = variants.find((x) => x.variantId === variantId);
       if (!v || typeof v.face_value !== 'number') continue;
-      const floor = v.nexus_cost ?? v.member_price ?? 0;
-      const clamped = Math.min(Math.max(price, floor), v.face_value);
+      // Floor is 0 (not nexus_cost): a tenant may price a voucher below cost - down
+      // to free - as a member subsidy, so only clamp overrides down to the new
+      // face_value ceiling, never up off a below-cost subsidy.
+      const clamped = Math.min(Math.max(price, 0), v.face_value);
       if (clamped !== price) { nextPrices[variantId] = clamped; changed = true; }
     }
 
@@ -222,8 +238,10 @@ export async function resetTenantPricesForChangedVariants(
       if (vid in nextMarkup) continue;
       const v = variants.find((x) => x.variantId === vid);
       if (!v || typeof v.face_value !== 'number') continue;
-      const floor = v.nexus_cost ?? v.member_price ?? 0;
-      const clamped = Math.min(Math.max(price, floor), v.face_value);
+      // Floor is 0 (not nexus_cost): a tenant may price a voucher below cost - down
+      // to free - as a member subsidy, so only clamp overrides down to the new
+      // face_value ceiling, never up off a below-cost subsidy.
+      const clamped = Math.min(Math.max(price, 0), v.face_value);
       if (clamped !== price) { nextPrices[vid] = clamped; changed = true; }
     }
 
@@ -267,7 +285,7 @@ export async function setTenantVoucherPrice(
   | { ok: true; config: TenantOfferConfig }
   | { ok: false; reason: SetTenantVoucherPriceError }
 > {
-  const { tenantId, offerId, markupPct, variantId } = input;
+  const { tenantId, offerId, memberPrice, markupPct, variantId } = input;
 
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
@@ -305,10 +323,10 @@ export async function setTenantVoucherPrice(
     ceiling = offer.face_value;
   }
 
-  // 4. Base + ceiling must be configured. The markup floor is 0% (= base sale
-  //    price); face_value is the ceiling (the effective price is capped there).
-  //    Missing either means the offer/variant is misconfigured for per-tenant
-  //    pricing - reject conservatively.
+  // 4. Base + ceiling must be configured. face_value is the ceiling (the price
+  //    is capped there); the floor is 0 (free) for an absolute price, or the base
+  //    sale price for the legacy markup path. Missing either means the
+  //    offer/variant is misconfigured for per-tenant pricing - reject conservatively.
   if (base === undefined || base === null || ceiling === undefined || ceiling === null) {
     return { ok: false, reason: 'out_of_bounds' };
   }
@@ -324,23 +342,35 @@ export async function setTenantVoucherPrice(
     return { ok: false, reason: 'not_adopted' };
   }
 
-  // 6. Clamp the % into the headroom, compute the cached effective price, and
-  //    build the $set. The stored % is the tenant's intent; variantPrices /
-  //    memberPrice is its cached projection so the catalog read/sort/filter path
-  //    is unchanged.
-  const pct = clampMarkupPct(markupPct, base, ceiling);
-  const price = markupToPrice(base, ceiling, pct);
-  let update: Record<string, unknown>;
+  // 6. Resolve the cached effective price. The dashboard sends an ABSOLUTE price
+  //    (memberPrice) clamped into [0, face_value] - 0 = free, and any value below
+  //    the base cost is a subsidy the tenant gives the member. The legacy path
+  //    (markupPct only) clamps a % into the headroom and applies it. variantPrices
+  //    / memberPrice is the cached projection so the catalog read/sort/filter path
+  //    is unchanged. When an absolute price is set, the stored markup % for the
+  //    target is cleared ($unset) so a later deal-price re-sync treats it as an
+  //    absolute override (preserved) rather than recomputing it from a stale %.
+  const useAbsolute = memberPrice !== undefined;
+  const price = useAbsolute
+    ? roundAgorot(Math.min(Math.max(memberPrice, 0), ceiling))
+    : markupToPrice(base, ceiling, clampMarkupPct(markupPct ?? 0, base, ceiling));
+
+  let setOps: Record<string, unknown>;
+  let unsetOps: Record<string, ''> | undefined;
   if (variantId !== undefined) {
-    // Per-variant: store the % + its cached price, derive displayPrice from the
-    // lowest effective price across all variants.
+    // Per-variant: cache the price, derive displayPrice from the lowest effective
+    // price across all variants.
     const nextOverrides = { ...(existing.variantPrices ?? {}), [variantId]: price };
     const displayPrice = lowestEffectiveVariantPrice(offer.variants, nextOverrides);
-    update = {
-      [`variantMarkupPct.${variantId}`]: pct,
+    setOps = {
       [`variantPrices.${variantId}`]: price,
       ...(displayPrice !== undefined ? { displayPrice } : {}),
     };
+    if (useAbsolute) {
+      unsetOps = { [`variantMarkupPct.${variantId}`]: '' };
+    } else {
+      setOps[`variantMarkupPct.${variantId}`] = clampMarkupPct(markupPct ?? 0, base, ceiling);
+    }
   } else {
     const displayPrice = computeTenantDisplayPrice(
       offer.executionType,
@@ -349,16 +379,20 @@ export async function setTenantVoucherPrice(
       offer.member_price,
       offer.market_price,
     );
-    update = {
+    setOps = {
       memberPrice: price,
-      markupPct: pct,
       ...(displayPrice !== undefined ? { displayPrice } : {}),
     };
+    if (useAbsolute) {
+      unsetOps = { markupPct: '' };
+    } else {
+      setOps.markupPct = clampMarkupPct(markupPct ?? 0, base, ceiling);
+    }
   }
 
   await tenantOfferConfigs.updateOne(
     { configId: existing.configId },
-    { $set: update },
+    unsetOps ? { $set: setOps, $unset: unsetOps } : { $set: setOps },
   );
 
   // 6. Re-fetch so callers get the post-update row (including any other
