@@ -11,7 +11,7 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { resolveTenantContext } from '../utils/resolve-tenant-context';
-import { listAllTenants, setTenantAutoApprove } from '../services/admin-tenants.service';
+import { listAllTenants, setTenantAutoApprove, lookupTenants } from '../services/admin-tenants.service';
 
 const router = Router();
 router.use(apiLimiter);
@@ -39,6 +39,21 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     // The list is scoped to business-setup-APPROVED tenants (M8) in the service,
     // in dev and prod alike.
     res.json(await listAllTenants(q));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// M7 on-behalf-of picker: ALL tenants (approved or not), light + searchable + paginated.
+const lookupQuery = z.object({
+  search: z.string().trim().max(100).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+router.get('/lookup', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json(await lookupTenants(lookupQuery.parse(req.query)));
   } catch (e) {
     next(e);
   }

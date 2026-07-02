@@ -61,6 +61,7 @@ import { getOnboardingStatus } from '../services/onboarding.service';
 import { env } from '../config/env';
 import { isEcosystemBusinessSetupGateEnforced } from '../services/supply-ecosystem-gate.helper';
 import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
+import { resolveCreateAttribution } from '../services/supply-on-behalf.helper';
 
 const router = Router();
 
@@ -258,6 +259,9 @@ const createOfferSchema = z.object({
   description: z.string().max(10000).default(''),
   category: z.enum(OFFER_CATEGORIES),
   market_price: z.coerce.number().positive().optional(),
+  // Admin-only (M7): upload this offer AS an existing tenant. Rejected for
+  // non-admins in the handler; never trusted from the client otherwise.
+  onBehalfOfTenantId: z.string().trim().min(1).optional(),
   visibility: z.enum(OFFER_VISIBILITY).default('ecosystem'),
   executionType: z.enum(OFFER_EXECUTION_TYPES).default('voucher'),
   stockLimit: z.coerce.number().int().positive().nullable().optional().default(null),
@@ -542,9 +546,37 @@ router.post(
 
       const ctx = await resolveTenantContextWithPermission(req, 'supply.ingest');
 
-      // Platform admins always create ecosystem-wide offers regardless of what
-      // the client sends. This prevents accidentally scoping supply to a single tenant.
-      const finalVisibility = ctx.isPlatformAdmin ? 'ecosystem' : parsed.data.visibility;
+      // M7: admin-only "upload on behalf of a tenant". A non-admin can never set it.
+      const onBehalfOfTenantId = parsed.data.onBehalfOfTenantId;
+      if (onBehalfOfTenantId && !ctx.isPlatformAdmin) {
+        res.status(403).json({ error: 'forbidden' });
+        return;
+      }
+      // A platform admin must upload ON BEHALF of a tenant - they can no longer
+      // create platform-owned offers, so a tenant choice is required.
+      if (ctx.isPlatformAdmin && !onBehalfOfTenantId) {
+        res.status(400).json({
+          error: 'Choose an organization to upload the offer on behalf of',
+          errorHe: 'יש לבחור ארגון שעבורו מעלים את ההצעה',
+        });
+        return;
+      }
+      let targetTenant: { tenantId: string; createdByIdentityId: string } | null = null;
+      if (onBehalfOfTenantId) {
+        const db = await getMongoDb();
+        const t = await getTenantDomainCollections(db).domainTenants.findOne(
+          { tenantId: onBehalfOfTenantId }, { projection: { tenantId: 1, createdByIdentityId: 1 } },
+        );
+        if (!t) { res.status(404).json({ error: 'tenant_not_found' }); return; }
+        targetTenant = { tenantId: t.tenantId, createdByIdentityId: t.createdByIdentityId };
+      }
+      // Who the offer is stamped as + effective visibility + force-active status.
+      // No on-behalf: caller (admins still forced ecosystem for their OWN offers).
+      const attribution = resolveCreateAttribution(
+        { tenantId: ctx.tenantId, identityId: ctx.identityId, isPlatformAdmin: ctx.isPlatformAdmin ?? false },
+        onBehalfOfTenantId, targetTenant, parsed.data.visibility,
+      );
+      const finalVisibility = attribution.visibility;
 
       // Ecosystem offers require a NEXUS-admin APPROVED business setup (M8) so the
       // tenant is vetted before advertising to the entire platform. Enforced in dev
@@ -628,22 +660,23 @@ router.post(
             mimetype: f.mimetype,
           }))
         : [];
-      const { keptImageUrls: _ignoredKept, keptImageCrops: _ignoredKeptCrops, ...createPayload } = restParsed;
+      const { keptImageUrls: _ignoredKept, keptImageCrops: _ignoredKeptCrops, onBehalfOfTenantId: _obo, ...createPayload } = restParsed;
       const offer = await createOffer({
         ...createPayload,
         visibility: finalVisibility,
         validFrom: validFromDate,
         validUntil: validUntilDate,
         imageFiles,
-        createdByTenantId: ctx.tenantId,
-        createdByIdentityId: ctx.identityId,
+        createdByTenantId: attribution.createdByTenantId,
+        createdByIdentityId: attribution.createdByIdentityId,
+        forceActiveStatus: attribution.forceActive,
       });
 
-      // Auto-adopt tenant_only offers for the creating tenant so the offer
-      // appears in their catalog immediately without a manual toggle.
+      // Auto-adopt tenant_only offers for the OWNING tenant (the target when the
+      // admin uploaded on behalf) so the offer appears in their catalog immediately.
       if (offer.visibility === 'tenant_only') {
         try {
-          await adoptOffer(ctx.tenantId, offer.offerId, ctx.identityId);
+          await adoptOffer(attribution.createdByTenantId, offer.offerId, attribution.createdByIdentityId);
         } catch (err) {
           // Log but do not fail the response - offer was created successfully.
           console.error('[OFFERS] Auto-adopt failed for tenant_only offer:', err);

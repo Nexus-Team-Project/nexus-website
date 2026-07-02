@@ -52,6 +52,49 @@ export async function isTenantAutoApprove(tenantId: string): Promise<boolean> {
   return t?.autoApproveOffers === true;
 }
 
+/** A lightweight tenant row for the admin on-behalf-of picker (M7). */
+export interface AdminTenantLookupRow {
+  tenantId: string;
+  organizationName: string;
+  logoUrl?: string;
+  brandColor?: string;
+}
+
+/**
+ * Look up tenants for the admin on-behalf-of picker (M7): ALL tenants (approved
+ * or not), a light projection, org-name search, PAGINATED (there can be many
+ * orgs; the picker loads pages as the admin scrolls). Platform-admin gating is
+ * enforced at the route layer. Unlike listAllTenants this has no approval filter
+ * and no pending-offer aggregation - it just powers a fast searchable dropdown.
+ */
+export async function lookupTenants(
+  opts: { search?: string; page: number; limit: number },
+): Promise<{ tenants: AdminTenantLookupRow[]; total: number }> {
+  const db = await getMongoDb();
+  const { domainTenants } = getTenantDomainCollections(db);
+  const filter = opts.search
+    ? { organizationName: { $regex: opts.search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } }
+    : {};
+  const [total, docs] = await Promise.all([
+    domainTenants.countDocuments(filter),
+    domainTenants
+      .find(filter, { projection: { _id: 0, tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1 } })
+      .sort({ organizationName: 1 })
+      .skip((opts.page - 1) * opts.limit)
+      .limit(opts.limit)
+      .toArray(),
+  ]);
+  return {
+    total,
+    tenants: docs.map((d) => ({
+      tenantId: d.tenantId,
+      organizationName: d.organizationName,
+      ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
+      ...(d.brandColor ? { brandColor: d.brandColor } : {}),
+    })),
+  };
+}
+
 /**
  * List tenants (paginated, org-name search) whose business setup has been
  * APPROVED by a NEXUS admin (M8), with a pending-offer count each. Only approved
