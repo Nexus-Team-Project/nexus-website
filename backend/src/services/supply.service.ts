@@ -136,6 +136,8 @@ export interface CreateOfferInput {
    * when a platform admin uploads on behalf of a tenant (implicit approval).
    */
   forceActiveStatus?: boolean;
+  /** M9: acting uploader identity when created on behalf by an admin. */
+  uploadedByIdentityId?: string;
 }
 
 /**
@@ -376,6 +378,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     statusChangedAt: now,
     createdByTenantId: input.createdByTenantId,
     createdByIdentityId: input.createdByIdentityId,
+    ...(input.uploadedByIdentityId ? { uploadedByIdentityId: input.uploadedByIdentityId } : {}),
     // For tenant_only offers, restrict visibility to the creating tenant.
     invitedByTenantId:
       input.visibility === 'tenant_only' ? input.createdByTenantId : undefined,

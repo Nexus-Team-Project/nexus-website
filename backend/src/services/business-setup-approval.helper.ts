@@ -49,3 +49,21 @@ export function approvalAuthFields(a: BusinessSetupApproval | null | undefined):
     businessSetupApprovalReason: a?.status === 'denied' ? (a.reason ?? null) : null,
   };
 }
+
+/**
+ * True when a caller may CREATE an offer (M9). Platform admins always may (they
+ * upload on behalf); a non-admin tenant may only when its business setup is
+ * approved. Input: isPlatformAdmin, approved. Output: boolean.
+ */
+export function canTenantCreateOffer(isPlatformAdmin: boolean, approved: boolean): boolean {
+  return isPlatformAdmin || approved;
+}
+
+/**
+ * True when a caller may ADOPT an offer (M9). Re-adopting one's OWN offer is
+ * always allowed; platform admins always may; otherwise the tenant's business
+ * setup must be approved. Input: isOwnOffer, isPlatformAdmin, approved.
+ */
+export function canTenantAdoptOffer(isOwnOffer: boolean, isPlatformAdmin: boolean, approved: boolean): boolean {
+  return isOwnOffer || isPlatformAdmin || approved;
+}

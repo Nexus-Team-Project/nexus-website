@@ -58,9 +58,8 @@ import {
 } from '../services/voucher-approval-email.service';
 import { getIdentityDomainCollections } from '../models/domain/identity.models';
 import { getOnboardingStatus } from '../services/onboarding.service';
-import { env } from '../config/env';
-import { isEcosystemBusinessSetupGateEnforced } from '../services/supply-ecosystem-gate.helper';
 import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
+import { canTenantCreateOffer, canTenantAdoptOffer } from '../services/business-setup-approval.helper';
 import { resolveCreateAttribution } from '../services/supply-on-behalf.helper';
 
 const router = Router();
@@ -586,17 +585,17 @@ router.post(
       );
       const finalVisibility = attribution.visibility;
 
-      // Ecosystem offers require a NEXUS-admin APPROVED business setup (M8) so the
-      // tenant is vetted before advertising to the entire platform. Enforced in dev
-      // AND prod - in dev the tenant gets approved via the dev-request shortcut.
-      if (finalVisibility === 'ecosystem' && !ctx.isPlatformAdmin) {
-        if (!(await isTenantBusinessSetupApproved(ctx.tenantId))) {
-          res.status(403).json({
-            error: 'Your business setup is pending platform approval before you can publish global offers',
-            errorHe: 'הגדרת העסק שלך ממתינה לאישור הפלטפורמה לפני פרסום הצעות גלובליות',
-          });
-          return;
-        }
+      // M9: publishing ANY offer (ecosystem OR tenant_only) requires a NEXUS-admin
+      // APPROVED business setup so the tenant is vetted. Enforced in dev AND prod
+      // (dev gets approved via the business-setup dev-request shortcut). Platform
+      // admins (always on-behalf per M7) bypass regardless of the target's status.
+      const createApproved = ctx.isPlatformAdmin ? true : await isTenantBusinessSetupApproved(ctx.tenantId);
+      if (!canTenantCreateOffer(ctx.isPlatformAdmin ?? false, createApproved)) {
+        res.status(403).json({
+          error: 'Your business setup is pending platform approval before you can publish offers',
+          errorHe: 'הגדרת העסק שלך ממתינה לאישור הפלטפורמה לפני פרסום הצעות',
+        });
+        return;
       }
 
       // Cross-field validation for voucher pricing/validity/stackable. With a
@@ -678,6 +677,8 @@ router.post(
         createdByTenantId: attribution.createdByTenantId,
         createdByIdentityId: attribution.createdByIdentityId,
         forceActiveStatus: attribution.forceActive,
+        // M9: record the acting admin when uploading on behalf, for the admin catalog.
+        ...(onBehalfOfTenantId ? { uploadedByIdentityId: ctx.identityId } : {}),
       });
 
       // Auto-adopt tenant_only offers for the OWNING tenant (the target when the
@@ -1118,7 +1119,7 @@ router.post(
   authenticate,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { tenantId, identityId } = await resolveTenantContextWithPermission(
+      const { tenantId, identityId, isPlatformAdmin } = await resolveTenantContextWithPermission(
         req,
         'catalog.adopt_offer',
       );
@@ -1134,17 +1135,18 @@ router.post(
       );
       const isOwnOffer = targetOffer?.createdByTenantId === tenantId;
 
-      // DEV ONLY: outside production the business-setup gate is relaxed so the
-      // global adopt flow can be tested locally. Production always enforces it.
-      if (!isOwnOffer && isEcosystemBusinessSetupGateEnforced(env.NODE_ENV)) {
-        const { onboarding } = await getOnboardingStatus(req.user!.sub);
-        if (onboarding.step === 'business_setup') {
-          res.status(403).json({
-            error: 'Complete your business setup before adopting offers',
-            errorHe: 'יש להשלים את הגדרת העסק לפני אימוץ הצעות',
-          });
-          return;
-        }
+      // M9: adopting an offer into your member catalog requires a NEXUS-admin
+      // APPROVED business setup (dev + prod). Re-adopting your OWN offer and
+      // platform admins bypass.
+      const adoptApproved = (isOwnOffer || (isPlatformAdmin ?? false))
+        ? true
+        : await isTenantBusinessSetupApproved(tenantId);
+      if (!canTenantAdoptOffer(isOwnOffer, isPlatformAdmin ?? false, adoptApproved)) {
+        res.status(403).json({
+          error: 'Your business setup is pending platform approval before you can adopt offers',
+          errorHe: 'הגדרת העסק שלך ממתינה לאישור הפלטפורמה לפני אימוץ הצעות',
+        });
+        return;
       }
 
       await adoptOffer(tenantId, req.params.offerId, identityId);
