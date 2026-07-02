@@ -30,10 +30,15 @@ import { getOnboardingCollections } from '../../src/models/onboarding.models';
 
 let client: MongoClient;
 
-/** Insert a minimal domain tenant (raw, no Zod). */
+/**
+ * Insert a minimal domain tenant (raw, no Zod). Defaults to business-setup
+ * APPROVED so it appears in listAllTenants (which is approved-only, M8);
+ * pass `businessSetupApproval` to override.
+ */
 async function seedTenant(fields: Record<string, unknown>): Promise<void> {
   await getTenantDomainCollections(db).domainTenants.insertOne({
-    status: 'build_mode', autoApproveOffers: false, createdAt: new Date(), updatedAt: new Date(), ...fields,
+    status: 'build_mode', autoApproveOffers: false, businessSetupApproval: { status: 'approved' },
+    createdAt: new Date(), updatedAt: new Date(), ...fields,
   } as never);
 }
 
@@ -97,27 +102,14 @@ describe('listAllTenants', () => {
     expect(tenants[0].organizationName).toBe('Acme Foods');
   });
 
-  it('businessSetupPassedOnly returns only tenants past business setup (prod); dev shows all', async () => {
-    // Domain tenantId === legacy onboarding tenant _id hex.
-    const passedId = new ObjectId();
-    const notId = new ObjectId();
-    await seedTenant({ tenantId: passedId.toHexString(), organizationName: 'Passed' });
-    await seedTenant({ tenantId: notId.toHexString(), organizationName: 'NotYet' });
-    await getOnboardingCollections(db).tenants.insertOne({ _id: passedId, businessSetupStatus: 'submitted' } as never);
-    await getOnboardingCollections(db).tenants.insertOne({ _id: notId, businessSetupStatus: 'in_progress' } as never);
-
-    const prod = await listAllTenants({ page: 1, limit: 10, businessSetupPassedOnly: true });
-    expect(prod.total).toBe(1);
-    expect(prod.tenants[0].organizationName).toBe('Passed');
-
-    const dev = await listAllTenants({ page: 1, limit: 10 });
-    expect(dev.total).toBe(2);
-  });
-
-  it('businessSetupPassedOnly with nobody past setup returns an empty page', async () => {
-    await seedTenant({ tenantId: new ObjectId().toHexString(), organizationName: 'NotYet' });
-    const res = await listAllTenants({ page: 1, limit: 10, businessSetupPassedOnly: true });
-    expect(res).toEqual({ total: 0, tenants: [] });
+  it('returns ONLY business-setup-approved tenants (dev + prod)', async () => {
+    await seedTenant({ tenantId: 'ap', organizationName: 'Approved', businessSetupApproval: { status: 'approved' } });
+    await seedTenant({ tenantId: 'pe', organizationName: 'Pending', businessSetupApproval: { status: 'pending' } });
+    await seedTenant({ tenantId: 'de', organizationName: 'Denied', businessSetupApproval: { status: 'denied' } });
+    await seedTenant({ tenantId: 'no', organizationName: 'NoneYet', businessSetupApproval: undefined });
+    const { tenants, total } = await listAllTenants({ page: 1, limit: 10 });
+    expect(total).toBe(1);
+    expect(tenants.map((t) => t.organizationName)).toEqual(['Approved']);
   });
 });
 

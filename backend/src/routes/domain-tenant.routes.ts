@@ -30,6 +30,7 @@ import {
   deactivateBenefitsCatalogForUser,
 } from '../services/domain-service-activation.service';
 import { triggerGoLive } from '../services/onboarding.service';
+import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
 import { resolveTenantContextWithPermission } from '../utils/resolve-tenant-context';
 
 const router = Router();
@@ -256,6 +257,14 @@ router.post(
       // resolveTenantContextWithPermission is required here because the tenantId is
       // not in the URL, so requireDomainPermission middleware would find no tenant scope.
       const { tenantId } = await resolveTenantContextWithPermission(req, 'workspace.trigger_go_live');
+      // Go Live requires a NEXUS-admin APPROVED business setup (M8), dev + prod.
+      if (!(await isTenantBusinessSetupApproved(tenantId))) {
+        res.status(403).json({
+          error: 'Your business setup is pending platform approval before you can go live',
+          errorHe: 'הגדרת העסק שלך ממתינה לאישור הפלטפורמה לפני עלייה לאוויר',
+        });
+        return;
+      }
       await triggerGoLive(tenantId);
       res.json({ success: true, catalogMode: 'live' });
     } catch (err) {

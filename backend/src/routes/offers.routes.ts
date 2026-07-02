@@ -60,6 +60,7 @@ import { getIdentityDomainCollections } from '../models/domain/identity.models';
 import { getOnboardingStatus } from '../services/onboarding.service';
 import { env } from '../config/env';
 import { isEcosystemBusinessSetupGateEnforced } from '../services/supply-ecosystem-gate.helper';
+import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
 
 const router = Router();
 
@@ -545,21 +546,14 @@ router.post(
       // the client sends. This prevents accidentally scoping supply to a single tenant.
       const finalVisibility = ctx.isPlatformAdmin ? 'ecosystem' : parsed.data.visibility;
 
-      // Ecosystem offers require business setup to be complete so the tenant has
-      // a valid business profile before advertising to the entire platform.
-      // Uses getOnboardingStatus (same logic as /api/me) for consistency across all tenant types.
-      // DEV ONLY: outside production the gate is relaxed so the global-upload flow can be
-      // tested locally without completing business setup. Production always enforces it.
-      if (
-        finalVisibility === 'ecosystem'
-        && !ctx.isPlatformAdmin
-        && isEcosystemBusinessSetupGateEnforced(env.NODE_ENV)
-      ) {
-        const { onboarding } = await getOnboardingStatus(req.user!.sub);
-        if (onboarding.step === 'business_setup') {
+      // Ecosystem offers require a NEXUS-admin APPROVED business setup (M8) so the
+      // tenant is vetted before advertising to the entire platform. Enforced in dev
+      // AND prod - in dev the tenant gets approved via the dev-request shortcut.
+      if (finalVisibility === 'ecosystem' && !ctx.isPlatformAdmin) {
+        if (!(await isTenantBusinessSetupApproved(ctx.tenantId))) {
           res.status(403).json({
-            error: 'Complete your business setup before publishing offers to the ecosystem',
-            errorHe: 'יש להשלים את הגדרת העסק לפני פרסום הצעות לכל הפלטפורמה',
+            error: 'Your business setup is pending platform approval before you can publish global offers',
+            errorHe: 'הגדרת העסק שלך ממתינה לאישור הפלטפורמה לפני פרסום הצעות גלובליות',
           });
           return;
         }

@@ -21,6 +21,8 @@ import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../
 import { getDomainAuthorizationContext, getPrimaryTenantRole, hasDomainPermission } from './domain-authorization.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
 import { syncDomainTenantMembership } from './domain-tenant-sync.service';
+import { nextApprovalOnSubmit, approvalAuthFields } from './business-setup-approval.helper';
+import { sendBusinessSetupSubmittedToAdmins } from './business-setup-approval-email.service';
 import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 import type { DomainPermission } from './domain-permissions.service';
 import { getTenantPlanSummary, type TenantPlanSummary } from './domain-tenant-plan.service';
@@ -65,6 +67,12 @@ export interface DashboardAuthorization {
   memberServices: string[];
   /** True when business setup is complete and the tenant can go live. */
   businessSetupComplete: boolean;
+  /** True when a platform admin has APPROVED this tenant's business setup (M8). */
+  businessSetupApproved: boolean;
+  /** Raw approval state for the tenant-side indicator; null = never submitted. */
+  businessSetupApprovalStatus: 'pending' | 'approved' | 'denied' | null;
+  /** Denial reason (only when status === 'denied'), for the tenant-side indicator. */
+  businessSetupApprovalReason: string | null;
 }
 
 export interface TenantSeats {
@@ -206,6 +214,10 @@ function getDashboardAuthorization(
     memberServices: [],
     // businessSetupComplete is overwritten in getMe() after the tenantOnboardingStates lookup.
     businessSetupComplete: false,
+    // M8 approval fields - overwritten in getMe() after the domain tenant lookup.
+    businessSetupApproved: false,
+    businessSetupApprovalStatus: null,
+    businessSetupApprovalReason: null,
   };
 }
 
@@ -478,7 +490,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const tenantBrandingDoc = context.tenantId
     ? await getTenantDomainCollections(db).domainTenants.findOne(
         { tenantId: context.tenantId },
-        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1 } },
+        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, businessSetupApproval: 1 } },
       )
     : null;
 
@@ -507,6 +519,8 @@ export async function getMe(userId: string): Promise<MeResponse> {
       canPurchaseCatalog: hasMemberRole && catalogMode !== 'inactive',
       memberServices,
       businessSetupComplete,
+      // M8: NEXUS-admin approval state of this tenant's business setup.
+      ...approvalAuthFields(tenantBrandingDoc?.businessSetupApproval ?? null),
     },
     onboarding: resolvedOnboarding,
     memberships: walletRouter.memberships,
@@ -787,6 +801,31 @@ export async function submitBusinessSetup(userId: string, data: BusinessSetupInp
 }
 
 /**
+ * DEV-ONLY: submit a business-setup approval request WITHOUT completing the full
+ * form, so the global-upload / Go-Live gates can be exercised in development. Marks
+ * the legacy business setup 'submitted' (so onboarding no longer routes to the
+ * wizard) and the domain approval 'pending' + devMode:true, then notifies admins.
+ * The ROUTE hard-disables this in production; this function must never run there.
+ * Input: Prisma user id. Output: void.
+ */
+export async function submitDevBusinessSetupRequest(userId: string): Promise<void> {
+  const tenantId = await requireTenantPermission(userId, 'workspace.trigger_go_live');
+  const db = await getMongoDb();
+  const now = new Date();
+  await getOnboardingCollections(db).tenants.updateOne(
+    { _id: tenantId },
+    { $set: { businessSetupStatus: 'submitted', updatedAt: now } },
+  );
+  const tc = getTenantDomainCollections(db);
+  await tc.domainTenants.updateOne(
+    { tenantId: tenantId.toHexString() },
+    { $set: { businessSetupApproval: { status: 'pending', devMode: true, submittedAt: now }, updatedAt: now } },
+  );
+  const t = await tc.domainTenants.findOne({ tenantId: tenantId.toHexString() }, { projection: { organizationName: 1 } });
+  void sendBusinessSetupSubmittedToAdmins(t?.organizationName ?? tenantId.toHexString(), true);
+}
+
+/**
  * Upserts business setup data and mirrors status onto the tenant document.
  * Input: Prisma user id, validated setup data, and desired status.
  * Output: saved setup response.
@@ -820,6 +859,20 @@ async function upsertBusinessSetup(
     { _id: tenantId },
     { $set: { businessSetupStatus: status === 'submitted' ? 'submitted' : 'in_progress', updatedAt: now } },
   );
+
+  // On SUBMIT, put the tenant into the NEXUS-admin approval queue (M8). Domain
+  // tenantId === the legacy tenant _id hex. Re-submitting after edits resets to
+  // 'pending', clearing any prior reason/review + the devMode flag.
+  if (status === 'submitted') {
+    const tc = getTenantDomainCollections(db);
+    await tc.domainTenants.updateOne(
+      { tenantId: tenantId.toHexString() },
+      { $set: { businessSetupApproval: nextApprovalOnSubmit(now), updatedAt: now } },
+    );
+    // Notify NEXUS admins that a tenant is awaiting business-setup approval.
+    const t = await tc.domainTenants.findOne({ tenantId: tenantId.toHexString() }, { projection: { organizationName: 1 } });
+    void sendBusinessSetupSubmittedToAdmins(t?.organizationName ?? tenantId.toHexString(), false);
+  }
 
   return getBusinessSetup(userId);
 }
