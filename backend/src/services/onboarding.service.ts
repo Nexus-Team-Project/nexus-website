@@ -73,6 +73,13 @@ export interface DashboardAuthorization {
   businessSetupApprovalStatus: 'pending' | 'approved' | 'denied' | null;
   /** Denial reason (only when status === 'denied'), for the tenant-side indicator. */
   businessSetupApprovalReason: string | null;
+  /**
+   * True when a platform admin has marked this tenant as auto-approve/trusted
+   * (`Tenant.autoApproveOffers`), so its ecosystem offers publish immediately
+   * (active) instead of waiting in the per-offer approval queue. Used to word the
+   * offer-visibility hint. Always false for non-tenant users.
+   */
+  offersAutoApproved: boolean;
 }
 
 export interface TenantSeats {
@@ -218,6 +225,8 @@ function getDashboardAuthorization(
     businessSetupApproved: false,
     businessSetupApprovalStatus: null,
     businessSetupApprovalReason: null,
+    // Overwritten in getMe() after the domain tenant lookup (autoApproveOffers).
+    offersAutoApproved: false,
   };
 }
 
@@ -490,7 +499,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const tenantBrandingDoc = context.tenantId
     ? await getTenantDomainCollections(db).domainTenants.findOne(
         { tenantId: context.tenantId },
-        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, businessSetupApproval: 1 } },
+        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, businessSetupApproval: 1, autoApproveOffers: 1 } },
       )
     : null;
 
@@ -521,6 +530,8 @@ export async function getMe(userId: string): Promise<MeResponse> {
       businessSetupComplete,
       // M8: NEXUS-admin approval state of this tenant's business setup.
       ...approvalAuthFields(tenantBrandingDoc?.businessSetupApproval ?? null),
+      // Trusted/auto-approve tenant: its ecosystem offers publish immediately.
+      offersAutoApproved: tenantBrandingDoc?.autoApproveOffers === true,
     },
     onboarding: resolvedOnboarding,
     memberships: walletRouter.memberships,

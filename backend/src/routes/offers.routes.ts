@@ -1229,6 +1229,7 @@ router.patch(
           result.reason === 'offer_not_found' ? 404 :
           result.reason === 'variant_not_found' ? 404 :
           result.reason === 'not_adopted' ? 403 :
+          result.reason === 'owner_locked' ? 403 :
           400;
         res.status(code).json({ error: result.reason });
         return;

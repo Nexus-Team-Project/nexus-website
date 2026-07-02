@@ -60,13 +60,15 @@ export interface SetTenantVoucherPriceInput {
  *   variant_not_found  -> 404
  *   not_adopted        -> 404 / 409 (route decides)
  *   out_of_bounds      -> 400
+ *   owner_locked       -> 403 (offer is Nexus-managed for its owning tenant)
  */
 export type SetTenantVoucherPriceError =
   | 'offer_not_found'
   | 'not_voucher'
   | 'variant_not_found'
   | 'not_adopted'
-  | 'out_of_bounds';
+  | 'out_of_bounds'
+  | 'owner_locked';
 
 /**
  * Lowest effective per-tenant member price across the offer's variants, given a
@@ -300,6 +302,14 @@ export async function setTenantVoucherPrice(
   //    that this service enforces.
   if (offer.executionType !== 'voucher') {
     return { ok: false, reason: 'not_voucher' };
+  }
+
+  // 2b. A Nexus admin uploaded this offer on behalf of its owning tenant
+  //     (uploadedByIdentityId set). That tenant may NOT change its own selling
+  //     price - Nexus manages it. Adopting tenants (createdByTenantId !== caller)
+  //     are unaffected and keep their per-tenant price.
+  if (offer.uploadedByIdentityId && offer.createdByTenantId === tenantId) {
+    return { ok: false, reason: 'owner_locked' };
   }
 
   // 3. Resolve base (the number the % applies to = member_price) + ceiling

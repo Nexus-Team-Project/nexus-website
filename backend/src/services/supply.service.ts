@@ -420,7 +420,15 @@ export async function updateOffer(
 
   // Read current offer to detect denied status for resubmit flow.
   // Ownership is checked here to avoid a redundant DB round trip on not-found.
-  const currentOffer = await nexusOffers.findOne({ offerId, createdByTenantId: tenantId, ...NOT_DELETED });
+  // A tenant may NOT edit an offer a Nexus admin uploaded on its behalf
+  // (uploadedByIdentityId set) - Nexus manages those. Excluding it from the owner
+  // lookup makes update return null (404) for that tenant. Platform admins are exempt.
+  const currentOffer = await nexusOffers.findOne({
+    offerId,
+    createdByTenantId: tenantId,
+    ...(isPlatformAdmin ? {} : { uploadedByIdentityId: { $exists: false } }),
+    ...NOT_DELETED,
+  });
   if (!currentOffer) return null;
 
   // When a denied offer is edited and saved, it re-enters the approval queue.
@@ -721,10 +729,12 @@ export async function deleteOffer(
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
   // Platform admins can delete any offer; tenant admins only their own.
-  // Already-deleted offers are excluded so a repeat delete returns 404 cleanly.
+  // A tenant may NOT delete an offer a Nexus admin uploaded on its behalf
+  // (uploadedByIdentityId set) - Nexus manages those. Already-deleted offers are
+  // excluded so a repeat delete returns 404 cleanly.
   const ownerFilter = isPlatformAdmin
     ? { offerId, ...NOT_DELETED }
-    : { offerId, createdByTenantId: tenantId, ...NOT_DELETED };
+    : { offerId, createdByTenantId: tenantId, uploadedByIdentityId: { $exists: false }, ...NOT_DELETED };
 
   const offer = await nexusOffers.findOne(ownerFilter);
   if (!offer) throw Object.assign(new Error('Offer not found'), { status: 404 });

@@ -135,6 +135,12 @@ export interface CatalogItem {
   adoptedAt?: Date;
   /** TenantId of the supply manager who created the offer. */
   createdByTenantId: string;
+  /**
+   * True when a Nexus platform admin uploaded this offer on behalf of a tenant
+   * (uploadedByIdentityId set). The owning tenant may not edit/delete/reprice it;
+   * clients render those actions as locked. Not tied to who is viewing.
+   */
+  uploadedByAdmin: boolean;
   /** Creating tenant's org name (NEXUS for platform-created offers). */
   createdByTenantName?: string;
   /** Creating tenant's logo URL, when set. */
@@ -277,6 +283,7 @@ function toItem(
     isAdopted: config?.adoptionStatus === 'active',
     adoptedAt: config?.adoptedAt,
     createdByTenantId: offer.createdByTenantId,
+    uploadedByAdmin: !!offer.uploadedByIdentityId,
     ...uploaderFieldsFromTenant(context.uploaderTenant),
     executionType: offer.executionType ?? 'voucher',
     stockLimit: offer.stockLimit ?? null,
