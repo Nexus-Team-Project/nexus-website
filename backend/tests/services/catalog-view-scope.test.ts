@@ -84,6 +84,12 @@ describe('getTenantCatalogView browse scope (global-only)', () => {
     await seedOffer({ offerId: 'ob1', visibility: 'ecosystem', createdByTenantId: CALLER, uploadedByIdentityId: 'admin1' });
     const res = await getTenantCatalogView('nexus_platform', { page: 1, limit: 50, ownedOnly: true }, { isPlatformAdmin: true });
     expect(res.items.map((i) => i.offerId)).toEqual(['ob1']);
+    expect(res.items[0]?.uploadedByAdmin).toBe(true);
+  });
+
+  it('exposes uploadedByAdmin=false for a normally-created offer', async () => {
+    const res = await getTenantCatalogView(CALLER, { page: 1, limit: 50 });
+    expect(res.items.find((i) => i.offerId === 'eco_own')?.uploadedByAdmin).toBe(false);
   });
 });
 
