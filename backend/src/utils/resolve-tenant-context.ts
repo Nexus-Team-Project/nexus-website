@@ -19,9 +19,9 @@ import {
   getDomainAuthorizationContext,
   hasDomainPermission,
 } from '../services/domain-authorization.service';
-import { getTenantDomainCollections } from '../models/domain/tenant.models';
 import type { DomainPermission } from '../services/domain-permissions.service';
 import { isPlatformAdminEmail, NEXUS_PLATFORM_TENANT_ID } from './platform-admin';
+import { findPreferredTenantMembership } from './preferred-tenant-membership';
 
 /** Resolved tenant and identity ids for the authenticated request user. */
 export interface TenantContext {
@@ -67,12 +67,10 @@ export async function resolveTenantContext(req: Request): Promise<TenantContext>
   const domainIdentity = await syncDomainIdentityForLoginUser(loginUser);
 
   // Derive tenantId from the domain TenantMember record - never from the browser.
+  // Privileged (non-member) memberships win over plain member ones so an
+  // admin-assigned tenant owner resolves into the tenant they own.
   const db = await getMongoDb();
-  const tenantCollections = getTenantDomainCollections(db);
-  const tenantMember = await tenantCollections.tenantMembers.findOne(
-    { nexusIdentityId: domainIdentity.nexusIdentityId, status: 'active' },
-    { sort: { createdAt: 1 }, projection: { tenantId: 1 } },
-  );
+  const tenantMember = await findPreferredTenantMembership(db, domainIdentity.nexusIdentityId);
 
   if (!tenantMember) {
     throw Object.assign(new Error('No tenant context'), { status: 403 });
