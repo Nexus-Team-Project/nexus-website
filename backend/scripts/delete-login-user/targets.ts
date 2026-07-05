@@ -95,7 +95,14 @@ export async function resolveMongoDeletionTargets(
 
   const domainOwnedTenants = person.nexusIdentityIds.length
     ? await tenants.domainTenants
-      .find({ createdByIdentityId: { $in: person.nexusIdentityIds } })
+      .find({
+        createdByIdentityId: { $in: person.nexusIdentityIds },
+        // Admin-created tenants with an ASSIGNED owner belong to that owner,
+        // not the creating platform admin - never cascade-delete them with
+        // the creator. Ownerless admin-created tenants are cleaned up like
+        // any owned tenant.
+        ownerAssignment: { $exists: false },
+      })
       .project<{ tenantId: string }>({ tenantId: 1 })
       .toArray()
     : [];
