@@ -51,20 +51,25 @@ function mapLegacyOnboardingState(status: TenantDocument['businessSetupStatus'])
   return status === 'approved' ? 'go_live_pending' : 'build_mode';
 }
 
+export interface DomainTenantCoreSyncInput {
+  tenantId: ObjectId;
+  tenant: TenantDocument;
+  /** Identity stamped as createdByIdentityId on first insert. */
+  createdByIdentityId: string;
+}
+
 /**
- * Mirrors one legacy tenant membership into domain tenant/member/role records.
- * Input: trusted legacy tenant, membership, and domain identity id.
- * Output: domain records are upserted idempotently.
+ * Upserts the tenant-level domain docs (tenant, onboarding state, profile)
+ * WITHOUT any membership/role rows. Used by workspace creation (via
+ * syncDomainTenantMembership) and by admin on-behalf org creation, where the
+ * creating platform admin must NOT become a member of the tenant.
+ * Input: legacy tenant doc + creator identity id. Output: docs upserted idempotently.
  */
-export async function syncDomainTenantMembership(input: LegacyTenantMembershipSyncInput): Promise<void> {
+export async function syncDomainTenantCoreDocs(input: DomainTenantCoreSyncInput): Promise<void> {
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
-  const identityCollections = getIdentityDomainCollections(db);
   const tenantId = input.tenantId.toHexString();
-  const tenantMemberId = input.tenantMembershipId.toHexString();
   const now = new Date();
-  // Workspace creators get the 'owner' role in the domain model regardless of the legacy role.
-  const role = input.isWorkspaceCreator ? 'owner' : mapLegacyTenantRole(input.tenantMembership.role);
 
   await Promise.all([
     tenantCollections.domainTenants.updateOne(
@@ -72,7 +77,7 @@ export async function syncDomainTenantMembership(input: LegacyTenantMembershipSy
       {
         $setOnInsert: {
           tenantId,
-          createdByIdentityId: input.nexusIdentityId,
+          createdByIdentityId: input.createdByIdentityId,
           // New tenants start on the basic plan. Upgrade via MongoDB or PayMe billing.
           plan: 'basic' as const,
           // New tenants auto-accept wallet join requests by default; a tenant
@@ -120,6 +125,31 @@ export async function syncDomainTenantMembership(input: LegacyTenantMembershipSy
       },
       { upsert: true },
     ),
+  ]);
+}
+
+/**
+ * Mirrors one legacy tenant membership into domain tenant/member/role records.
+ * Input: trusted legacy tenant, membership, and domain identity id.
+ * Output: domain records are upserted idempotently.
+ */
+export async function syncDomainTenantMembership(input: LegacyTenantMembershipSyncInput): Promise<void> {
+  const db = await getMongoDb();
+  const tenantCollections = getTenantDomainCollections(db);
+  const identityCollections = getIdentityDomainCollections(db);
+  const tenantId = input.tenantId.toHexString();
+  const tenantMemberId = input.tenantMembershipId.toHexString();
+  const now = new Date();
+  // Workspace creators get the 'owner' role in the domain model regardless of the legacy role.
+  const role = input.isWorkspaceCreator ? 'owner' : mapLegacyTenantRole(input.tenantMembership.role);
+
+  await syncDomainTenantCoreDocs({
+    tenantId: input.tenantId,
+    tenant: input.tenant,
+    createdByIdentityId: input.nexusIdentityId,
+  });
+
+  await Promise.all([
     tenantCollections.tenantMembers.updateOne(
       { tenantId, nexusIdentityId: input.nexusIdentityId },
       {

@@ -7,6 +7,7 @@ import { prisma } from '../config/database';
 import { getMongoDb } from '../config/mongo';
 import { PlatformRole, getPlatformRoleForEmail, normalizeEmail } from '../config/platform-admins';
 import { isPlatformAdminEmail } from '../utils/platform-admin';
+import { findPreferredTenantMembership } from '../utils/preferred-tenant-membership';
 import { createError } from '../middleware/errorHandler';
 import {
   BusinessSetupDocument,
@@ -259,11 +260,22 @@ async function getDomainTenantContextForUser(userId: string): Promise<UserContex
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
-  const tenantMember = await tenantCollections.tenantMembers.findOne(
-    { nexusIdentityId: identity.nexusIdentityId, status: 'active' },
-    { sort: { createdAt: 1 } },
-  );
+  // Privileged (non-member) memberships win over plain member ones, so an
+  // admin-assigned tenant OWNER who is also a member elsewhere resolves into
+  // the tenant they own (see utils/preferred-tenant-membership).
+  const tenantMember = await findPreferredTenantMembership(db, identity.nexusIdentityId);
   if (!tenantMember) return null;
+
+  // Admin-created tenants: the assigned owner's first context resolution locks
+  // the replace/remove typo window (see admin-organizations.service).
+  await tenantCollections.domainTenants.updateOne(
+    {
+      tenantId: tenantMember.tenantId,
+      'ownerAssignment.identityId': identity.nexusIdentityId,
+      'ownerAssignment.activatedAt': null,
+    },
+    { $set: { 'ownerAssignment.activatedAt': new Date() } },
+  );
 
   const [roles, tenant] = await Promise.all([
     identityCollections.tenantUserRoles

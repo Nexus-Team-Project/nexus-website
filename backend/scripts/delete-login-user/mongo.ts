@@ -108,6 +108,7 @@ export async function collectMongoCounts(
     walletRateLimits,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
+    ownerAssignmentsCleared,
   ] = await Promise.all([
     identity.nexusIdentities.countDocuments({
       $or: [
@@ -237,6 +238,11 @@ export async function collectMongoCounts(
     db.collection(TENANT_JOIN_REQUEST_COLLECTION).countDocuments({
       tenantId: { $in: targets.domainOwnedTenantIds },
     }),
+    // Admin-created orgs where this user is the ASSIGNED owner: the tenant is
+    // kept but its ownerAssignment is cleared (reverts to "no owner").
+    tenants.domainTenants.countDocuments({
+      'ownerAssignment.identityId': { $in: targets.nexusIdentityIds },
+    }),
   ]);
 
   return {
@@ -278,6 +284,7 @@ export async function collectMongoCounts(
     walletRateLimits,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
+    ownerAssignmentsCleared,
   };
 }
 
@@ -338,6 +345,17 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   await orchestration.platformEvents.deleteMany({ platformEventId: { $in: orchestrationTargets.platformEventIds } });
   await orchestration.processedSteps.deleteMany({ sagaInstanceId: { $in: orchestrationTargets.sagaInstanceIds } });
   await orchestration.sagaInstances.deleteMany({ sagaInstanceId: { $in: orchestrationTargets.sagaInstanceIds } });
+
+  // Admin-created orgs where this user is the ASSIGNED owner revert to
+  // "no owner" (the tenant stays listed + assignable on the admin page); the
+  // owner's membership/role rows are removed by the identity-scoped deletes
+  // below.
+  if (targets.nexusIdentityIds.length > 0) {
+    await tenants.domainTenants.updateMany(
+      { 'ownerAssignment.identityId': { $in: targets.nexusIdentityIds } },
+      { $unset: { ownerAssignment: '' }, $set: { updatedAt: new Date() } },
+    );
+  }
 
   await tenants.memberGroupAssignments.deleteMany({
     $or: [
