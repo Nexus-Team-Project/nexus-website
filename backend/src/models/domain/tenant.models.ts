@@ -71,6 +71,28 @@ export const logoCropSchema = z.object({
 });
 export type LogoCrop = z.infer<typeof logoCropSchema>;
 
+/** Audit stamp for tenants created from the admin "Create & Manage Organizations" page. */
+export const tenantAdminCreatedSchema = z.object({
+  /** Email of the NEXUS platform admin who created this tenant. */
+  createdByAdminEmail: z.string().min(1),
+  createdAt: z.date(),
+});
+export type TenantAdminCreated = z.infer<typeof tenantAdminCreatedSchema>;
+
+/** The single external owner assigned to an admin-created tenant. */
+export const tenantOwnerAssignmentSchema = z.object({
+  /** Normalized email of the assigned owner. */
+  email: z.string().min(1),
+  /** NexusIdentity id created/linked for that email at assign time. */
+  identityId: z.string().min(1),
+  assignedByAdminEmail: z.string().min(1),
+  assignedAt: z.date(),
+  /** Stamped the first time the owner resolves this tenant in /api/me.
+   *  null = replace/remove still allowed (typo window). */
+  activatedAt: z.date().nullable(),
+});
+export type TenantOwnerAssignment = z.infer<typeof tenantOwnerAssignmentSchema>;
+
 export const domainTenantSchema = z.object({
   tenantId: z.string().min(1),
   organizationName: z.string().min(1).max(255),
@@ -119,6 +141,10 @@ export const domainTenantSchema = z.object({
     reviewedByEmail: z.string().optional(),
     reviewedAt: z.date().optional(),
   }).optional(),
+  /** Present only on tenants created via the admin org-management page. */
+  adminCreated: tenantAdminCreatedSchema.optional(),
+  /** The one assigned owner of an admin-created tenant (absent = none). */
+  ownerAssignment: tenantOwnerAssignmentSchema.optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
