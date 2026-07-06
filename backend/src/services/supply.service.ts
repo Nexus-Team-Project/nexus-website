@@ -437,21 +437,13 @@ export async function updateOffer(
   // Routes use this to re-notify admins with the latest offer details.
   const wasUpdatedWhilePending = currentOffer.status === 'pending_approval';
 
-  // Deal pricing (face_value + nexus_cost) is normally the Nexus<->supplier deal,
-  // editable only by a platform admin after create. Exception: a tenant_only offer
-  // is sold solely to that tenant's own members, so its owning tenant (ownership is
-  // already guaranteed by the createdByTenantId query above, and the route requires
-  // supply.manage_offers) may change its real sale price + face value. This single
-  // flag gates both the flat-field path (below) and the per-variant path (further
-  // down) so they can never diverge. Ecosystem offers stay platform-admin-only.
-  const canEditDealPricing = isPlatformAdmin || currentOffer.visibility === 'tenant_only';
-  // Flat-field defense-in-depth (non-voucher / pre-variant clients): reject a deal-price
-  // change from a caller who may not make it. Only fires when the value actually differs.
-  if (!canEditDealPricing
-      && ((input.face_value !== undefined && input.face_value !== currentOffer.face_value)
-       || (input.nexus_cost !== undefined && input.nexus_cost !== currentOffer.nexus_cost))) {
-    throw createError('voucher_pricing_locked', 403);
-  }
+  // Deal pricing (face_value + nexus_cost) is editable by the OWNING tenant for
+  // BOTH visibilities (2026-07-06: the previous ecosystem platform-admin-only
+  // lock - 403 voucher_pricing_locked - was removed on request). Ownership is
+  // guaranteed by the createdByTenantId query above and the route requires
+  // supply.manage_offers; Nexus-managed on-behalf offers still cannot reach
+  // this path for their owner at all. Per-tenant price overrides are re-synced
+  // after the save (snap for tenant_only, clamp for ecosystem - see below).
 
   // Spec rule: 'disabled' / 'archived' transitions must carry a non-empty reason.
   // Fail fast before any Cloudinary upload or DB write.
@@ -579,22 +571,6 @@ export async function updateOffer(
       terms: input.terms,
       implementationInstructions: input.implementationInstructions,
     });
-    // Pricing lock: face_value + nexus_cost are the Nexus<->supplier deal. For
-    // ecosystem offers they are platform-admin-only after create - a non-admin may
-    // not add a variant or change an existing variant's face_value/nexus_cost
-    // (which would move the Nexus margin); each built variant must match a stored
-    // variant by id with identical face_value + nexus_cost. For tenant_only offers
-    // the owning tenant may change them freely (canEditDealPricing). Removing
-    // variants and editing non-price fields stays allowed regardless.
-    if (!canEditDealPricing) {
-      const stored = new Map((currentOffer.variants ?? []).map((v) => [v.variantId, v]));
-      for (const v of built) {
-        const prev = stored.get(v.variantId);
-        if (!prev || prev.face_value !== v.face_value || prev.nexus_cost !== v.nexus_cost) {
-          throw createError('voucher_pricing_locked', 403);
-        }
-      }
-    }
     // Detect which variants had their sale price (nexus_cost) changed. A brand-new
     // variant (no stored match) counts as changed.
     const storedForPricing = new Map((currentOffer.variants ?? []).map((v) => [v.variantId, v]));
@@ -669,10 +645,10 @@ export async function updateOffer(
   //   - tenant_only: the owning tenant edited ITS OWN sale price, so the displayed
   //     price must SNAP to the new value - drop the override for each changed
   //     variant (display falls back to the freshly-reseeded base member_price).
-  //   - ecosystem (platform admin): preserve each adopter's margin, only clamp any
-  //     override back into the new [nexus_cost, face_value] window.
-  // Only runs when deal pricing was editable here. Best-effort: never fails the save.
-  if (isVoucherUpdate && variantSet.variants !== undefined && canEditDealPricing) {
+  //   - ecosystem: preserve each adopter's margin, only clamp any override back
+  //     into the new [0, face_value] window.
+  // Best-effort: never fails the save.
+  if (isVoucherUpdate && variantSet.variants !== undefined) {
     try {
       if (currentOffer.visibility === 'tenant_only') {
         await resetTenantPricesForChangedVariants(offerId, variantSet.variants, nexusChangedVids);
