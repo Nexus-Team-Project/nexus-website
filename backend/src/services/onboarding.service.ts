@@ -28,6 +28,12 @@ import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 import type { DomainPermission } from './domain-permissions.service';
 import { getTenantPlanSummary, type TenantPlanSummary } from './domain-tenant-plan.service';
 import { isNoTenantPlatformAdmin } from './onboarding-admin.helper';
+import { classifyOnboardingPhone } from './onboarding/onboarding-phone.helper';
+import {
+  hasVerifiedOnboardingPhone,
+  consumeVerifiedOnboardingPhone,
+} from './onboarding/onboarding-phone-otp.service';
+import { createOnboardingLead } from './monday-lead.service';
 
 export interface UserContext {
   isTenant: boolean;
@@ -42,6 +48,8 @@ export interface UserContext {
 export interface OnboardingInfo {
   required: boolean;
   step: 'workspace_setup' | 'workspace_setup_deferred' | 'business_setup' | null;
+  /** True when the post-onboarding welcome popup must block the dashboard. */
+  welcomePending?: boolean;
 }
 
 export interface DashboardAuthorization {
@@ -426,7 +434,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   // Run all four tenant-scoped lookups in parallel to avoid serial latency on
   // every /api/me call. domainTenantStatus feeds resolveCatalogMode, which is
   // called after Promise.all resolves.
-  const [domainTenantDoc, userRoles, domainMemberDoc] = await Promise.all([
+  const [domainTenantDoc, userRoles, domainMemberDoc, legacyOnboardingState] = await Promise.all([
     // Look up the domain tenant's live status (separate from the legacy onboarding tenant).
     context.tenantId
       ? tenantCollections.domainTenants.findOne(
@@ -452,6 +460,12 @@ export async function getMe(userId: string): Promise<MeResponse> {
           { projection: { services: 1 } },
         )
       : Promise.resolve(null),
+    // Post-onboarding welcome flag: lives on the user's legacy onboarding
+    // state doc, set by createWorkspace, cleared only by the dev dismiss.
+    getOnboardingCollections(db).onboardingStates.findOne(
+      { userId },
+      { projection: { welcomePending: 1 } },
+    ),
   ]);
 
   const domainTenantStatus: string | null = domainTenantDoc?.status ?? null;
@@ -479,7 +493,13 @@ export async function getMe(userId: string): Promise<MeResponse> {
   // keep their normal 'tenant' mode.
   const noTenantAdmin = isNoTenantPlatformAdmin(baseAuthorization.isPlatformAdmin === true, context);
   const resolvedMode = noTenantAdmin ? ('platform_admin' as const) : context.mode;
-  const resolvedOnboarding = noTenantAdmin ? { required: false, step: null } : status.onboarding;
+  // welcomePending blocks tenant users only (never admins/members) - the
+  // popup shows on every login until cleared.
+  const welcomePending =
+    !noTenantAdmin && context.isTenant && legacyOnboardingState?.welcomePending === true;
+  const resolvedOnboarding = noTenantAdmin
+    ? { required: false, step: null }
+    : { ...status.onboarding, welcomePending };
 
   // Wallet RouterScreen payload - cards the user sees right after login.
   // Lives in its own helper so getMe does not grow further (file is already
@@ -602,6 +622,17 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
   const collections = getOnboardingCollections(db);
   const now = new Date();
 
+  // Israeli phones must be OTP-verified (server-side proof written by
+  // /api/v1/onboarding/phone-otp/verify); Israeli-prefixed junk is rejected.
+  // Foreign numbers pass without verification. The wizard mirrors this; the
+  // backend is the real boundary.
+  const phoneClass = classifyOnboardingPhone(input.contactPhone);
+  if (phoneClass.kind === 'invalid_israeli') throw createError('invalid_israeli_phone', 400);
+  if (phoneClass.kind === 'israeli') {
+    const verified = await hasVerifiedOnboardingPhone(db, userId, phoneClass.normalized);
+    if (!verified) throw createError('phone_not_verified', 400);
+  }
+
   const tenant: TenantDocument = {
     organizationName: input.organizationName,
     website: input.website,
@@ -652,12 +683,33 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
         state: 'business_setup_required',
         skippedWorkspaceSetup: false,
         tenantId: tenantInsert.insertedId,
+        // The welcome popup blocks the dashboard on every login until a rep
+        // flow clears it (dev-only dismiss endpoint for local testing).
+        welcomePending: true,
         updatedAt: now,
       },
       $unset: { skipReason: '', memberId: '' },
     },
     { upsert: true },
   );
+
+  // Monday.com Website Leads item - fire-and-forget (the service never
+  // throws); runs in dev + prod for now (dev skip is a planned follow-up).
+  void createOnboardingLead({
+    fullName: (user.fullName ?? '').trim() || user.email,
+    contactRole: input.contactRole,
+    organizationName: input.organizationName,
+    website: input.website,
+    phone: input.contactPhone,
+    tenantId: tenantInsert.insertedId.toHexString(),
+  });
+
+  // Verification is single-use: drop it now that the workspace exists.
+  if (phoneClass.kind === 'israeli') {
+    await consumeVerifiedOnboardingPhone(db, userId, phoneClass.normalized).catch((e) => {
+      console.warn('[onboarding] failed to consume phone verification (non-fatal):', e);
+    });
+  }
 
   return {
     success: true,
@@ -666,6 +718,19 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
     nextStep: 'business_setup' as const,
     redirectTo: '/dashboard',
   };
+}
+
+/**
+ * DEV-ONLY: clears the post-onboarding welcome flag so the dashboard opens
+ * normally again. Production has no dismiss path (the route 404s there).
+ * Input: Prisma user id. Output: flag cleared (no-op when no state doc).
+ */
+export async function dismissPostOnboardingWelcome(userId: string): Promise<void> {
+  const db = await getMongoDb();
+  await getOnboardingCollections(db).onboardingStates.updateOne(
+    { userId },
+    { $set: { welcomePending: false, updatedAt: new Date() } },
+  );
 }
 
 /**

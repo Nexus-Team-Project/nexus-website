@@ -57,7 +57,7 @@ export type VerifyPhoneResult =
  */
 export async function startPhoneOtp(
   db: Db,
-  args: { phone: string; ip: string; userAgentHash?: string },
+  args: { phone: string; ip: string; userAgentHash?: string; smsHost?: string | null },
 ): Promise<{ challengeId: string; __testCode?: string }> {
   const phone = normalizeIsraeliPhone(args.phone);
   await assertRateLimit(db, { bucket: 'phone_otp_send', key: phone, windowSec: 30, max: 1 });
@@ -72,7 +72,7 @@ export async function startPhoneOtp(
   // plaintext lives only in the SMS we send and is never persisted or logged.
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
   const codeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
-  await inforuSendSms({ phone, message: buildOtpSms(code) });
+  await inforuSendSms({ phone, message: buildOtpSms(code, args.smsHost) });
 
   const now = new Date();
   const insert: PhoneOtpChallenge = {

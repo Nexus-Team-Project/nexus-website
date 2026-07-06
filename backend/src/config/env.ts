@@ -63,6 +63,7 @@ const envSchema = z.object({
   MONDAY_API_TOKEN: z.string().min(1).optional(),
   MONDAY_BOARD_ID: z.string().min(1).optional(),
   MONDAY_COLUMN_MAP: z.string().optional(), // JSON: maps logical names to column IDs
+  MONDAY_LEADS_BOARD_ID: z.string().min(1).optional(), // onboarding Website Leads board (default 1767743351)
 
   // WhatsApp — Meta Cloud API (optional)
   WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),

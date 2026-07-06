@@ -92,6 +92,8 @@ Identity has two layers:
 
 **Workspace setup** (`POST /api/onboarding/workspace`): creates Mongo `tenants` + `tenantMembers` (role `admin`) + `onboardingStates` (`business_setup_required`).
 
+**Onboarding phone OTP + Monday lead (2026-07-06):** `createWorkspace` gates ISRAELI contact phones - must normalize to a valid 05X mobile AND have a server-side OTP verification (`onboardingPhoneVerifications`, 1h TTL, single-use) written by `POST /api/v1/onboarding/phone-otp/start|verify` (`onboarding-phone-otp.routes.ts` -> `services/onboarding/onboarding-phone-otp.service.ts`, reusing the wallet OTP machinery; SMS WebOTP line binds to `DASHBOARD_URL`). Foreign numbers pass unverified; Israeli-prefixed junk 400s (`classifyOnboardingPhone` in `onboarding-phone.helper.ts`). On success `createWorkspace` fire-and-forgets a Monday "Website Leads" item via `services/monday-lead.service.ts` (board `MONDAY_LEADS_BOARD_ID` default 1767743351, group + column ids live-verified constants; never fails onboarding; no PII in logs). `delete-login-user` covers the new collection.
+
 **Skip options:** `regular_user` → `members` doc + `member_created` state. `complete_later` → `workspace_setup_deferred` state, no tenant/member created.
 
 **Business setup** (`/api/business-setup`): tenant admins only. `GET` = load draft, `PATCH` = save draft, `POST` = submit. Backend derives tenant from Mongo membership; never trust tenant id from browser. Invited members must not be sent to business setup.
