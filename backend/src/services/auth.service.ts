@@ -253,11 +253,18 @@ export async function resendVerification(email: string) {
   return { rawToken, email: pending.email, fullName: pending.fullName };
 }
 
-export async function login(
+/**
+ * Verifies email+password credentials WITHOUT issuing any tokens or
+ * stamping lastLoginAt. The login-mfa service decides afterwards whether
+ * to issue a session directly or demand a new-device OTP first.
+ * Input: raw email + password.
+ * Output: the matching Prisma user (id, email, role).
+ * Throws 403 for unverified pending registrations, 401 otherwise.
+ */
+export async function verifyCredentials(
   email: string,
   password: string,
-  meta: { userAgent?: string; ipAddress?: string } = {},
-) {
+): Promise<{ id: string; email: string; role: string }> {
   const normalizedEmail = email.toLowerCase().trim();
   const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (!user || !user.passwordHash) {
@@ -270,12 +277,7 @@ export async function login(
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) throw createError('Invalid email or password', 401);
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { lastLoginAt: new Date() },
-  });
-
-  return issueTokens(user.id, user.email, user.role, meta);
+  return { id: user.id, email: user.email, role: user.role };
 }
 
 export async function googleAuth(

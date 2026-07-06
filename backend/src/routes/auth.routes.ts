@@ -12,29 +12,10 @@ import { env } from '../config/env';
 import * as AuthService from '../services/auth.service';
 import * as EmailService from '../services/email.service';
 import { signEmailVerificationToken, verifyEmailVerificationToken } from '../utils/jwt';
+import * as LoginMfaService from '../services/auth/login-mfa.service';
+import { REFRESH_COOKIE, refreshCookieOpts, TRUSTED_DEVICE_COOKIE } from '../utils/auth-cookies';
 
 const router = Router();
-
-const REFRESH_COOKIE = 'nexus_refresh';
-// 30-day refresh cookie — same regardless of rememberMe choice.
-const REFRESH_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
-
-/**
- * Builds consistent cookie options for the httpOnly refresh token.
- * SameSite=Lax is safe for same-registrable-domain cross-subdomain XHR
- * (dashboard.nexus-payment.com → api.nexus-payment.com) without needing
- * SameSite=None+Secure for same-site requests.
- * COOKIE_DOMAIN (e.g. .nexus-payment.com) is set in production so the cookie
- * is shared across all subdomains.
- */
-const COOKIE_OPTS = () => ({
-  httpOnly: true,
-  secure: env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  maxAge: REFRESH_MAX_AGE,
-  path: '/',
-  ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
-});
 
 const authCodeSchema = z.object({
   body: z.object({
@@ -104,7 +85,7 @@ const loginSchema = z.object({
   body: z.object({
     email: z.string().email(),
     password: z.string().min(1),
-    rememberMe: z.boolean().optional(),
+    language: z.enum(['he', 'en']).optional(),
   }),
 });
 
@@ -114,13 +95,21 @@ router.post(
   validate(loginSchema),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email, password } = req.body;
-      const result = await AuthService.login(email, password, {
+      const outcome = await LoginMfaService.performLogin({
+        email: req.body.email,
+        password: req.body.password,
+        trustedDeviceToken: req.cookies?.[TRUSTED_DEVICE_COOKIE] ?? null,
+        lang: req.body.language ?? 'en',
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
       });
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
-      res.json({ accessToken: result.accessToken });
+      if (outcome.kind === 'mfa_required') {
+        // Privileged user on an unknown device: no session cookie yet.
+        res.json({ mfaRequired: true, challengeToken: outcome.challengeToken });
+        return;
+      }
+      res.cookie(REFRESH_COOKIE, outcome.rawRefreshToken, refreshCookieOpts());
+      res.json({ accessToken: outcome.accessToken });
     } catch (err) {
       next(err);
     }
@@ -163,7 +152,7 @@ router.post(
         req.body.language ?? 'en',
         req.body.dashboardRedirect,
       );
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, refreshCookieOpts());
       res.json({ accessToken: result.accessToken, dashboardCode, dashboardUrl, isNew: result.isNew ?? false });
     } catch (err) {
       next(err);
@@ -185,7 +174,7 @@ router.post(
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
       });
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, refreshCookieOpts());
       res.json({ accessToken: result.accessToken, dashboardRedirect: result.dashboardRedirect });
     } catch (err) {
       next(err);
@@ -235,7 +224,7 @@ router.post('/refresh', async (req: Request, res: Response, next: NextFunction) 
       ipAddress: req.ip,
     });
     const user = await AuthService.getUserProfile(result.userId);
-    res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
+    res.cookie(REFRESH_COOKIE, result.rawRefreshToken, refreshCookieOpts());
     res.json({ accessToken: result.accessToken, user });
   } catch (err) {
     next(err);
@@ -261,7 +250,7 @@ router.post(
         userAgent: req.headers['user-agent'],
         ipAddress: req.ip,
       });
-      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, COOKIE_OPTS());
+      res.cookie(REFRESH_COOKIE, result.rawRefreshToken, refreshCookieOpts());
       res.json({ accessToken: result.accessToken, user: result.user });
     } catch (err) {
       next(err);

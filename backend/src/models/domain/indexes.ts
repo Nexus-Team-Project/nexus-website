@@ -13,6 +13,8 @@ import { ensurePhoneOtpIndexes } from '../auth/phone-otp.models';
 import { ensureEmailOtpIndexes } from '../auth/email-otp.models';
 import { ensurePhoneSignupTicketIndexes } from '../auth/phone-signup-ticket.models';
 import { ensureTenantJoinRequestIndexes } from '../auth/tenant-join-request.models';
+import { ensureLoginOtpIndexes } from '../auth/login-otp.models';
+import { ensureTrustedDeviceIndexes } from '../auth/trusted-device.models';
 
 /**
  * Creates idempotent indexes for identity, tenant, member, event, and saga data.
@@ -130,4 +132,6 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
   await ensureEmailOtpIndexes(db);
   await ensurePhoneSignupTicketIndexes(db);
   await ensureTenantJoinRequestIndexes(db);
+  await ensureLoginOtpIndexes(db);
+  await ensureTrustedDeviceIndexes(db);
 }
