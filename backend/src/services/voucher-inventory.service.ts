@@ -107,6 +107,26 @@ export async function getInventorySummary(
   };
 }
 
+/**
+ * Per-variant unit COUNTS for one offer (every kind + status, matching the
+ * owner summary's semantics). Returns ONLY numbers - never code values - so
+ * the route may expose it to any caller who can SEE the offer in the catalog
+ * (visibility is enforced by the route, not here).
+ * Input: offerId. Output: map of variantId -> unit count (absent = 0 units).
+ */
+export async function getOfferVariantInventoryCounts(offerId: string): Promise<Record<string, number>> {
+  const db = await getMongoDb();
+  const rows = await getVoucherCodeCollection(db)
+    .aggregate<{ _id: string; n: number }>([
+      { $match: { offerId } },
+      { $group: { _id: '$variantId', n: { $sum: 1 } } },
+    ])
+    .toArray();
+  const counts: Record<string, number> = {};
+  for (const r of rows) counts[r._id] = r.n;
+  return counts;
+}
+
 /** MongoDB duplicate-key error code. */
 const DUPLICATE_KEY = 11000;
 

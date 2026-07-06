@@ -18,6 +18,7 @@ import {
   updateUnitValidity,
   updateUnitsValidity,
   deleteUnit,
+  getOfferVariantInventoryCounts,
 } from '../../src/services/voucher-inventory.service';
 import { getVoucherCodeCollection } from '../../src/models/domain/voucher-codes.models';
 
@@ -37,6 +38,20 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await getVoucherCodeCollection(db).deleteMany({});
+});
+
+describe('getOfferVariantInventoryCounts', () => {
+  it('groups unit counts per variant and ignores other offers', async () => {
+    await addBarcodes(OFFER, VARIANT, ['C1', 'C2', 'C3'], { validityValue: 1, validityUnit: 'years' });
+    await addBarcodes(OFFER, 'var_other', ['C4'], { validityValue: 1, validityUnit: 'years' });
+    await addBarcodes('offer_2', VARIANT, ['C5'], { validityValue: 1, validityUnit: 'years' });
+    const counts = await getOfferVariantInventoryCounts(OFFER);
+    expect(counts).toEqual({ [VARIANT]: 3, var_other: 1 });
+  });
+
+  it('returns an empty map for an offer with no units', async () => {
+    expect(await getOfferVariantInventoryCounts('offer_none')).toEqual({});
+  });
 });
 
 describe('addBarcodes stamps per-batch validity', () => {
