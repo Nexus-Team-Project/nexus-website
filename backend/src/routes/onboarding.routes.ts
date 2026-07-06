@@ -112,6 +112,19 @@ router.post('/business-setup/dev-request', authenticate, async (req: Request, re
   }
 });
 
+// DEV-ONLY: dismiss the post-onboarding welcome popup so local testing can
+// enter the dashboard. HARD-DISABLED in production - prod users leave the
+// popup only via logout or the booking link.
+router.post('/onboarding/welcome/dismiss', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (env.NODE_ENV === 'production') { res.status(404).json({ error: 'not_found' }); return; }
+    await onboardingService.dismissPostOnboardingWelcome(req.user!.sub);
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/onboarding/wizard-draft', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const draft = await onboardingService.loadWizardDraft(req.user!.sub);

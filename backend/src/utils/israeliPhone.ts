@@ -28,11 +28,16 @@ export function normalizeIsraeliPhone(raw: string | undefined | null): string | 
   const compact = trimmed.replace(/[^\d+]/g, '');
 
   // Strip leading +972 or 972 country code and replace with the local "0".
+  // Some phone inputs keep the leading zero AFTER the dial code (e.g.
+  // "+9720508465858" when the user types "0508465858" with the IL flag), so
+  // only prepend the "0" when the remainder does not already start with one.
   let local: string;
   if (compact.startsWith('+972')) {
-    local = '0' + compact.slice(4);
+    const rest = compact.slice(4);
+    local = rest.startsWith('0') ? rest : '0' + rest;
   } else if (compact.startsWith('972')) {
-    local = '0' + compact.slice(3);
+    const rest = compact.slice(3);
+    local = rest.startsWith('0') ? rest : '0' + rest;
   } else {
     local = compact;
   }

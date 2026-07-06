@@ -115,6 +115,12 @@ export interface OnboardingStateDocument {
   tenantId?: ObjectId;
   memberId?: ObjectId;
   wizardDraft?: WizardDraft;
+  /**
+   * True from workspace creation until dismissed: the user sees the
+   * post-onboarding welcome popup on EVERY login (a rep will contact them).
+   * Only the dev-only dismiss endpoint clears it; production has no dismiss.
+   */
+  welcomePending?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -19,6 +19,7 @@ import { EMAIL_OTP_COLLECTION } from '../../src/models/auth/email-otp.models';
 import { PHONE_SIGNUP_TICKET_COLLECTION } from '../../src/models/auth/phone-signup-ticket.models';
 import { LOGIN_OTP_COLLECTION } from '../../src/models/auth/login-otp.models';
 import { TRUSTED_DEVICE_COLLECTION } from '../../src/models/auth/trusted-device.models';
+import { ONBOARDING_PHONE_VERIFICATION_COLLECTION } from '../../src/models/auth/onboarding-phone-verification.models';
 import { TENANT_JOIN_REQUEST_COLLECTION } from '../../src/models/auth/tenant-join-request.models';
 import {
   resolveMongoDeletionTargets,
@@ -110,6 +111,7 @@ export async function collectMongoCounts(
     walletRateLimits,
     loginOtpChallenges,
     trustedDevices,
+    onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
     ownerAssignmentsCleared,
@@ -237,6 +239,12 @@ export async function collectMongoCounts(
         ? { prismaUserId: { $in: targets.prismaUserIds } }
         : { prismaUserId: '__none__' },
     ),
+    // Onboarding phone verifications keyed by the Prisma user id.
+    db.collection(ONBOARDING_PHONE_VERIFICATION_COLLECTION).countDocuments(
+      targets.prismaUserIds.length
+        ? { userId: { $in: targets.prismaUserIds } }
+        : { userId: '__none__' },
+    ),
     // Plan #4: tenant join requests submitted by the user.
     db.collection(TENANT_JOIN_REQUEST_COLLECTION).countDocuments({
       $or: [
@@ -296,6 +304,7 @@ export async function collectMongoCounts(
     walletRateLimits,
     loginOtpChallenges,
     trustedDevices,
+    onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
     ownerAssignmentsCleared,
@@ -342,6 +351,10 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   if (targets.prismaUserIds.length > 0) {
     await db.collection(TRUSTED_DEVICE_COLLECTION).deleteMany({
       prismaUserId: { $in: targets.prismaUserIds },
+    });
+    // Onboarding phone verifications keyed by the Prisma user id.
+    await db.collection(ONBOARDING_PHONE_VERIFICATION_COLLECTION).deleteMany({
+      userId: { $in: targets.prismaUserIds },
     });
   }
   await db.collection(WALLET_RATE_LIMIT_COLLECTION).deleteMany({

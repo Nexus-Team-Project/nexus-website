@@ -29,6 +29,7 @@ import {
   sanitizeShortText,
 } from '../utils/contact-sanitize.util';
 import { dispatchContactSales } from '../services/contact-sales.service';
+import { createContactSalesLead } from '../services/monday-lead.service';
 
 const router = Router();
 
@@ -94,6 +95,17 @@ router.post(
       const userAgent = typeof userAgentRaw === 'string'
         ? sanitizeShortText(userAgentRaw, 256)
         : undefined;
+
+      // Monday "Website Leads" item - fire-and-forget (the service never
+      // throws) and independent of the email dispatch below, so a mail
+      // outage still records the lead and vice versa.
+      void createContactSalesLead({
+        email,
+        name: name || undefined,
+        phone: phone || undefined,
+        message,
+        page,
+      });
 
       await dispatchContactSales({
         email,
