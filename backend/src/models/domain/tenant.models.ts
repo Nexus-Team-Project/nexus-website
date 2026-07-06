@@ -55,12 +55,53 @@ export type CatalogAdoptionMode = typeof CATALOG_ADOPTION_MODES[number];
 export type DefaultPricingRule = typeof DEFAULT_PRICING_RULES[number];
 export type TenantMemberInvitationStatus = typeof TENANT_MEMBER_INVITATION_STATUSES[number];
 
+/**
+ * Normalized crop of the tenant logo relative to the PRISTINE original (fractions
+ * 0..1). Applied at display time (Cloudinary transform), so the crop can be changed
+ * or reverted (cleared) without re-uploading the image. Mirrors the offer imageCrop shape.
+ */
+export const logoCropSchema = z.object({
+  x: z.number().min(0).max(1),
+  y: z.number().min(0).max(1),
+  width: z.number().gt(0).max(1),
+  height: z.number().gt(0).max(1),
+  aspect: z.number().positive().optional(),
+  naturalWidth: z.number().positive().optional(),
+  naturalHeight: z.number().positive().optional(),
+});
+export type LogoCrop = z.infer<typeof logoCropSchema>;
+
+/** Audit stamp for tenants created from the admin "Create & Manage Organizations" page. */
+export const tenantAdminCreatedSchema = z.object({
+  /** Email of the NEXUS platform admin who created this tenant. */
+  createdByAdminEmail: z.string().min(1),
+  createdAt: z.date(),
+});
+export type TenantAdminCreated = z.infer<typeof tenantAdminCreatedSchema>;
+
+/** The single external owner assigned to an admin-created tenant. */
+export const tenantOwnerAssignmentSchema = z.object({
+  /** Normalized email of the assigned owner. */
+  email: z.string().min(1),
+  /** NexusIdentity id created/linked for that email at assign time. */
+  identityId: z.string().min(1),
+  assignedByAdminEmail: z.string().min(1),
+  assignedAt: z.date(),
+  /** Stamped the first time the owner resolves this tenant in /api/me.
+   *  null = replace/remove still allowed (typo window). */
+  activatedAt: z.date().nullable(),
+});
+export type TenantOwnerAssignment = z.infer<typeof tenantOwnerAssignmentSchema>;
+
 export const domainTenantSchema = z.object({
   tenantId: z.string().min(1),
   organizationName: z.string().min(1).max(255),
-  // Cloudinary URL of the organization logo. Absent -> the UI shows the
-  // tenant-name initials (only the Nexus ecosystem catalog uses the Nexus logo).
+  // Cloudinary URL of the organization logo (the PRISTINE original). Absent -> the
+  // UI shows the tenant-name initials (only the Nexus ecosystem catalog uses Nexus logo).
   logoUrl: z.string().url().optional(),
+  // Crop of the logo (normalized fractions), applied at display time. Absent/null =
+  // show the full logo. Lets the crop be adjusted or reverted without re-upload.
+  logoCrop: logoCropSchema.nullable().optional(),
   // Organization brand color as a 6-digit hex (e.g. "#635bff"). This is the
   // accent color wallet members see the first time they sign in to this
   // tenant's benefits. Absent -> the wallet derives a deterministic color from
@@ -79,6 +120,31 @@ export const domainTenantSchema = z.object({
    * dashboard. Absent on tenants created before this field = treated as true.
    */
   autoAcceptJoinRequests: z.boolean().default(true),
+  /**
+   * When true, this tenant is TRUSTED: its global (ecosystem) offer create/edit
+   * skips platform-admin approval and goes straight to 'active'. Default false.
+   * Absent on tenants created before this field = treated as false (not trusted).
+   */
+  autoApproveOffers: z.boolean().default(false),
+  /**
+   * NEXUS-admin approval of this tenant's business setup (Phase 2 M8). Absent =
+   * never submitted. Set to 'pending' when business setup is submitted (or via
+   * the dev-only shortcut, which also sets devMode:true); a platform admin moves
+   * it to 'approved' or 'denied' (denied carries a free-text reason). Production
+   * global-offer publish + Go Live require status 'approved'.
+   */
+  businessSetupApproval: z.object({
+    status: z.enum(['pending', 'approved', 'denied']),
+    reason: z.string().max(1000).optional(),
+    devMode: z.boolean().optional(),
+    submittedAt: z.date().optional(),
+    reviewedByEmail: z.string().optional(),
+    reviewedAt: z.date().optional(),
+  }).optional(),
+  /** Present only on tenants created via the admin org-management page. */
+  adminCreated: tenantAdminCreatedSchema.optional(),
+  /** The one assigned owner of an admin-created tenant (absent = none). */
+  ownerAssignment: tenantOwnerAssignmentSchema.optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });

@@ -14,6 +14,7 @@ import { httpCorsOptions } from './config/cors';
 
 // Routes
 import authRoutes from './routes/auth.routes';
+import authMfaRoutes from './routes/auth-mfa.routes';
 import chatRoutes from './routes/chat.routes';
 import analyticsRoutes from './routes/analytics.routes';
 import dashboardRoutes from './routes/dashboard.routes';
@@ -91,6 +92,7 @@ app.get(['/api/health', '/api/v1/health'], sendHealthStatus);
 // ─── API Routes ───────────────────────────────────────────
 app.use('/api/v1', v1Routes);
 app.use('/api/auth', authRoutes);
+app.use('/api/auth', authMfaRoutes);
 app.use('/api', onboardingRoutes);
 app.use('/api/tenant', domainTenantRoutes);
 app.use('/api/chat', chatRoutes);

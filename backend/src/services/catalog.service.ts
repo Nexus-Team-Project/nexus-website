@@ -22,11 +22,16 @@ import { randomUUID } from 'node:crypto';
 import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
+  NOT_DELETED,
   type NexusOffer,
   type TenantOfferConfig,
+  type ImageCropEntry,
 } from '../models/domain/supply.models';
 import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
 import { computeTenantDisplayPrice } from './supply-price.helper';
+import { getTenantDomainCollections } from '../models/domain';
+import type { LogoCrop } from '../models/domain/tenant.models';
+import { uploaderFieldsFromTenant, type UploaderTenantDoc } from './catalog-uploader.helper';
 
 // ---------------------------------------------------------------------------
 // Public contract
@@ -46,6 +51,12 @@ export interface CatalogQuery {
   category?: string;
   approvalStatus?: 'active' | 'pending_approval' | 'denied' | 'expired';
   adoptionStatus?: 'adopted' | 'not_adopted';
+  /**
+   * When true, return ONLY offers this tenant created (createdByTenantId ===
+   * tenantId), in any status/visibility - not offers adopted from the ecosystem.
+   * Used by the Product Catalog page (a tenant's own uploaded offers).
+   */
+  ownedOnly?: boolean;
 
   /** ANY-of match against NexusOffer.executionType. Empty array = no filter. */
   offerTypes?: string[];
@@ -84,6 +95,12 @@ export interface CatalogItem {
   imageUrl?: string;
   /** Ordered gallery of public image URLs. Index 0 is the cover. */
   imageUrls?: string[];
+  /**
+   * Per-image crop metadata keyed by original URL. The URLs above point at the
+   * pristine originals; clients apply the crop at display time (Cloudinary
+   * transform URLs). Missing entry / crop=null = show the whole image.
+   */
+  imageCrops?: ImageCropEntry[];
   /** Top-level offer category (e.g. "health", "food"). */
   category: string;
   /**
@@ -118,6 +135,20 @@ export interface CatalogItem {
   adoptedAt?: Date;
   /** TenantId of the supply manager who created the offer. */
   createdByTenantId: string;
+  /**
+   * True when a Nexus platform admin uploaded this offer on behalf of a tenant
+   * (uploadedByIdentityId set). The owning tenant may not edit/delete/reprice it;
+   * clients render those actions as locked. Not tied to who is viewing.
+   */
+  uploadedByAdmin: boolean;
+  /** Creating tenant's org name (NEXUS for platform-created offers). */
+  createdByTenantName?: string;
+  /** Creating tenant's logo URL, when set. */
+  createdByTenantLogoUrl?: string;
+  /** Creating tenant's brand color (#rrggbb), for an initials avatar fallback. */
+  createdByTenantBrandColor?: string;
+  /** Crop of the creating tenant's logo (normalized fractions), applied at display time. */
+  createdByTenantLogoCrop?: LogoCrop | null;
   /** How the offer is fulfilled/redeemed (voucher, coupon, gift_card, product, service). */
   executionType: string;
   /** Maximum total units available (null = unlimited). */
@@ -132,12 +163,50 @@ export interface CatalogItem {
   implementationInstructions?: string;
   /** Date the offer goes live. null = live immediately on approval. */
   validFrom?: Date | null;
-  /** Offer expiry date. null means no expiry. */
+  /** Offer expiry date. null means no expiry. Always null for vouchers. */
   validUntil?: Date | null;
+  /** Voucher validity TYPE default ('limit' | 'from_until'). Voucher-only; null
+   *  otherwise. The validity VALUE is per inventory unit. See voucher-validity-dating. */
+  defaultValidityType?: 'limit' | 'from_until' | null;
+  /** Whether the voucher may be combined with other promotions. Voucher-only; null otherwise. */
+  voucherStackable?: boolean | null;
+  /** Voucher card background color ("#rrggbb"). Voucher-only; null otherwise. */
+  voucherBackgroundColor?: string | null;
+  /** Voucher SKU / internal company code. Voucher-only; null otherwise. */
+  sku?: string | null;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator. */
   tags: string[];
+  /** Whether redemption terms/method are shared across variants or per variant. */
+  redemptionScope?: 'shared' | 'per_variant';
+  /**
+   * Voucher variants (priced configurations). Present only for voucher offers
+   * that carry variants. Each variant's `nexus_cost` is included ONLY when the
+   * caller may see it (creating tenant / platform admin / active adoption) -
+   * stripped for everyone else, same rule as the offer-level nexus_cost.
+   */
+  variants?: CatalogVariant[];
+}
+
+/**
+ * A voucher variant as exposed in the catalog. Mirrors the stored OfferVariant
+ * but `nexus_cost` is present only for privileged callers (see CatalogItem.variants).
+ */
+export interface CatalogVariant {
+  variantId: string;
+  face_value?: number;
+  nexus_cost?: number;
+  member_price?: number;
+  /** Raw offer base sale price (member_price) before this tenant's markup. */
+  baseMemberPrice?: number;
+  /** This tenant's stored markup % for the variant (0 when none). */
+  tenantMarkupPct?: number;
+  voucherStackable?: boolean | null;
+  sku?: string | null;
+  tags?: string[];
+  terms?: string;
+  implementationInstructions?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -168,9 +237,19 @@ function toItem(
     isPlatformAdmin: boolean;
     canSeeNexusCost: boolean;
     effectiveMemberPrice?: number;
+    /** Per-tenant per-variant price overrides (variantId -> member price). */
+    effectiveVariantPrices?: Record<string, number>;
+    /** Per-tenant per-variant markup % (variantId -> pct). */
+    effectiveVariantMarkup?: Record<string, number>;
+    /** Creating tenant's branding for the uploader badge (name/logo/brandColor). */
+    uploaderTenant?: UploaderTenantDoc;
   },
 ): CatalogItem {
   const now = Date.now();
+  // Catalog "expired" is derived from the absolute validUntil. Vouchers never
+  // set validUntil (their expiry is a per-purchase window held in
+  // voucherValidityValue/Unit and applied at checkout), so a voucher is never
+  // marked expired here — which is the intended behavior.
   const isExpired =
     offer.status === 'active'
     && offer.validUntil != null
@@ -189,6 +268,7 @@ function toItem(
     imageUrls: offer.imageUrls && offer.imageUrls.length > 0
       ? offer.imageUrls
       : (offer.imageUrl ? [offer.imageUrl] : []),
+    ...(offer.imageCrops && offer.imageCrops.length > 0 && { imageCrops: offer.imageCrops }),
     category: offer.category,
     visibility: offer.visibility,
     market_price: offer.market_price,
@@ -203,6 +283,8 @@ function toItem(
     isAdopted: config?.adoptionStatus === 'active',
     adoptedAt: config?.adoptedAt,
     createdByTenantId: offer.createdByTenantId,
+    uploadedByAdmin: !!offer.uploadedByIdentityId,
+    ...uploaderFieldsFromTenant(context.uploaderTenant),
     executionType: offer.executionType ?? 'voucher',
     stockLimit: offer.stockLimit ?? null,
     stockAvailable: offer.stockLimit === null
@@ -214,8 +296,43 @@ function toItem(
     implementationInstructions: offer.implementationInstructions ?? '',
     validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
+    defaultValidityType: offer.defaultValidityType ?? null,
+    voucherStackable: offer.voucherStackable ?? null,
+    voucherBackgroundColor: offer.voucherBackgroundColor ?? null,
+    sku: offer.sku ?? null,
     terms: offer.terms ?? '',
     tags: offer.tags ?? [],
+    ...(offer.redemptionScope && { redemptionScope: offer.redemptionScope }),
+    // Variants: strip nexus_cost per variant unless the caller may see it
+    // (same gate as the offer-level nexus_cost above).
+    ...(offer.variants && offer.variants.length > 0 && {
+      variants: offer.variants.map((v) => {
+        // Per-tenant per-variant price override wins over the variant's own
+        // member_price (the selling price members see for this tenant).
+        const effPrice = context.effectiveVariantPrices?.[v.variantId] ?? v.member_price;
+        // Redemption text is surfaced PER VARIANT so each variant is
+        // self-contained: a variant's own (custom) text wins; otherwise it
+        // inherits the offer's shared terms/method. Storage stays normalized
+        // (inherited variants persist no terms) - this is a read-time fill only.
+        const effTerms = (v.terms && v.terms.trim()) ? v.terms : (offer.terms || undefined);
+        const effMethod = (v.implementationInstructions && v.implementationInstructions.trim())
+          ? v.implementationInstructions
+          : (offer.implementationInstructions || undefined);
+        return ({
+        variantId: v.variantId,
+        ...(v.face_value !== undefined && { face_value: v.face_value }),
+        ...(context.canSeeNexusCost && v.nexus_cost !== undefined && { nexus_cost: v.nexus_cost }),
+        ...(effPrice !== undefined && { member_price: effPrice }),
+        ...(v.member_price !== undefined && { baseMemberPrice: v.member_price }),
+        tenantMarkupPct: context.effectiveVariantMarkup?.[v.variantId] ?? 0,
+        voucherStackable: v.voucherStackable ?? null,
+        sku: v.sku ?? null,
+        tags: v.tags ?? [],
+        ...(effTerms !== undefined && { terms: effTerms }),
+        ...(effMethod !== undefined && { implementationInstructions: effMethod }),
+        });
+      }),
+    }),
   };
 }
 
@@ -228,8 +345,11 @@ function toItem(
  * per-tenant adoption status. Honors search, category, approval, and adoption
  * filters server-side.
  *
- * Visibility rules: ecosystem offers visible to everyone; tenant_only offers
- * visible only to the matching invitedByTenantId.
+ * Visibility rules: the browse (non-owned) view is the tenant's GLOBAL catalog,
+ * so it returns ONLY ecosystem offers (from any uploader, including this tenant's
+ * own). A tenant's own tenant_only offers belong to Product Catalog (the
+ * ownedOnly view) and are not surfaced here. tenant_only offers are never shown
+ * in the browse view - even to the invited tenant - since it is global-only (M5).
  *
  * Status rules: 'active' offers always visible. 'pending_approval' / 'denied'
  * visible to their creator and to platform admins.
@@ -246,17 +366,22 @@ export async function getTenantCatalogView(
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  const visibilityClause = { $or: [
-    { visibility: 'ecosystem' },
-    { visibility: 'tenant_only', invitedByTenantId: tenantId },
-  ]};
+  // ownedOnly: the Product Catalog page. For a tenant, its own offers. For a
+  // PLATFORM ADMIN (M9), the offers they uploaded ON BEHALF of tenants
+  // (uploadedByIdentityId set) - admins have no own-tenant offers. Otherwise this
+  // is the Benefits Partnerships GLOBAL catalog: ecosystem-only (M5).
+  const scopeClause = query.ownedOnly
+    ? (options?.isPlatformAdmin
+        ? { uploadedByIdentityId: { $exists: true } }
+        : { createdByTenantId: tenantId })
+    : { visibility: 'ecosystem' };
   const baseStatusClause = { $or: [
     { status: 'active' },
     { status: { $in: ['pending_approval', 'denied'] }, createdByTenantId: tenantId },
     ...(options?.isPlatformAdmin ? [{ status: 'pending_approval' }] : []),
   ]};
 
-  const andClauses: Array<Record<string, unknown>> = [visibilityClause, baseStatusClause];
+  const andClauses: Array<Record<string, unknown>> = [scopeClause, baseStatusClause, NOT_DELETED];
 
   if (query.category) andClauses.push({ category: query.category });
   const searchFilter = buildSearchFilter(query.search);
@@ -304,6 +429,19 @@ export async function getTenantCatalogView(
     : await tenantOfferConfigs.find({ tenantId, offerId: { $in: pageOfferIds } }).toArray();
   const configMap = new Map<string, TenantOfferConfig>(configs.map((c) => [c.offerId, c]));
 
+  // Uploader identity: batch-fetch the creating tenants for this page in ONE query
+  // (avoid N+1), so each card/row can show "uploaded by <org> + logo".
+  const uploaderTenantIds = [...new Set(offers.map((o) => o.createdByTenantId).filter(Boolean))];
+  const uploaderTenants = uploaderTenantIds.length === 0
+    ? []
+    : await getTenantDomainCollections(db).domainTenants
+        .find(
+          { tenantId: { $in: uploaderTenantIds } },
+          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } },
+        )
+        .toArray();
+  const uploaderMap = new Map(uploaderTenants.map((tn) => [tn.tenantId, tn]));
+
   const items = offers.map((o) => {
     const toc = configMap.get(o.offerId);
     const isOwnOffer = o.createdByTenantId === tenantId;
@@ -315,6 +453,9 @@ export async function getTenantCatalogView(
       isOwnOffer,
       isPlatformAdmin,
       canSeeNexusCost,
+      ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+      ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+      uploaderTenant: uploaderMap.get(o.createdByTenantId) ?? undefined,
     });
 
     return {
@@ -325,6 +466,61 @@ export async function getTenantCatalogView(
   });
 
   return { items, total };
+}
+
+/**
+ * Fetches a SINGLE offer's detail for a tenant, by offerId (robust regardless of
+ * how many offers exist - it queries the one document directly rather than
+ * scanning a page of the browse view).
+ *
+ * Visibility: the tenant always sees its OWN offers of ANY visibility/status
+ * (needed for the edit-offer flow, including tenant_only and pending/denied);
+ * platform admins see any offer; everyone else sees an ecosystem offer only when
+ * it is active. Returns null when not found or not visible.
+ *
+ * Enrichment mirrors getTenantCatalogView (adoption config + uploader identity +
+ * nexus_cost gating) so the detail shape matches the list.
+ */
+export async function getTenantOfferDetail(
+  tenantId: string,
+  offerId: string,
+  options?: { isPlatformAdmin?: boolean },
+): Promise<CatalogItem | null> {
+  const db = await getMongoDb();
+  const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
+  const isPlatformAdmin = options?.isPlatformAdmin ?? false;
+
+  const offer = await nexusOffers.findOne({ offerId, ...NOT_DELETED });
+  if (!offer) return null;
+
+  const isOwnOffer = offer.createdByTenantId === tenantId;
+  const visible = isOwnOffer || isPlatformAdmin
+    || (offer.visibility === 'ecosystem' && offer.status === 'active');
+  if (!visible) return null;
+
+  const toc = await tenantOfferConfigs.findOne({ tenantId, offerId }) ?? undefined;
+  const uploaderTenant = offer.createdByTenantId
+    ? await getTenantDomainCollections(db).domainTenants.findOne(
+        { tenantId: offer.createdByTenantId },
+        { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } },
+      ) ?? undefined
+    : undefined;
+
+  const hasActiveToc = toc?.adoptionStatus === 'active';
+  const canSeeNexusCost = isOwnOffer || isPlatformAdmin || hasActiveToc;
+  const base = toItem(offer, toc, {
+    isOwnOffer,
+    isPlatformAdmin,
+    canSeeNexusCost,
+    ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+    ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+    uploaderTenant: uploaderTenant ?? undefined,
+  });
+  return {
+    ...base,
+    ...(toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
+    ...(toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
+  };
 }
 
 /**
@@ -355,6 +551,7 @@ export async function getMemberCatalogView(
   const andClauses: Array<Record<string, unknown>> = [
     { offerId: { $in: adoptedConfigs.map((c) => c.offerId) } },
     { status: 'active' },
+    NOT_DELETED,
     { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
     { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
   ];
@@ -417,6 +614,7 @@ export async function getMemberCatalogView(
       isPlatformAdmin: false,
       canSeeNexusCost: false,
       effectiveMemberPrice,
+      ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
     });
   });
 
@@ -448,6 +646,7 @@ export async function adoptOffer(
   const offer = await nexusOffers.findOne({
     offerId,
     status: 'active',
+    ...NOT_DELETED,
     $or: [
       { visibility: 'ecosystem' },
       { visibility: 'tenant_only', invitedByTenantId: tenantId },

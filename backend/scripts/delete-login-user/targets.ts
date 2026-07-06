@@ -9,6 +9,7 @@ import { getMongoDb } from '../../src/config/mongo';
 import { getIdentityDomainCollections } from '../../src/models/domain/identity.models';
 import { getOrchestrationDomainCollections } from '../../src/models/domain/orchestration.models';
 import { getTenantDomainCollections } from '../../src/models/domain/tenant.models';
+import { getSupplyDomainCollections } from '../../src/models/domain/supply.models';
 import { getOnboardingCollections } from '../../src/models/onboarding.models';
 import type {
   MongoDeletionTargets,
@@ -89,12 +90,31 @@ export async function resolveMongoDeletionTargets(
   const db = await getMongoDb();
   const onboarding = getOnboardingCollections(db);
   const tenants = getTenantDomainCollections(db);
+  const supply = getSupplyDomainCollections(db);
   const person = await resolveMongoPerson(email, prismaUser);
 
   const domainOwnedTenants = person.nexusIdentityIds.length
     ? await tenants.domainTenants
-      .find({ createdByIdentityId: { $in: person.nexusIdentityIds } })
+      .find({
+        createdByIdentityId: { $in: person.nexusIdentityIds },
+        // Admin-created tenants with an ASSIGNED owner belong to that owner,
+        // not the creating platform admin - never cascade-delete them with
+        // the creator. Ownerless admin-created tenants are cleaned up like
+        // any owned tenant.
+        ownerAssignment: { $exists: false },
+      })
       .project<{ tenantId: string }>({ tenantId: 1 })
+      .toArray()
+    : [];
+
+  const domainOwnedTenantIds = [...new Set(domainOwnedTenants.map((tenant) => tenant.tenantId))];
+
+  // Offers created by the owned tenants - needed to clean their voucher
+  // inventory (`voucherCodes`, keyed by offerId, not tenantId).
+  const domainOwnedOffers = domainOwnedTenantIds.length
+    ? await supply.nexusOffers
+      .find({ createdByTenantId: { $in: domainOwnedTenantIds } })
+      .project<{ offerId: string }>({ offerId: 1 })
       .toArray()
     : [];
 
@@ -126,9 +146,10 @@ export async function resolveMongoDeletionTargets(
     nexusIdentityIds: person.nexusIdentityIds,
     prismaUserIds: person.prismaUserIds,
     walletPhones: person.walletPhones,
-    domainOwnedTenantIds: [...new Set(domainOwnedTenants.map((tenant) => tenant.tenantId))],
+    domainOwnedTenantIds,
     domainTenantMemberIds: [...new Set(domainMembers.map((member) => member.tenantMemberId))],
     domainMemberTenantIds: [...new Set(domainMembers.map((member) => member.tenantId))],
+    domainOwnedOfferIds: [...new Set(domainOwnedOffers.map((offer) => offer.offerId))],
     legacyOwnedTenantIds: legacyOwnedTenants.map((tenant) => tenant._id),
     legacyMemberTenantIds: [...new Set(legacyMemberships.map((member) => member.tenantId.toHexString()))],
   };

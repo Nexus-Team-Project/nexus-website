@@ -16,7 +16,7 @@ interface GoogleSignInProps {
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 const REDIRECT_URI = window.location.origin;
 
-export default function GoogleSignIn({ variant = 'form', redirectTo = '/workspace' }: GoogleSignInProps) {
+export default function GoogleSignIn({ variant = 'form', redirectTo = '/' }: GoogleSignInProps) {
   const { t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
 

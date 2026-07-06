@@ -49,6 +49,5 @@ backend/public/
 nul
 extglob*
 
-AGENTS.md
 
-CLAUDE.MD
+public/sitemap.xml

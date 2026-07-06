@@ -60,3 +60,19 @@ describe('buildOtpSms', () => {
     expect(sms).not.toContain('#123456');
   });
 });
+
+describe('buildOtpSms host override', () => {
+  it('uses the given host when a string override is passed (ignores WALLET_URL)', () => {
+    process.env.WALLET_URL = 'https://wallet.example.com';
+    const sms = buildOtpSms('123456', 'dashboard.example.com');
+    const lines = sms.split('\n');
+    expect(lines[lines.length - 1]).toBe('@dashboard.example.com #123456');
+  });
+
+  it('omits the origin line when the override is null even if WALLET_URL is set', () => {
+    process.env.WALLET_URL = 'https://wallet.example.com';
+    const sms = buildOtpSms('123456', null);
+    expect(sms).toContain('123456');
+    expect(sms).not.toContain('@');
+  });
+});

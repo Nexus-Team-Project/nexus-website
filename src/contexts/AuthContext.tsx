@@ -36,10 +36,22 @@ interface RegisterData {
   dashboardRedirect?: string;
 }
 
+/**
+ * Result of a password login when the backend demands the new-device OTP
+ * second factor (privileged user on an unrecognized device). The browser
+ * holds the challenge token and completes it via verifyLoginOtp.
+ */
+export interface LoginMfaChallenge {
+  mfaRequired: true;
+  challengeToken: string;
+}
+
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<AuthUser>;
+  login: (email: string, password: string) => Promise<AuthUser | LoginMfaChallenge>;
+  verifyLoginOtp: (challengeToken: string, code: string) => Promise<AuthUser>;
+  resendLoginOtp: (challengeToken: string) => Promise<void>;
   register: (data: RegisterData) => Promise<{ requiresVerification: true; email: string } | void>;
   googleLogin: (accessToken: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
@@ -218,16 +230,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const login = useCallback(async (email: string, password: string, rememberMe = false): Promise<AuthUser> => {
-    const data = await api.post<{ accessToken: string }>('/api/auth/login', { email, password, rememberMe });
+  const login = useCallback(async (email: string, password: string): Promise<AuthUser | LoginMfaChallenge> => {
+    const data = await api.post<{ accessToken?: string; mfaRequired?: boolean; challengeToken?: string }>(
+      '/api/auth/login',
+      { email, password, language: getCurrentWebsiteLanguage() },
+    );
+    // Privileged user on a new device: no session yet, an OTP step follows.
+    if (data.mfaRequired && data.challengeToken) {
+      return { mfaRequired: true, challengeToken: data.challengeToken };
+    }
+    setAccessToken(data.accessToken!);
+    const profile = await api.get<AuthUser>('/api/auth/me');
+    setUser(profile);
+    return profile;
+  }, []);
+
+  /** Completes the new-device OTP challenge and establishes the session. */
+  const verifyLoginOtp = useCallback(async (challengeToken: string, code: string): Promise<AuthUser> => {
+    const data = await api.post<{ accessToken: string }>('/api/auth/mfa/verify', { challengeToken, code });
     setAccessToken(data.accessToken);
     const profile = await api.get<AuthUser>('/api/auth/me');
     setUser(profile);
     return profile;
   }, []);
 
+  /** Re-sends the OTP code for an open login challenge. */
+  const resendLoginOtp = useCallback(async (challengeToken: string): Promise<void> => {
+    await api.post('/api/auth/mfa/resend', { challengeToken });
+  }, []);
+
   const register = useCallback(async (registerData: RegisterData) => {
-    const data = await api.post<{ requiresVerification?: boolean; email?: string; accessToken?: string }>('/api/auth/register', registerData);
+    const data = await api.post<{ requiresVerification?: boolean; email?: string; accessToken?: string }>(
+      '/api/auth/register',
+      { ...registerData, language: getCurrentWebsiteLanguage() },
+    );
     if (data.requiresVerification) {
       return { requiresVerification: true as const, email: data.email! };
     }
@@ -244,7 +280,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, googleLogin, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, verifyLoginOtp, resendLoginOtp, register, googleLogin, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

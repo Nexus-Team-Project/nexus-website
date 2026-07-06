@@ -80,7 +80,6 @@ export default function Signup() {
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
   const loginPath = isHe ? '/he/login' : '/login';
-  const workspacePath = isHe ? '/he/workspace' : '/workspace';
   const dashboardRedirect = new URLSearchParams(window.location.search).get('dashboardRedirect');
 
   // When the visitor arrived from an invite email, look up the organization so
@@ -91,7 +90,7 @@ export default function Signup() {
     : loginPath;
   const googleDashboardRedirect = dashboardRedirect && dashboardRedirect.startsWith('/') && !dashboardRedirect.startsWith('//')
     ? dashboardRedirect
-    : workspacePath;
+    : '/';
 
   useEffect(() => {
     if (dashboardRedirect && dashboardRedirect.startsWith('/') && !dashboardRedirect.startsWith('//')) {
@@ -247,7 +246,7 @@ export default function Signup() {
         setVerificationEmail(result.email);
         setStep('verify');
       } else {
-        navigate(workspacePath);
+        navigate(homePath);
       }
     } catch (error: unknown) {
       const err = toSignupPageError(error);

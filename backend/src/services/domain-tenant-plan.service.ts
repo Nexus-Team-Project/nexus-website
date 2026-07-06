@@ -1,6 +1,9 @@
 /**
  * Reads and enforces billing-plan seat limits for tenant non-member roles.
- * Regular `member` roles are unlimited. All other roles (admin, finance,
+ * Regular `member` roles are unlimited and the `owner` role is never billable
+ * (in organic tenants the owner is the creator, already excluded by
+ * createdByIdentityId; in admin-created tenants the assigned owner is not the
+ * creator, so the role itself must be exempt). All other roles (admin, finance,
  * operator, analyst, developer, supply_manager) consume one seat per distinct
  * identity. An identity holding multiple non-member roles still counts as one seat.
  *
@@ -16,9 +19,13 @@ import { DOMAIN_COLLECTIONS } from '../models/domain/collections';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
 import { PLAN_SEAT_LIMITS, type TenantPlan } from '../models/domain/tenant.models';
 
-/** The `member` role is free and unlimited — only other roles consume seats. */
+/**
+ * The `member` role is free and unlimited, and the `owner` role (the unique
+ * per-tenant top role, held by the workspace creator or an admin-assigned
+ * owner) is never billable - only other roles consume seats.
+ */
 function isSeatConsumingRole(role: string): boolean {
-  return role !== 'member';
+  return role !== 'member' && role !== 'owner';
 }
 
 export interface TenantPlanSummary {
@@ -46,7 +53,7 @@ async function countNonMemberSeatsUsed(tenantId: string, excludeIdentityId?: str
   const db = await getMongoDb();
   const identityCollections = getIdentityDomainCollections(db);
 
-  const matchStage: Record<string, unknown> = { tenantId, role: { $ne: 'member' } };
+  const matchStage: Record<string, unknown> = { tenantId, role: { $nin: ['member', 'owner'] } };
   if (excludeIdentityId) {
     matchStage.nexusIdentityId = { $ne: excludeIdentityId };
   }
@@ -177,7 +184,7 @@ export async function identityAlreadyHoldsNonMemberSeat(
   const existing = await identityCollections.tenantUserRoles.findOne({
     tenantId,
     nexusIdentityId,
-    role: { $ne: 'member' },
+    role: { $nin: ['member', 'owner'] },
   });
   return existing !== null;
 }

@@ -54,3 +54,57 @@ export function computeTenantDisplayPrice(
   }
   return offerDisplayPrice ?? computeDisplayPrice(executionType, offerMemberPrice, offerMarketPrice);
 }
+
+/**
+ * Round a shekel amount to agorot (2 decimals), avoiding floating-point dust
+ * (e.g. 36.29999999 -> 36.3). Used for every per-tenant effective price.
+ */
+export function roundAgorot(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Maximum markup percentage for a voucher variant: the % that lifts the base
+ * sale price exactly to the face value. Returns 0 when there is no headroom
+ * (face <= base) or inputs are missing/invalid.
+ * Input:  base (member_price), faceValue. Output: max % (>= 0), 2dp.
+ */
+export function maxMarkupPct(
+  base: number | null | undefined,
+  faceValue: number | null | undefined,
+): number {
+  if (typeof base !== 'number' || base <= 0 || typeof faceValue !== 'number') return 0;
+  if (faceValue <= base) return 0;
+  return roundAgorot((faceValue / base - 1) * 100);
+}
+
+/**
+ * Clamp a markup percentage into [0, maxMarkupPct(base, faceValue)].
+ * A negative, non-finite, or too-large % is coerced into range.
+ */
+export function clampMarkupPct(pct: number, base: number, faceValue: number): number {
+  const max = maxMarkupPct(base, faceValue);
+  if (!Number.isFinite(pct) || pct < 0) return 0;
+  return pct > max ? max : pct;
+}
+
+/**
+ * Effective per-tenant sale price from a markup % on the base sale price.
+ * The % is clamped first, then applied, capped at faceValue, rounded to agorot.
+ * Result is always within [base, faceValue].
+ * Input:  base (member_price), faceValue, pct. Output: price (2dp).
+ */
+export function markupToPrice(base: number, faceValue: number, pct: number): number {
+  const safePct = clampMarkupPct(pct, base, faceValue);
+  return roundAgorot(Math.min(base * (1 + safePct / 100), faceValue));
+}
+
+/**
+ * Derive the markup % that produces an absolute price on a base sale price.
+ * Used to convert legacy absolute overrides into a percentage (backfill /
+ * first read). Clamped into [0, maxMarkupPct].
+ */
+export function priceToMarkupPct(price: number, base: number, faceValue: number): number {
+  if (typeof base !== 'number' || base <= 0) return 0;
+  return clampMarkupPct(roundAgorot((price / base - 1) * 100), base, faceValue);
+}

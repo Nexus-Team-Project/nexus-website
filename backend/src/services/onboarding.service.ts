@@ -7,6 +7,7 @@ import { prisma } from '../config/database';
 import { getMongoDb } from '../config/mongo';
 import { PlatformRole, getPlatformRoleForEmail, normalizeEmail } from '../config/platform-admins';
 import { isPlatformAdminEmail } from '../utils/platform-admin';
+import { findPreferredTenantMembership } from '../utils/preferred-tenant-membership';
 import { createError } from '../middleware/errorHandler';
 import {
   BusinessSetupDocument,
@@ -16,19 +17,28 @@ import {
   getOnboardingCollections,
 } from '../models/onboarding.models';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
-import { DEFAULT_MEMBER_SERVICES } from '../models/domain/tenant.models';
+import { DEFAULT_MEMBER_SERVICES, type LogoCrop } from '../models/domain/tenant.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
 import { getDomainAuthorizationContext, getPrimaryTenantRole, hasDomainPermission } from './domain-authorization.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
 import { syncDomainTenantMembership } from './domain-tenant-sync.service';
+import { nextApprovalOnSubmit, approvalAuthFields } from './business-setup-approval.helper';
+import { sendBusinessSetupSubmittedToAdmins } from './business-setup-approval-email.service';
 import { syncOnboardingMemberEmail } from './onboarding-identity.service';
 import type { DomainPermission } from './domain-permissions.service';
 import { getTenantPlanSummary, type TenantPlanSummary } from './domain-tenant-plan.service';
+import { isNoTenantPlatformAdmin } from './onboarding-admin.helper';
+import { classifyOnboardingPhone } from './onboarding/onboarding-phone.helper';
+import {
+  hasVerifiedOnboardingPhone,
+  consumeVerifiedOnboardingPhone,
+} from './onboarding/onboarding-phone-otp.service';
+import { createOnboardingLead } from './monday-lead.service';
 
 export interface UserContext {
   isTenant: boolean;
   isMember: boolean;
-  mode: 'tenant' | 'regular_user' | 'workspace_setup_deferred' | 'needs_workspace_setup';
+  mode: 'tenant' | 'regular_user' | 'workspace_setup_deferred' | 'needs_workspace_setup' | 'platform_admin';
   tenantId: string | null;
   tenantName: string | null;
   memberId: string | null;
@@ -38,6 +48,8 @@ export interface UserContext {
 export interface OnboardingInfo {
   required: boolean;
   step: 'workspace_setup' | 'workspace_setup_deferred' | 'business_setup' | null;
+  /** True when the post-onboarding welcome popup must block the dashboard. */
+  welcomePending?: boolean;
 }
 
 export interface DashboardAuthorization {
@@ -64,6 +76,19 @@ export interface DashboardAuthorization {
   memberServices: string[];
   /** True when business setup is complete and the tenant can go live. */
   businessSetupComplete: boolean;
+  /** True when a platform admin has APPROVED this tenant's business setup (M8). */
+  businessSetupApproved: boolean;
+  /** Raw approval state for the tenant-side indicator; null = never submitted. */
+  businessSetupApprovalStatus: 'pending' | 'approved' | 'denied' | null;
+  /** Denial reason (only when status === 'denied'), for the tenant-side indicator. */
+  businessSetupApprovalReason: string | null;
+  /**
+   * True when a platform admin has marked this tenant as auto-approve/trusted
+   * (`Tenant.autoApproveOffers`), so its ecosystem offers publish immediately
+   * (active) instead of waiting in the per-offer approval queue. Used to word the
+   * offer-visibility hint. Always false for non-tenant users.
+   */
+  offersAutoApproved: boolean;
 }
 
 export interface TenantSeats {
@@ -88,6 +113,8 @@ export interface MeResponse {
     /** Cloudinary URL of the tenant's logo, or null -> the dashboard shows the
      *  tenant-name initials. */
     tenantLogoUrl?: string | null;
+    /** Crop of the logo (normalized fractions), or null -> show the full logo. */
+    tenantLogoCrop?: LogoCrop | null;
     /** Org brand color ("#rrggbb"), or null -> wallet derives one from the id. */
     tenantBrandColor?: string | null;
   };
@@ -203,6 +230,12 @@ function getDashboardAuthorization(
     memberServices: [],
     // businessSetupComplete is overwritten in getMe() after the tenantOnboardingStates lookup.
     businessSetupComplete: false,
+    // M8 approval fields - overwritten in getMe() after the domain tenant lookup.
+    businessSetupApproved: false,
+    businessSetupApprovalStatus: null,
+    businessSetupApprovalReason: null,
+    // Overwritten in getMe() after the domain tenant lookup (autoApproveOffers).
+    offersAutoApproved: false,
   };
 }
 
@@ -235,11 +268,22 @@ async function getDomainTenantContextForUser(userId: string): Promise<UserContex
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
-  const tenantMember = await tenantCollections.tenantMembers.findOne(
-    { nexusIdentityId: identity.nexusIdentityId, status: 'active' },
-    { sort: { createdAt: 1 } },
-  );
+  // Privileged (non-member) memberships win over plain member ones, so an
+  // admin-assigned tenant OWNER who is also a member elsewhere resolves into
+  // the tenant they own (see utils/preferred-tenant-membership).
+  const tenantMember = await findPreferredTenantMembership(db, identity.nexusIdentityId);
   if (!tenantMember) return null;
+
+  // Admin-created tenants: the assigned owner's first context resolution locks
+  // the replace/remove typo window (see admin-organizations.service).
+  await tenantCollections.domainTenants.updateOne(
+    {
+      tenantId: tenantMember.tenantId,
+      'ownerAssignment.identityId': identity.nexusIdentityId,
+      'ownerAssignment.activatedAt': null,
+    },
+    { $set: { 'ownerAssignment.activatedAt': new Date() } },
+  );
 
   const [roles, tenant] = await Promise.all([
     identityCollections.tenantUserRoles
@@ -390,7 +434,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   // Run all four tenant-scoped lookups in parallel to avoid serial latency on
   // every /api/me call. domainTenantStatus feeds resolveCatalogMode, which is
   // called after Promise.all resolves.
-  const [domainTenantDoc, userRoles, domainMemberDoc] = await Promise.all([
+  const [domainTenantDoc, userRoles, domainMemberDoc, legacyOnboardingState] = await Promise.all([
     // Look up the domain tenant's live status (separate from the legacy onboarding tenant).
     context.tenantId
       ? tenantCollections.domainTenants.findOne(
@@ -416,6 +460,12 @@ export async function getMe(userId: string): Promise<MeResponse> {
           { projection: { services: 1 } },
         )
       : Promise.resolve(null),
+    // Post-onboarding welcome flag: lives on the user's legacy onboarding
+    // state doc, set by createWorkspace, cleared only by the dev dismiss.
+    getOnboardingCollections(db).onboardingStates.findOne(
+      { userId },
+      { projection: { welcomePending: 1 } },
+    ),
   ]);
 
   const domainTenantStatus: string | null = domainTenantDoc?.status ?? null;
@@ -436,6 +486,20 @@ export async function getMe(userId: string): Promise<MeResponse> {
   );
 
   const baseAuthorization = getDashboardAuthorization(user.email, context, domainAuthorization.permissions);
+
+  // A NEXUS platform admin with no tenant/member has nothing to onboard: report a
+  // terminal 'platform_admin' mode and clear onboarding so the dashboard lands them
+  // on Home instead of the workspace-setup wizard. Admins who ARE tenant members
+  // keep their normal 'tenant' mode.
+  const noTenantAdmin = isNoTenantPlatformAdmin(baseAuthorization.isPlatformAdmin === true, context);
+  const resolvedMode = noTenantAdmin ? ('platform_admin' as const) : context.mode;
+  // welcomePending blocks tenant users only (never admins/members) - the
+  // popup shows on every login until cleared.
+  const welcomePending =
+    !noTenantAdmin && context.isTenant && legacyOnboardingState?.welcomePending === true;
+  const resolvedOnboarding = noTenantAdmin
+    ? { required: false, step: null }
+    : { ...status.onboarding, welcomePending };
 
   // Wallet RouterScreen payload - cards the user sees right after login.
   // Lives in its own helper so getMe does not grow further (file is already
@@ -467,7 +531,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const tenantBrandingDoc = context.tenantId
     ? await getTenantDomainCollections(db).domainTenants.findOne(
         { tenantId: context.tenantId },
-        { projection: { logoUrl: 1, brandColor: 1 } },
+        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, businessSetupApproval: 1, autoApproveOffers: 1 } },
       )
     : null;
 
@@ -475,7 +539,9 @@ export async function getMe(userId: string): Promise<MeResponse> {
     user: { id: user.id, email: user.email, name: user.fullName, avatarUrl: user.avatarUrl ?? null },
     context: {
       ...context,
+      mode: resolvedMode,
       tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
+      tenantLogoCrop: tenantBrandingDoc?.logoCrop ?? null,
       tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
       ...(planSummary && {
         plan: planSummary.plan,
@@ -494,8 +560,12 @@ export async function getMe(userId: string): Promise<MeResponse> {
       canPurchaseCatalog: hasMemberRole && catalogMode !== 'inactive',
       memberServices,
       businessSetupComplete,
+      // M8: NEXUS-admin approval state of this tenant's business setup.
+      ...approvalAuthFields(tenantBrandingDoc?.businessSetupApproval ?? null),
+      // Trusted/auto-approve tenant: its ecosystem offers publish immediately.
+      offersAutoApproved: tenantBrandingDoc?.autoApproveOffers === true,
     },
-    onboarding: status.onboarding,
+    onboarding: resolvedOnboarding,
     memberships: walletRouter.memberships,
     isPlatformAdmin: walletRouter.isPlatformAdmin,
     canOpenDashboard: walletRouter.canOpenDashboard,
@@ -552,6 +622,17 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
   const collections = getOnboardingCollections(db);
   const now = new Date();
 
+  // Israeli phones must be OTP-verified (server-side proof written by
+  // /api/v1/onboarding/phone-otp/verify); Israeli-prefixed junk is rejected.
+  // Foreign numbers pass without verification. The wizard mirrors this; the
+  // backend is the real boundary.
+  const phoneClass = classifyOnboardingPhone(input.contactPhone);
+  if (phoneClass.kind === 'invalid_israeli') throw createError('invalid_israeli_phone', 400);
+  if (phoneClass.kind === 'israeli') {
+    const verified = await hasVerifiedOnboardingPhone(db, userId, phoneClass.normalized);
+    if (!verified) throw createError('phone_not_verified', 400);
+  }
+
   const tenant: TenantDocument = {
     organizationName: input.organizationName,
     website: input.website,
@@ -602,12 +683,33 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
         state: 'business_setup_required',
         skippedWorkspaceSetup: false,
         tenantId: tenantInsert.insertedId,
+        // The welcome popup blocks the dashboard on every login until a rep
+        // flow clears it (dev-only dismiss endpoint for local testing).
+        welcomePending: true,
         updatedAt: now,
       },
       $unset: { skipReason: '', memberId: '' },
     },
     { upsert: true },
   );
+
+  // Monday.com Website Leads item - fire-and-forget (the service never
+  // throws); runs in dev + prod for now (dev skip is a planned follow-up).
+  void createOnboardingLead({
+    fullName: (user.fullName ?? '').trim() || user.email,
+    contactRole: input.contactRole,
+    organizationName: input.organizationName,
+    website: input.website,
+    phone: input.contactPhone,
+    tenantId: tenantInsert.insertedId.toHexString(),
+  });
+
+  // Verification is single-use: drop it now that the workspace exists.
+  if (phoneClass.kind === 'israeli') {
+    await consumeVerifiedOnboardingPhone(db, userId, phoneClass.normalized).catch((e) => {
+      console.warn('[onboarding] failed to consume phone verification (non-fatal):', e);
+    });
+  }
 
   return {
     success: true,
@@ -616,6 +718,19 @@ export async function createWorkspace(userId: string, input: WorkspaceSetupInput
     nextStep: 'business_setup' as const,
     redirectTo: '/dashboard',
   };
+}
+
+/**
+ * DEV-ONLY: clears the post-onboarding welcome flag so the dashboard opens
+ * normally again. Production has no dismiss path (the route 404s there).
+ * Input: Prisma user id. Output: flag cleared (no-op when no state doc).
+ */
+export async function dismissPostOnboardingWelcome(userId: string): Promise<void> {
+  const db = await getMongoDb();
+  await getOnboardingCollections(db).onboardingStates.updateOne(
+    { userId },
+    { $set: { welcomePending: false, updatedAt: new Date() } },
+  );
 }
 
 /**
@@ -774,6 +889,31 @@ export async function submitBusinessSetup(userId: string, data: BusinessSetupInp
 }
 
 /**
+ * DEV-ONLY: submit a business-setup approval request WITHOUT completing the full
+ * form, so the global-upload / Go-Live gates can be exercised in development. Marks
+ * the legacy business setup 'submitted' (so onboarding no longer routes to the
+ * wizard) and the domain approval 'pending' + devMode:true, then notifies admins.
+ * The ROUTE hard-disables this in production; this function must never run there.
+ * Input: Prisma user id. Output: void.
+ */
+export async function submitDevBusinessSetupRequest(userId: string): Promise<void> {
+  const tenantId = await requireTenantPermission(userId, 'workspace.trigger_go_live');
+  const db = await getMongoDb();
+  const now = new Date();
+  await getOnboardingCollections(db).tenants.updateOne(
+    { _id: tenantId },
+    { $set: { businessSetupStatus: 'submitted', updatedAt: now } },
+  );
+  const tc = getTenantDomainCollections(db);
+  await tc.domainTenants.updateOne(
+    { tenantId: tenantId.toHexString() },
+    { $set: { businessSetupApproval: { status: 'pending', devMode: true, submittedAt: now }, updatedAt: now } },
+  );
+  const t = await tc.domainTenants.findOne({ tenantId: tenantId.toHexString() }, { projection: { organizationName: 1 } });
+  void sendBusinessSetupSubmittedToAdmins(t?.organizationName ?? tenantId.toHexString(), true);
+}
+
+/**
  * Upserts business setup data and mirrors status onto the tenant document.
  * Input: Prisma user id, validated setup data, and desired status.
  * Output: saved setup response.
@@ -807,6 +947,20 @@ async function upsertBusinessSetup(
     { _id: tenantId },
     { $set: { businessSetupStatus: status === 'submitted' ? 'submitted' : 'in_progress', updatedAt: now } },
   );
+
+  // On SUBMIT, put the tenant into the NEXUS-admin approval queue (M8). Domain
+  // tenantId === the legacy tenant _id hex. Re-submitting after edits resets to
+  // 'pending', clearing any prior reason/review + the devMode flag.
+  if (status === 'submitted') {
+    const tc = getTenantDomainCollections(db);
+    await tc.domainTenants.updateOne(
+      { tenantId: tenantId.toHexString() },
+      { $set: { businessSetupApproval: nextApprovalOnSubmit(now), updatedAt: now } },
+    );
+    // Notify NEXUS admins that a tenant is awaiting business-setup approval.
+    const t = await tc.domainTenants.findOne({ tenantId: tenantId.toHexString() }, { projection: { organizationName: 1 } });
+    void sendBusinessSetupSubmittedToAdmins(t?.organizationName ?? tenantId.toHexString(), false);
+  }
 
   return getBusinessSetup(userId);
 }

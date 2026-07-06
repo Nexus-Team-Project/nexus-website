@@ -6,3 +6,6 @@ backups/
 *.archive
 *.bson
 *.sql.gz
+
+# TypeScript incremental build cache (regenerated on every build)
+*.tsbuildinfo

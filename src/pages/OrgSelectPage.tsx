@@ -23,7 +23,8 @@ export default function OrgSelectPage() {
   useEffect(() => {
     if (isLoading) return;
     if (!user) { navigate(isHe ? '/he/login' : '/login', { replace: true }); return; }
-    if (orgs.length === 0) { navigate(isHe ? '/he/workspace' : '/workspace', { replace: true }); return; }
+    // No organizations yet: hand off to the dashboard, where workspace setup now lives.
+    if (orgs.length === 0) { window.location.replace(`${DASHBOARD_URL}/`); return; }
     // If only one org — skip picker and go straight in
     if (orgs.length === 1) {
       window.location.replace(`${DASHBOARD_URL}/organizations/${orgs[0].org.slug}`);

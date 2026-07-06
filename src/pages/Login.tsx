@@ -13,6 +13,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import InviteBanner from '../components/InviteBanner';
+import LoginOtpStep from '../components/LoginOtpStep';
 
 interface LoginPageError {
   status?: number;
@@ -31,7 +32,8 @@ function toLoginPageError(error: unknown): LoginPageError {
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [rememberMe, setRememberMe] = useState(false);
+  // Set when a privileged login on a new device must complete an email OTP.
+  const [mfaChallenge, setMfaChallenge] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showPasswordTooltip, setShowPasswordTooltip] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,13 +46,12 @@ export default function Login() {
   const hasRedirectedExistingSession = useRef(false);
 
   const { t, language } = useLanguage();
-  const { user: authenticatedUser, isLoading: isAuthLoading, login } = useAuth();
+  const { user: authenticatedUser, isLoading: isAuthLoading, login, verifyLoginOtp, resendLoginOtp } = useAuth();
   const { search } = useLocation();
   const { identify } = useAnalytics();
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
   const signupPath = isHe ? '/he/signup' : '/signup';
-  const workspacePath = isHe ? '/he/workspace' : '/workspace';
 
   const searchParams = new URLSearchParams(search);
   const dashboardRedirect = searchParams.get('dashboardRedirect');
@@ -88,18 +89,17 @@ export default function Login() {
   }, [dashboardRedirect]);
   const googleDashboardRedirect = dashboardRedirect && dashboardRedirect.startsWith('/') && !dashboardRedirect.startsWith('//')
     ? dashboardRedirect
-    : workspacePath;
+    : '/';
 
   /**
    * Sends an authenticated website user to the dashboard with a fresh SSO code.
-   * Input: authenticated user profile and the remembered-device choice.
+   * Input: authenticated user profile.
    * Output: navigation occurs in the current browser tab.
    */
   const redirectToDashboard = useCallback(async (
     user: { orgMemberships?: { org: { slug: string } }[] },
-    shouldRememberDevice?: boolean,
   ) => {
-    const { code } = await api.post<{ code: string }>('/api/auth/create-code', { rememberMe: shouldRememberDevice });
+    const { code } = await api.post<{ code: string }>('/api/auth/create-code');
     window.location.replace(buildDashboardCallbackUrl(code, getDashboardRedirectPath(user)));
   }, [buildDashboardCallbackUrl, getDashboardRedirectPath]);
 
@@ -109,7 +109,7 @@ export default function Login() {
    * Output: navigation occurs in the current browser tab.
    */
   const navigateAfterLogin = async (user: { role: string; onboardingDone: boolean; orgMemberships?: { org: { slug: string } }[] }) => {
-    await redirectToDashboard(user, rememberMe);
+    await redirectToDashboard(user);
   };
 
   useEffect(() => {
@@ -157,9 +157,15 @@ export default function Login() {
     setIsLoading(true);
 
     try {
-      const user = await login(email, password, rememberMe);
-      identify(user.id, 'login');
-      await navigateAfterLogin(user);
+      const result = await login(email, password);
+      if ('mfaRequired' in result) {
+        // Privileged user on a new device: switch the card to the OTP step.
+        setIsLoading(false);
+        setMfaChallenge(result.challengeToken);
+        return;
+      }
+      identify(result.id, 'login');
+      await navigateAfterLogin(result);
     } catch (error: unknown) {
       const err = toLoginPageError(error);
       setIsLoading(false);
@@ -221,6 +227,19 @@ export default function Login() {
                 </div>
               )}
 
+              {mfaChallenge ? (
+                <LoginOtpStep
+                  email={email.trim().toLowerCase()}
+                  onVerify={async (otpCode) => {
+                    const user = await verifyLoginOtp(mfaChallenge, otpCode);
+                    identify(user.id, 'login');
+                    await navigateAfterLogin(user);
+                  }}
+                  onResend={() => resendLoginOtp(mfaChallenge)}
+                  onBack={() => setMfaChallenge(null)}
+                />
+              ) : (
+                <>
               <form className="space-y-3" onSubmit={handleSubmit}>
                 {/* Email Field */}
                 <div>
@@ -300,20 +319,6 @@ export default function Login() {
                   )}
                 </div>
 
-                {/* Remember Me */}
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300 text-nx-primary focus:ring-nx-primary/30 cursor-pointer"
-                    id="remember-me"
-                  />
-                  <label htmlFor="remember-me" className={`${isHe ? 'mr-2' : 'ml-2'} block text-sm text-nx-gray cursor-pointer`}>
-                    {t.auth.rememberMeDevice}
-                  </label>
-                </div>
-
                 {/* Sign In Button */}
                 <button
                   type="submit"
@@ -359,6 +364,8 @@ export default function Login() {
                   </Link>
                 </p>
               </div>
+                </>
+              )}
             </div>
           </div>
         </div>

@@ -49,12 +49,18 @@ export function boundOtpHost(): string | null {
  * The origin-bound line is appended only when a host is resolvable, and is always
  * the final line of the message (required by the WebOTP / iOS autofill parsers).
  *
+ * hostOverride semantics: undefined = default wallet host (boundOtpHost);
+ * null = omit the origin-bound line; string = bind to that host. Lets the
+ * dashboard-onboarding OTP bind autofill to the dashboard domain while the
+ * wallet flows stay unchanged.
+ *
  * @param code the plaintext 6-digit OTP to deliver.
+ * @param hostOverride optional origin host override (see above).
  * @returns the SMS body to hand to InforU.
  */
-export function buildOtpSms(code: string): string {
+export function buildOtpSms(code: string, hostOverride?: string | null): string {
   const human = `קוד האימות שלך הוא: ${code}\nאין לשתף קוד זה עם אף אחד.`;
-  const host = boundOtpHost();
+  const host = hostOverride === undefined ? boundOtpHost() : hostOverride;
   // Blank line then `@host #code` as the LAST line - the format both Android
   // WebOTP and iOS Safari look for. Omitted when no host is configured.
   return host ? `${human}\n\n@${host} #${code}` : human;
