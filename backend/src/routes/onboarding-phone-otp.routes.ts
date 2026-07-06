@@ -2,8 +2,9 @@
  * Onboarding phone-OTP routes - verify the Israeli phone typed in the
  * dashboard onboarding wizard before workspace creation.
  *
- *   POST /api/v1/onboarding/phone-otp/start   - send an InforU OTP (Israeli mobiles only)
- *   POST /api/v1/onboarding/phone-otp/verify  - verify the code, record the verification
+ *   POST /api/v1/onboarding/phone-otp/start    - send an InforU OTP (Israeli mobiles only)
+ *   POST /api/v1/onboarding/phone-otp/verify   - verify the code, record the verification
+ *   POST /api/v1/onboarding/phone-otp/dev-skip - DEV ONLY: mark verified, no SMS (404 in prod)
  *
  * Both routes are caller-scoped (authenticate only - the user verifies their
  * OWN phone; no tenant exists yet at this point in onboarding).
@@ -15,9 +16,11 @@ import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
+import { env } from '../config/env';
 import {
   startOnboardingPhoneOtp,
   verifyOnboardingPhoneOtp,
+  devSkipOnboardingPhoneVerification,
 } from '../services/onboarding/onboarding-phone-otp.service';
 
 const router = Router();
@@ -87,6 +90,29 @@ router.post('/verify', authenticate, async (req: Request, res: Response) => {
     console.info('[onboarding-phone-otp] POST /verify -> ok (phone verified)');
     res.json(out);
   } catch (e) { mapError('POST /verify', e, res); }
+});
+
+// DEV-ONLY: mark the phone verified without sending an InforU SMS, so local
+// onboarding runs don't burn SMS credits. HARD-DISABLED in production.
+router.post('/dev-skip', authenticate, async (req: Request, res: Response) => {
+  if (env.NODE_ENV === 'production') {
+    res.status(404).json({ error: 'not_found' });
+    return;
+  }
+  const parsed = startSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'invalid_request' });
+    return;
+  }
+  try {
+    const db = await getMongoDb();
+    const out = await devSkipOnboardingPhoneVerification(db, {
+      userId: req.user!.sub,
+      phone: parsed.data.phone,
+    });
+    console.info('[onboarding-phone-otp] POST /dev-skip -> ok (phone marked verified, no SMS)');
+    res.json(out);
+  } catch (e) { mapError('POST /dev-skip', e, res); }
 });
 
 export default router;
