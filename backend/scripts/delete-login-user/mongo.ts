@@ -17,6 +17,8 @@ import { deleteOfferImage } from '../../src/utils/cloudinary';
 import { PHONE_OTP_COLLECTION } from '../../src/models/auth/phone-otp.models';
 import { EMAIL_OTP_COLLECTION } from '../../src/models/auth/email-otp.models';
 import { PHONE_SIGNUP_TICKET_COLLECTION } from '../../src/models/auth/phone-signup-ticket.models';
+import { LOGIN_OTP_COLLECTION } from '../../src/models/auth/login-otp.models';
+import { TRUSTED_DEVICE_COLLECTION } from '../../src/models/auth/trusted-device.models';
 import { TENANT_JOIN_REQUEST_COLLECTION } from '../../src/models/auth/tenant-join-request.models';
 import {
   resolveMongoDeletionTargets,
@@ -106,6 +108,8 @@ export async function collectMongoCounts(
     emailOtpChallenges,
     phoneSignupTickets,
     walletRateLimits,
+    loginOtpChallenges,
+    trustedDevices,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
     ownerAssignmentsCleared,
@@ -225,6 +229,14 @@ export async function collectMongoCounts(
         { key: email },
       ],
     }),
+    // Login new-device OTP challenges keyed by email.
+    db.collection(LOGIN_OTP_COLLECTION).countDocuments({ email }),
+    // Trusted login devices keyed by the Prisma user id.
+    db.collection(TRUSTED_DEVICE_COLLECTION).countDocuments(
+      targets.prismaUserIds.length
+        ? { prismaUserId: { $in: targets.prismaUserIds } }
+        : { prismaUserId: '__none__' },
+    ),
     // Plan #4: tenant join requests submitted by the user.
     db.collection(TENANT_JOIN_REQUEST_COLLECTION).countDocuments({
       $or: [
@@ -282,6 +294,8 @@ export async function collectMongoCounts(
     emailOtpChallenges,
     phoneSignupTickets,
     walletRateLimits,
+    loginOtpChallenges,
+    trustedDevices,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
     ownerAssignmentsCleared,
@@ -323,6 +337,13 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
     });
   }
   await db.collection(EMAIL_OTP_COLLECTION).deleteMany({ email });
+  // Login new-device OTP challenges + trusted devices (login-device-otp).
+  await db.collection(LOGIN_OTP_COLLECTION).deleteMany({ email });
+  if (targets.prismaUserIds.length > 0) {
+    await db.collection(TRUSTED_DEVICE_COLLECTION).deleteMany({
+      prismaUserId: { $in: targets.prismaUserIds },
+    });
+  }
   await db.collection(WALLET_RATE_LIMIT_COLLECTION).deleteMany({
     $or: [
       ...(targets.walletPhones.length ? [{ key: { $in: targets.walletPhones } }] : []),
