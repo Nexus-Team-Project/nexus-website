@@ -45,6 +45,22 @@ export async function startOnboardingPhoneOtp(
 }
 
 /**
+ * Upsert the (userId, phone) verification record with a fresh TTL.
+ * Shared by the real OTP verify and the dev-only skip.
+ */
+async function recordVerifiedPhone(db: Db, userId: string, phone: string): Promise<void> {
+  const now = new Date();
+  await db.collection<OnboardingPhoneVerification>(ONBOARDING_PHONE_VERIFICATION_COLLECTION).updateOne(
+    { userId, phone },
+    {
+      $set: { verifiedAt: now, expiresAt: new Date(now.getTime() + VERIFICATION_TTL_MS) },
+      $setOnInsert: { userId, phone },
+    },
+    { upsert: true },
+  );
+}
+
+/**
  * Verify an OTP code and record the (userId, phone) verification.
  * Input: Prisma user id + challengeId + 6-digit code.
  * Output: { verified: true }.
@@ -58,15 +74,24 @@ export async function verifyOnboardingPhoneOtp(
     challengeId: args.challengeId,
     code: args.code,
   });
-  const now = new Date();
-  await db.collection<OnboardingPhoneVerification>(ONBOARDING_PHONE_VERIFICATION_COLLECTION).updateOne(
-    { userId: args.userId, phone },
-    {
-      $set: { verifiedAt: now, expiresAt: new Date(now.getTime() + VERIFICATION_TTL_MS) },
-      $setOnInsert: { userId: args.userId, phone },
-    },
-    { upsert: true },
-  );
+  await recordVerifiedPhone(db, args.userId, phone);
+  return { verified: true };
+}
+
+/**
+ * DEV-ONLY: mark an Israeli phone verified WITHOUT sending any SMS. The
+ * route exposing this is hard-disabled in production; this writes the same
+ * verification record the real OTP flow writes so createWorkspace passes.
+ * Input: Prisma user id + raw phone. Output: { verified: true }.
+ * @throws invalid_israeli_phone when the phone is not a valid Israeli mobile.
+ */
+export async function devSkipOnboardingPhoneVerification(
+  db: Db,
+  args: { userId: string; phone: string },
+): Promise<{ verified: true }> {
+  const normalized = normalizeIsraeliPhone(args.phone);
+  if (!normalized) throw new Error('invalid_israeli_phone');
+  await recordVerifiedPhone(db, args.userId, normalized);
   return { verified: true };
 }
 

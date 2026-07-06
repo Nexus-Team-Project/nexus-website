@@ -14,6 +14,7 @@ import {
   verifyOnboardingPhoneOtp,
   hasVerifiedOnboardingPhone,
   consumeVerifiedOnboardingPhone,
+  devSkipOnboardingPhoneVerification,
 } from '../../../src/services/onboarding/onboarding-phone-otp.service';
 import { inforuSendSms } from '../../../src/services/sms/inforu.client';
 
@@ -82,5 +83,20 @@ describe('verify + has + consume', () => {
       verifyOnboardingPhoneOtp(db, { userId: 'user-1', challengeId: r.challengeId, code: '000000' }),
     ).rejects.toThrow('otp_invalid');
     expect(await hasVerifiedOnboardingPhone(db, 'user-1', '0508465858')).toBe(false);
+  });
+});
+
+describe('devSkipOnboardingPhoneVerification', () => {
+  it('writes a verification record WITHOUT sending an SMS', async () => {
+    const out = await devSkipOnboardingPhoneVerification(db, { userId: 'user-1', phone: '+972508465858' });
+    expect(out).toEqual({ verified: true });
+    expect(await hasVerifiedOnboardingPhone(db, 'user-1', '0508465858')).toBe(true);
+    expect(inforuSendSms).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-Israeli phone', async () => {
+    await expect(
+      devSkipOnboardingPhoneVerification(db, { userId: 'user-1', phone: '+14155551234' }),
+    ).rejects.toThrow('invalid_israeli_phone');
   });
 });

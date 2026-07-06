@@ -7,7 +7,8 @@
  *     form ("צור קשר עם מכירות") is submitted; the message is posted as an
  *     item UPDATE so sales sees the full inquiry on the item.
  * Both are fire-and-forget: they log and never throw, so a Monday outage can
- * never fail onboarding or the contact form.
+ * never fail onboarding or the contact form. Both are PRODUCTION-only -
+ * outside NODE_ENV=production they log a skip line and do nothing.
  *
  * Legacy monday.service.ts (marketing-site leads, different board) is
  * intentionally untouched.
@@ -147,6 +148,12 @@ async function createWebsiteLeadsItem(itemName: string, columnValues: Record<str
  * Input: the lead fields. Output: resolves when the attempt finished.
  */
 export async function createOnboardingLead(input: OnboardingLeadInput): Promise<void> {
+  // Leads are PRODUCTION-only: dev/test onboarding runs must not pollute the
+  // sales board.
+  if (env.NODE_ENV !== 'production') {
+    console.info(`[monday-lead] non-production env - skipping onboarding lead for tenant ${input.tenantId}`);
+    return;
+  }
   if (!env.MONDAY_API_TOKEN) {
     console.warn(`[monday-lead] MONDAY_API_TOKEN not set - skipping lead for tenant ${input.tenantId}`);
     return;
@@ -214,6 +221,12 @@ export function buildContactSalesColumnValues(input: ContactSalesLeadInput): Rec
  * Input: the sanitized form fields. Output: resolves when the attempt finished.
  */
 export async function createContactSalesLead(input: ContactSalesLeadInput): Promise<void> {
+  // Leads are PRODUCTION-only: dev/test form submissions must not pollute the
+  // sales board.
+  if (env.NODE_ENV !== 'production') {
+    console.info(`[monday-lead] non-production env - skipping contact-sales lead for ${input.email}`);
+    return;
+  }
   if (!env.MONDAY_API_TOKEN) {
     console.warn(`[monday-lead] MONDAY_API_TOKEN not set - skipping contact-sales lead for ${input.email}`);
     return;
