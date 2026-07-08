@@ -42,7 +42,7 @@ import {
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
-import { addBarcodes, addLinks, getInventorySummary, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
+import { addBarcodes, addLinks, getInventorySummary, getOfferVariantInventoryCounts, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
 import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX, VOUCHER_CODE_REGEX } from '../models/domain/voucher-codes.models';
@@ -1402,6 +1402,45 @@ router.get(
       }
       const summary = await getInventorySummary(req.params.offerId, req.params.variantId);
       res.json(summary);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/offers/:offerId/inventory/counts
+ * Per-variant inventory unit COUNTS for an offer the caller can SEE in the
+ * catalog: their own offers, or an ACTIVE ecosystem offer (platform admins see
+ * any). Unlike the owner-only summaries above, this returns numbers only -
+ * never code values - so the Benefits table can show another supplier's stock
+ * without exposing redeemable codes. Anything else 404s without revealing
+ * whether the offer exists. Rate-limited by the router-level apiLimiter like
+ * every offers route; requires only catalog.view (read-only, non-sensitive).
+ */
+router.get(
+  '/:offerId/inventory/counts',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContextWithPermission(req, 'catalog.view');
+      const db = await getMongoDb();
+      const { nexusOffers } = getSupplyDomainCollections(db);
+      const offer = await nexusOffers.findOne(
+        { offerId: req.params.offerId, ...NOT_DELETED },
+        { projection: { createdByTenantId: 1, visibility: 1, status: 1 } },
+      );
+      const visible =
+        !!offer &&
+        (ctx.isPlatformAdmin === true ||
+          offer.createdByTenantId === ctx.tenantId ||
+          (offer.visibility === 'ecosystem' && offer.status === 'active'));
+      if (!visible) {
+        res.status(404).json({ error: 'Offer not found' });
+        return;
+      }
+      const counts = await getOfferVariantInventoryCounts(req.params.offerId);
+      res.json({ counts });
     } catch (err) {
       next(err);
     }
