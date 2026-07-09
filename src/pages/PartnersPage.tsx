@@ -165,38 +165,41 @@ export default function PartnersPage() {
             )}
           </div>
 
-          {/* Category dropdown */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
-                       focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary
-                       py-2 px-3 cursor-pointer"
-            dir={direction}
-          >
-            <option value="">{pT?.allCategories ?? (language === 'he' ? 'כל הקטגוריות' : 'All categories')}</option>
-            {categories.map((cat) => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
-
-          {/* Sort dropdown */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-slate-500 whitespace-nowrap">
-              {language === 'he' ? 'לסדר לפי' : 'Sort by'}
-            </span>
+          {/* Category + sort - single row on mobile, unchanged on desktop */}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {/* Category dropdown */}
             <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
               className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
                          focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary
-                         py-2 px-3 cursor-pointer"
+                         py-2 px-3 cursor-pointer flex-1 min-w-0 sm:flex-none"
               dir={direction}
             >
-              <option value="default">{pT?.sortDefault ?? (language === 'he' ? 'המלצה' : 'Recommended')}</option>
-              <option value="az">{pT?.sortAZ ?? (language === 'he' ? 'א–ת' : 'A–Z')}</option>
-              <option value="za">{pT?.sortZA ?? (language === 'he' ? 'ת–א' : 'Z–A')}</option>
+              <option value="">{pT?.allCategories ?? (language === 'he' ? 'כל הקטגוריות' : 'All categories')}</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
             </select>
+
+            {/* Sort dropdown */}
+            <div className="flex items-center gap-2 flex-1 min-w-0 sm:flex-none">
+              <span className="text-sm text-slate-500 whitespace-nowrap">
+                {language === 'he' ? 'לסדר לפי' : 'Sort by'}
+              </span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortBy)}
+                className="border border-slate-200 rounded-xl text-sm text-slate-700 bg-slate-50
+                           focus:outline-none focus:ring-2 focus:ring-nx-primary/30 focus:border-nx-primary
+                           py-2 px-3 cursor-pointer flex-1 min-w-0 sm:flex-none"
+                dir={direction}
+              >
+                <option value="default">{pT?.sortDefault ?? (language === 'he' ? 'המלצה' : 'Recommended')}</option>
+                <option value="az">{pT?.sortAZ ?? (language === 'he' ? 'א–ת' : 'A–Z')}</option>
+                <option value="za">{pT?.sortZA ?? (language === 'he' ? 'ת–א' : 'Z–A')}</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
