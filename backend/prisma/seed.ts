@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { NEW_PARTNERS, PINNED_ORDERS } from '../scripts/add-partners/partners.data';
+import { PARTNER_SEARCH_TERMS } from '../scripts/add-partners/search-terms.data';
 
 const prisma = new PrismaClient();
 
@@ -363,12 +365,11 @@ async function main() {
     console.log(`✅ Admin user: ${u.email}`);
   }
 
-  // ─── Partner brands (from Wix CMS CSV, 71 entries) ───────
+  // ─── Partner brands (71 from Wix CMS CSV + 65 from the benefits CSV) ───────
   const existingPartners = await prisma.partner.count();
   if (existingPartners === 0) {
     const cdn = (hash: string) => `https://static.wixstatic.com/media/${hash}`;
-    await prisma.partner.createMany({
-      data: [
+    const legacyPartners = [
         { title: 'Bakers Secret',           thumbnailUrl: cdn('57cf68_0667346f0d33491cb792cbf54f182586~mv2.png'),  categories: ['למטבח'],                    order: 1  },
         { title: 'Masu',                    thumbnailUrl: cdn('57cf68_af18b1c2a0724f2b883abc537bc92c1d~mv2.png'),  categories: ['פנאי','וולנס','אטרקציות'],   order: 2  },
         { title: 'Samsung',                 thumbnailUrl: cdn('57cf68_692ecad80093476ab9c39c8ad410156d~mv2.png'),  categories: ['אלקטרוניקה'],                order: 3  },
@@ -436,13 +437,29 @@ async function main() {
         { title: 'Converse',                thumbnailUrl: cdn('57cf68_8bec64b8bd7d47778814522a4b75e83c~mv2.png'),  categories: ['ביגוד'],                    order: 65 },
         { title: 'GOOL',                    thumbnailUrl: cdn('57cf68_8afb18cc84d14984ae2722226d835b1d~mv2.png'),  categories: ['קורסים'],                   order: 66 },
         { title: 'Ovali',                   thumbnailUrl: cdn('57cf68_14f60b18c7c84e26b483dbfd45acdd4f~mv2.png'),  categories: ['אלקטרוניקה'],                order: 67 },
-        { title: 'Homonugus',               thumbnailUrl: cdn('57cf68_4dff6246bf9d4e07a32c5f037a0bf850~mv2.png'),  categories: ['אוכל','מזון'],              order: 68 },
+        { title: 'Humongous',               thumbnailUrl: cdn('57cf68_4dff6246bf9d4e07a32c5f037a0bf850~mv2.png'),  categories: ['אוכל','מזון'],              order: 68 },
         { title: 'קסטרו',                   thumbnailUrl: cdn('57cf68_70b1110168e341f8b82ab3fdf5172a3b~mv2.png'),  categories: ['ביגוד'],                    order: 69 },
         { title: 'Kenneth Cole',            thumbnailUrl: cdn('57cf68_f51a21742935496ab8b8089bec196014~mv2.png'),  categories: ['ביגוד'],                    order: 70 },
         { title: 'Top Ten',                 thumbnailUrl: cdn('57cf68_9abad9ad8c954eaf900c2ba411d6dbe1~mv2.png'),  categories: ['אקססוריס','תכשיטים'],       order: 71 },
-      ],
+    ];
+    await prisma.partner.createMany({
+      data: [
+        ...legacyPartners,
+        ...NEW_PARTNERS.map((p, i) => ({
+          title: p.title,
+          thumbnailUrl: `/partners/${p.slug}.png`,
+          categories: p.categories,
+          discount: p.discount,
+          isActive: true,
+          order: 72 + i,
+        })),
+      ].map((p) => ({
+        ...p,
+        order: PINNED_ORDERS[p.title] ?? p.order,
+        searchTerms: PARTNER_SEARCH_TERMS[p.title] ?? [],
+      })),
     });
-    console.log('✅ 71 partners seeded');
+    console.log('✅ 136 partners seeded');
   } else {
     console.log(`⏭️  Partners already seeded (${existingPartners} rows) — skipping`);
   }

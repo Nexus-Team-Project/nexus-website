@@ -10,6 +10,10 @@ const RINGS = [
 
 const CIRCLE_SIZE = 120;
 const GAP = 8;
+// Below this container width the rings render scaled down inside a bottom strip
+// (mobile) instead of the full hero overlay, so bubbles never cover the headline.
+const MOBILE_BREAKPOINT = 640;
+const MOBILE_SCALE = 0.6;
 
 // ─── Internal types ───────────────────────────────────────────
 interface CircleObj {
@@ -35,8 +39,15 @@ export default function PartnerRingsAnimation({ partners, language }: Props) {
     const container = containerRef.current;
     const { width, height } = container.getBoundingClientRect();
 
-    // Center = bottom-right corner for LTR, bottom-left corner for RTL (Hebrew)
-    const offset = 80;
+    // Mobile: the container is a short bottom strip - shrink circles + radii so the
+    // rings fit under the hero text instead of sweeping over it.
+    const isMobile = width < MOBILE_BREAKPOINT;
+    const scale = isMobile ? MOBILE_SCALE : 1;
+    const circleSize = CIRCLE_SIZE * scale;
+
+    // Center = bottom-right corner for LTR, bottom-left corner for RTL (Hebrew).
+    // Mobile uses a much smaller offset so the rings sit higher in the strip.
+    const offset = isMobile ? 12 : 80;
     const centerX = language === 'he' ? -offset : width + offset;
     const centerY = height + offset;
 
@@ -44,7 +55,8 @@ export default function PartnerRingsAnimation({ partners, language }: Props) {
     let partnerIdx = 0;
 
     RINGS.forEach((ring) => {
-      const count = Math.floor((2 * Math.PI * ring.radius) / (CIRCLE_SIZE + GAP));
+      const ringRadius = ring.radius * scale;
+      const count = Math.floor((2 * Math.PI * ringRadius) / (circleSize + GAP));
       for (let c = 0; c < count; c++) {
         const partner = partners[partnerIdx++ % partners.length];
 
@@ -52,8 +64,8 @@ export default function PartnerRingsAnimation({ partners, language }: Props) {
         const wrapper = document.createElement('div');
         wrapper.style.cssText = `
           position:absolute;
-          width:${CIRCLE_SIZE}px;
-          height:${CIRCLE_SIZE}px;
+          width:${circleSize}px;
+          height:${circleSize}px;
           top:0; left:0;
           pointer-events:none;
           will-change:transform;
@@ -92,8 +104,8 @@ export default function PartnerRingsAnimation({ partners, language }: Props) {
           const r = inner.getBoundingClientRect();
           const x = e.clientX - r.left;
           const y = e.clientY - r.top;
-          const rotateX = -((y - CIRCLE_SIZE / 2) / 8);
-          const rotateY = (x - CIRCLE_SIZE / 2) / 8;
+          const rotateX = -((y - circleSize / 2) / 8);
+          const rotateY = (x - circleSize / 2) / 8;
           inner.style.transition = 'transform 0.1s ease-out, box-shadow 0.25s';
           inner.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.1,1.1,1.1)`;
           inner.style.boxShadow = '0 16px 40px rgba(99,91,255,0.25)';
@@ -109,7 +121,7 @@ export default function PartnerRingsAnimation({ partners, language }: Props) {
           wrapper,
           inner,
           angle: (c / count) * Math.PI * 2,
-          radius: ring.radius,
+          radius: ringRadius,
           speed: ring.speed,
           direction: ring.direction,
         });
@@ -122,8 +134,8 @@ export default function PartnerRingsAnimation({ partners, language }: Props) {
     function animate() {
       circles.forEach((c) => {
         c.angle += c.speed * c.direction;
-        const tx = centerX + Math.cos(c.angle) * c.radius - CIRCLE_SIZE / 2;
-        const ty = centerY + Math.sin(c.angle) * c.radius - CIRCLE_SIZE / 2;
+        const tx = centerX + Math.cos(c.angle) * c.radius - circleSize / 2;
+        const ty = centerY + Math.sin(c.angle) * c.radius - circleSize / 2;
         c.wrapper.style.transform = `translate(${tx}px,${ty}px)`;
       });
       rafId = requestAnimationFrame(animate);
@@ -139,9 +151,12 @@ export default function PartnerRingsAnimation({ partners, language }: Props) {
   }, [partners, language]);
 
   return (
+    // Mobile: short clipped strip pinned under the hero text (inside the hero's
+    // bottom padding). Desktop (sm+): full hero overlay, unchanged.
     <div
       ref={containerRef}
-      className="absolute inset-0 overflow-hidden"
+      className="absolute inset-x-0 bottom-0 h-64 overflow-hidden sm:inset-0 sm:h-auto
+                 [mask-image:linear-gradient(to_bottom,transparent_0,black_72px)] sm:[mask-image:none]"
       style={{ pointerEvents: 'none' }}
     />
   );
