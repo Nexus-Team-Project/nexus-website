@@ -16,6 +16,18 @@ export interface NewPartnerSeed {
   logoHint?: string;
 }
 
+/**
+ * Pinned display orders (route sorts by `order` asc, legacy rows start at 1).
+ * Supermarkets must appear first on the /partners page - negative orders put
+ * them ahead of everything without renumbering the other 130+ rows.
+ */
+export const PINNED_ORDERS: Record<string, number> = {
+  'רמי לוי שיווק השקמה': -4,
+  'קרפור': -3,
+  'שופרסל': -2,
+  'ויקטורי': -1,
+};
+
 export const NEW_PARTNERS: NewPartnerSeed[] = [
   // ── אופנה ולבית ──────────────────────────────────────────
   { title: 'Golf',                 slug: 'golf',             categories: ['ביגוד'],                    discount: '50% הנחה או 20% כולל כפל מבצעים', logoHint: 'golf.co.il' },

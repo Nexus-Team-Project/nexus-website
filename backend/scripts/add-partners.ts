@@ -13,7 +13,7 @@
 import 'dotenv/config';
 
 import { PrismaClient } from '@prisma/client';
-import { NEW_PARTNERS } from './add-partners/partners.data';
+import { NEW_PARTNERS, PINNED_ORDERS } from './add-partners/partners.data';
 import { PARTNER_SEARCH_TERMS } from './add-partners/search-terms.data';
 
 const prisma = new PrismaClient();
@@ -87,6 +87,19 @@ async function main(): Promise<void> {
   }
   console.log(`searchTerms updates: ${updates}`);
   if (unmapped.length) console.warn(`WARN - titles with no search-terms mapping: ${unmapped.join(', ')}`);
+
+  // Phase 4: pin display order (supermarkets first). Idempotent by-title updates.
+  let pins = 0;
+  for (const [title, order] of Object.entries(PINNED_ORDERS)) {
+    const row = await prisma.partner.findFirst({ where: { title }, select: { id: true, order: true } });
+    const pending = !row && toInsert.some((p) => p.title === title); // dry-run: not inserted yet
+    if (row ? row.order !== order : pending) {
+      pins++;
+      console.log(`  pin: ${title} -> order ${order}`);
+      if (apply && row) await prisma.partner.update({ where: { id: row.id }, data: { order } });
+    }
+  }
+  console.log(`order pins: ${pins}`);
 
   if (!apply) console.log('\nDry run - nothing written. Pass --apply to write.');
 }

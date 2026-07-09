@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { NEW_PARTNERS } from '../scripts/add-partners/partners.data';
+import { NEW_PARTNERS, PINNED_ORDERS } from '../scripts/add-partners/partners.data';
 import { PARTNER_SEARCH_TERMS } from '../scripts/add-partners/search-terms.data';
 
 const prisma = new PrismaClient();
@@ -453,7 +453,11 @@ async function main() {
           isActive: true,
           order: 72 + i,
         })),
-      ].map((p) => ({ ...p, searchTerms: PARTNER_SEARCH_TERMS[p.title] ?? [] })),
+      ].map((p) => ({
+        ...p,
+        order: PINNED_ORDERS[p.title] ?? p.order,
+        searchTerms: PARTNER_SEARCH_TERMS[p.title] ?? [],
+      })),
     });
     console.log('✅ 136 partners seeded');
   } else {
