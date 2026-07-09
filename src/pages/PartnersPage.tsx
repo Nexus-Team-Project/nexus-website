@@ -80,7 +80,10 @@ export default function PartnersPage() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return partners.filter((p) => {
-      const matchSearch = !q || p.title.toLowerCase().includes(q);
+      const matchSearch =
+        !q ||
+        p.title.toLowerCase().includes(q) ||
+        (p.searchTerms ?? []).some((term) => term.toLowerCase().includes(q));
       const matchCat = !selectedCategory || p.categories.includes(selectedCategory);
       return matchSearch && matchCat;
     });

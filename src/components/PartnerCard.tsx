@@ -11,6 +11,8 @@ export interface Partner {
   discount?: string | null;
   description?: string | null;
   websiteUrl?: string | null;
+  /** Bilingual search aliases (HE/EN alt names) - used by the partners page search filter. */
+  searchTerms?: string[];
 }
 
 interface PartnerCardProps {
