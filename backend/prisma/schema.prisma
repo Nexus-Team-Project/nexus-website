@@ -542,6 +542,7 @@ model Partner {
   discount     String?
   description  String?
   websiteUrl   String?
+  searchTerms  String[] @default([])
   isActive     Boolean  @default(true)
   order        Int      @default(0)
   createdAt    DateTime @default(now())
