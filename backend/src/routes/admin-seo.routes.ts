@@ -26,8 +26,8 @@ router.get('/status', async (_req: Request, res: Response) => {
       const r = await fetch(`${env.AGENT_API_URL}/health`, { signal: AbortSignal.timeout(5000) });
       agentHealth = await r.json().catch(() => r.statusText);
       agentReachable = r.ok;
-    } catch (err: any) {
-      agentHealth = err.message;
+    } catch (err) {
+      agentHealth = err instanceof Error ? err.message : String(err);
     }
   }
 
@@ -79,9 +79,10 @@ router.all('/*', async (req: Request, res: Response) => {
       const text = await response.text();
       res.status(response.status).send(text);
     }
-  } catch (err: any) {
-    console.error(`[AdminSEO] Proxy error for ${agentPath}:`, err.message ?? err);
-    res.status(502).json({ error: 'Agent service unavailable', detail: err.message });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error(`[AdminSEO] Proxy error for ${agentPath}:`, detail);
+    res.status(502).json({ error: 'Agent service unavailable', detail });
   }
 });
 

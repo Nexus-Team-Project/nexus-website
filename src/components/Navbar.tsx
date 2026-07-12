@@ -1,17 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
-import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, Users, Store, Code, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart, Layers, Cpu } from 'lucide-react';
+import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, Users, Store, Code, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart, Layers, Cpu, type LucideIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
+import type { TranslationKeys } from '../i18n/translations';
 import { useAuth } from '../contexts/AuthContext';
 import { createPortal } from 'react-dom';
 
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
+// Shapes of the navigation data returned by getNavItems.
+interface NavSubItem {
+  name: string;
+  desc: string;
+  icon: LucideIcon;
+  href?: string;
+  comingSoon?: boolean;
+}
+
+interface NavItem {
+  label: string;
+  disableMegaMenu?: boolean;
+  tooltip?: string;
+  megaMenu: {
+    sections: { title: string; items: NavSubItem[] }[];
+    sidebar: { title: string; content: string; cta: string; link?: string };
+  };
+}
+
 // Function to get nav items with translations
-const getNavItems = (t: any, lang: 'en' | 'he') => [
+const getNavItems = (t: TranslationKeys, lang: 'en' | 'he'): NavItem[] => [
   {
     label: t.navbar.products,
     megaMenu: {
@@ -453,11 +473,11 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                             <div className="space-y-6">
                               {section.items.map((subItem) => {
                                 const Icon = subItem.icon;
-                                const isComingSoon = (subItem as any).comingSoon;
+                                const isComingSoon = subItem.comingSoon;
                                 return (
                                   <a
                                     key={subItem.name}
-                                    href={isComingSoon ? undefined : ((subItem as any).href || '#')}
+                                    href={isComingSoon ? undefined : (subItem.href || '#')}
                                     className={`group flex items-start gap-3 relative ${isComingSoon ? 'cursor-default' : ''}`}
                                     onClick={isComingSoon ? (e: React.MouseEvent) => e.preventDefault() : undefined}
                                   >

@@ -22,6 +22,23 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+/** Shape of the website's static blog articles (src/data/blog/articles-*.ts). */
+interface StaticArticle {
+  slug: string;
+  title: string;
+  subtitle?: string;
+  excerpt?: string;
+  heroImage?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  category?: string;
+  author?: { name?: string; role?: string; avatar?: string };
+  publishDate?: string;
+  readTime?: number;
+  sections?: unknown[];
+  faq?: unknown[];
+}
+
 async function main() {
   const slug = process.argv[2];
   const lang = process.argv[3] || 'he';
@@ -32,12 +49,10 @@ async function main() {
   }
 
   // Dynamic import to avoid rootDir restrictions (same pattern as prisma/seed.ts)
-  // @ts-ignore
   const { articlesHe } = await import('../../src/data/blog/articles-he');
-  // @ts-ignore
   const { articlesEn } = await import('../../src/data/blog/articles-en');
 
-  const source: any[] = lang === 'he' ? articlesHe : articlesEn;
+  const source: StaticArticle[] = lang === 'he' ? articlesHe : articlesEn;
   const article = source.find((a) => a.slug === slug);
 
   if (!article) {
@@ -82,7 +97,7 @@ async function main() {
     where: { action: 'BLOG_PUBLISH', status: 'PENDING' },
   });
   const alreadyQueued =
-    existing && (existing.payload as any)?.articleId === row.id;
+    existing && (existing.payload as { articleId?: string } | null)?.articleId === row.id;
 
   if (alreadyQueued) {
     console.log(`ℹ️  A PENDING BLOG_PUBLISH request already exists: id=${existing!.id}`);

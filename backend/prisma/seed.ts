@@ -478,14 +478,12 @@ async function seedBlogArticlesIfEmpty() {
   }
 
   // Dynamic import to avoid rootDir restrictions
-  // @ts-ignore
   const { articlesEn } = await import('../../src/data/blog/articles-en');
-  // @ts-ignore
   const { articlesHe } = await import('../../src/data/blog/articles-he');
 
   const allArticles = [
-    ...articlesEn.map((a: any) => ({ ...a, lang: 'en' })),
-    ...articlesHe.map((a: any) => ({ ...a, lang: 'he' })),
+    ...articlesEn.map((a) => ({ ...a, lang: 'en' })),
+    ...articlesHe.map((a) => ({ ...a, lang: 'he' })),
   ];
 
   for (const article of allArticles) {

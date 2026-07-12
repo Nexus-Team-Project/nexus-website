@@ -18,8 +18,25 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+/** Shape of the website's static blog articles (src/data/blog/articles-*.ts). */
+interface StaticArticle {
+  slug: string;
+  title: string;
+  subtitle?: string;
+  excerpt?: string;
+  heroImage?: string;
+  metaTitle?: string;
+  metaDescription?: string;
+  category?: string;
+  author?: { name?: string; role?: string; avatar?: string };
+  publishDate?: string;
+  readTime?: number;
+  sections?: unknown[];
+  faq?: unknown[];
+}
+
 /** Maps a static Article object to the BlogArticle column set (without status fields). */
-function toRow(article: any, lang: string) {
+function toRow(article: StaticArticle, lang: string) {
   return {
     slug: article.slug,
     lang,
@@ -40,7 +57,7 @@ function toRow(article: any, lang: string) {
   };
 }
 
-async function seedLang(lang: 'he' | 'en', articles: any[]) {
+async function seedLang(lang: 'he' | 'en', articles: StaticArticle[]) {
   console.log(`\nSeeding ${articles.length} "${lang}" articles...`);
   for (const article of articles) {
     const data = toRow(article, lang);
@@ -78,9 +95,7 @@ async function main() {
   }
 
   // Dynamic import to avoid rootDir restrictions (same pattern as publish-blog-article.ts)
-  // @ts-ignore
   const { articlesHe } = await import('../../src/data/blog/articles-he');
-  // @ts-ignore
   const { articlesEn } = await import('../../src/data/blog/articles-en');
 
   if (lang === 'he' || lang === 'all') await seedLang('he', articlesHe);

@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import './WalletEditor.css';
 
+// Constant palette - module scope so its identity is stable across renders.
+const colors = [
+  { a: '#6366f1', b: '#06b6d4' },
+  { a: '#06b6d4', b: '#22c55e' },
+  { a: '#22c55e', b: '#0ea5e9' },
+  { a: '#f97316', b: '#fde047' },
+  { a: '#111827', b: '#6b7280' },
+  { a: '#7c3aed', b: '#ec4899' },
+];
+
 const WalletEditor = () => {
   const [currency, setCurrency] = useState({ sym: '$', val: 3898 });
   const [isPaying, setIsPaying] = useState(false);
   const [currentColor, setCurrentColor] = useState({ a: '#6366f1', b: '#06b6d4' });
-
-  const colors = [
-    { a: '#6366f1', b: '#06b6d4' },
-    { a: '#06b6d4', b: '#22c55e' },
-    { a: '#22c55e', b: '#0ea5e9' },
-    { a: '#f97316', b: '#fde047' },
-    { a: '#111827', b: '#6b7280' },
-    { a: '#7c3aed', b: '#ec4899' },
-  ];
 
   const currencies = [
     { sym: '£', val: 3100, flag: 'gb', name: 'UK' },

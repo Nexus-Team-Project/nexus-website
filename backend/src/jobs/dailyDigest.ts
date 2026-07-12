@@ -1,7 +1,6 @@
 import { CronJob } from 'cron';
 import { prisma } from '../config/database';
 import { sendDailyDigest } from '../services/email.service';
-import { env } from '../config/env';
 
 export function scheduleDailyDigest(): void {
   // Run every day at 09:00 Israel time (UTC+2/+3)

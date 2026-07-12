@@ -145,8 +145,9 @@ export default function UserDashboard() {
         ]);
         setStats(s);
         setOrdersData(o);
-      } catch (e: any) {
-        setError(e?.error ?? 'Failed to load dashboard');
+      } catch (e) {
+        // The api client throws plain objects shaped { error, status }.
+        setError((e as { error?: string })?.error ?? 'Failed to load dashboard');
       } finally {
         setLoading(false);
       }

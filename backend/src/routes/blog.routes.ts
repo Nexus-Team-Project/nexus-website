@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { ArticleStatus } from '@prisma/client';
 import { prisma } from '../config/database';
 
 const router = Router();
@@ -14,7 +15,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const [articles, total] = await Promise.all([
       prisma.blogArticle.findMany({
-        where: { lang, status: status as any },
+        where: { lang, status: status as ArticleStatus },
         orderBy: [
           { publishDate: { sort: 'desc', nulls: 'last' } },
           { publishedAt: 'desc' },
@@ -44,7 +45,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           // Exclude sectionsJson / faqJson from list endpoint for performance
         },
       }),
-      prisma.blogArticle.count({ where: { lang, status: status as any } }),
+      prisma.blogArticle.count({ where: { lang, status: status as ArticleStatus } }),
     ]);
 
     res.json({

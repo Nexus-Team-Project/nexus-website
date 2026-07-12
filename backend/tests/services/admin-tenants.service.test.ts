@@ -13,7 +13,7 @@
  * can be asserted.
  */
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
-import { MongoClient, Db, ObjectId } from 'mongodb';
+import { MongoClient, Db } from 'mongodb';
 
 let db: Db;
 // The service (and approveOffer it calls) reach Mongo via getMongoDb().

@@ -17,23 +17,29 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let LAND_MULTI_POLY: any = null;
+    // 3D point on the unit sphere; Ring = [lon, lat] pairs; a polygon is an outer ring + hole rings.
+    interface Vec3 { x: number; y: number; z: number }
+    type Ring = number[][];
+    type PolygonWithHoles = Ring[];
+
+    // Land loading is skipped for performance, so this stays null (kept for the land-dot code paths).
+    const LAND_MULTI_POLY = null as PolygonWithHoles[] | null;
 
     // Math helpers
     const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-    function rotY(p: any, ang: number) {
+    function rotY(p: Vec3, ang: number) {
       const c = Math.cos(ang), s = Math.sin(ang);
       return { x: p.x * c + p.z * s, y: p.y, z: -p.x * s + p.z * c };
     }
 
-    function rotX(p: any, ang: number) {
+    function rotX(p: Vec3, ang: number) {
       const c = Math.cos(ang), s = Math.sin(ang);
       return { x: p.x, y: p.y * c - p.z * s, z: p.y * s + p.z * c };
     }
 
-    function project(p: any, cx: number, cy: number, r: number) {
+    function project(p: Vec3, cx: number, cy: number, r: number) {
       const depth = 2.9;
       const k = depth / (depth - p.z);
       return { x: cx + p.x * r * k, y: cy + p.y * r * k, k };
@@ -49,11 +55,11 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
     };
 
     // Dots - drastically reduced for performance
-    const dots: any[] = [];
+    const dots: (Vec3 & { seed: number; land: boolean })[] = [];
     const DOTS = 300;
     const LAND_EXTRA_DOTS = 200;
 
-    function pointInRing(lon: number, lat: number, ring: any) {
+    function pointInRing(lon: number, lat: number, ring: Ring) {
       let inside = false;
       for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
         const xi = ring[i][0], yi = ring[i][1];
@@ -64,7 +70,7 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
       return inside;
     }
 
-    function pointInPolygonWithHoles(lon: number, lat: number, polygon: any) {
+    function pointInPolygonWithHoles(lon: number, lat: number, polygon: PolygonWithHoles) {
       if (!polygon || polygon.length === 0) return false;
       if (!pointInRing(lon, lat, polygon[0])) return false;
       for (let i = 1; i < polygon.length; i++) {
@@ -121,7 +127,7 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
     const ptsBuffer = dots.map(d => ({ p: { x: d.x, y: d.y, z: d.z }, seed: d.seed, land: d.land }));
 
     // Grid
-    const grid: any[] = [];
+    const grid: Vec3[][] = [];
     function addLatitude(latDeg: number, step = 7) {
       const lat = latDeg * Math.PI / 180;
       const line = [];
@@ -151,7 +157,7 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
       return { x: Math.cos(lat) * Math.cos(lon), y: Math.sin(lat), z: Math.cos(lat) * Math.sin(lon) };
     }
 
-    function makeArc(p1: any, p2: any, steps = 40) {
+    function makeArc(p1: Vec3, p2: Vec3, steps = 40) {
       const dot = clamp(p1.x * p2.x + p1.y * p2.y + p1.z * p2.z, -1, 1);
       const omega = Math.acos(dot);
       const sinO = Math.sin(omega) || 1e-6;

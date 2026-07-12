@@ -39,6 +39,7 @@ router.get(
       // Strip `discount` field for unauthenticated users
       const result = isAuthenticated
         ? partners
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip `discount` from the public payload
         : partners.map(({ discount: _d, ...rest }) => rest);
 
       res.json({ partners: result, total: result.length });

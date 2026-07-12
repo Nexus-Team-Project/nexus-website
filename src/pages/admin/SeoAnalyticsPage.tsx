@@ -134,7 +134,56 @@ type DateRange = '7' | '14' | '28' | '30' | 'custom';
 
 // ─── Normalizers (map backend field names → UI field names) ──
 
-function normalizeGscOverview(raw: any): GscOverview {
+// Raw wire shapes - the SEO backend returns several field-name variants
+// (snake_case GSC/GA4 fields, container objects, etc.), so each normalizer
+// accepts the union of variants and maps it onto the UI types above.
+interface RawGscOverview {
+  total_clicks?: number;
+  clicks?: number;
+  total_impressions?: number;
+  impressions?: number;
+  avg_ctr_pct?: number;
+  ctr_pct?: number;
+  ctr?: number;
+  avg_position?: number;
+  position?: number;
+}
+
+interface RawGscRow {
+  query?: string;
+  page?: string;
+  clicks?: number;
+  impressions?: number;
+  ctr_pct?: number;
+  ctr?: number;
+  position?: number;
+}
+
+interface RawGa4Overview {
+  sessions?: number;
+  users?: number;
+  pageviews?: number;
+  screenPageViews?: number;
+  bounce_rate_pct?: number;
+  bounceRate?: number;
+}
+
+interface RawTrafficSource {
+  channel?: string;
+  source?: string;
+  sessionDefaultChannelGroup?: string;
+  sessions?: number;
+  users?: number;
+}
+
+interface RawDevice {
+  device?: string;
+  deviceCategory?: string;
+  sessions?: number;
+  users?: number;
+}
+
+function normalizeGscOverview(raw: RawGscOverview): GscOverview {
   return {
     clicks:      raw.total_clicks      ?? raw.clicks      ?? 0,
     impressions: raw.total_impressions  ?? raw.impressions  ?? 0,
@@ -143,14 +192,15 @@ function normalizeGscOverview(raw: any): GscOverview {
   };
 }
 
-function normalizeGscRows(raw: any, arrayKey: string): any[] {
+function normalizeGscRows(raw: unknown, arrayKey: string): RawGscRow[] {
   if (Array.isArray(raw)) return raw;
-  if (raw?.[arrayKey] && Array.isArray(raw[arrayKey])) return raw[arrayKey];
-  if (raw?.rows && Array.isArray(raw.rows)) return raw.rows;
+  const obj = raw as Record<string, unknown> | null | undefined;
+  if (obj?.[arrayKey] && Array.isArray(obj[arrayKey])) return obj[arrayKey] as RawGscRow[];
+  if (obj?.rows && Array.isArray(obj.rows)) return obj.rows as RawGscRow[];
   return [];
 }
 
-function normalizeGscQuery(raw: any): GscQuery {
+function normalizeGscQuery(raw: RawGscRow): GscQuery {
   return {
     query:       raw.query       ?? '',
     clicks:      raw.clicks      ?? 0,
@@ -160,7 +210,7 @@ function normalizeGscQuery(raw: any): GscQuery {
   };
 }
 
-function normalizeGscPage(raw: any): GscPage {
+function normalizeGscPage(raw: RawGscRow): GscPage {
   return {
     page:        raw.page        ?? '',
     clicks:      raw.clicks      ?? 0,
@@ -170,7 +220,7 @@ function normalizeGscPage(raw: any): GscPage {
   };
 }
 
-function normalizeGa4Overview(raw: any): Ga4Overview {
+function normalizeGa4Overview(raw: RawGa4Overview): Ga4Overview {
   return {
     sessions:   raw.sessions   ?? 0,
     users:      raw.users      ?? 0,
@@ -179,22 +229,24 @@ function normalizeGa4Overview(raw: any): Ga4Overview {
   };
 }
 
-function normalizeTrafficSources(raw: any): TrafficSource[] {
-  const arr = Array.isArray(raw)
+function normalizeTrafficSources(raw: unknown): TrafficSource[] {
+  const container = raw as { sources?: RawTrafficSource[]; rows?: RawTrafficSource[] } | null | undefined;
+  const arr: RawTrafficSource[] = Array.isArray(raw)
     ? raw
-    : raw?.sources ?? raw?.rows ?? [];
-  return arr.map((s: any) => ({
+    : container?.sources ?? container?.rows ?? [];
+  return arr.map((s) => ({
     source:   s.channel ?? s.source ?? s.sessionDefaultChannelGroup ?? '—',
     sessions: s.sessions ?? 0,
     users:    s.users    ?? 0,
   }));
 }
 
-function normalizeDevices(raw: any): DeviceData[] {
-  const arr = Array.isArray(raw)
+function normalizeDevices(raw: unknown): DeviceData[] {
+  const container = raw as { devices?: RawDevice[]; rows?: RawDevice[] } | null | undefined;
+  const arr: RawDevice[] = Array.isArray(raw)
     ? raw
-    : raw?.devices ?? raw?.rows ?? [];
-  return arr.map((d: any) => ({
+    : container?.devices ?? container?.rows ?? [];
+  return arr.map((d) => ({
     device:   d.device ?? d.deviceCategory ?? '—',
     sessions: d.sessions ?? 0,
     users:    d.users    ?? 0,
@@ -277,11 +329,11 @@ export default function SeoAnalyticsPage() {
     results.forEach((result, i) => {
       const key = endpoints[i].key;
       if (result.status === 'fulfilled') {
-        const data = result.value as any;
+        const data: unknown = result.value;
         try {
           switch (key) {
             case 'gscOverview':
-              setGscOverview(normalizeGscOverview(data));
+              setGscOverview(normalizeGscOverview(data as RawGscOverview));
               break;
             case 'gscQueries':
               setGscQueries(normalizeGscRows(data, 'queries').map(normalizeGscQuery));
@@ -290,7 +342,7 @@ export default function SeoAnalyticsPage() {
               setGscPages(normalizeGscRows(data, 'pages').map(normalizeGscPage));
               break;
             case 'ga4Overview':
-              setGa4Overview(normalizeGa4Overview(data));
+              setGa4Overview(normalizeGa4Overview(data as RawGa4Overview));
               break;
             case 'trafficSources':
               setTrafficSources(normalizeTrafficSources(data));
@@ -327,11 +379,12 @@ export default function SeoAnalyticsPage() {
     setTrendsAnalysisLoading(true);
     setErrors((prev) => { const n = { ...prev }; delete n.trendsAnalysis; return n; });
     try {
-      const result = await api.post<any>('/api/admin/seo/skills/trends-analyzer/run', {
-        config: { days: Number(effectiveDays()), includeCompetitors: true },
-      });
+      const result = await api.post<{ success?: boolean; data?: TrendsAnalysisData; summary?: string }>(
+        '/api/admin/seo/skills/trends-analyzer/run',
+        { config: { days: Number(effectiveDays()), includeCompetitors: true } },
+      );
       if (result.success && result.data) {
-        setTrendsAnalysis(result.data as TrendsAnalysisData);
+        setTrendsAnalysis(result.data);
         setTrendsAnalysisSummary(result.summary ?? '');
       } else {
         setErrors((prev) => ({ ...prev, trendsAnalysis: 'unavailable' }));

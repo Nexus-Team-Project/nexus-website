@@ -95,7 +95,7 @@ interface Lead {
 interface AgentRequest {
   id: string;
   action: 'BLOG_PUBLISH' | 'BLOG_UPDATE_PUBLISHED' | 'BLOG_UNPUBLISH';
-  payload: Record<string, any>;
+  payload: { articleId?: string } & Record<string, unknown>;
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXECUTED';
   requestedAt: string;
   resolvedAt: string | null;
@@ -371,8 +371,9 @@ export default function AdminDashboard() {
       setRevenue(rev);
       setLeads(lds);
       setNotifications(notifs);
-    } catch (e: any) {
-      setError(e?.error ?? 'Failed to load dashboard data');
+    } catch (e) {
+      // The api client throws plain objects shaped { error, status }.
+      setError((e as { error?: string })?.error ?? 'Failed to load dashboard data');
     } finally {
       setLoading(false);
       setRefreshing(false);

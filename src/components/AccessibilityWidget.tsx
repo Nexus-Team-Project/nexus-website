@@ -185,9 +185,13 @@ export default function AccessibilityWidget() {
     }
   });
 
-  // Position state: { x, y } = top-left of the button (px from viewport top-left)
-  // null = use default bottom-left (24, window.innerHeight - 24 - BTN_SIZE)
-  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  // Position state: { x, y } = top-left of the button (px from viewport top-left).
+  // Lazily initialized to the default bottom-left (24px margins) - same position
+  // the old mount effect produced, without a setState-in-effect.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(() => ({
+    x: 24,
+    y: window.innerHeight - 24 - BTN_SIZE,
+  }));
 
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -201,11 +205,6 @@ export default function AccessibilityWidget() {
     origX: 0,
     origY: 0,
   });
-
-  // Initialize position to bottom-left after mount
-  useEffect(() => {
-    setPos({ x: 24, y: window.innerHeight - 24 - BTN_SIZE });
-  }, []);
 
   // Apply settings on mount + on change
   useEffect(() => {
@@ -260,6 +259,8 @@ export default function AccessibilityWidget() {
     (e: React.PointerEvent<HTMLButtonElement>) => {
       // Capture pointer so we get events even when dragging fast
       e.currentTarget.setPointerCapture(e.pointerId);
+      // Cursor is set imperatively (not via render state) so dragging stays render-free.
+      e.currentTarget.style.cursor = 'grabbing';
       const currentPos = pos ?? { x: 24, y: window.innerHeight - 24 - BTN_SIZE };
       dragRef.current = {
         active: true,
@@ -288,9 +289,10 @@ export default function AccessibilityWidget() {
     }
   }, []);
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
     if (!dragRef.current.active) return;
     dragRef.current.active = false;
+    e.currentTarget.style.cursor = 'grab';
     // If not dragged, treat as a click (toggle panel)
     if (!dragRef.current.moved) {
       setOpen((v) => !v);
@@ -604,7 +606,7 @@ export default function AccessibilityWidget() {
             height: BTN_SIZE,
             borderRadius: '50%',
             border: 'none',
-            cursor: dragRef.current.active ? 'grabbing' : 'grab',
+            cursor: 'grab',
             background: open
               ? 'linear-gradient(135deg, #4f46e5, #0ea5e9)'
               : 'linear-gradient(135deg, #0d9488, #00d4ff)',

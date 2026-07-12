@@ -206,14 +206,14 @@ router.post('/test', async (req: Request, res: Response, next: NextFunction) => 
 // ════════════════════════════════════════════════════════════
 
 // POST /api/admin/ai/test-email  — sends a test verification email and returns result
-router.post('/test-email', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/test-email', async (req: Request, res: Response) => {
   try {
     const to = (req.body?.to as string) || req.user!.email;
     const lang = (req.body?.lang as 'en' | 'he') ?? 'he';
     await EmailService.sendVerificationEmail(to, 'Test User', 'TEST_TOKEN_123', lang);
     res.json({ ok: true, sentTo: to });
-  } catch (err: any) {
-    res.status(500).json({ ok: false, error: err?.message ?? String(err) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
   }
 });
 

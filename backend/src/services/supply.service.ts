@@ -10,7 +10,6 @@
 
 import { randomUUID } from 'node:crypto';
 import { getMongoDb } from '../config/mongo';
-import { createError } from '../middleware/errorHandler';
 import {
   getSupplyDomainCollections,
   deriveValueTypeFromExecutionType,

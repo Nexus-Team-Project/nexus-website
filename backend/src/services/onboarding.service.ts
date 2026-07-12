@@ -1015,6 +1015,7 @@ export async function loadWizardDraft(userId: string): Promise<WizardDraftInput 
     { projection: { wizardDraft: 1 } },
   );
   if (!doc?.wizardDraft) return null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit `savedAt` from the returned draft
   const { savedAt: _savedAt, ...fields } = doc.wizardDraft;
   return fields;
 }

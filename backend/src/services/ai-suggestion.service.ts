@@ -20,7 +20,7 @@ export async function generateSuggestion(
     if (!session || session.mode !== 'HUMAN' || !session.assignedAgentWa) return;
 
     // 2. Detect language from session metadata
-    const meta = (session.metadata as Record<string, any>) ?? {};
+    const meta = (session.metadata ?? {}) as { language?: string; page?: string };
     const lang = meta.language?.startsWith?.('en') ? 'en' : 'he';
 
     // 3. Try nexus-agents first, fall back to local AI
