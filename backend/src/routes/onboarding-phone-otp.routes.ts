@@ -4,7 +4,9 @@
  *
  *   POST /api/v1/onboarding/phone-otp/start    - send an InforU OTP (Israeli mobiles only)
  *   POST /api/v1/onboarding/phone-otp/verify   - verify the code, record the verification
- *   POST /api/v1/onboarding/phone-otp/dev-skip - DEV ONLY: mark verified, no SMS (404 in prod)
+ *   POST /api/v1/onboarding/phone-otp/dev-skip - mark verified, no SMS. Allowed
+ *       outside production for anyone; in production allowed ONLY for NEXUS
+ *       platform admins (404 for everyone else).
  *
  * Both routes are caller-scoped (authenticate only - the user verifies their
  * OWN phone; no tenant exists yet at this point in onboarding).
@@ -17,6 +19,7 @@ import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { env } from '../config/env';
+import { isPlatformAdminEmail } from '../utils/platform-admin';
 import {
   startOnboardingPhoneOtp,
   verifyOnboardingPhoneOtp,
@@ -92,10 +95,12 @@ router.post('/verify', authenticate, async (req: Request, res: Response) => {
   } catch (e) { mapError('POST /verify', e, res); }
 });
 
-// DEV-ONLY: mark the phone verified without sending an InforU SMS, so local
-// onboarding runs don't burn SMS credits. HARD-DISABLED in production.
+// Mark the phone verified without sending an InforU SMS, so onboarding runs
+// don't burn SMS credits. Allowed for anyone outside production; in production
+// restricted to NEXUS platform admins (who create tenants via onboarding and
+// need to skip the SMS step). 404 for non-admins in production.
 router.post('/dev-skip', authenticate, async (req: Request, res: Response) => {
-  if (env.NODE_ENV === 'production') {
+  if (env.NODE_ENV === 'production' && !isPlatformAdminEmail(req.user!.email)) {
     res.status(404).json({ error: 'not_found' });
     return;
   }
