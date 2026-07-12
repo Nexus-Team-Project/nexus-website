@@ -131,8 +131,8 @@ const variantInputSchema = z.object({
   voucherStackable: z.boolean().nullable().optional(),
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
-  terms: z.string().max(2000).optional(),
-  implementationInstructions: z.string().max(1000).optional(),
+  terms: z.string().max(6000).optional(),
+  implementationInstructions: z.string().max(4000).optional(),
 });
 
 /**
@@ -265,7 +265,7 @@ const createOfferSchema = z.object({
   executionType: z.enum(OFFER_EXECUTION_TYPES).default('voucher'),
   stockLimit: z.coerce.number().int().positive().nullable().optional().default(null),
   implementationLink: z.string().url().nullable().optional(),
-  implementationInstructions: z.string().max(1000).optional(),
+  implementationInstructions: z.string().max(4000).optional(),
   // ISO string from multipart form; convert to Date in handler.
   // validFrom is optional - null/undefined means the offer goes live as soon as approved.
   // No future-date refinement on validFrom: setting it to today (or the past) is valid
@@ -282,7 +282,7 @@ const createOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // optional for pre-variant clients). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
-  terms: z.string().max(2000).optional(),
+  terms: z.string().max(6000).optional(),
   // JSON-encoded array string from multipart form.
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
@@ -335,7 +335,7 @@ const updateOfferSchema = z.object({
   // Map it to null before validation so an untouched empty field does not 400.
   stockLimit: z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().positive().nullable().optional()),
   implementationLink: z.preprocess((v) => (v === '' ? null : v), z.string().url().nullable().optional()),
-  implementationInstructions: z.string().max(1000).optional(),
+  implementationInstructions: z.string().max(4000).optional(),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
   // Voucher combine-with-promotions + background color (voucher-only).
@@ -343,7 +343,7 @@ const updateOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // replaces the array wholesale when sent). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
-  terms: z.string().max(2000).optional(),
+  terms: z.string().max(6000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
     (v) => {
