@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Bot, Zap, CheckCircle, Pause, XCircle } from 'lucide-react';
+import { Bot, Zap, CheckCircle } from 'lucide-react';
 import { api } from '../../lib/api';
 
 // ─── Types ────────────────────────────────────────────────

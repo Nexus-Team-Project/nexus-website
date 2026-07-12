@@ -177,7 +177,8 @@ export default function Login() {
       setShouldShake(true);
       setTimeout(() => setShouldShake(false), 900);
       if (err?.error) {
-        setErrors((prev) => ({ ...prev, password: err.error }));
+        const message = err.error;
+        setErrors((prev) => ({ ...prev, password: message }));
       }
     }
   };

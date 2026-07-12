@@ -5,7 +5,6 @@ import SpendingLimitsAnimation from './SpendingLimitsAnimation';
 import BorderlessGlobe from './BorderlessGlobe';
 import BorderHighlightCard from './BorderHighlightCard';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { MouseEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';

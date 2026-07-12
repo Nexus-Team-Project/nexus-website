@@ -92,7 +92,6 @@ export default function Profile() {
     }
   };
 
-  const isHe = true; // Profile is Hebrew-first
   const dashboardPath = user?.role === 'ADMIN' ? '/admin' : '/dashboard';
 
   return (

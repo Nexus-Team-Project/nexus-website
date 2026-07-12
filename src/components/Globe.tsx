@@ -10,7 +10,7 @@ interface Arc {
 }
 
 export default function MoneyGlobe() {
-  const globeEl = useRef<any>();
+  const globeEl = useRef<any>(null);
   const [arcsData, setArcsData] = useState<Arc[]>([]);
 
   useEffect(() => {

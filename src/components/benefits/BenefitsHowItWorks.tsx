@@ -14,9 +14,8 @@ const STEPS_EN = [
 ];
 
 export default function BenefitsHowItWorks() {
-  const { language, direction } = useLanguage();
+  const { language } = useLanguage();
   const he = language === 'he';
-  const isRtl = direction === 'rtl';
   const steps = he ? STEPS_HE : STEPS_EN;
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeStep, setActiveStep] = useState(-1);

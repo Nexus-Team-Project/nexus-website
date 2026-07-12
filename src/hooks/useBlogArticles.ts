@@ -1,6 +1,6 @@
 // This hook loads published blog content from the standalone backend API.
 import { useEffect, useState } from 'react';
-import type { Article, ArticleSection, ArticleFAQ } from '../data/blog/types';
+import type { Article, ArticleCategory, ArticleSection, ArticleFAQ } from '../data/blog/types';
 import { API_URL } from '../lib/api';
 
 interface BlogArticleDto {
@@ -31,7 +31,7 @@ function toArticle(raw: BlogArticleDto): Article {
     excerpt: raw.excerpt ?? '',
     metaTitle: raw.metaTitle ?? raw.title,
     metaDescription: raw.metaDescription ?? raw.excerpt ?? '',
-    category: raw.category ?? 'benefits',
+    category: (raw.category as ArticleCategory | null) ?? 'benefits',
     heroImage: raw.heroImage ?? '',
     author: {
       name: raw.authorName ?? 'Nexus Team',

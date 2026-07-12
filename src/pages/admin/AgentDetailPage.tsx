@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, Bot, Play, Pause, CheckCircle, XCircle, Clock,
-  AlertTriangle, Zap, Settings, List, BarChart3, ScrollText, Plus,
+  ArrowLeft, ArrowRight, Bot, Play, Pause, CheckCircle, XCircle,
+  Zap, Settings, List, BarChart3, ScrollText, Plus,
   ChevronDown, ChevronRight, Loader2, Save, FileText,
 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -330,7 +330,7 @@ export default function AgentDetailPage() {
 
 // ─── Overview Tab ─────────────────────────────────────────
 
-function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: string; isHe: boolean; color: string }) {
+function OverviewTab({ agent, slug, isHe }: { agent: AgentDetail; slug: string; isHe: boolean; color: string }) {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [budget, setBudget] = useState<BudgetSummary | null>(null);
   const [loadingLogs, setLoadingLogs] = useState(true);

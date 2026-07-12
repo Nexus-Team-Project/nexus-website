@@ -255,7 +255,8 @@ export default function Signup() {
       if (err?.field === 'email') {
         setErrors((prev) => ({ ...prev, email: err.error || 'Email already in use' }));
       } else if (err?.error) {
-        setErrors((prev) => ({ ...prev, email: err.error }));
+        const message = err.error;
+        setErrors((prev) => ({ ...prev, email: message }));
       }
     } finally {
       setIsLoading(false);

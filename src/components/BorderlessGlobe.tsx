@@ -1,8 +1,5 @@
 import { useEffect, useRef } from 'react';
 
-// @ts-ignore - topojson loaded via script tag
-declare const topojson: any;
-
 interface BorderlessGlobeProps {
   isHovered?: boolean;
 }
@@ -20,7 +17,6 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let animationId: number;
     let LAND_MULTI_POLY: any = null;
 
     // Math helpers
@@ -43,13 +39,14 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
       return { x: cx + p.x * r * k, y: cy + p.y * r * k, k };
     }
 
-    function resize() {
+    // Arrow (not a hoisted function declaration) so the null-guards above narrow canvas/ctx here.
+    const resize = () => {
       const dpr = 1; // Fixed at 1 for better performance
       const { width, height } = canvas.getBoundingClientRect();
       canvas.width = Math.floor(width * dpr);
       canvas.height = Math.floor(height * dpr);
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    }
+    };
 
     // Dots - drastically reduced for performance
     const dots: any[] = [];
@@ -88,44 +85,6 @@ export default function BorderlessGlobe({ isHovered = false }: BorderlessGlobePr
       const lat = Math.asin(y) * 180 / Math.PI;
       const lon = Math.atan2(z, x) * 180 / Math.PI;
       return isLandLonLat(lon, lat);
-    }
-
-    async function loadLand() {
-      if (typeof topojson === 'undefined') return false;
-
-      try {
-        const url = 'https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json';
-        const res = await fetch(url, { cache: 'force-cache' });
-        if (!res.ok) return false;
-        const topo = await res.json();
-
-        const landObj = topo?.objects?.land;
-        if (!landObj) return false;
-
-        let geom = null;
-        if (landObj.type === 'GeometryCollection' && Array.isArray(landObj.geometries)) {
-          geom = topojson.merge(topo, landObj.geometries);
-        } else {
-          const feat = topojson.feature(topo, landObj);
-          if (feat?.type === 'FeatureCollection' && Array.isArray(feat.features) && feat.features.length) {
-            geom = feat.features[0]?.geometry || null;
-          } else {
-            geom = feat?.geometry || null;
-          }
-        }
-
-        if (!geom || !geom.coordinates) return false;
-
-        if (geom.type === 'Polygon') {
-          LAND_MULTI_POLY = [geom.coordinates];
-        } else if (geom.type === 'MultiPolygon') {
-          LAND_MULTI_POLY = geom.coordinates;
-        }
-
-        return true;
-      } catch {
-        return false;
-      }
     }
 
     function buildDots() {

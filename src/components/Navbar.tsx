@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
-import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, BarChart3, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, AppWindow, Users, Store, Code, Book, Terminal, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart, Layers, Cpu } from 'lucide-react';
+import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, Users, Store, Code, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart, Layers, Cpu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -134,7 +134,7 @@ function MegaMenuPanel({
   onMouseLeave,
   children,
 }: {
-  direction: string;
+  direction: 'ltr' | 'rtl';
   slideDirection?: 'left' | 'right' | null;
   onMouseEnter: React.MouseEventHandler<HTMLDivElement>;
   onMouseLeave: React.MouseEventHandler<HTMLDivElement>;
@@ -172,8 +172,8 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
 
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const [closeTimer, setCloseTimer] = useState<NodeJS.Timeout | null>(null);
-  const [stabilizeTimer, setStabilizeTimer] = useState<NodeJS.Timeout | null>(null);
+  const [closeTimer, setCloseTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [stabilizeTimer, setStabilizeTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [hoveredColumn, setHoveredColumn] = useState<number | null>(null);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
   const [isLocked, setIsLocked] = useState(false);
@@ -327,7 +327,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
           {navItems.map((item) => (
             <div key={item.label} className="border-b border-slate-100">
               <a
-                href={item.href || '#'}
+                href={(item as { href?: string }).href || '#'}
                 className="flex items-center justify-between py-4 text-slate-900 font-medium text-base"
                 onClick={(e) => {
                   if (item.megaMenu) {
@@ -380,7 +380,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
               onMouseLeave={() => { if (megaMenuEnabled) handleMouseLeave(); }}
             >
               <a
-                href={item.href || '#'}
+                href={(item as { href?: string }).href || '#'}
                 className={`flex items-center gap-1 px-4 py-2 text-sm rounded-lg transition-all ${
                   isLocked && openDropdown === item.label
                     ? variant === 'dark' ? 'bg-slate-100 text-slate-900' : 'bg-white text-slate-900'

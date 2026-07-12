@@ -1,8 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import './WalletEditor.css';
 
 const WalletEditor = () => {
-  const [balance, setBalance] = useState(3898);
   const [currency, setCurrency] = useState({ sym: '$', val: 3898 });
   const [isPaying, setIsPaying] = useState(false);
   const [currentColor, setCurrentColor] = useState({ a: '#6366f1', b: '#06b6d4' });
@@ -27,7 +26,7 @@ const WalletEditor = () => {
   ];
 
   const [activeCurrencyIndex, setActiveCurrencyIndex] = useState(1);
-  const [colorIndex, setColorIndex] = useState(0);
+  const [, setColorIndex] = useState(0);
 
   // Auto-cycle colors
   useEffect(() => {
