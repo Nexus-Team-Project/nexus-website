@@ -330,6 +330,13 @@ const updateOfferSchema = z.object({
     .enum(['draft', 'active', 'inactive', 'pending_approval', 'denied', 'disabled', 'expired', 'archived'])
     .optional(),
   statusReason: z.string().min(1).max(1000).optional(),
+  // Offer visibility. Accepted from the body but honored ONLY for platform
+  // admins - the PATCH handler strips it for everyone else before updateOffer.
+  visibility: z.enum(OFFER_VISIBILITY).optional(),
+  // Reassign the owning tenant (platform-admin only; stripped for others). When
+  // set to a different tenant, the offer is re-stamped to that tenant + its owner
+  // identity. Mirrors the create-time onBehalfOfTenantId.
+  onBehalfOfTenantId: z.string().trim().min(1).optional(),
   executionType: z.enum(OFFER_EXECUTION_TYPES).optional(),
   // Empty string from the multipart edit form means "no value / clear it".
   // Map it to null before validation so an untouched empty field does not 400.
@@ -803,8 +810,35 @@ router.patch(
       // owning tenant may change its sale price + face value. Enforcing it there
       // (it loads the offer) avoids a redundant load + a split rule in two places.
 
+      // Visibility is platform-admin-only. Strip it for everyone else so a
+      // non-admin cannot change who sees the offer (the frontend hides the
+      // control too, but this is the real guard).
+      if (!ctx.isPlatformAdmin && parsed.data.visibility !== undefined) {
+        delete parsed.data.visibility;
+      }
+
+      // Owner reassignment is platform-admin-only. Strip it for everyone else; for
+      // an admin, resolve + validate the target tenant so the offer can be
+      // re-stamped to it + its owner identity (mirrors the create-time on-behalf
+      // attribution). updateOffer removes the offer from the old owner.
+      let ownerReassign: { ownerTenantId: string; ownerIdentityId: string } | undefined;
+      if (parsed.data.onBehalfOfTenantId !== undefined) {
+        if (!ctx.isPlatformAdmin) {
+          delete parsed.data.onBehalfOfTenantId;
+        } else {
+          const db = await getMongoDb();
+          const t = await getTenantDomainCollections(db).domainTenants.findOne(
+            { tenantId: parsed.data.onBehalfOfTenantId },
+            { projection: { tenantId: 1, createdByIdentityId: 1 } },
+          );
+          if (!t) { res.status(404).json({ error: 'tenant_not_found' }); return; }
+          ownerReassign = { ownerTenantId: t.tenantId, ownerIdentityId: t.createdByIdentityId };
+        }
+      }
+
       // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
-      const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
+      // onBehalfOfTenantId is consumed above (not an updateOffer field) - drop it.
+      const { validFrom: validFromStr, validUntil: validUntilStr, onBehalfOfTenantId: _obo, ...restParsed } = parsed.data;
       const validFromDate = validFromStr !== undefined
         ? (validFromStr ? new Date(validFromStr) : null)
         : undefined;
@@ -861,6 +895,7 @@ router.patch(
       const { keptImageUrls, ...restNoKept } = restParsed;
       const result = await updateOffer(req.params.offerId, ctx.tenantId, {
         ...restNoKept,
+        ...(ownerReassign ?? {}),
         ...(validFromDate !== undefined && { validFrom: validFromDate }),
         ...(validUntilDate !== undefined && { validUntil: validUntilDate }),
         imageFiles,
