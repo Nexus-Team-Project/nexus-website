@@ -14,29 +14,13 @@
  * Usage (DATABASE_URL from backend/.env unless overridden):
  *   npx tsx scripts/seed-blog-articles.ts [lang]   # lang: he (default) | en | all
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import type { Article } from '../../src/data/blog/types';
 
 const prisma = new PrismaClient();
 
-/** Shape of the website's static blog articles (src/data/blog/articles-*.ts). */
-interface StaticArticle {
-  slug: string;
-  title: string;
-  subtitle?: string;
-  excerpt?: string;
-  heroImage?: string;
-  metaTitle?: string;
-  metaDescription?: string;
-  category?: string;
-  author?: { name?: string; role?: string; avatar?: string };
-  publishDate?: string;
-  readTime?: number;
-  sections?: unknown[];
-  faq?: unknown[];
-}
-
 /** Maps a static Article object to the BlogArticle column set (without status fields). */
-function toRow(article: StaticArticle, lang: string) {
+function toRow(article: Article, lang: string) {
   return {
     slug: article.slug,
     lang,
@@ -53,11 +37,12 @@ function toRow(article: StaticArticle, lang: string) {
     publishDate: article.publishDate ? new Date(article.publishDate) : null,
     readTime: article.readTime ?? null,
     sectionsJson: article.sections ?? [],
-    faqJson: article.faq ?? null,
+    // ArticleFAQ is an interface (no index signature), so cast for Prisma's Json input.
+    faqJson: (article.faq ?? []) as unknown as Prisma.InputJsonValue,
   };
 }
 
-async function seedLang(lang: 'he' | 'en', articles: StaticArticle[]) {
+async function seedLang(lang: 'he' | 'en', articles: Article[]) {
   console.log(`\nSeeding ${articles.length} "${lang}" articles...`);
   for (const article of articles) {
     const data = toRow(article, lang);

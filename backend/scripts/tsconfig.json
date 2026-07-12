@@ -9,10 +9,12 @@
   // unaffected by this file.
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "..",
+    "rootDir": "../..",
     "noEmit": true,
     "declaration": false,
-    "declarationMap": false
+    "declarationMap": false,
+    // TS7 defaults `types` to [] (no auto @types discovery) - list node explicitly.
+    "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  "include": ["**/*.ts", "../../src/data/blog/**/*.ts"]
 }

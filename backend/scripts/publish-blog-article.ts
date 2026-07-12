@@ -18,26 +18,10 @@
  * Idempotent: re-running syncs content into the existing DRAFT and reuses an
  * existing PENDING request instead of creating a duplicate.
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import type { Article } from '../../src/data/blog/types';
 
 const prisma = new PrismaClient();
-
-/** Shape of the website's static blog articles (src/data/blog/articles-*.ts). */
-interface StaticArticle {
-  slug: string;
-  title: string;
-  subtitle?: string;
-  excerpt?: string;
-  heroImage?: string;
-  metaTitle?: string;
-  metaDescription?: string;
-  category?: string;
-  author?: { name?: string; role?: string; avatar?: string };
-  publishDate?: string;
-  readTime?: number;
-  sections?: unknown[];
-  faq?: unknown[];
-}
 
 async function main() {
   const slug = process.argv[2];
@@ -52,7 +36,7 @@ async function main() {
   const { articlesHe } = await import('../../src/data/blog/articles-he');
   const { articlesEn } = await import('../../src/data/blog/articles-en');
 
-  const source: StaticArticle[] = lang === 'he' ? articlesHe : articlesEn;
+  const source: Article[] = lang === 'he' ? articlesHe : articlesEn;
   const article = source.find((a) => a.slug === slug);
 
   if (!article) {
@@ -76,7 +60,8 @@ async function main() {
     publishDate: article.publishDate ? new Date(article.publishDate) : null,
     readTime: article.readTime ?? null,
     sectionsJson: article.sections ?? [],
-    faqJson: article.faq ?? null,
+    // ArticleFAQ is an interface (no index signature), so cast for Prisma's Json input.
+    faqJson: (article.faq ?? []) as unknown as Prisma.InputJsonValue,
   };
 
   // 1. Upsert as DRAFT (status only set on create; never demote an existing article).

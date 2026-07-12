@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { NEW_PARTNERS, PINNED_ORDERS } from '../scripts/add-partners/partners.data';
 import { PARTNER_SEARCH_TERMS } from '../scripts/add-partners/search-terms.data';
@@ -506,7 +506,8 @@ async function seedBlogArticlesIfEmpty() {
         publishDate: article.publishDate ? new Date(article.publishDate) : null,
         readTime: article.readTime ?? null,
         sectionsJson: article.sections ?? [],
-        faqJson: article.faq ?? null,
+        // ArticleFAQ is an interface (no index signature), so cast for Prisma's Json input.
+        faqJson: (article.faq ?? []) as unknown as Prisma.InputJsonValue,
         publishedAt: article.publishDate ? new Date(article.publishDate) : new Date(),
       },
       update: {},
