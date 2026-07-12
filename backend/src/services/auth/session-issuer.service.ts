@@ -21,13 +21,18 @@ const REFRESH_MAX_AGE = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Cookie options for the httpOnly refresh cookie shared across
- * .nexus-payment.com subdomains in production.
+ * .nexus-payment.com subdomains in production. When CROSS_SITE_COOKIES is on
+ * (cross-registrable-domain HTTPS deploy, e.g. the wallet dev host calling the
+ * dev API on a different *.up.railway.app site), it switches to
+ * SameSite=None; Secure so the cookie survives the cross-site refresh call.
+ * Mirrors refreshCookieOpts in utils/auth-cookies.ts (kept in sync by hand).
  */
 function cookieOpts() {
   return {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
+    ...(env.CROSS_SITE_COOKIES
+      ? { sameSite: 'none' as const, secure: true }
+      : { sameSite: 'lax' as const, secure: env.NODE_ENV === 'production' }),
     maxAge: REFRESH_MAX_AGE,
     path: '/',
     ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
