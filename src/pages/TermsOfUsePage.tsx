@@ -4,7 +4,6 @@ import Footer from '../components/Footer';
 
 const sectionStyle = "mb-10";
 const h2Style = "text-xl font-bold text-slate-900 mb-4 pb-2 border-b border-slate-200";
-const h3Style = "text-base font-semibold text-slate-800 mt-5 mb-2";
 const pStyle = "text-sm text-slate-700 leading-relaxed mb-3";
 const ulStyle = "list-disc list-inside text-sm text-slate-700 leading-relaxed space-y-1 mb-3 ps-4";
 const linkStyle = "text-indigo-600 hover:underline";

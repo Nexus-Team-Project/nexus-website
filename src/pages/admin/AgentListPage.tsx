@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Bot, Zap, CheckCircle, Pause, XCircle } from 'lucide-react';
+import { Bot, Zap, CheckCircle } from 'lucide-react';
 import { api } from '../../lib/api';
 
 // ─── Types ────────────────────────────────────────────────
@@ -46,15 +46,16 @@ export default function AgentListPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
+    // No sync setState here: the effect runs once and loading/error already
+    // start as true/null, so resetting them was a no-op.
 
     api.get<AgentSummary[]>('/api/admin/agents')
       .then((data) => {
         if (!cancelled) setAgents(data);
       })
-      .catch((e: any) => {
-        if (!cancelled) setError(e?.error ?? 'Failed to load agents');
+      .catch((e: unknown) => {
+        // The api client throws plain objects shaped { error, status }.
+        if (!cancelled) setError((e as { error?: string })?.error ?? 'Failed to load agents');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

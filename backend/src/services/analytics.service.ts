@@ -72,24 +72,29 @@ export async function ingest(data: IngestPayload): Promise<void> {
 
   // [3] Async aggregation — keep legacy PageView + VisitorProfile in sync
   //     (fire-and-forget — errors here don't fail the request)
-  void aggregateLegacy(data, accountId).catch(() => {});
+  void aggregateLegacy(data).catch(() => {});
 }
 
-async function aggregateLegacy(
-  data: IngestPayload,
-  _accountId: string | null,
-): Promise<void> {
+async function aggregateLegacy(data: IngestPayload): Promise<void> {
   const { anonymousId, userId, eventName, properties, context } = data;
 
   if (eventName === 'Page_Viewed') {
-    const page = String((properties as any).page_path ?? '/');
-    const referrer = String((context as any).page?.referrer ?? '');
-    const userAgent = String((context as any).userAgent ?? '');
-    const ip = String((context as any).ip ?? '');
-    const country = String((context as any).device?.country ?? '');
-    const language = String((context as any).locale ?? '');
-    const device = String((context as any).device?.type ?? '');
-    const browser = String((context as any).device?.browser ?? '');
+    // Narrow the free-form context to the fields this aggregation reads.
+    const ctx = context as {
+      page?: { referrer?: unknown };
+      userAgent?: unknown;
+      ip?: unknown;
+      locale?: unknown;
+      device?: { country?: unknown; type?: unknown; browser?: unknown };
+    };
+    const page = String(properties.page_path ?? '/');
+    const referrer = String(ctx.page?.referrer ?? '');
+    const userAgent = String(ctx.userAgent ?? '');
+    const ip = String(ctx.ip ?? '');
+    const country = String(ctx.device?.country ?? '');
+    const language = String(ctx.locale ?? '');
+    const device = String(ctx.device?.type ?? '');
+    const browser = String(ctx.device?.browser ?? '');
 
     await prisma.$transaction([
       prisma.pageView.create({

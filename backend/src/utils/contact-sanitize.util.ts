@@ -28,11 +28,13 @@ export const CONTACT_NAME_MAX_LENGTH = 100;
 // from string literals + `new RegExp(...)` so the source file stays plain
 // ASCII (literal control bytes in a .ts file are a portability hazard).
 
+// eslint-disable-next-line no-control-regex -- control characters are matched intentionally to strip them from untrusted input
 const CONTROL_CHARS_RE = new RegExp('[\\x00-\\x1F\\x7F]', 'g');
 
 // Same as CONTROL_CHARS_RE but excluding tab (\x09), LF (\x0A), CR (\x0D)
 // so the multi-line message can keep its line endings before they get
 // normalised.
+// eslint-disable-next-line no-control-regex -- control characters are matched intentionally to strip them from untrusted input
 const NON_LINE_CONTROL_CHARS_RE = new RegExp('[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]', 'g');
 
 /**

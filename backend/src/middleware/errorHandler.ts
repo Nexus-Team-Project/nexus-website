@@ -11,6 +11,7 @@ export function errorHandler(
   err: AppError,
   _req: Request,
   res: Response,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- Express identifies error middleware by its 4-param signature
   _next: NextFunction,
 ): void {
   // Zod validation failures are client errors (400), not server errors. Without
@@ -26,7 +27,7 @@ export function errorHandler(
   const message = err.isOperational ? err.message : 'Internal server error';
 
   if (statusCode >= 400) {
-    console.error(`[ERROR ${statusCode}]`, err?.message, err?.constructor?.name, (err as any)?.code);
+    console.error(`[ERROR ${statusCode}]`, err?.message, err?.constructor?.name, (err as { code?: unknown })?.code);
   }
 
   // Prevent ERR_HTTP_HEADERS_SENT crash if response already started

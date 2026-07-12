@@ -24,7 +24,7 @@ router.post('/subscribe', authenticate, async (req, res, next) => {
     if (!subscription?.endpoint || !subscription?.keys) {
       return res.status(400).json({ error: 'Invalid subscription object' });
     }
-    const userId = (req as any).user?.id ?? 'anonymous';
+    const userId = (req.user as { id?: string } | undefined)?.id ?? 'anonymous';
     await pushService.subscribe(userId, subscription);
     res.json({ ok: true });
   } catch (err) {

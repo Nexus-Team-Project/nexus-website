@@ -674,6 +674,7 @@ router.post(
             mimetype: f.mimetype,
           }))
         : [];
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit these keys from the rest payload
       const { keptImageUrls: _ignoredKept, keptImageCrops: _ignoredKeptCrops, onBehalfOfTenantId: _obo, ...createPayload } = restParsed;
       const offer = await createOffer({
         ...createPayload,
@@ -838,6 +839,7 @@ router.patch(
 
       // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
       // onBehalfOfTenantId is consumed above (not an updateOffer field) - drop it.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit the key from the rest payload
       const { validFrom: validFromStr, validUntil: validUntilStr, onBehalfOfTenantId: _obo, ...restParsed } = parsed.data;
       const validFromDate = validFromStr !== undefined
         ? (validFromStr ? new Date(validFromStr) : null)

@@ -151,8 +151,8 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     });
 
     res.json({ ...user, status: deriveStatus(user) });
-  } catch (err: any) {
-    if (err?.code === 'P2025') { res.status(404).json({ error: 'User not found' }); return; }
+  } catch (err) {
+    if ((err as { code?: unknown })?.code === 'P2025') { res.status(404).json({ error: 'User not found' }); return; }
     next(err);
   }
 });
@@ -169,8 +169,8 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 
     await prisma.user.delete({ where: { id: req.params.id } });
     res.status(204).end();
-  } catch (err: any) {
-    if (err?.code === 'P2025') { res.status(404).json({ error: 'User not found' }); return; }
+  } catch (err) {
+    if ((err as { code?: unknown })?.code === 'P2025') { res.status(404).json({ error: 'User not found' }); return; }
     next(err);
   }
 });

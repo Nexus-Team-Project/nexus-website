@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { AgentRequestStatus, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { validate } from '../middleware/validate';
 import { authenticate, requireAdmin } from '../middleware/authenticate';
@@ -16,7 +17,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
     const skip = (page - 1) * limit;
 
-    const where = status ? { status: status as any } : {};
+    const where = status ? { status: status as AgentRequestStatus } : {};
 
     const [requests, total] = await Promise.all([
       prisma.agentRequest.findMany({
@@ -40,7 +41,7 @@ const rejectSchema = z.object({ reason: z.string().optional() });
 router.post('/:id/approve', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const adminId = (req as any).user?.id ?? 'unknown';
+    const adminId = (req.user as { id?: string } | undefined)?.id ?? 'unknown';
 
     const request = await prisma.agentRequest.findUnique({ where: { id } });
     if (!request) { res.status(404).json({ error: 'Request not found' }); return; }
@@ -51,7 +52,7 @@ router.post('/:id/approve', async (req: Request, res: Response, next: NextFuncti
 
     // Execute action atomically
     await prisma.$transaction(async (tx) => {
-      const payload = request.payload as any;
+      const payload = request.payload as { articleId: string; changes: Prisma.BlogArticleUpdateInput };
 
       if (request.action === 'BLOG_PUBLISH') {
         await tx.blogArticle.update({
@@ -88,7 +89,7 @@ router.post(
     try {
       const { id } = req.params;
       const { reason } = req.body as { reason?: string };
-      const adminId = (req as any).user?.id ?? 'unknown';
+      const adminId = (req.user as { id?: string } | undefined)?.id ?? 'unknown';
 
       const request = await prisma.agentRequest.findUnique({ where: { id } });
       if (!request) { res.status(404).json({ error: 'Request not found' }); return; }

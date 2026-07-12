@@ -51,8 +51,16 @@ function shouldApply(args: string[]): boolean {
   return args.includes('--apply');
 }
 
+/** The flat validity fields as they existed when this migration ran - later
+ *  moved to unit level and REMOVED from OfferVariant by the 2026-06-25
+ *  unit-level dating migration (backfill-voucher-unit-dating.ts strips them). */
+type LegacyVariantValidity = {
+  voucherValidityValue: NexusOffer['voucherValidityValue'] | null;
+  voucherValidityUnit: NexusOffer['voucherValidityUnit'] | null;
+};
+
 /** Builds the single default variant from an offer's current flat fields. */
-function defaultVariantFromOffer(offer: NexusOffer): OfferVariant {
+function defaultVariantFromOffer(offer: NexusOffer): OfferVariant & LegacyVariantValidity {
   return {
     variantId: generateVariantId(),
     ...(offer.face_value !== undefined && { face_value: offer.face_value }),

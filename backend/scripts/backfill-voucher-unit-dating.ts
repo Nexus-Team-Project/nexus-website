@@ -80,6 +80,8 @@ function majorityMode(modes: (ValidityType | null)[]): ValidityType {
  *  variant + the variant's prior mode (used to stamp its own units). */
 function rebuildVariant(v: RawVariant): { variant: OfferVariant; mode: ValidityType | null } {
   const mode = priorMode(v);
+  // Destructure-to-omit: the four legacy validity fields are stripped from the variant.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { voucherValidityValue: _a, voucherValidityUnit: _b, validFrom: _c, validUntil: _d, ...rest } = v;
   return { variant: rest as OfferVariant, mode };
 }

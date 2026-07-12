@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { NEW_PARTNERS, PINNED_ORDERS } from '../scripts/add-partners/partners.data';
 import { PARTNER_SEARCH_TERMS } from '../scripts/add-partners/search-terms.data';
@@ -478,14 +478,12 @@ async function seedBlogArticlesIfEmpty() {
   }
 
   // Dynamic import to avoid rootDir restrictions
-  // @ts-ignore
   const { articlesEn } = await import('../../src/data/blog/articles-en');
-  // @ts-ignore
   const { articlesHe } = await import('../../src/data/blog/articles-he');
 
   const allArticles = [
-    ...articlesEn.map((a: any) => ({ ...a, lang: 'en' })),
-    ...articlesHe.map((a: any) => ({ ...a, lang: 'he' })),
+    ...articlesEn.map((a) => ({ ...a, lang: 'en' })),
+    ...articlesHe.map((a) => ({ ...a, lang: 'he' })),
   ];
 
   for (const article of allArticles) {
@@ -508,7 +506,8 @@ async function seedBlogArticlesIfEmpty() {
         publishDate: article.publishDate ? new Date(article.publishDate) : null,
         readTime: article.readTime ?? null,
         sectionsJson: article.sections ?? [],
-        faqJson: article.faq ?? null,
+        // ArticleFAQ is an interface (no index signature), so cast for Prisma's Json input.
+        faqJson: (article.faq ?? []) as unknown as Prisma.InputJsonValue,
         publishedAt: article.publishDate ? new Date(article.publishDate) : new Date(),
       },
       update: {},

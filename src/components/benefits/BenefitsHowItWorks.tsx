@@ -14,9 +14,8 @@ const STEPS_EN = [
 ];
 
 export default function BenefitsHowItWorks() {
-  const { language, direction } = useLanguage();
+  const { language } = useLanguage();
   const he = language === 'he';
-  const isRtl = direction === 'rtl';
   const steps = he ? STEPS_HE : STEPS_EN;
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeStep, setActiveStep] = useState(-1);
@@ -36,17 +35,20 @@ export default function BenefitsHowItWorks() {
     return () => observer.disconnect();
   }, []);
 
-  // Sequential fill animation: activate steps one by one
+  // Sequential fill animation: activate steps one by one.
+  // Only the COUNT is used inside, so depending on the primitive keeps the
+  // timers stable across language switches (both step arrays have length 3).
+  const stepCount = steps.length;
   useEffect(() => {
     if (!isVisible) return;
 
     const timers: ReturnType<typeof setTimeout>[] = [];
-    steps.forEach((_, i) => {
+    for (let i = 0; i < stepCount; i++) {
       timers.push(setTimeout(() => setActiveStep(i), 600 + i * 1000));
-    });
+    }
 
     return () => timers.forEach(clearTimeout);
-  }, [isVisible, steps.length]);
+  }, [isVisible, stepCount]);
 
   return (
     <div ref={containerRef} className="relative">

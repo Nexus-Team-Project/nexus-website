@@ -1,4 +1,4 @@
-import { LanguageProvider } from '../i18n/LanguageContext';
+import { LanguageProvider } from '../i18n/LanguageProvider';
 import Signup from './Signup';
 
 export default function SignupHe() {

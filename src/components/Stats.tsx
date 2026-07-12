@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
+import type { TranslationKeys } from '../i18n/translations';
 
-const getStats = (t: any) => [
+// Builds the localized stat entries; decimals is optional (defaults handled by StatCounter).
+const getStats = (t: TranslationKeys): { value: number; suffix: string; label: string; decimals?: number }[] => [
   { value: 135, suffix: '+', label: t.stats.currenciesAndPayment },
   { value: 99.99, suffix: '%', label: t.stats.uptimeSLA, decimals: 2 },
   { value: 160, suffix: '+', label: t.stats.benefitsPartners },

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -18,6 +18,7 @@ const GlobalSection = lazy(() => import('../components/GlobalSection'));
 const Testimonials = lazy(() => import('../components/Testimonials'));
 const CTA = lazy(() => import('../components/CTA'));
 const Footer = lazy(() => import('../components/Footer'));
+const ContactSalesModal = lazy(() => import('../components/contact/ContactSalesModal'));
 
 // ─── Skeleton Components ──────────────────────────────────────────────────────
 
@@ -213,6 +214,7 @@ function FooterSkeleton() {
 export default function HomeContent() {
   const { t, direction, language } = useLanguage();
   const { track } = useAnalytics();
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useSEO({
     title: language === 'he'
@@ -513,6 +515,13 @@ export default function HomeContent() {
           <FooterSkeleton />
         )}
       </div>
+
+      {/* Contact sales modal, opened by the bottom CTA */}
+      {isChatOpen && (
+        <Suspense fallback={null}>
+          <ContactSalesModal open={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        </Suspense>
+      )}
     </div>
   );
 }

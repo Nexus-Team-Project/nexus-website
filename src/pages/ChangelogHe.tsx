@@ -4,7 +4,7 @@ link.rel = 'stylesheet';
 link.href = 'https://fonts.googleapis.com/css2?family=Rubik:wght@300..900&display=block';
 document.head.appendChild(link);
 
-import { LanguageProvider } from '../i18n/LanguageContext';
+import { LanguageProvider } from '../i18n/LanguageProvider';
 import ChangelogContent from './ChangelogContent';
 
 export default function ChangelogHe() {

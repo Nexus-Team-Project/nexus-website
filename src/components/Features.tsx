@@ -5,7 +5,6 @@ import SpendingLimitsAnimation from './SpendingLimitsAnimation';
 import BorderlessGlobe from './BorderlessGlobe';
 import BorderHighlightCard from './BorderHighlightCard';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { MouseEvent } from 'react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
@@ -71,9 +70,11 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
 
   // Rotation interval - moves cards to next slot
   useEffect(() => {
+    let firstRotation: number | null = null;
     if (isActive) {
-      // Trigger first rotation immediately
-      rotateCards();
+      // Trigger first rotation immediately (next frame, so the effect body
+      // itself does no synchronous setState - visually identical).
+      firstRotation = window.requestAnimationFrame(() => rotateCards());
 
       // Then set interval for subsequent rotations
       intervalRef.current = window.setInterval(() => {
@@ -87,6 +88,9 @@ function CircularCarouselCard({ isGlobeHovered, isMobileActive, onMobileClick }:
     }
 
     return () => {
+      if (firstRotation !== null) {
+        cancelAnimationFrame(firstRotation);
+      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }

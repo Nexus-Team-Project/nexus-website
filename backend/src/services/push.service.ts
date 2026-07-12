@@ -80,12 +80,13 @@ export async function sendPushToAll(payload: {
         data,
       );
       sent++;
-    } catch (err: any) {
+    } catch (err) {
+      const e = err as { statusCode?: number; message?: string };
       // 410 Gone = subscription expired, clean up
-      if (err.statusCode === 410 || err.statusCode === 404) {
+      if (e.statusCode === 410 || e.statusCode === 404) {
         await prisma.pushSubscription.deleteMany({ where: { endpoint: sub.endpoint } }).catch(() => {});
       } else {
-        console.error(`[Push] Failed to send to ${sub.endpoint.slice(-20)}:`, err.message);
+        console.error(`[Push] Failed to send to ${sub.endpoint.slice(-20)}:`, e.message);
       }
     }
   }

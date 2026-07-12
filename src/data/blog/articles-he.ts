@@ -2488,7 +2488,7 @@ export const articlesHe: Article[] = [
     metaDescription:
       'גלו איך תשתית ארנק דיגיטלי משנה תוכניות נאמנות, הטבות לעובדים ותגמולי קהילה. למדו על מקרי שימוש מרכזיים ועתיד ההטבות מבוססות הארנק.',
     category: 'loyalty',
-    heroImage: 'https://images.unsplash.com/photo-1563986768609-322da13575f2?w=800&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80',
     author: { name: 'צוות Nexus', role: 'תשתית נאמנות ותשלומים' },
     publishDate: '2026-03-09',
     readTime: 7,

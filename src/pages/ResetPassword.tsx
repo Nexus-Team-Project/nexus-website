@@ -32,8 +32,9 @@ export default function ResetPassword() {
       await api.post('/api/auth/reset-password', { token, newPassword: password });
       setSuccess(true);
       setTimeout(() => navigate(loginPath), 2500);
-    } catch (err: any) {
-      setError(err?.error ?? (isHe ? 'הקישור פג תוקף או לא תקין. בקש קישור חדש.' : 'Link expired or invalid. Please request a new one.'));
+    } catch (err) {
+      // The api client throws plain objects shaped { error, status }.
+      setError((err as { error?: string })?.error ?? (isHe ? 'הקישור פג תוקף או לא תקין. בקש קישור חדש.' : 'Link expired or invalid. Please request a new one.'));
     } finally {
       setIsLoading(false);
     }

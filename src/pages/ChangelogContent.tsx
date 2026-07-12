@@ -92,13 +92,18 @@ export default function ChangelogContent() {
             `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/commits?per_page=50&sha=main`,
           );
           if (!commitRes.ok) throw new Error(`GitHub API responded ${commitRes.status}`);
-          const commits = await commitRes.json();
+          // Narrow shape of the GitHub commits API response (only the fields used below).
+          const commits: {
+            sha?: string;
+            html_url?: string;
+            commit?: { message?: string; author?: { date?: string } };
+          }[] = await commitRes.json();
           const parsed: ChangelogEntry[] = commits
-            .filter((c: any) => {
+            .filter((c) => {
               const msg = (c.commit?.message || '').toLowerCase();
               return !msg.startsWith('merge pull request') && !msg.startsWith('merge branch');
             })
-            .map((c: any, idx: number) => {
+            .map((c, idx) => {
               const lines = (c.commit?.message || '').split('\n');
               return {
                 id: idx + 1,

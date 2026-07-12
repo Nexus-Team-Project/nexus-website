@@ -58,9 +58,9 @@ router.post('/whatsapp', async (req: Request, res: Response) => {
   // Always respond 200 immediately (Meta requires <5s)
   res.status(200).send('OK');
 
-  let payload: any;
+  let payload: MetaWebhookPayload;
   try {
-    payload = JSON.parse(rawBody.toString());
+    payload = JSON.parse(rawBody.toString()) as MetaWebhookPayload;
   } catch {
     return;
   }
@@ -278,9 +278,10 @@ router.post('/payment', async (req: Request, res: Response) => {
   try {
     await PaymentService.handleStripeWebhook(rawBody, signature);
     res.status(200).json({ received: true });
-  } catch (err: any) {
-    console.error('[Webhook] Stripe error:', err.message);
-    res.status(err.statusCode ?? 400).json({ error: err.message });
+  } catch (err) {
+    const e = err as { message?: string; statusCode?: number };
+    console.error('[Webhook] Stripe error:', e.message);
+    res.status(e.statusCode ?? 400).json({ error: e.message });
   }
 });
 
@@ -292,6 +293,27 @@ interface EmailInboundPayload {
   subject: string;
   text: string;
   html?: string;
+}
+
+/** Minimal shape of Meta's WhatsApp webhook payload (only the fields we read). */
+interface MetaWebhookPayload {
+  entry?: Array<{
+    changes?: Array<{
+      value: {
+        contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>;
+        messages?: Array<{
+          id: string;
+          from: string;
+          type?: string;
+          text?: { body?: string };
+          image?: { caption?: string };
+          video?: { caption?: string };
+          document?: { caption?: string; filename?: string };
+        }>;
+        statuses?: Array<{ id?: string; status?: string }>;
+      };
+    }>;
+  }>;
 }
 
 export default router;

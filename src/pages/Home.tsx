@@ -1,4 +1,4 @@
-import { LanguageProvider } from '../i18n/LanguageContext';
+import { LanguageProvider } from '../i18n/LanguageProvider';
 import HomeContent from './HomeContent';
 
 export default function Home() {

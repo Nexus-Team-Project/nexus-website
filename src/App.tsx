@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { useState, useEffect, useRef, lazy, Suspense, type ReactNode } from 'react';
-import { LanguageProvider } from './i18n/LanguageContext';
+import { LanguageProvider } from './i18n/LanguageProvider';
 import { useAnalytics } from './hooks/useAnalytics';
 import ProtectedRoute from './components/ProtectedRoute';
 import AccessibilityWidget from './components/AccessibilityWidget';
