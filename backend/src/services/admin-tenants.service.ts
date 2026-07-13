@@ -6,6 +6,7 @@
  */
 import { getMongoDb } from '../config/mongo';
 import { getTenantDomainCollections, getIdentityDomainCollections } from '../models/domain';
+import type { LogoCrop } from '../models/domain/tenant.models';
 import { getSupplyDomainCollections, NOT_DELETED, type NexusOffer } from '../models/domain/supply.models';
 import { createError } from '../middleware/errorHandler';
 import { approveOffer } from './supply-approval.service';
@@ -58,6 +59,7 @@ export interface AdminTenantLookupRow {
   organizationName: string;
   logoUrl?: string;
   brandColor?: string;
+  logoCrop?: LogoCrop | null;
 }
 
 /**
@@ -78,7 +80,7 @@ export async function lookupTenants(
   const [total, docs] = await Promise.all([
     domainTenants.countDocuments(filter),
     domainTenants
-      .find(filter, { projection: { _id: 0, tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1 } })
+      .find(filter, { projection: { _id: 0, tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } })
       .sort({ organizationName: 1 })
       .skip((opts.page - 1) * opts.limit)
       .limit(opts.limit)
@@ -91,6 +93,7 @@ export async function lookupTenants(
       organizationName: d.organizationName,
       ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
       ...(d.brandColor ? { brandColor: d.brandColor } : {}),
+      ...(d.logoCrop ? { logoCrop: d.logoCrop } : {}),
     })),
   };
 }

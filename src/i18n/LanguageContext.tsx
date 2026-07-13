@@ -1,6 +1,7 @@
+// Language context + useLanguage hook. The provider component lives in
+// LanguageProvider.tsx so this file only exports non-component values
+// (react-refresh only-export-components).
 import { createContext, useContext } from 'react';
-import type { ReactNode } from 'react';
-import { translations } from './translations';
 import type { Language, TranslationKeys } from './translations';
 
 interface LanguageContextType {
@@ -9,27 +10,10 @@ interface LanguageContextType {
   direction: 'ltr' | 'rtl';
 }
 
-const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+/** Shared context consumed by useLanguage and populated by LanguageProvider. */
+export const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export function LanguageProvider({
-  children,
-  language
-}: {
-  children: ReactNode;
-  language: Language;
-}) {
-  const t = translations[language] as TranslationKeys;
-  const direction = t.direction as 'ltr' | 'rtl';
-
-  return (
-    <LanguageContext.Provider value={{ language, t, direction }}>
-      <div dir={direction} className={direction === 'rtl' ? 'rtl' : 'ltr'}>
-        {children}
-      </div>
-    </LanguageContext.Provider>
-  );
-}
-
+/** Returns { language, t, direction }; throws outside a LanguageProvider. */
 export function useLanguage() {
   const context = useContext(LanguageContext);
   if (!context) {

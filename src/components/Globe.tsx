@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import Globe from 'react-globe.gl';
+import Globe, { type GlobeMethods } from 'react-globe.gl';
 
 interface Arc {
   startLat: number;
@@ -10,7 +10,8 @@ interface Arc {
 }
 
 export default function MoneyGlobe() {
-  const globeEl = useRef<any>();
+  // react-globe.gl expects a MutableRefObject<GlobeMethods | undefined> as its ref.
+  const globeEl = useRef<GlobeMethods | undefined>(undefined);
   const [arcsData, setArcsData] = useState<Arc[]>([]);
 
   useEffect(() => {

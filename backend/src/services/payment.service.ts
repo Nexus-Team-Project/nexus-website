@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 import { env } from '../config/env';
 import { createError } from '../middleware/errorHandler';
@@ -71,8 +72,8 @@ async function createStripeOrder(input: CreateOrderInput): Promise<OrderResult> 
       currency: currency.toUpperCase(),
       providerName: 'stripe',
       providerOrderId: intent.id,
-      providerData: { clientSecret: intent.client_secret } as any,
-      shippingAddress: (input.shippingAddress ?? null) as any,
+      providerData: { clientSecret: intent.client_secret } as Prisma.InputJsonValue,
+      shippingAddress: (input.shippingAddress ?? null) as unknown as Prisma.InputJsonValue,
       items: {
         create: input.items.map((item) => ({
           productId: item.productId,
@@ -109,7 +110,7 @@ async function createPayPlusOrder(input: CreateOrderInput): Promise<OrderResult>
       ...totals,
       currency,
       providerName: 'payplus',
-      shippingAddress: (input.shippingAddress ?? null) as any,
+      shippingAddress: (input.shippingAddress ?? null) as unknown as Prisma.InputJsonValue,
       items: {
         create: input.items.map((item) => ({
           productId: item.productId,
@@ -155,12 +156,12 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
   let event: import('stripe').Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, env.STRIPE_WEBHOOK_SECRET);
-  } catch (err: any) {
-    throw createError(`Webhook signature verification failed: ${err.message}`, 400);
+  } catch (err) {
+    throw createError(`Webhook signature verification failed: ${err instanceof Error ? err.message : String(err)}`, 400);
   }
 
   // Persist event for audit trail
-  const intent = event.data.object as any;
+  const intent = event.data.object as { id?: string; last_payment_error?: { code?: string; message?: string } };
   const orderId = intent?.id
     ? (
         await prisma.order.findFirst({ where: { providerOrderId: intent.id } })
@@ -172,7 +173,7 @@ export async function handleStripeWebhook(rawBody: Buffer, signature: string): P
       data: {
         orderId,
         type: event.type,
-        payload: event.data.object as any,
+        payload: event.data.object as unknown as Prisma.InputJsonValue,
       },
     });
   }

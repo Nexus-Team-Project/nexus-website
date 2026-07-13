@@ -48,7 +48,7 @@ function isAgentPhone(phone: string): boolean {
 
 async function resolveSession(shortId: string) {
   // Try exact match first (full CUID pasted)
-  let session = await prisma.chatSession.findUnique({ where: { id: shortId } });
+  const session = await prisma.chatSession.findUnique({ where: { id: shortId } });
   if (session) return session;
 
   // Match by suffix among open sessions

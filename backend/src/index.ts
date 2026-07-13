@@ -29,7 +29,6 @@ import { pollInbox } from './services/outlook-inbound.service';
 import { startMemberInviteWorker } from './jobs/member-invite-worker';
 
 const PORT = env.PORT;
-const BACKEND_URL = env.BACKEND_URL ?? env.FRONTEND_URL;
 
 // ─── Auto-seed knowledge base on first run ────────────────
 async function seedKnowledgeIfEmpty() {
@@ -129,7 +128,7 @@ async function seedTechnicalChunks() {
 
     let embedding: number[] = [];
     if (canEmbed) {
-      try { embedding = await embedText(`${chunk.title}\n${chunk.content}`); } catch {}
+      try { embedding = await embedText(`${chunk.title}\n${chunk.content}`); } catch { /* embedding is optional - seed the chunk without it */ }
     }
     await prisma.knowledgeChunk.create({
       data: { title: chunk.title, content: chunk.content, source: 'kb_seed_tech', language: 'he', isActive: true, embedding },

@@ -1,6 +1,6 @@
 // This hook loads published blog content from the standalone backend API.
 import { useEffect, useState } from 'react';
-import type { Article, ArticleSection, ArticleFAQ } from '../data/blog/types';
+import type { Article, ArticleCategory, ArticleSection, ArticleFAQ } from '../data/blog/types';
 import { API_URL } from '../lib/api';
 
 interface BlogArticleDto {
@@ -31,7 +31,7 @@ function toArticle(raw: BlogArticleDto): Article {
     excerpt: raw.excerpt ?? '',
     metaTitle: raw.metaTitle ?? raw.title,
     metaDescription: raw.metaDescription ?? raw.excerpt ?? '',
-    category: raw.category ?? 'benefits',
+    category: (raw.category as ArticleCategory | null) ?? 'benefits',
     heroImage: raw.heroImage ?? '',
     author: {
       name: raw.authorName ?? 'Nexus Team',
@@ -56,34 +56,33 @@ interface UseBlogArticlesResult {
 }
 
 export function useBlogArticles(lang: string): UseBlogArticlesResult {
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // The stored result is keyed by the request (lang) it answered; `loading` is
+  // DERIVED by comparing that key to the current lang, so the effect never
+  // needs a synchronous setState. Initial load and lang changes both render
+  // as loading until the matching response lands (same UX as before).
+  const [result, setResult] = useState<{ key: string; articles: Article[]; error: string | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     fetch(`${API_URL}/api/blog?lang=${lang}&status=published&limit=100`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.statusText)))
       .then((data: { articles?: BlogArticleDto[] }) => {
         if (!cancelled) {
-          setArticles((data.articles ?? []).map(toArticle));
-          setLoading(false);
+          setResult({ key: lang, articles: (data.articles ?? []).map(toArticle), error: null });
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(String(err));
-          setLoading(false);
+          setResult({ key: lang, articles: [], error: String(err) });
         }
       });
 
     return () => { cancelled = true; };
   }, [lang]);
 
-  return { articles, loading, error };
+  const fresh = result?.key === lang ? result : null;
+  return { articles: fresh?.articles ?? [], loading: fresh === null, error: fresh?.error ?? null };
 }
 
 interface UseBlogArticleResult {
@@ -93,33 +92,31 @@ interface UseBlogArticleResult {
 }
 
 export function useBlogArticle(slug: string | undefined, lang: string): UseBlogArticleResult {
-  const [article, setArticle] = useState<Article | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Same derived-loading pattern as useBlogArticles, keyed by slug + lang.
+  const [result, setResult] = useState<{ key: string; article: Article | null; error: string | null } | null>(null);
 
   useEffect(() => {
-    if (!slug) { setLoading(false); return; }
+    if (!slug) return;
+    const key = `${slug}|${lang}`;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     fetch(`${API_URL}/api/blog/${slug}?lang=${lang}`)
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status === 404 ? 'not_found' : r.statusText)))
       .then((data: { article: BlogArticleDto }) => {
         if (!cancelled) {
-          setArticle(toArticle(data.article));
-          setLoading(false);
+          setResult({ key, article: toArticle(data.article), error: null });
         }
       })
       .catch((err) => {
         if (!cancelled) {
-          setError(String(err));
-          setLoading(false);
+          setResult({ key, article: null, error: String(err) });
         }
       });
 
     return () => { cancelled = true; };
   }, [slug, lang]);
 
-  return { article, loading, error };
+  if (!slug) return { article: null, loading: false, error: null };
+  const fresh = result?.key === `${slug}|${lang}` ? result : null;
+  return { article: fresh?.article ?? null, loading: fresh === null, error: fresh?.error ?? null };
 }

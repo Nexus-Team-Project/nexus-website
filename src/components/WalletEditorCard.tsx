@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './WalletEditor.css';
 
 const colorSwatches = [
@@ -34,7 +34,7 @@ export default function WalletEditorCard() {
     setTimeout(() => setIsPaying(false), 950);
   };
 
-  const animateBalance = (from: number, to: number, duration = 1200) => {
+  const animateBalance = useCallback((from: number, to: number, duration = 1200) => {
     const start = performance.now();
     const currency = currencies[currencyIndex];
 
@@ -53,9 +53,9 @@ export default function WalletEditorCard() {
     };
 
     requestAnimationFrame(animate);
-  };
+  }, [currencyIndex]);
 
-  const handlePayoutsToggle = (checked: boolean) => {
+  const handlePayoutsToggle = useCallback((checked: boolean) => {
     setShowPayouts(checked);
     if (checked) {
       animateBalance(balanceCounterRef.current, balanceCounterRef.current + 2888);
@@ -64,9 +64,9 @@ export default function WalletEditorCard() {
       balanceCounterRef.current = currency.val;
       setBalance(`${currency.sym}${Math.round(currency.val).toLocaleString()}`);
     }
-  };
+  }, [animateBalance, currencyIndex]);
 
-  const cycleCurrency = () => {
+  const cycleCurrency = useCallback(() => {
     const nextIndex = (currencyIndex + 1) % currencies.length;
     setCurrencyIndex(nextIndex);
 
@@ -76,14 +76,20 @@ export default function WalletEditorCard() {
 
     setPulsingCurrency(nextIndex);
     setTimeout(() => setPulsingCurrency(null), 600);
-  };
+  }, [currencyIndex]);
 
   const handleColorClick = (a: string, b: string) => {
     setCardGradient(`linear-gradient(135deg, ${b}, ${a})`);
   };
 
-  // Auto-demo on mount
+  // Auto-demo on mount. The ref guard keeps it strictly one-shot even though
+  // the handlers (now in the dep list) get new identities as state changes -
+  // the running demo keeps its originally captured closures, exactly as before.
+  const demoStartedRef = useRef(false);
   useEffect(() => {
+    if (demoStartedRef.current) return;
+    demoStartedRef.current = true;
+
     const runDemo = async () => {
       await new Promise(r => setTimeout(r, 1000));
 
@@ -110,7 +116,7 @@ export default function WalletEditorCard() {
     };
 
     runDemo();
-  }, []);
+  }, [cycleCurrency, handlePayoutsToggle]);
 
   return (
     <div className="wed-wrap wallet-editor-interactive" style={{ transform: 'scale(0.95)', transformOrigin: 'top center' }}>

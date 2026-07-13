@@ -3,8 +3,6 @@
  * Registered by the frontend when an admin enables push notifications.
  */
 
-/* eslint-disable no-restricted-globals */
-
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 

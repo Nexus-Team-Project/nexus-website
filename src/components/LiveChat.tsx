@@ -214,8 +214,8 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
           {
             id: `system-${Date.now()}`,
             text: data.mode === 'HUMAN'
-              ? (t.liveChat as any).agentJoined ?? 'An agent has joined the conversation.'
-              : (t.liveChat as any).aiResumed ?? 'AI assistant has resumed the conversation.',
+              ? t.liveChat.agentJoined ?? 'An agent has joined the conversation.'
+              : t.liveChat.aiResumed ?? 'AI assistant has resumed the conversation.',
             sender: 'agent',
             timestamp: new Date(),
           },
@@ -228,7 +228,7 @@ export default function LiveChat({ onClose, onMinimize, existingSessionId, onSes
           ...prev,
           {
             id: `system-${Date.now()}`,
-            text: (t.liveChat as any).sessionClosed ?? 'This conversation has been closed.',
+            text: t.liveChat.sessionClosed ?? 'This conversation has been closed.',
             sender: 'agent',
             timestamp: new Date(),
           },

@@ -47,7 +47,7 @@ router.post(
         NotificationService.handleVisitorArrival({
           visitorId: req.body.anonymousId,
           page: String(req.body.properties?.page_path ?? '/'),
-          country: String((enrichedContext as any).device?.country ?? ''),
+          country: String((enrichedContext as { device?: { country?: unknown } }).device?.country ?? ''),
         }).catch(console.error);
       }
 

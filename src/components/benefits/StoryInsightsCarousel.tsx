@@ -114,7 +114,6 @@ export default function StoryInsightsCarousel() {
   const slidesLen = slides.length;
 
   const balance = useMotionValue(0);
-  const formattedBalance = useTransform(balance, (v) => `₪${Math.round(v).toLocaleString()}`);
   const balanceTarget = useRef(0);
 
   const safeIndex = useMemo(() => {

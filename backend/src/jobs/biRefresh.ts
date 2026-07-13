@@ -14,9 +14,9 @@ export async function refreshBiViews(): Promise<void> {
     try {
       await sql();
       console.log(`[BI] Refreshed ${name}`);
-    } catch (err: any) {
+    } catch (err) {
       // Views may not exist yet (bi_views.sql not yet applied) — log and continue
-      console.warn(`[BI] Could not refresh ${name}: ${err?.message ?? err}`);
+      console.warn(`[BI] Could not refresh ${name}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }

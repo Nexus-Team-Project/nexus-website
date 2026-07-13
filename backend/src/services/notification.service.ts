@@ -226,8 +226,8 @@ export async function handleChatEscalated(data: {
             }).catch(() => {});
             console.log(`[Notification] Outlook thread anchor saved: convId=${found.conversationId}`);
           }
-        } catch (err: any) {
-          console.error('[Notification] Outlook search failed:', err?.message ?? err);
+        } catch (err) {
+          console.error('[Notification] Outlook search failed:', err instanceof Error ? err.message : err);
         }
       }
     }).catch((err) => console.error('[Notification] Email alert failed:', err));

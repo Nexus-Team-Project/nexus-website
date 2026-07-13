@@ -18,19 +18,21 @@ function shuffle(arr: string[]): string[] {
   return a;
 }
 
+/** Picks the three displayed card names from a fresh shuffle of the pool. */
+function pickCardNames(): string[] {
+  const pool = shuffle(names);
+  return [pool[0], 'Jordan Lee', pool[2]];
+}
+
 export default function CardStackAnimation() {
-  const [cardNames, setCardNames] = useState<string[]>([]);
+  // Lazy initializer: names are ready on first render (no setState-in-effect).
+  const [cardNames, setCardNames] = useState<string[]>(pickCardNames);
   const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Initialize names
-    const pool = shuffle(names);
-    setCardNames([pool[0], 'Jordan Lee', pool[2]]);
-
     // Match the 7.2s stack loop
     const interval = setInterval(() => {
-      const pool = shuffle(names);
-      setCardNames([pool[0], 'Jordan Lee', pool[2]]);
+      setCardNames(pickCardNames());
     }, 7200);
 
     return () => clearInterval(interval);

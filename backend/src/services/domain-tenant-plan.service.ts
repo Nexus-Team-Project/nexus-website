@@ -19,15 +19,6 @@ import { DOMAIN_COLLECTIONS } from '../models/domain/collections';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
 import { PLAN_SEAT_LIMITS, type TenantPlan } from '../models/domain/tenant.models';
 
-/**
- * The `member` role is free and unlimited, and the `owner` role (the unique
- * per-tenant top role, held by the workspace creator or an admin-assigned
- * owner) is never billable - only other roles consume seats.
- */
-function isSeatConsumingRole(role: string): boolean {
-  return role !== 'member' && role !== 'owner';
-}
-
 export interface TenantPlanSummary {
   plan: TenantPlan;
   seatsUsed: number;
