@@ -5,22 +5,22 @@
  * collections. It intentionally does not delete global role permission maps.
  */
 import { ObjectId } from 'mongodb';
-import { getMongoDb } from '../../src/config/mongo';
-import { getIdentityDomainCollections } from '../../src/models/domain/identity.models';
-import { getOrchestrationDomainCollections } from '../../src/models/domain/orchestration.models';
-import { getSupplyDomainCollections } from '../../src/models/domain/supply.models';
-import { getVoucherCodeCollection } from '../../src/models/domain/voucher-codes.models';
-import { getTenantDomainCollections } from '../../src/models/domain/tenant.models';
-import { getInviteJobCollections } from '../../src/models/domain/invite-jobs.models';
-import { getOnboardingCollections } from '../../src/models/onboarding.models';
-import { deleteOfferImage } from '../../src/utils/cloudinary';
-import { PHONE_OTP_COLLECTION } from '../../src/models/auth/phone-otp.models';
-import { EMAIL_OTP_COLLECTION } from '../../src/models/auth/email-otp.models';
-import { PHONE_SIGNUP_TICKET_COLLECTION } from '../../src/models/auth/phone-signup-ticket.models';
-import { LOGIN_OTP_COLLECTION } from '../../src/models/auth/login-otp.models';
-import { TRUSTED_DEVICE_COLLECTION } from '../../src/models/auth/trusted-device.models';
-import { ONBOARDING_PHONE_VERIFICATION_COLLECTION } from '../../src/models/auth/onboarding-phone-verification.models';
-import { TENANT_JOIN_REQUEST_COLLECTION } from '../../src/models/auth/tenant-join-request.models';
+import { getMongoDb } from '../../config/mongo';
+import { getIdentityDomainCollections } from '../../models/domain/identity.models';
+import { getOrchestrationDomainCollections } from '../../models/domain/orchestration.models';
+import { getSupplyDomainCollections } from '../../models/domain/supply.models';
+import { getVoucherCodeCollection } from '../../models/domain/voucher-codes.models';
+import { getTenantDomainCollections } from '../../models/domain/tenant.models';
+import { getInviteJobCollections } from '../../models/domain/invite-jobs.models';
+import { getOnboardingCollections } from '../../models/onboarding.models';
+import { deleteOfferImage } from '../../utils/cloudinary';
+import { PHONE_OTP_COLLECTION } from '../../models/auth/phone-otp.models';
+import { EMAIL_OTP_COLLECTION } from '../../models/auth/email-otp.models';
+import { PHONE_SIGNUP_TICKET_COLLECTION } from '../../models/auth/phone-signup-ticket.models';
+import { LOGIN_OTP_COLLECTION } from '../../models/auth/login-otp.models';
+import { TRUSTED_DEVICE_COLLECTION } from '../../models/auth/trusted-device.models';
+import { ONBOARDING_PHONE_VERIFICATION_COLLECTION } from '../../models/auth/onboarding-phone-verification.models';
+import { TENANT_JOIN_REQUEST_COLLECTION } from '../../models/auth/tenant-join-request.models';
 import {
   resolveMongoDeletionTargets,
   resolveOrchestrationDeletionTargets,
