@@ -113,7 +113,15 @@ export default function Signup() {
     },
   ];
 
-  const isFormValid = email.trim() !== '' && fullName.trim() !== '' && password.trim() !== '';
+  // Enforced password policy (mirrors backend utils/password-policy.ts):
+  // 8-128 chars, a digit, upper+lower case, and a special character.
+  const isPasswordCompliant =
+    password.length >= 8 && password.length <= 128 &&
+    /\d/.test(password) &&
+    /[a-z]/.test(password) && /[A-Z]/.test(password) &&
+    /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+  const isFormValid = email.trim() !== '' && fullName.trim() !== '' && isPasswordCompliant;
 
   const getPasswordStrength = (pwd: string): 'weak' | 'medium' | 'strong' | null => {
     if (pwd.length === 0) return null;
@@ -496,6 +504,10 @@ export default function Signup() {
                           {strengthConfig.text}
                         </span>
                       </div>
+                    )}
+                    {/* Enforced policy hint - shown until the password passes all rules. */}
+                    {password.length > 0 && !isPasswordCompliant && (
+                      <p className="text-[10px] text-red-500 mt-1">{t.auth.passwordRequirements}</p>
                     )}
                   </div>
 

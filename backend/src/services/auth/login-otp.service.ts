@@ -11,9 +11,17 @@ import { Db } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { randomInt } from 'crypto';
 import { generateToken, hashToken } from '../../utils/crypto';
-import { LOGIN_OTP_COLLECTION, type LoginOtpChallenge } from '../../models/auth/login-otp.models';
+import {
+  LOGIN_OTP_COLLECTION,
+  type ChallengePurpose,
+  type LoginOtpChallenge,
+} from '../../models/auth/login-otp.models';
 import { assertRateLimit } from './wallet-rate-limit';
 import { sendLoginOtpMessage } from '../email/login-otp-email.service';
+import {
+  sendWalletLoginCodeMessage,
+  sendWalletResetCodeMessage,
+} from '../email/wallet-password-email.service';
 
 const TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
@@ -39,6 +47,28 @@ async function newCode(): Promise<{ code: string; codeHash: string }> {
 }
 
 /**
+ * Route the plaintext code to the purpose-appropriate email template:
+ * wallet_reset -> reset copy, wallet_login/wallet_signup -> wallet 2FA copy,
+ * absent purpose -> the website new-device MFA copy (legacy behavior).
+ */
+async function sendChallengeCode(args: {
+  email: string;
+  code: string;
+  lang: 'he' | 'en';
+  purpose?: ChallengePurpose;
+}): Promise<void> {
+  if (args.purpose === 'wallet_reset') {
+    await sendWalletResetCodeMessage({ to: args.email, code: args.code, lang: args.lang });
+    return;
+  }
+  if (args.purpose === 'wallet_login' || args.purpose === 'wallet_signup') {
+    await sendWalletLoginCodeMessage({ to: args.email, code: args.code, lang: args.lang });
+    return;
+  }
+  await sendLoginOtpMessage({ to: args.email, code: args.code, lang: args.lang });
+}
+
+/**
  * Start a login-OTP challenge for a password-verified user on an
  * unrecognized device. Rate-limits sends per email, stores hashes only,
  * and emails the plaintext code.
@@ -47,7 +77,16 @@ async function newCode(): Promise<{ code: string; codeHash: string }> {
  */
 export async function startLoginOtpChallenge(
   db: Db,
-  args: { prismaUserId: string; email: string; ip: string | null; lang: 'he' | 'en' },
+  args: {
+    prismaUserId: string | null;
+    email: string;
+    ip: string | null;
+    lang: 'he' | 'en';
+    /** Wallet flow discriminator; omit for website new-device MFA. */
+    purpose?: ChallengePurpose;
+    /** bcrypt hash of a wallet-signup password, stashed until verify. */
+    pendingPasswordHash?: string;
+  },
 ): Promise<StartLoginOtpResult> {
   const email = normalize(args.email);
   await assertSendLimits(db, email);
@@ -66,9 +105,13 @@ export async function startLoginOtpChallenge(
     expiresAt: new Date(now.getTime() + TTL_MS),
     verifiedAt: null,
     ip: args.ip || null,
+    // Wallet-only fields stay absent on website MFA docs (legacy shape).
+    ...(args.purpose
+      ? { purpose: args.purpose, pendingPasswordHash: args.pendingPasswordHash ?? null, consumedAt: null }
+      : {}),
   };
   await db.collection<LoginOtpChallenge>(LOGIN_OTP_COLLECTION).insertOne(insert);
-  await sendLoginOtpMessage({ to: email, code, lang: args.lang });
+  await sendChallengeCode({ email, code, lang: args.lang, purpose: args.purpose });
 
   if (process.env.NODE_ENV === 'test') return { challengeToken: rawToken, __testCode: code };
   return { challengeToken: rawToken };
@@ -83,7 +126,13 @@ export async function startLoginOtpChallenge(
 export async function verifyLoginOtpChallenge(
   db: Db,
   args: { challengeToken: string; code: string },
-): Promise<{ prismaUserId: string; email: string }> {
+): Promise<{
+  prismaUserId: string | null;
+  email: string;
+  lang: 'he' | 'en';
+  purpose?: ChallengePurpose;
+  pendingPasswordHash: string | null;
+}> {
   const col = db.collection<LoginOtpChallenge>(LOGIN_OTP_COLLECTION);
   const doc = await col.findOne({ challengeTokenHash: hashToken(args.challengeToken) });
   if (!doc || doc.verifiedAt || doc.expiresAt < new Date()) throw new Error('otp_invalid');
@@ -95,7 +144,13 @@ export async function verifyLoginOtpChallenge(
     throw new Error('otp_invalid');
   }
   await col.updateOne({ _id: doc._id }, { $set: { verifiedAt: new Date() } });
-  return { prismaUserId: doc.prismaUserId, email: doc.email };
+  return {
+    prismaUserId: doc.prismaUserId,
+    email: doc.email,
+    lang: doc.lang,
+    purpose: doc.purpose,
+    pendingPasswordHash: doc.pendingPasswordHash ?? null,
+  };
 }
 
 /**
@@ -115,7 +170,7 @@ export async function resendLoginOtpCode(
   await assertSendLimits(db, doc.email);
   const { code, codeHash } = await newCode();
   await col.updateOne({ _id: doc._id }, { $set: { codeHash } });
-  await sendLoginOtpMessage({ to: doc.email, code, lang: doc.lang });
+  await sendChallengeCode({ email: doc.email, code, lang: doc.lang, purpose: doc.purpose });
 
   if (process.env.NODE_ENV === 'test') return { __testCode: code };
   return {};

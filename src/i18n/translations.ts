@@ -414,6 +414,8 @@ export const translations = {
       weak: 'Weak',
       medium: 'Medium',
       strong: 'Strong',
+      passwordRequirements: 'Password must be 8+ characters and include a digit, upper and lower case letters, and a special character.',
+      passwordUnchanged: 'The new password must be different from your current password.',
       // Validation messages
       emailRequired: 'Email is required',
       emailInvalid: 'Invalid email address',
@@ -923,6 +925,8 @@ export const translations = {
       weak: 'חלשה',
       medium: 'בינונית',
       strong: 'חזקה',
+      passwordRequirements: 'הסיסמה חייבת להכיל לפחות 8 תווים, ספרה, אותיות גדולות וקטנות ותו מיוחד.',
+      passwordUnchanged: 'הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית.',
       // Validation messages
       emailRequired: 'אימייל נדרש',
       emailInvalid: 'כתובת אימייל לא תקינה',
