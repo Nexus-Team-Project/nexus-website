@@ -10,6 +10,10 @@ import { MongoClient, Db } from 'mongodb';
 vi.mock('../../../src/services/email/login-otp-email.service', () => ({
   sendLoginOtpMessage: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../../../src/services/email/wallet-password-email.service', () => ({
+  sendWalletLoginCodeMessage: vi.fn().mockResolvedValue(undefined),
+  sendWalletResetCodeMessage: vi.fn().mockResolvedValue(undefined),
+}));
 
 import {
   startLoginOtpChallenge,
@@ -17,6 +21,10 @@ import {
   resendLoginOtpCode,
 } from '../../../src/services/auth/login-otp.service';
 import { sendLoginOtpMessage } from '../../../src/services/email/login-otp-email.service';
+import {
+  sendWalletLoginCodeMessage,
+  sendWalletResetCodeMessage,
+} from '../../../src/services/email/wallet-password-email.service';
 import { LOGIN_OTP_COLLECTION } from '../../../src/models/auth/login-otp.models';
 
 let client: MongoClient;
@@ -107,5 +115,41 @@ describe('login OTP challenge', () => {
     ).rejects.toThrow('otp_invalid');
     const out = await verifyLoginOtpChallenge(db, { challengeToken: r.challengeToken, code: resent.__testCode! });
     expect(out.prismaUserId).toBe('user_1');
+  });
+
+  it('carries purpose + pendingPasswordHash through start -> verify, allows null prismaUserId', async () => {
+    const start = await startLoginOtpChallenge(db, {
+      prismaUserId: null,
+      email: 'new@wallet.test',
+      ip: null,
+      lang: 'en',
+      purpose: 'wallet_signup',
+      pendingPasswordHash: 'bcrypt-hash-here',
+    });
+    expect(sendWalletLoginCodeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'new@wallet.test', code: start.__testCode, lang: 'en' }),
+    );
+    expect(sendLoginOtpMessage).not.toHaveBeenCalled();
+    const verified = await verifyLoginOtpChallenge(db, {
+      challengeToken: start.challengeToken,
+      code: start.__testCode!,
+    });
+    expect(verified.prismaUserId).toBeNull();
+    expect(verified.purpose).toBe('wallet_signup');
+    expect(verified.pendingPasswordHash).toBe('bcrypt-hash-here');
+  });
+
+  it('routes wallet_reset codes to the reset email template', async () => {
+    const start = await startLoginOtpChallenge(db, {
+      prismaUserId: 'user_9',
+      email: 'reset@wallet.test',
+      ip: null,
+      lang: 'he',
+      purpose: 'wallet_reset',
+    });
+    expect(sendWalletResetCodeMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ to: 'reset@wallet.test', code: start.__testCode, lang: 'he' }),
+    );
+    expect(sendLoginOtpMessage).not.toHaveBeenCalled();
   });
 });

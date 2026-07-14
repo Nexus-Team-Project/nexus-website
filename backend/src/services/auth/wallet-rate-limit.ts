@@ -42,17 +42,38 @@ interface RateLimitRow {
  * @throws Error with message starting 'rate_limited:' when over the cap
  */
 export async function assertRateLimit(db: Db, p: RateLimitParams): Promise<void> {
+  const count = await countRecentEvents(db, p);
+  if (count >= p.max) throw new Error(`rate_limited:${p.bucket}`);
+  await recordEvent(db, p);
+}
+
+/**
+ * Count events for (bucket, key) inside the last windowSec seconds.
+ * Read-only: never records anything. Used by the wallet password lockout
+ * to check the failure count without consuming an attempt.
+ */
+export async function countRecentEvents(
+  db: Db,
+  p: { bucket: string; key: string; windowSec: number },
+): Promise<number> {
+  const since = new Date(Date.now() - p.windowSec * 1000);
+  return db.collection<RateLimitRow>(COLLECTION).countDocuments({
+    bucket: p.bucket,
+    key: p.key,
+    createdAt: { $gte: since },
+  });
+}
+
+/**
+ * Record one event for (bucket, key) without checking any cap. Used to count
+ * FAILED password attempts only (successes never consume the budget).
+ * Ensures the TTL index exists (no-op after the first call).
+ */
+export async function recordEvent(db: Db, p: { bucket: string; key: string }): Promise<void> {
   const col = db.collection<RateLimitRow>(COLLECTION);
   await col.createIndex(
     { createdAt: 1 },
     { name: 'createdAt_ttl', expireAfterSeconds: 24 * 3600 },
   );
-  const since = new Date(Date.now() - p.windowSec * 1000);
-  const count = await col.countDocuments({
-    bucket: p.bucket,
-    key: p.key,
-    createdAt: { $gte: since },
-  });
-  if (count >= p.max) throw new Error(`rate_limited:${p.bucket}`);
   await col.insertOne({ bucket: p.bucket, key: p.key, createdAt: new Date() });
 }

@@ -498,7 +498,9 @@ export async function logout(rawToken: string) {
 
 export async function forgotPassword(email: string): Promise<string | null> {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
-  if (!user || !user.passwordHash) return null;
+  // Passwordless accounts (Google/wallet-created) are allowed: the reset flow
+  // is how they SET a first password (2026-07-14 wallet email+password spec).
+  if (!user) return null;
 
   await prisma.passwordReset.updateMany({
     where: { userId: user.id, used: false },
@@ -523,6 +525,14 @@ export async function resetPassword(rawToken: string, newPassword: string) {
 
   if (!record || record.used || record.expiresAt < new Date()) {
     throw createError('Invalid or expired reset token', 400);
+  }
+
+  // Resetting to the CURRENT password is rejected (machine code; the
+  // frontends localize it).
+  const user = await prisma.user.findUnique({ where: { id: record.userId } });
+  if (!user) throw createError('Invalid or expired reset token', 400);
+  if (user.passwordHash && (await comparePassword(newPassword, user.passwordHash))) {
+    throw createError('password_unchanged', 400);
   }
 
   const passwordHash = await hashPassword(newPassword);

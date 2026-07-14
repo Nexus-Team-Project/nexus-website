@@ -4,7 +4,11 @@
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { MongoClient, Db } from 'mongodb';
-import { assertRateLimit } from '../../../src/services/auth/wallet-rate-limit';
+import {
+  assertRateLimit,
+  countRecentEvents,
+  recordEvent,
+} from '../../../src/services/auth/wallet-rate-limit';
 
 let client: MongoClient;
 let db: Db;
@@ -84,5 +88,34 @@ describe('assertRateLimit', () => {
         max: 1,
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe('countRecentEvents + recordEvent', () => {
+  it('counts only events inside the window for the exact (bucket, key)', async () => {
+    await recordEvent(db, { bucket: 'pwd_fail', key: 'a@b.com' });
+    await recordEvent(db, { bucket: 'pwd_fail', key: 'a@b.com' });
+    expect(
+      await countRecentEvents(db, { bucket: 'pwd_fail', key: 'a@b.com', windowSec: 900 }),
+    ).toBe(2);
+    expect(
+      await countRecentEvents(db, { bucket: 'pwd_fail', key: 'other@b.com', windowSec: 900 }),
+    ).toBe(0);
+    expect(
+      await countRecentEvents(db, { bucket: 'other_bucket', key: 'a@b.com', windowSec: 900 }),
+    ).toBe(0);
+  });
+
+  it('excludes events older than the window', async () => {
+    await recordEvent(db, { bucket: 'pwd_fail', key: 'a@b.com' });
+    await db
+      .collection('walletRateLimits')
+      .updateMany(
+        { bucket: 'pwd_fail', key: 'a@b.com' },
+        { $set: { createdAt: new Date(Date.now() - 1000 * 1000) } },
+      );
+    expect(
+      await countRecentEvents(db, { bucket: 'pwd_fail', key: 'a@b.com', windowSec: 900 }),
+    ).toBe(0);
   });
 });
