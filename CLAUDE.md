@@ -117,7 +117,7 @@ Identity has two layers:
 - `backend/src/utils/crypto.ts` — password/token hashing
 - `backend/scripts/delete-login-user.ts` — admin CLI: deletes user by email from Prisma + Mongo domain data. Dry-run by default; requires `--apply`. Use `npx tsx` directly on Windows.
 - `backend/scripts/delete-login-user/index.ts` — CLI arg parsing only; the actual cleanup logic (2026-07-14) lives in `backend/src/services/account-deletion/` (`prisma.ts`, `mongo.ts`, `targets.ts`, `types.ts`) so it can also be called from a route, not just the CLI.
-- `backend/src/routes/wallet-dev.routes.ts` — TEMPORARY: `POST /api/v1/wallet/dev/self-delete` lets the authenticated caller delete their OWN account (same cleanup as the CLI script). Hard-disabled (404) in production. Backs the nexusWallet dev-only "delete my account" button on the wallet header logo; remove both sides together once no longer needed.
+- `backend/src/routes/dev.routes.ts` — TEMPORARY: `POST /api/v1/dev/self-delete` lets the authenticated caller delete their OWN account + all their tenants/offers (same cleanup as the CLI script). Hard-disabled (404) in production. Backs the nexusWallet AND nexus-dashboard dev-only "delete my account" buttons (both in the profile/logout menu); remove all sides together once no longer needed.
 
 **Onboarding/tenant/member:**
 - `backend/src/routes/onboarding.routes.ts` — `/api/me`, `/api/onboarding/*`, `/api/business-setup`
