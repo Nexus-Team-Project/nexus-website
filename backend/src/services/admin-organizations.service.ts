@@ -21,6 +21,7 @@ import { syncDomainIdentityForMemberInvite } from './domain-identity.service';
 import { isPlatformAdminEmail } from '../utils/platform-admin';
 import { normalizeEmail } from '../config/platform-admins';
 import { sendOrgOwnerAssignedEmail, type EmailLanguage } from './org-owner-email.service';
+import { ensureBenefitsCatalogActivation } from './domain-service-activation.service';
 
 /** One row of the admin organizations list. */
 export interface AdminOrganizationRow {
@@ -118,6 +119,11 @@ export async function createAdminOrganization(input: {
       },
     },
   );
+
+  // Admin-created tenants ship with Benefits Catalog already ON (no teaser for
+  // the future owner). Manual mode = clean slate: no silent auto-adoption of
+  // ecosystem offers for a tenant the owner has not configured yet.
+  await ensureBenefitsCatalogActivation(tenantId, 'build_from_scratch');
 
   const doc = await tenantCollections.domainTenants.findOne({ tenantId });
   return toRow(doc as unknown as AdminOrgTenantDoc);

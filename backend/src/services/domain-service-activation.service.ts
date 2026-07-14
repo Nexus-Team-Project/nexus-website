@@ -170,6 +170,45 @@ export async function ensureBenefitsCatalogPolicy(
 }
 
 /**
+ * Marks Benefits Catalog active for a tenant + ensures its catalog policy.
+ * No permission check - callers own authorization (self-service activation
+ * gates via requireServiceActivationAccess; admin-created tenants are already
+ * platform-admin-gated at the route). Does NOT run the offer-restore sweep.
+ * Input: tenant id, starting mode, optional activating identity id.
+ * Output: none (writes the activation + policy docs).
+ */
+export async function ensureBenefitsCatalogActivation(
+  tenantId: string,
+  startingMode: BenefitsCatalogStartingMode,
+  activatedByIdentityId?: string,
+): Promise<void> {
+  const db = await getMongoDb();
+  const collections = getTenantDomainCollections(db);
+  const now = new Date();
+
+  await collections.tenantServiceActivations.updateOne(
+    { tenantId, serviceKey: 'benefits_catalog' },
+    {
+      $setOnInsert: {
+        tenantServiceActivationId: `tenant_service_activation_${tenantId}_benefits_catalog`,
+        tenantId,
+        serviceKey: 'benefits_catalog',
+        createdAt: now,
+      },
+      $set: {
+        status: 'active',
+        ...(activatedByIdentityId ? { activatedByIdentityId } : {}),
+        activatedAt: now,
+        updatedAt: now,
+      },
+    },
+    { upsert: true },
+  );
+
+  await ensureBenefitsCatalogPolicy(tenantId, startingMode);
+}
+
+/**
  * Activates Benefits Catalog for the authenticated tenant admin.
  * Input: Prisma user id and selected Benefits Catalog starting mode.
  * Output: public activation state without exposing internal Nexus pricing.
@@ -180,28 +219,10 @@ export async function activateBenefitsCatalogForUser(
 ): Promise<BenefitsCatalogActivationResponse> {
   const access = await requireServiceActivationAccess(userId);
   const db = await getMongoDb();
-  const collections = getTenantDomainCollections(db);
   const now = new Date();
   const defaults = BENEFITS_CATALOG_MODE_DEFAULTS[input.startingMode];
 
-  await collections.tenantServiceActivations.updateOne(
-    { tenantId: access.tenantId, serviceKey: 'benefits_catalog' },
-    {
-      $setOnInsert: {
-        tenantServiceActivationId: `tenant_service_activation_${access.tenantId}_benefits_catalog`,
-        tenantId: access.tenantId,
-        serviceKey: 'benefits_catalog',
-        createdAt: now,
-      },
-      $set: {
-        status: 'active',
-        activatedByIdentityId: access.nexusIdentityId,
-        activatedAt: now,
-        updatedAt: now,
-      },
-    },
-    { upsert: true },
-  );
+  await ensureBenefitsCatalogActivation(access.tenantId, input.startingMode, access.nexusIdentityId);
 
   // Restore inactive tenant-created offers when the service is re-activated.
   // NOTE: This also restores offers the admin may have manually deactivated before
@@ -222,8 +243,6 @@ export async function activateBenefitsCatalogForUser(
       },
     },
   );
-
-  await ensureBenefitsCatalogPolicy(access.tenantId, input.startingMode);
 
   return {
     tenantId: access.tenantObjectId.toHexString(),
