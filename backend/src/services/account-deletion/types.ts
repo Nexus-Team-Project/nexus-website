@@ -1,14 +1,8 @@
 /**
- * Purpose: Shared types for the full Nexus user cleanup script.
- *
- * These types keep the CLI, Prisma cleanup, and Mongo cleanup modules small.
+ * Purpose: Shared types for full-account deletion (Prisma login + Mongo domain
+ * data), used by both the CLI script and the wallet dev self-delete route.
  */
 import type { ObjectId } from 'mongodb';
-
-export type ScriptArgs = {
-  email: string;
-  apply: boolean;
-};
 
 export type PrismaUserSnapshot = {
   id: string;
