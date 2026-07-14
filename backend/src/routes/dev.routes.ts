@@ -1,15 +1,18 @@
 /**
- * TEMPORARY wallet dev-only routes. Not part of the product API surface.
+ * TEMPORARY dev-only routes. Not part of the product API surface.
  *
- *   POST /api/v1/wallet/dev/self-delete - permanently deletes the AUTHENTICATED
- *   caller's own login (Prisma) and all linked Mongo domain data - the same
- *   cleanup as `scripts/delete-login-user.ts --apply`, scoped to the caller's
- *   own email so nobody can delete another account through this route.
+ *   POST /api/v1/dev/self-delete - permanently deletes the AUTHENTICATED
+ *   caller's own login (Prisma) and all linked Mongo domain data (tenants,
+ *   offers, memberships, everything) - the same cleanup as
+ *   `scripts/delete-login-user.ts --apply`, scoped to the caller's own email
+ *   so nobody can delete another account through this route.
+ *
+ * Shared by the nexus-wallet + nexus-dashboard dev "delete my account" buttons.
  *
  * HARD-DISABLED in production (404 for everyone, no exceptions) - this exists
- * only so wallet developers can reset their own test account from the UI
- * while comparing the old and new wallet in local dev. Remove this route (and
- * the wallet button/dialog that calls it) once that comparison work is done.
+ * only so developers can reset their own test account from the wallet or
+ * dashboard UI while testing locally. Remove this route (and the wallet +
+ * dashboard buttons that call it) once that work is done.
  */
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/authenticate';
@@ -36,10 +39,10 @@ router.post('/self-delete', authenticate, async (req: Request, res: Response) =>
     });
     await deleteMongoUser(email, prismaUser);
     await deletePrismaLoginUser(prisma, email);
-    console.info(`[wallet-dev] POST /self-delete -> ok (deleted ${email})`);
+    console.info(`[dev] POST /self-delete -> ok (deleted ${email})`);
     res.json({ deleted: true });
   } catch (e) {
-    console.error('[wallet-dev] POST /self-delete -> 500', e);
+    console.error('[dev] POST /self-delete -> 500', e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
