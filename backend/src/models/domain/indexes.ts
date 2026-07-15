@@ -65,6 +65,17 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     // contacts is created sequentially below - partial indexes need the old
     // full-unique email index dropped first.)
     tenants.tenantContacts.createIndex({ tenantId: 1, createdAt: -1 }),
+    // GLOBAL (cross-tenant) reverse lookups for wallet contact-matches: find
+    // every tenant that listed an identifier. Partial (field-exists) so rows
+    // without that identifier cost nothing.
+    tenants.tenantContacts.createIndex(
+      { normalizedEmail: 1 },
+      { name: 'contact_email_global', partialFilterExpression: { normalizedEmail: { $exists: true } } },
+    ),
+    tenants.tenantContacts.createIndex(
+      { phone: 1 },
+      { name: 'contact_phone_global', partialFilterExpression: { phone: { $exists: true } } },
+    ),
     // Backs filtering by custom column values (customFields.<fieldId>). Wildcard
     // index so any dynamic custom-column path is covered without a fixed schema.
     tenants.tenantContacts.createIndex({ 'customFields.$**': 1 }, { name: 'customFields_wildcard' }),
