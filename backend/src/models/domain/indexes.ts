@@ -61,8 +61,9 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     tenants.memberGroups.createIndex({ tenantId: 1, name: 1 }, { unique: true }),
     tenants.memberGroupAssignments.createIndex({ memberGroupId: 1, tenantMemberId: 1 }, { unique: true }),
     tenants.tenantCatalogPolicies.createIndex({ tenantId: 1 }, { unique: true }),
-    // Unique contact per tenant per email; sorted list by creation time.
-    tenants.tenantContacts.createIndex({ tenantId: 1, normalizedEmail: 1 }, { unique: true }),
+    // Sorted contact list by creation time. (Email/phone uniqueness for
+    // contacts is created sequentially below - partial indexes need the old
+    // full-unique email index dropped first.)
     tenants.tenantContacts.createIndex({ tenantId: 1, createdAt: -1 }),
     // Backs filtering by custom column values (customFields.<fieldId>). Wildcard
     // index so any dynamic custom-column path is covered without a fixed schema.
@@ -84,6 +85,35 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
     orchestration.processedSteps.createIndex({ sagaInstanceId: 1, step: 1 }, { unique: true }),
     orchestration.consumedEvents.createIndex({ platformEventId: 1, consumerName: 1 }, { unique: true }),
   ]);
+
+  // Contact identity uniqueness (members-service-invite s.4): email is now
+  // optional, so email uniqueness applies only to docs that HAVE an email,
+  // and phone-only contacts get their own partial unique key. The old
+  // full-unique auto-named index must be dropped first - createIndex with
+  // different options on the same key pattern throws IndexOptionsConflict.
+  await tenants.tenantContacts.dropIndex('tenantId_1_normalizedEmail_1').catch(() => undefined);
+  await tenants.tenantContacts.createIndex(
+    { tenantId: 1, normalizedEmail: 1 },
+    {
+      name: 'uniq_tenant_email_partial',
+      unique: true,
+      partialFilterExpression: { normalizedEmail: { $exists: true } },
+    },
+  );
+  await tenants.tenantContacts
+    .createIndex(
+      { tenantId: 1, phone: 1 },
+      {
+        name: 'uniq_tenant_phone_partial',
+        unique: true,
+        partialFilterExpression: { phone: { $exists: true } },
+      },
+    )
+    .catch((error: unknown) => {
+      // Legacy data may hold duplicate phones inside one tenant; never block
+      // startup on that - log so the dupes can be cleaned and the index retried.
+      console.warn('uniq_tenant_phone_partial not created (duplicate phones in legacy data?)', error);
+    });
 
   const supply = getSupplyDomainCollections(db);
   await Promise.all([

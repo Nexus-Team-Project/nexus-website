@@ -254,8 +254,9 @@ export const tenantMemberInvitationSchema = z.object({
 export const tenantContactSchema = z.object({
   tenantContactId: z.string().min(1),
   tenantId: z.string().min(1),
-  email: z.string().email(),
-  normalizedEmail: z.string().email(),
+  // Optional since members-service-invite s.4: a contact needs email OR phone.
+  email: z.string().email().optional(),
+  normalizedEmail: z.string().email().optional(),
   displayName: z.string().min(1).max(255),
   status: z.enum(TENANT_CONTACT_STATUSES),
   address: z.string().max(500).optional(),
