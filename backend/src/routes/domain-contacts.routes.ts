@@ -20,6 +20,8 @@ import {
   updateTenantContact,
   importTenantContacts,
 } from '../services/domain-contacts.service';
+import { outreachEnqueueSchema, outreachPreviewSchema } from '../schemas/tenant-outreach.schemas';
+import { enqueueServiceOutreach, previewServiceOutreach } from '../services/tenant-outreach.service';
 
 const router = Router();
 
@@ -98,6 +100,46 @@ router.post(
       const input = importContactsSchema.parse(req.body);
       const result = await importTenantContacts(req.user!.sub, input.rows);
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/tenant/contacts/outreach/preview
+ * Server-computed targeting counts for the outreach confirm screen.
+ * ONE $facet aggregation; flat counts response. Requires team.invite_member.
+ */
+router.post(
+  '/outreach/preview',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const input = outreachPreviewSchema.parse(req.body);
+      res.json(await previewServiceOutreach(req.user!.sub, input));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/tenant/contacts/outreach
+ * Enqueues a service-outreach job (SMS/email blast with the tenant's short
+ * wallet link). Re-runs the preview targeting query with an _id cursor and
+ * hands delivery to the invite worker. Rate-limited; team.invite_member.
+ * Returns: 202 { jobId, totals: { willSend, skipped, alreadyInvitedIncluded } }
+ */
+router.post(
+  '/outreach',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const input = outreachEnqueueSchema.parse(req.body);
+      res.status(202).json(await enqueueServiceOutreach(req.user!.sub, input));
     } catch (error) {
       next(error);
     }

@@ -259,6 +259,49 @@ router.post(
 );
 
 /**
+ * GET /api/v1/tenant/jobs/:jobId
+ *
+ * Kind-agnostic alias of /members/invitations/jobs/:jobId - aggregate
+ * progress for ANY invite-queue job (member_invite or service_outreach).
+ * The dashboard outreach modal polls THIS path. Tenant scope enforced from
+ * the caller's membership.
+ */
+router.get(
+  '/jobs/:jobId',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = inviteJobIdParamsSchema.parse(req.params);
+      const access = await requireMemberManagementAccess(req.user!.sub);
+      res.json(await getInviteJobStatus(access.tenantId, jobId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/tenant/jobs/:jobId/retry-failed
+ *
+ * Kind-agnostic alias of /members/invitations/jobs/:jobId/retry-failed.
+ */
+router.post(
+  '/jobs/:jobId/retry-failed',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = inviteJobIdParamsSchema.parse(req.params);
+      const access = await requireMemberManagementAccess(req.user!.sub);
+      res.json(await retryFailedInviteJobItems(access.tenantId, jobId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
  * POST /api/v1/tenant/go-live
  *
  * Transitions the authenticated user's tenant catalog from sandbox mode to live.
