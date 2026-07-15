@@ -45,6 +45,7 @@ import {
   type ImageUploadFile,
 } from './supply-images.helper';
 import { computeDisplayPrice } from './supply-price.helper';
+import { resolveVoucherMaxPayments } from './supply-voucher.helper';
 import { isTenantAutoApprove } from './admin-tenants.service';
 import { getVoucherCodeCollection } from '../models/domain/voucher-codes.models';
 import { clampTenantVariantPricesToBounds, resetTenantPricesForChangedVariants } from './tenant-pricing.service';
@@ -88,6 +89,9 @@ export interface CreateOfferInput {
   voucherBackgroundColor?: string | null;
   /** Optional voucher SKU / internal company code. Voucher-only. */
   sku?: string | null;
+  /** Max credit-card payments for this voucher (offer-level). Voucher-only;
+   *  defaults to VOUCHER_PAYMENTS_DEFAULT when omitted. */
+  maxPayments?: number;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator (max 10, each max 50 chars). */
@@ -195,6 +199,8 @@ export interface UpdateOfferInput {
   voucherBackgroundColor?: string | null;
   /** Updated voucher SKU / internal company code. Voucher-only. */
   sku?: string | null;
+  /** Updated max credit-card payments (offer-level). Voucher-only. */
+  maxPayments?: number;
   /** Updated terms and conditions text. */
   terms?: string;
   /** Updated display tags. */
@@ -329,6 +335,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   const resolvedStackable = isVoucher ? (mirror.voucherStackable ?? null) : null;
   const resolvedBgColor = isVoucher ? (input.voucherBackgroundColor ?? null) : null;
   const resolvedSku = isVoucher ? (mirror.sku ?? null) : null;
+  const resolvedMaxPayments = resolveVoucherMaxPayments(isVoucher, input.maxPayments);
   const resolvedRedemptionScope = isVoucher ? (input.redemptionScope ?? 'shared') : 'shared';
   const resolvedDefaultValidityType = isVoucher ? (input.defaultValidityType ?? null) : null;
 
@@ -383,6 +390,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     voucherStackable: resolvedStackable,
     voucherBackgroundColor: resolvedBgColor,
     sku: resolvedSku,
+    maxPayments: resolvedMaxPayments,
     terms: input.terms ?? '',
     tags: resolvedTags,
     redemptionScope: resolvedRedemptionScope,
@@ -561,6 +569,7 @@ export async function updateOffer(
         ...(input.voucherStackable !== undefined && { voucherStackable: input.voucherStackable }),
         ...(input.voucherBackgroundColor !== undefined && { voucherBackgroundColor: input.voucherBackgroundColor }),
         ...(input.sku !== undefined && { sku: input.sku }),
+        ...(input.maxPayments !== undefined && { maxPayments: resolveVoucherMaxPayments(true, input.maxPayments) }),
       }
     : {
         ...(input.validFrom !== undefined && { validFrom: input.validFrom }),
@@ -571,6 +580,7 @@ export async function updateOffer(
         voucherStackable: null,
         voucherBackgroundColor: null,
         sku: null,
+        maxPayments: null,
       };
   const mergedMemberPrice =
     input.member_price !== undefined ? input.member_price : currentOffer.member_price;

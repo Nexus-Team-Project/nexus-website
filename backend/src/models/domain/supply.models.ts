@@ -148,6 +148,16 @@ export const SKU_REGEX = /^[A-Z0-9_-]+$/;
  */
 export const OFFER_IMAGES_MAX = 6;
 
+/**
+ * Bounds + default for a voucher's `maxPayments` (how many credit-card payments
+ * a member may split the voucher purchase into). Voucher-only. Single source of
+ * truth for the route Zod schemas, service defaulting, and the backfill script.
+ * Keep in sync with the mirrored constants in the dashboard `src/lib/api.ts`.
+ */
+export const VOUCHER_PAYMENTS_MIN = 1;
+export const VOUCHER_PAYMENTS_MAX = 6;
+export const VOUCHER_PAYMENTS_DEFAULT = 1;
+
 export type OfferStatus = typeof OFFER_STATUSES[number];
 export type OfferCategory = typeof OFFER_CATEGORIES[number];
 export type OfferAdoptionStatus = typeof OFFER_ADOPTION_STATUSES[number];
@@ -374,6 +384,15 @@ export const nexusOfferSchema = z.object({
    * types. Uppercase alphanumeric + hyphen + underscore, length 4-20.
    */
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
+  /**
+   * Maximum number of credit-card payments (installments) a member may split
+   * this voucher purchase into. Offer-level (applies to ALL variants).
+   * Voucher-only; null for other types. Mandatory for vouchers by enforcement:
+   * create/update always write a value (default VOUCHER_PAYMENTS_DEFAULT) and
+   * reads fall back to it, so a missing field (pre-backfill doc) reads as 1.
+   * Payment enforcement itself is future nexusWallet work.
+   */
+  maxPayments: z.number().int().min(VOUCHER_PAYMENTS_MIN).max(VOUCHER_PAYMENTS_MAX).nullable().optional(),
   /** Terms and conditions text. */
   terms: z.string().max(2000).optional().default(''),
   /** Display tags set by the offer creator (max 10, each max 50 chars). */
