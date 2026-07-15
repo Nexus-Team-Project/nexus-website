@@ -9,6 +9,7 @@ import { createError } from '../middleware/errorHandler';
 import {
   getIdentityDomainCollections,
   getTenantDomainCollections,
+  SERVICE_KEYS,
   type TenantUserRoleName,
 } from '../models/domain';
 import type { InviteTenantMemberInput } from '../schemas/domain-member.schemas';
@@ -249,17 +250,14 @@ export async function inviteTenantMemberByEmail(
     }
   }
 
-  // Seat-limit check: only needed when the invite includes at least one non-member role
-  // AND the identity doesn't already occupy a non-member seat for this tenant.
-  const inviteHasNonMemberRole = input.roles.some((r) => r !== 'member');
-  if (inviteHasNonMemberRole) {
-    const alreadySeated = await identityAlreadyHoldsNonMemberSeat(
-      access.tenantId,
-      invitedIdentity.nexusIdentityId,
-    );
-    if (!alreadySeated) {
-      await assertSeatAvailable(access.tenantId, 1);
-    }
+  // Every invite is privileged now (member invites were removed 2026-07-15),
+  // so the seat check always applies when the identity is not already seated.
+  const alreadySeated = await identityAlreadyHoldsNonMemberSeat(
+    access.tenantId,
+    invitedIdentity.nexusIdentityId,
+  );
+  if (!alreadySeated) {
+    await assertSeatAvailable(access.tenantId, 1);
   }
 
   const tenantMemberId = `tenant_member_${randomUUID()}`;
@@ -271,8 +269,8 @@ export async function inviteTenantMemberByEmail(
     employeeId: input.employeeId,
     requireAdminApproval: false,
     customFields: input.customFields,
-    // Copy service grants from the invite input so members only access features they were invited with.
-    services: input.services ?? ['benefits_catalog'],
+    // Privileged staff get every service surface (decision 7, 2026-07-15).
+    services: [...SERVICE_KEYS],
     // Carry the canonical phone (already normalized by the schema) onto the
     // member doc so it is present immediately, including on accept.
     ...(invitePhone !== undefined && { phone: invitePhone }),
@@ -340,7 +338,8 @@ export async function inviteTenantMemberByEmail(
     groupIds,
     // Persist the service grants so the invitation record is self-contained and
     // the accept flow can read them without re-reading the member document.
-    services: input.services ?? ['benefits_catalog'],
+    // Privileged invites always carry all service surfaces (decision 7).
+    services: [...SERVICE_KEYS],
     // Persist the phone on the invitation as well, so the accept flow can
     // re-apply it if a future migration ever rebuilds the member from it.
     ...(invitePhone !== undefined && { phone: invitePhone }),
@@ -381,7 +380,7 @@ export async function inviteTenantMemberByEmail(
     displayName: input.displayName,
     tenantName: tenant?.organizationName ?? 'Nexus',
     roles: uniqueRoles,
-    services: input.services,
+    services: [...SERVICE_KEYS],
     token: rawToken,
     expiresAt,
     language: input.language,
@@ -420,15 +419,11 @@ export async function bulkInviteTenantMembersByEmail(
   managerUserId: string,
   invitations: InviteTenantMemberInput[],
 ): Promise<{ results: BulkInviteTenantMemberResult[] }> {
-  // Up-front seat check: count rows that ask for at least one non-member role.
-  // Each unique email that isn't already a non-member on the tenant needs a seat.
-  // We approximate by counting distinct non-member-role rows (emails are unique per invite).
+  // Up-front seat check: every invite is privileged now (member invites were
+  // removed 2026-07-15), so each row needs a seat (emails are unique per invite).
   const access = await requireMemberManagementAccess(managerUserId);
-  const newNonMemberRows = invitations.filter((inv) =>
-    inv.roles.some((r) => r !== 'member'),
-  ).length;
-  if (newNonMemberRows > 0) {
-    await assertSeatAvailable(access.tenantId, newNonMemberRows);
+  if (invitations.length > 0) {
+    await assertSeatAvailable(access.tenantId, invitations.length);
   }
 
   const results: BulkInviteTenantMemberResult[] = [];

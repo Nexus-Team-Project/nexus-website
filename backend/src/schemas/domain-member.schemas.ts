@@ -34,18 +34,19 @@ const inviteIsraeliPhoneSchema = z
 export const inviteTenantMemberSchema = z.object({
   email: z.string().email().transform((value) => value.trim().toLowerCase()),
   displayName: z.string().trim().min(1).max(255).optional(),
+  /**
+   * Privileged staff roles only. 'member' was removed (2026-07-15): regular
+   * members join exclusively through the wallet join-request flow. A stale
+   * client sending 'member' gets a 400; a stale client sending 'services'
+   * has it stripped (z.object drops unknown keys) - never trusted. The
+   * backend stamps ALL SERVICE_KEYS on privileged invites.
+   */
   roles: z.array(
-    z.enum(['admin', 'finance', 'operator', 'analyst', 'developer', 'supply_manager', 'member'])
-  ).min(1).default(['member']),
+    z.enum(['admin', 'finance', 'operator', 'analyst', 'developer', 'supply_manager'])
+  ).min(1),
   groupIds: z.array(z.string().min(1)).default([]),
   employeeId: z.string().trim().min(1).max(100).optional(),
   customFields: z.record(z.unknown()).default({}),
-  /**
-   * Services granted to this member at invite time.
-   * Controls which product features the member can access after accepting.
-   * Defaults to benefits_catalog so existing callers that omit this field keep catalog access.
-   */
-  services: z.array(z.string()).default(['benefits_catalog']),
   // Optional Israeli mobile to carry from invite to the new tenant member.
   phone: inviteIsraeliPhoneSchema,
   language: inviteLanguageSchema,
@@ -65,7 +66,8 @@ export const bulkInviteTenantMembersAsyncSchema = z.object({
 });
 
 export const inviteJobIdParamsSchema = z.object({
-  jobId: z.string().trim().min(1).max(150).regex(/^member_invite_job_[A-Za-z0-9-]+$/),
+  // Accepts both queue kinds: bulk member invites and service outreach.
+  jobId: z.string().trim().min(1).max(150).regex(/^(member_invite_job|service_outreach_job)_[A-Za-z0-9-]+$/),
 });
 
 export const inviteTokenParamsSchema = z.object({
