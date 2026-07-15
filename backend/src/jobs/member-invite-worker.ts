@@ -6,9 +6,9 @@
  */
 import { getMongoDb } from '../config/mongo';
 import { env } from '../config/env';
-import { getTenantDomainCollections } from '../models/domain';
+import { getTenantDomainCollections, type TenantUserRoleName } from '../models/domain';
 import {
-  buildMemberInviteLoginUrl,
+  buildMemberInviteUrl,
   sendTenantMemberInviteEmail,
 } from '../services/domain-member-invite-email.service';
 import {
@@ -68,7 +68,12 @@ async function processOneItem(bucket: TokenBucket): Promise<boolean> {
     if (!item.rawToken) throw new Error('missing_raw_token');
     await bucket.take();
 
-    const inviteUrl = buildMemberInviteLoginUrl(item.rawToken, item.language);
+    const inviteUrl = buildMemberInviteUrl({
+      token: item.rawToken,
+      tenantId: item.tenantId,
+      roles: item.roles as TenantUserRoleName[],
+      language: item.language,
+    });
     const messageId = await sendTenantMemberInviteEmail({
       to: item.email,
       displayName: item.displayName,

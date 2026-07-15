@@ -51,7 +51,7 @@ Frontends must not connect directly to MongoDB. Dashboard context comes through 
 4. Browser redirects to dashboard: `/auth/callback?code=...&redirect=...&lang=...`.
 5. Dashboard calls `/api/auth/code-exchange`, stores access token **in memory only**, relies on refresh cookie for session restore.
 6. Dashboard calls `/api/me` → MongoDB-derived context → decides: onboarding / member mode / tenant dashboard.
-7. Invite links: email opens website login with `dashboardRedirect=/member-invite/accept?token=...`; after auth, SSO redirects to dashboard accept.
+7. Invite links: a PRIVILEGED-role invite (any role other than a plain `['member']`) opens website login with `dashboardRedirect=/member-invite/accept?token=...`; after auth, SSO redirects to dashboard accept. A REGULAR member invite (roles === `['member']`, 2026-07-15) instead links straight into the wallet (`WALLET_URL/<lang>?tenant=<tenantId>`, no token) - the wallet auto-accepts any pending invite for the signed-in email on login/signup via `reconcilePendingInvitations`, so no dashboard/accept step is needed. `domain-member-invite-email.service.ts`'s `buildMemberInviteUrl` picks between the two by role.
 8. New registrations via invite: website stores `dashboardRedirect` through signup + email verification, creates SSO code after verification. **Do not redirect verified invite signups to `/workspace`.**
 9. Google OAuth must preserve `dashboardRedirect` through `google_oauth_redirect` and `/api/auth/google`.
 10. Email/password invite signup stores `dashboardRedirect` in server-side `PendingRegistration.dashboardRedirect` (not just sessionStorage — must survive different browser/device).
