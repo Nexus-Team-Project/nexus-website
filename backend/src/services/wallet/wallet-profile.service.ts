@@ -85,11 +85,20 @@ export async function patchWalletProfile(
   if (args.patch.inviteFriendsSent !== undefined) set['profile.inviteFriendsSent'] = args.patch.inviteFriendsSent;
   if (args.patch.complete === true) set['profile.completedAt'] = now;
 
-  // One read of the current name + onboarding-started stamp, reused below.
+  // One read of the current name + onboarding-started stamp + phone, reused below.
   const existing = await nexusIdentities.findOne(
     { normalizedEmail: normalize(args.email) },
-    { projection: { 'profile.firstName': 1, 'profile.lastName': 1, 'profile.onboardingStartedAt': 1 } },
+    { projection: { phone: 1, 'profile.firstName': 1, 'profile.lastName': 1, 'profile.onboardingStartedAt': 1 } },
   );
+
+  // Phone is a MANDATORY onboarding step: refuse to complete onboarding (stamp
+  // completedAt) without a verified phone on file. The wallet UI also guards
+  // this, but the server is the real authority - a phoneless completion flush
+  // (e.g. a crafted request) must never mark onboarding done. `phone` is only
+  // ever written by the OTP-verified wallet-phone attach flow.
+  if (args.patch.complete === true && !existing?.phone) {
+    throw new Error('phone_required');
+  }
 
   // Members tab reads the top-level NexusIdentity.displayName, not profile.firstName/lastName.
   // Keep it converged with the wallet name on EVERY save (not only on name-carrying patches):
