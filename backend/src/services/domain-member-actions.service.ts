@@ -11,6 +11,7 @@ import { createError } from '../middleware/errorHandler';
 import {
   getIdentityDomainCollections,
   getTenantDomainCollections,
+  SERVICE_KEYS,
   type TenantUserRoleName,
 } from '../models/domain';
 import { syncDomainIdentityForMemberInvite } from './domain-identity.service';
@@ -122,10 +123,21 @@ export async function updateTenantMemberRoles(
     );
   }
 
-  // Sync roles on any still-pending invitation so the email/acceptance record stays consistent.
+  // Decision 7 (2026-07-15): TenantMember.services is a privileged-staff
+  // concept. Any non-member role grants ALL service surfaces; a plain
+  // ['member'] set clears them (regular members gate on membership +
+  // tenant catalog activation instead).
+  const services = uniqueRoles.some((r) => r !== 'member') ? [...SERVICE_KEYS] : [];
+  await tenantCollections.tenantMembers.updateOne(
+    { tenantMemberId, tenantId: access.tenantId },
+    { $set: { services, updatedAt: now } },
+  );
+
+  // Sync roles + services on any still-pending invitation so the
+  // email/acceptance record stays consistent.
   await tenantCollections.tenantMemberInvitations.updateOne(
     { tenantMemberId, tenantId: access.tenantId, status: 'pending' },
-    { $set: { roles: uniqueRoles, updatedAt: now } },
+    { $set: { roles: uniqueRoles, services, updatedAt: now } },
   );
 
   return { roles: uniqueRoles };
