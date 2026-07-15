@@ -32,6 +32,8 @@ export interface TenantContactListItem {
   phoneVerified: boolean;
   /** Custom-column values keyed by fieldId; empty when none set. */
   customFields: Record<string, unknown>;
+  /** Per-service outreach stamps ({} when never invited): lastSentAt ISO + delivered channels. */
+  serviceInvites: Record<string, { lastSentAt: string; channels: string[] }>;
   lastActivityAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +80,12 @@ function toListItem(doc: TenantContactDocument): TenantContactListItem {
     phone: doc.phone ?? null,
     phoneVerified: doc.phoneVerified ?? false,
     customFields: (doc.customFields as Record<string, unknown>) ?? {},
+    serviceInvites: Object.fromEntries(
+      Object.entries(doc.serviceInvites ?? {}).map(([key, stamp]) => [
+        key,
+        { lastSentAt: stamp.lastSentAt.toISOString(), channels: stamp.channels },
+      ]),
+    ),
     lastActivityAt: doc.lastActivityAt ? doc.lastActivityAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),

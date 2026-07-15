@@ -266,6 +266,13 @@ export const tenantContactSchema = z.object({
   // True only when the member verified this number themselves (SMS / wallet OTP).
   // Tenant-entered or test-attached numbers are false.
   phoneVerified: z.boolean().optional(),
+  // Per-service outreach stamp, written by the outreach worker after at least
+  // one channel was delivered. Keyed by TenantServiceKey. Used to exclude
+  // already-invited contacts from the next outreach run and to render an
+  // "invited" badge in the dashboard Contacts tab.
+  serviceInvites: z
+    .record(z.object({ lastSentAt: z.date(), channels: z.array(z.enum(['sms', 'email'])) }))
+    .optional(),
   lastActivityAt: z.date().optional(),
   nexusIdentityId: z.string().optional(),
   // User-defined custom column values, keyed by the server-generated fieldId

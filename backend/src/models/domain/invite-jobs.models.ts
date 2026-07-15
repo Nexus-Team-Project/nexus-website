@@ -7,12 +7,21 @@
  * without a separate queue service.
  */
 import type { Collection, Db } from 'mongodb';
+import type { TenantServiceKey } from './tenant.models';
 
 /** Aggregate status for a member invite job. */
 export type MemberInviteJobStatus = 'queued' | 'processing' | 'completed';
 
 /** Lifecycle status for an individual invite item processed by the worker. */
 export type MemberInviteJobItemStatus = 'queued' | 'processing' | 'sent' | 'failed';
+
+/** Discriminates the two work kinds sharing the invite job queue.
+ *  Absent on a document = 'member_invite' (pre-outreach back-compat). */
+export type InviteJobKind = 'member_invite' | 'service_outreach';
+
+/** Channels a service-outreach run may use. */
+export const OUTREACH_CHANNELS = ['sms', 'email', 'both'] as const;
+export type OutreachChannel = typeof OUTREACH_CHANNELS[number];
 
 /**
  * One job per chunk submitted to the bulk-async invite route.
@@ -23,6 +32,10 @@ export interface MemberInviteJob {
   jobId: string;
   tenantId: string;
   actorIdentityId: string;
+  /** Absent = member_invite (back-compat with pre-outreach documents). */
+  kind?: InviteJobKind;
+  /** Set only on service_outreach jobs: the invited-to service. */
+  serviceKey?: TenantServiceKey;
   totalCount: number;
   sentCount: number;
   failedCount: number;
@@ -43,6 +56,8 @@ export interface MemberInviteJobItem {
   jobItemId: string;
   jobId: string;
   tenantId: string;
+  /** Absent = member_invite (back-compat with pre-outreach documents). */
+  kind?: 'member_invite';
   invitationId: string;
   email: string;
   language: 'he' | 'en';
@@ -62,10 +77,44 @@ export interface MemberInviteJobItem {
   updatedAt: Date;
 }
 
+/**
+ * One item per contact in a service-outreach blast. Carries only what the
+ * worker needs to send: identifiers for the chosen channel, the tenant's
+ * display name for the message text, and the target service key.
+ */
+export interface ServiceOutreachJobItem {
+  jobItemId: string;
+  jobId: string;
+  tenantId: string;
+  kind: 'service_outreach';
+  serviceKey: TenantServiceKey;
+  tenantName: string;
+  contactId: string;
+  phone?: string;
+  email?: string;
+  channel: OutreachChannel;
+  language: 'he' | 'en';
+  /** Channels actually delivered on the last attempt (per-channel outcome). */
+  sentChannels?: ('sms' | 'email')[];
+  /** Per-channel provider error from the last attempt, when a channel failed. */
+  channelErrors?: { sms?: string; email?: string };
+  status: MemberInviteJobItemStatus;
+  attempts: number;
+  nextAttemptAt: Date;
+  lastError?: string;
+  claimedAt?: Date;
+  sentAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/** Union stored in the memberInviteJobItems collection, discriminated by kind. */
+export type InviteJobItem = MemberInviteJobItem | ServiceOutreachJobItem;
+
 /** Mongo collection accessors for invite jobs and items. */
 export interface InviteJobCollections {
   memberInviteJobs: Collection<MemberInviteJob>;
-  memberInviteJobItems: Collection<MemberInviteJobItem>;
+  memberInviteJobItems: Collection<InviteJobItem>;
 }
 
 /**
@@ -76,7 +125,7 @@ export interface InviteJobCollections {
 export function getInviteJobCollections(db: Db): InviteJobCollections {
   return {
     memberInviteJobs: db.collection<MemberInviteJob>('memberInviteJobs'),
-    memberInviteJobItems: db.collection<MemberInviteJobItem>('memberInviteJobItems'),
+    memberInviteJobItems: db.collection<InviteJobItem>('memberInviteJobItems'),
   };
 }
 
