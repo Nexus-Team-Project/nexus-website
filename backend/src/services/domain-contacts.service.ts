@@ -157,11 +157,16 @@ export async function createTenantContact(
   const now = new Date();
 
   // Validate custom-column values against the tenant's definitions (strict:
-  // an invalid value is a 400 so the admin gets feedback).
+  // an invalid value is a 400 so the admin gets feedback). Wallet-mirror
+  // columns are member-owned (wallet onboarding / profile update only) - a
+  // payload trying to set one is rejected outright.
   let customSet: Record<string, unknown> = {};
   if (data.customFields) {
     const defs = await fetchContactFieldDefs(db, access.tenantId);
     const plan = planCustomWrites(defs, data.customFields);
+    if (plan.readOnly.length) {
+      throw createError(`Read-only wallet fields: ${plan.readOnly.join(', ')}`, 400);
+    }
     if (plan.invalid.length) throw createError(`Invalid value for: ${plan.invalid.join(', ')}`, 400);
     customSet = plan.set;
   }
@@ -232,6 +237,11 @@ export async function updateTenantContact(
   if (rawCustom) {
     const defs = await fetchContactFieldDefs(db, access.tenantId);
     const plan = planCustomWrites(defs, rawCustom);
+    // Wallet-mirror columns are member-owned (wallet onboarding / profile
+    // update only) - a tenant edit trying to set one is rejected outright.
+    if (plan.readOnly.length) {
+      throw createError(`Read-only wallet fields: ${plan.readOnly.join(', ')}`, 400);
+    }
     if (plan.invalid.length) throw createError(`Invalid value for: ${plan.invalid.join(', ')}`, 400);
     Object.assign(customSet, plan.set);
     for (const key of plan.clearKeys) customUnset[`customFields.${key}`] = '';
