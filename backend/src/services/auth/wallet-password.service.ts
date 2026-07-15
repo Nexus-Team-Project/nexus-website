@@ -1,11 +1,13 @@
 /**
- * Wallet email+password auth orchestration: single-flow login/auto-signup with
- * MANDATORY email 2FA on every login (no trusted-device skip, by design), and
- * the code-based forgot-password flow (which also SETS a first password for
- * passwordless wallet/Google accounts). Reuses the loginOtpChallenges
- * machinery via purpose-tagged challenges. Enumeration posture: unknown-email
- * forgot returns a decoy token; login's invalid_credentials never says whether
- * the account exists or merely has no password. Passwords/codes never logged.
+ * Wallet email+password auth orchestration: SEPARATE login vs register intents
+ * (a login typo never creates an account) with MANDATORY email 2FA on every
+ * login (no trusted-device skip, by design), and the code-based forgot-password
+ * flow (which also SETS a first password for passwordless wallet/Google
+ * accounts). Reuses the loginOtpChallenges machinery via purpose-tagged
+ * challenges. Enumeration posture: unknown-email forgot returns a decoy token,
+ * and login's invalid_credentials never says whether the account exists or
+ * merely has no password; register does reveal existence via account_exists,
+ * which is inherent to any register form. Passwords/codes never logged.
  * Spec: docs/superpowers/specs/2026-07-14-wallet-email-password-auth-design.md
  */
 import { Db } from 'mongodb';
@@ -29,19 +31,34 @@ const MAX_FAILED_ATTEMPTS = 5;
 const normalize = (e: string): string => e.trim().toLowerCase();
 
 /**
- * Email+password entry point (single flow). Existing account + matching
- * password -> wallet_login 2FA challenge (code emailed). Wrong password or a
- * passwordless account -> invalid_credentials (failure recorded toward
- * lockout). Unknown email -> auto-signup: wallet_signup challenge stashing
- * bcrypt(password); the 2FA code doubles as email verification.
+ * Email+password entry point. The caller states an explicit intent so login and
+ * registration are separate actions (a login typo must never create an account):
+ *
+ * - intent 'login' (default): existing account + matching password -> wallet_login
+ *   2FA challenge (code emailed). Wrong password, a passwordless account, OR an
+ *   unknown email -> invalid_credentials. NOTHING is ever created here. The
+ *   unknown-email case is NOT counted toward the lockout (no account to protect,
+ *   and it would let anyone lock an email they do not own); a wrong password on a
+ *   real account still counts.
+ * - intent 'signup': unknown email -> wallet_signup challenge stashing
+ *   bcrypt(password) (the 2FA code doubles as email verification). An email that
+ *   already exists -> account_exists (the UI sends the user to sign in instead).
+ *
  * Output: the challenge token the client holds for verify/resend.
- * @throws account_locked | invalid_credentials | weak_password | rate_limited:*
+ * @throws account_locked | invalid_credentials | account_exists | weak_password | rate_limited:*
  */
 export async function startPasswordLogin(
   db: Db,
-  args: { email: string; password: string; ip: string | null; lang: 'he' | 'en' },
+  args: {
+    email: string;
+    password: string;
+    ip: string | null;
+    lang: 'he' | 'en';
+    intent?: 'login' | 'signup';
+  },
 ): Promise<StartLoginOtpResult> {
   const email = normalize(args.email);
+  const intent = args.intent ?? 'login';
   const failures = await countRecentEvents(db, {
     bucket: FAIL_BUCKET,
     key: email,
@@ -52,9 +69,12 @@ export async function startPasswordLogin(
   if (failures >= MAX_FAILED_ATTEMPTS) throw new Error('account_locked');
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) {
-    // Auto-signup path. Policy gates the NEW password here; the hash waits on
-    // the challenge until the email is verified.
+
+  if (intent === 'signup') {
+    // Register: refuse an email that already has an account (the client offers
+    // "sign in instead"); otherwise stash the policy-checked new password on a
+    // signup challenge until the 2FA code verifies the mailbox.
+    if (user) throw new Error('account_exists');
     if (!isPasswordPolicyCompliant(args.password)) throw new Error('weak_password');
     const pendingPasswordHash = await hashPassword(args.password);
     return startLoginOtpChallenge(db, {
@@ -67,6 +87,10 @@ export async function startPasswordLogin(
     });
   }
 
+  // Login: an unknown email is a generic invalid_credentials (no account made,
+  // not counted toward lockout). A real account with the wrong/no password is
+  // the same generic error, but does count.
+  if (!user) throw new Error('invalid_credentials');
   const ok = user.passwordHash ? await comparePassword(args.password, user.passwordHash) : false;
   if (!ok) {
     await recordEvent(db, { bucket: FAIL_BUCKET, key: email });
