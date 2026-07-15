@@ -23,6 +23,7 @@ import walletProfileRoutes from './wallet-profile.routes';
 import walletTenantsRoutes, { tenantJoinAdminRouter } from './wallet-tenants.routes';
 import walletPhoneRoutes from './wallet-phone.routes';
 import walletContactMatchRoutes from './wallet-contact-match.routes';
+import walletEmailRoutes from './wallet-email.routes';
 import devRoutes from './dev.routes';
 import tenantLogoRoutes from './tenant-logo.routes';
 import blogRoutes from './blog.routes';
@@ -59,6 +60,7 @@ router.use('/wallet', walletProfileRoutes);
 router.use('/wallet', walletTenantsRoutes);
 router.use('/wallet', walletPhoneRoutes);
 router.use('/wallet', walletContactMatchRoutes);
+router.use('/wallet', walletEmailRoutes);
 // TEMPORARY dev-only account self-delete (dashboard + wallet reset tool).
 // 404s in production (see dev.routes.ts).
 router.use('/dev', devRoutes);
