@@ -452,11 +452,16 @@ export async function removeTenantContact(
   if (!contact) throw createError('Contact not found', 404);
 
   // Resolve NexusIdentity by normalizedEmail, then find the TenantMember.
+  // Phone-only contacts (email-or-phone rule, spec s.4) have no email and can
+  // never be linked members - skip the lookup entirely (an undefined filter
+  // value would serialize to null and could mismatch).
   const identityCollections2 = getIdentityDomainCollections(db);
-  const linkedIdentity = await identityCollections2.nexusIdentities.findOne(
-    { normalizedEmail: contact.normalizedEmail },
-    { projection: { nexusIdentityId: 1 } },
-  );
+  const linkedIdentity = contact.normalizedEmail
+    ? await identityCollections2.nexusIdentities.findOne(
+        { normalizedEmail: contact.normalizedEmail },
+        { projection: { nexusIdentityId: 1 } },
+      )
+    : null;
   const linkedMember = linkedIdentity
     ? await tenantCollections.tenantMembers.findOne({
         tenantId: access.tenantId,
@@ -520,12 +525,15 @@ export async function updateTenantContactEmail(
     return;
   }
 
-  // Pending or expired: resolve identity → member, then delegate.
+  // Pending or expired: resolve identity -> member, then delegate.
+  // Phone-only contacts carry no email; the null identity falls through to 404.
   const identityCollections3 = getIdentityDomainCollections(db);
-  const linkedIdentity3 = await identityCollections3.nexusIdentities.findOne(
-    { normalizedEmail: contact.normalizedEmail },
-    { projection: { nexusIdentityId: 1 } },
-  );
+  const linkedIdentity3 = contact.normalizedEmail
+    ? await identityCollections3.nexusIdentities.findOne(
+        { normalizedEmail: contact.normalizedEmail },
+        { projection: { nexusIdentityId: 1 } },
+      )
+    : null;
   const linkedMember = linkedIdentity3
     ? await tenantCollections.tenantMembers.findOne({
         tenantId: access.tenantId,
