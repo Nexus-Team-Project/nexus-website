@@ -39,7 +39,7 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, VOUCHER_PAYMENTS_MIN, VOUCHER_PAYMENTS_MAX, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
 import { addBarcodes, addLinks, getInventorySummary, getOfferVariantInventoryCounts, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
@@ -282,6 +282,12 @@ const createOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // optional for pre-variant clients). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
+  // Voucher-only: max credit-card payments for this voucher (offer-level, all
+  // variants). Empty string from multipart = not provided (service defaults to 1).
+  maxPayments: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : v),
+    z.coerce.number().int().min(VOUCHER_PAYMENTS_MIN).max(VOUCHER_PAYMENTS_MAX).optional(),
+  ),
   terms: z.string().max(6000).optional(),
   // JSON-encoded array string from multipart form.
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -350,6 +356,12 @@ const updateOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // replaces the array wholesale when sent). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
+  // Voucher-only: max credit-card payments for this voucher (offer-level, all
+  // variants). Empty string from multipart = not provided (leave unchanged).
+  maxPayments: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : v),
+    z.coerce.number().int().min(VOUCHER_PAYMENTS_MIN).max(VOUCHER_PAYMENTS_MAX).optional(),
+  ),
   terms: z.string().max(6000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(

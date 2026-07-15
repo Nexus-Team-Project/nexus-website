@@ -23,6 +23,7 @@ import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
   NOT_DELETED,
+  VOUCHER_PAYMENTS_DEFAULT,
   type NexusOffer,
   type TenantOfferConfig,
   type ImageCropEntry,
@@ -170,6 +171,9 @@ export interface CatalogItem {
   defaultValidityType?: 'limit' | 'from_until' | null;
   /** Whether the voucher may be combined with other promotions. Voucher-only; null otherwise. */
   voucherStackable?: boolean | null;
+  /** Max credit-card payments for this voucher (offer-level, all variants).
+   *  Voucher-only; missing pre-backfill docs read as the default (1). Null otherwise. */
+  maxPayments?: number | null;
   /** Voucher card background color ("#rrggbb"). Voucher-only; null otherwise. */
   voucherBackgroundColor?: string | null;
   /** Voucher SKU / internal company code. Voucher-only; null otherwise. */
@@ -298,6 +302,9 @@ function toItem(
     validUntil: offer.validUntil ?? null,
     defaultValidityType: offer.defaultValidityType ?? null,
     voucherStackable: offer.voucherStackable ?? null,
+    maxPayments: (offer.executionType ?? 'voucher') === 'voucher'
+      ? (offer.maxPayments ?? VOUCHER_PAYMENTS_DEFAULT)
+      : null,
     voucherBackgroundColor: offer.voucherBackgroundColor ?? null,
     sku: offer.sku ?? null,
     terms: offer.terms ?? '',

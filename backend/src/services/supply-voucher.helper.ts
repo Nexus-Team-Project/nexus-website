@@ -11,9 +11,28 @@
  * and to give the security-relevant validation a pure, testable surface.
  */
 import {
+  VOUCHER_PAYMENTS_DEFAULT,
+  VOUCHER_PAYMENTS_MAX,
+  VOUCHER_PAYMENTS_MIN,
   VOUCHER_VALIDITY_MAX,
   type OfferVoucherValidityUnit,
 } from '../models/domain/supply.models';
+
+/**
+ * Resolves the stored `maxPayments` value for a create/update write.
+ * Voucher: the provided value clamped into [VOUCHER_PAYMENTS_MIN, VOUCHER_PAYMENTS_MAX]
+ * (Zod already bounds route input; the clamp guards non-route callers such as
+ * the backfill), defaulting to VOUCHER_PAYMENTS_DEFAULT when absent.
+ * Non-voucher: always null - the field never carries a value on other types.
+ */
+export function resolveVoucherMaxPayments(
+  isVoucher: boolean,
+  value: number | undefined,
+): number | null {
+  if (!isVoucher) return null;
+  const v = value ?? VOUCHER_PAYMENTS_DEFAULT;
+  return Math.min(Math.max(Math.round(v), VOUCHER_PAYMENTS_MIN), VOUCHER_PAYMENTS_MAX);
+}
 
 /** Result of a voucher validity check. */
 export type VoucherValidityResult =
