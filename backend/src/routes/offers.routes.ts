@@ -59,7 +59,7 @@ import {
 import { getIdentityDomainCollections } from '../models/domain/identity.models';
 import { getOnboardingStatus } from '../services/onboarding.service';
 import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
-import { canTenantCreateOffer, canTenantAdoptOffer } from '../services/business-setup-approval.helper';
+import { canTenantCreateOffer } from '../services/business-setup-approval.helper';
 import { resolveCreateAttribution } from '../services/supply-on-behalf.helper';
 
 const router = Router();
@@ -1142,13 +1142,11 @@ router.delete(
  * Adopts a platform offer into the tenant's member-facing catalog.
  * Requires: catalog.adopt_offer permission.
  *
- * Business rule: the tenant must have completed business setup before adopting
- * offers. Uses getOnboardingStatus (same logic as /api/me) so the check is
- * consistent for all tenant types and survives future identity model changes.
+ * No business-setup gate: any tenant with the permission may adopt, regardless
+ * of business-setup approval status (gate removed 2026-07-15).
  *
  * Input: offerId as path param.
  * Output: { success: true } on adoption.
- *         403 when business setup is not yet submitted.
  *         404 when the offer is not found or not visible to this tenant.
  */
 router.post(
@@ -1156,35 +1154,10 @@ router.post(
   authenticate,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { tenantId, identityId, isPlatformAdmin } = await resolveTenantContextWithPermission(
+      const { tenantId, identityId } = await resolveTenantContextWithPermission(
         req,
         'catalog.adopt_offer',
       );
-
-      // Business setup is only required when adopting another tenant's offer.
-      // Tenants can always adopt their own offers (e.g. re-adopting a tenant_only
-      // offer after unadopting it) regardless of setup status.
-      const db = await getMongoDb();
-      const { nexusOffers } = getSupplyDomainCollections(db);
-      const targetOffer = await nexusOffers.findOne(
-        { offerId: req.params.offerId, ...NOT_DELETED },
-        { projection: { createdByTenantId: 1 } },
-      );
-      const isOwnOffer = targetOffer?.createdByTenantId === tenantId;
-
-      // M9: adopting an offer into your member catalog requires a NEXUS-admin
-      // APPROVED business setup (dev + prod). Re-adopting your OWN offer and
-      // platform admins bypass.
-      const adoptApproved = (isOwnOffer || (isPlatformAdmin ?? false))
-        ? true
-        : await isTenantBusinessSetupApproved(tenantId);
-      if (!canTenantAdoptOffer(isOwnOffer, isPlatformAdmin ?? false, adoptApproved)) {
-        res.status(403).json({
-          error: 'Your business setup is pending platform approval before you can adopt offers',
-          errorHe: 'הגדרת העסק שלך ממתינה לאישור הפלטפורמה לפני אימוץ הצעות',
-        });
-        return;
-      }
 
       await adoptOffer(tenantId, req.params.offerId, identityId);
       res.json({ success: true });
