@@ -30,6 +30,7 @@ import {
   resolveTenantContextWithPermission,
 } from '../utils/resolve-tenant-context';
 import { createOffer, updateOffer, deleteOffer } from '../services/supply.service';
+import { resolveMemberCatalogAccess } from '../services/catalog-member-gate.service';
 import { setTenantVoucherPrice } from '../services/tenant-pricing.service';
 import { approveOffer, denyOffer } from '../services/supply-approval.service';
 import {
@@ -1697,8 +1698,10 @@ router.get(
  * Returns the member-facing benefits catalog for a given tenant.
  * Only shows offers that have been actively adopted by that tenant.
  *
- * Gate: the benefits_catalog service must be active for the requested tenant.
- * Returns 403 when the service has not been activated yet.
+ * Gate (decision 7, 2026-07-15): active membership + active tenant
+ * benefits_catalog. The member's services array is NOT consulted - join-path
+ * members carry services: [] and must pass. catalog.view holders bypass the
+ * membership check (they manage the catalog) but not the activation check.
  *
  * Input: tenantId as path param (used as the catalog scope, not auth context).
  * Output: array of adopted CatalogItem entries, sorted newest-first.
@@ -1710,25 +1713,6 @@ router.get(
     try {
       const { tenantId } = req.params;
 
-      // Guard: benefits_catalog service must be active for this tenant before
-      // exposing the member-facing catalog. This prevents tenants that have not
-      // activated the service from having their catalog accessed.
-      const db = await getMongoDb();
-      const tenantCollections = getTenantDomainCollections(db);
-      const serviceActive = await tenantCollections.tenantServiceActivations.findOne({
-        tenantId,
-        serviceKey: 'benefits_catalog',
-        status: 'active',
-      });
-      if (!serviceActive) {
-        res.status(403).json({ error: 'Benefits Catalog service is not activated' });
-        return;
-      }
-
-      // Guard: member-level access check.
-      // Admins with catalog.view permission bypass this check — they manage the catalog.
-      // Regular members must have been explicitly invited with benefits_catalog in their
-      // services array to browse and purchase offers.
       const loginUser = await prisma.user.findUnique({
         where: { id: req.user!.sub },
         select: { id: true, email: true, fullName: true, provider: true },
@@ -1739,21 +1723,20 @@ router.get(
       }
       const domainIdentity = await syncDomainIdentityForLoginUser(loginUser);
       const authCtx = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, tenantId);
-      const isAdminOrManager = hasDomainPermission(authCtx, 'catalog.view');
 
-      if (!isAdminOrManager) {
-        // Regular member: verify they were invited with catalog access.
-        const memberDoc = await tenantCollections.tenantMembers.findOne({
-          tenantId,
-          nexusIdentityId: domainIdentity.nexusIdentityId,
-        });
-        const memberHasCatalog =
-          Array.isArray(memberDoc?.services) &&
-          memberDoc.services.includes('benefits_catalog');
-        if (!memberHasCatalog) {
-          res.status(403).json({ error: 'You do not have access to the Benefits Catalog' });
-          return;
-        }
+      const db = await getMongoDb();
+      const access = await resolveMemberCatalogAccess(db, {
+        tenantId,
+        nexusIdentityId: domainIdentity.nexusIdentityId,
+        hasCatalogViewPermission: hasDomainPermission(authCtx, 'catalog.view'),
+      });
+      if (access === 'catalog_inactive') {
+        res.status(403).json({ error: 'Benefits Catalog service is not activated' });
+        return;
+      }
+      if (access === 'forbidden') {
+        res.status(403).json({ error: 'You do not have access to the Benefits Catalog' });
+        return;
       }
 
       const parsed = catalogListQuerySchema.safeParse(req.query);
