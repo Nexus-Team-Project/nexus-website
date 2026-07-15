@@ -16,6 +16,7 @@ import { ensureTenantJoinRequestIndexes } from '../auth/tenant-join-request.mode
 import { ensureLoginOtpIndexes } from '../auth/login-otp.models';
 import { ensureTrustedDeviceIndexes } from '../auth/trusted-device.models';
 import { ensureOnboardingPhoneVerificationIndexes } from '../auth/onboarding-phone-verification.models';
+import { ensureShortLinkIndexes } from './short-links.models';
 
 /**
  * Creates idempotent indexes for identity, tenant, member, event, and saga data.
@@ -136,4 +137,5 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
   await ensureLoginOtpIndexes(db);
   await ensureTrustedDeviceIndexes(db);
   await ensureOnboardingPhoneVerificationIndexes(db);
+  await ensureShortLinkIndexes(db);
 }
