@@ -258,6 +258,7 @@ Every service page in the dashboard must show a professional teaser when `servic
 
 ## Coding Standards
 
+- **Abstract swappable services behind one module.** When implementing (or touching) an integration with a third-party or internal service that could plausibly change, gain a second provider, or need a different implementation later (payment gateway, SMS/email sender, storage/CDN, auth provider, search, etc.), wrap it behind a narrow interface in its own module - callers depend on that module's contract, never on the vendor SDK/client directly. Swapping or adding a provider then means editing one file, not hunting through every call site across the codebase. Do not add this abstraction for something that will only ever have one implementation (do not over-engineer a wrapper nobody will swap).
 - **Production-grade always.** No prototype shortcuts, demo branches, silent failures, or hardcoded secrets.
 - **Security:** validate/sanitize inputs, enforce auth/authz server-side, no XSS interpolation, least-privilege.
 - **Document all code:** file purpose comment at top; every function documents inputs/outputs; document complex state and security decisions.

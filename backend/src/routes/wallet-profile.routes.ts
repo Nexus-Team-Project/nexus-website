@@ -72,6 +72,14 @@ router.patch('/profile', authenticate, async (req: Request, res: Response) => {
     });
     res.json({ profile: view });
   } catch (e) {
+    // Phone is mandatory before onboarding can complete - surface a clean 400
+    // the wallet can act on (bounce back to the verify-phone step) instead of
+    // a generic 500.
+    if (e instanceof Error && e.message === 'phone_required') {
+      console.warn('[wallet-profile] PATCH -> 400 phone_required (completion blocked, no phone)');
+      res.status(400).json({ error: 'phone_required' });
+      return;
+    }
     console.error('[wallet-profile] PATCH failed:', e);
     res.status(500).json({ error: 'internal_error' });
   }
