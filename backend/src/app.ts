@@ -35,6 +35,7 @@ import pushRoutes from './routes/push.routes';
 import onboardingRoutes from './routes/onboarding.routes';
 import domainTenantRoutes from './routes/domain-tenant.routes';
 import v1Routes from './routes/v1.routes';
+import shortLinkRoutes from './routes/short-link.routes';
 import { prisma } from './config/database';
 const app = express();
 app.set('trust proxy', 1);
@@ -111,6 +112,9 @@ app.use('/api/seo', seoRoutes);
 app.use('/api/orgs', orgsRoutes);
 app.use('/api/invites', invitesRoutes);
 app.use('/api/push', pushRoutes);
+
+// Public short-link redirects at the app root (NOT /api) - SMS/email links.
+app.use('/l', shortLinkRoutes);
 
 // ─── Dynamic sitemap.xml (must be before static middleware) ──────────────────
 app.get('/sitemap.xml', async (_req, res, next) => {
