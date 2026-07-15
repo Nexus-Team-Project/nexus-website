@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CheckCircle, Users, BarChart3, Zap, Gift, Shield, Calendar, Building2, TrendingUp, Star, Clock, Settings, Heart, Briefcase, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle, Users, BarChart3, Zap, Gift, Shield, Building2, TrendingUp, Star, Clock, Settings, Heart, Globe, ChevronLeft, ChevronRight } from 'lucide-react';
 import { lazy, Suspense } from 'react';
 import AnimatedGradient from '../components/AnimatedGradient';
 import BorderHighlightCard from '../components/BorderHighlightCard';
-import { LanguageProvider, useLanguage } from '../i18n/LanguageContext';
+import { useLanguage } from '../i18n/LanguageContext';
 import StoryGiftCards from '../components/benefits/StoryGiftCards';
 import StoryInsightsCarousel from '../components/benefits/StoryInsightsCarousel';
 import PartnerBubbles from '../components/PartnerBubbles';
-import BenefitsFeatureGrid from '../components/benefits/BenefitsFeatureGrid';
 import DashboardEnvelopePreview from '../components/benefits/DashboardEnvelopePreview';
 import { useSEO } from '../hooks/useSEO';
 
@@ -51,7 +50,7 @@ function FadeInSection({ children, className = '' }: { children: React.ReactNode
 
 // ─── Section 1: Hero ─────────────────────────────────────────────────────────
 function HeroSection() {
-  const { language, direction } = useLanguage();
+  const { language } = useLanguage();
   const he = language === 'he';
   const BackArrow = he ? ArrowLeft : ArrowRight;
 

@@ -29,6 +29,16 @@ const envSchema = z.object({
   // Leave unset in development.
   COOKIE_DOMAIN: z.string().min(1).optional(),
 
+  // Cross-site cookies — set 'true' when the frontends and the API are served
+  // from DIFFERENT registrable domains over HTTPS (e.g. the Railway dev deploy
+  // where each *.up.railway.app host is a separate site per the Public Suffix
+  // List). When on, the refresh/trusted-device cookies use SameSite=None; Secure
+  // so the browser sends them on the cross-site refresh call; otherwise they stay
+  // SameSite=Lax (correct for same-registrable-domain prod + http localhost).
+  // MUST stay off for localhost — SameSite=None requires Secure, which does not
+  // set on http://localhost.
+  CROSS_SITE_COOKIES: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+
   // Google OAuth — client ID required, secret optional (OAuth code flow disabled when absent)
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),

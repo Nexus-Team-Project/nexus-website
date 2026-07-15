@@ -3,15 +3,21 @@
  *
  * This script resets a person across PostgreSQL login data and MongoDB domain
  * data. It is dry-run by default and only deletes when `--apply` is provided.
+ * The actual cleanup logic lives in `src/services/account-deletion/` (shared
+ * with the wallet dev self-delete route); this file only handles CLI args.
  */
 /// <reference types="node" />
 import 'dotenv/config';
 
 import { PrismaClient } from '@prisma/client';
 import { closeMongoConnection } from '../../src/config/mongo';
-import { collectMongoCounts, deleteMongoUser } from './mongo';
-import { collectPrismaCounts, deletePrismaLoginUser } from './prisma';
-import type { ScriptArgs } from './types';
+import { collectMongoCounts, deleteMongoUser } from '../../src/services/account-deletion/mongo';
+import { collectPrismaCounts, deletePrismaLoginUser } from '../../src/services/account-deletion/prisma';
+
+type ScriptArgs = {
+  email: string;
+  apply: boolean;
+};
 
 const prisma = new PrismaClient();
 

@@ -1,11 +1,26 @@
 /**
  * Builds and sends tenant member invitation emails.
  * Visual style matches the reset-password email: logo banner, centered card, table layout.
- * The email sends users to the website login first, then into dashboard accept.
+ * A REGULAR member invite (roles is exactly ['member'], no privileged role) links
+ * straight into the wallet with `?tenant=` - the wallet auto-accepts any pending
+ * invitation for the signed-in email on login/signup (`reconcilePendingInvitations`,
+ * called by every wallet auth-verify route), so no token/accept step is needed there.
+ * Any invite carrying a privileged tenant role still sends users to the website
+ * login first, then into dashboard accept (those roles only exist in the dashboard).
  */
 import { env } from '../config/env';
 import { buildAuthEmailBannerHtml, sendMail } from './email.service';
 import type { TenantUserRoleName } from '../models/domain';
+
+/**
+ * Whether an invite's roles are a regular member invite (wallet-direct) rather
+ * than a privileged tenant role (dashboard-only).
+ * Input: the invitation's role list.
+ * Output: true only when the roles are exactly `['member']`.
+ */
+export function isRegularMemberInvite(roles: TenantUserRoleName[]): boolean {
+  return roles.length === 1 && roles[0] === 'member';
+}
 
 export interface TenantMemberInviteEmailInput {
   to: string;
@@ -135,6 +150,47 @@ export function buildMemberInviteLoginUrl(token: string, language: 'he' | 'en'):
   const url = new URL(loginPath, env.FRONTEND_URL);
   url.searchParams.set('dashboardRedirect', dashboardRedirect);
   return url.toString();
+}
+
+/** The wallet's local dev port (matches nexusWallet's documented dev server). */
+const LOCAL_WALLET_URL = 'http://localhost:8080';
+
+/**
+ * Creates the wallet URL a regular member invite links to directly: the
+ * language-prefixed wallet root with `?tenant=` set, so the wallet's own
+ * tenant-affiliation flow (match screen / join, or the returning-user
+ * landing) takes it from there. No token: the wallet auto-accepts a pending
+ * invitation for the signed-in email on any login/signup.
+ *
+ * Outside production, this ALWAYS uses the local dev wallet port and ignores
+ * `WALLET_URL` - that var is deliberately pointed at the real prod domain in
+ * local `.env` for the SMS-autofill origin binding (`otp-sms.helper.ts`), so
+ * following it here would send a local dev invite to production.
+ *
+ * Input: the tenant id and target email language.
+ * Output: absolute wallet URL (local dev port outside production; `WALLET_URL`,
+ * falling back to the local dev port if unset, in production).
+ */
+export function buildMemberInviteWalletUrl(tenantId: string, language: 'he' | 'en'): string {
+  const walletBase = env.NODE_ENV === 'production' ? (env.WALLET_URL ?? LOCAL_WALLET_URL) : LOCAL_WALLET_URL;
+  const url = new URL(`/${language}`, walletBase);
+  url.searchParams.set('tenant', tenantId);
+  return url.toString();
+}
+
+/**
+ * Picks the right invite URL for the roles being invited: a regular member
+ * (roles === ['member']) goes straight into the wallet with the tenant id; any
+ * privileged role keeps the existing website-login-first dashboard flow.
+ * Input: raw invite token, tenant id, roles, and target email language.
+ * Output: the absolute URL to place in the invite email / API response.
+ */
+export function buildMemberInviteUrl(
+  args: { token: string; tenantId: string; roles: TenantUserRoleName[]; language: 'he' | 'en' },
+): string {
+  return isRegularMemberInvite(args.roles)
+    ? buildMemberInviteWalletUrl(args.tenantId, args.language)
+    : buildMemberInviteLoginUrl(args.token, args.language);
 }
 
 /**

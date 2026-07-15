@@ -19,7 +19,7 @@ import { assertSeatAvailable, identityAlreadyHoldsNonMemberSeat } from './domain
 import { getUserContext } from './onboarding.service';
 import { getOnboardingCollections } from '../models/onboarding.models';
 import { ObjectId } from 'mongodb';
-import { buildMemberInviteLoginUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
+import { buildMemberInviteUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
 import { generateToken, hashToken } from '../utils/crypto';
 import type { DomainPermission } from './domain-permissions.service';
 
@@ -151,6 +151,7 @@ export async function validateTenantGroupIds(tenantId: string, groupIds: string[
  */
 async function sendAndTrackInvitationEmail(input: {
   invitationId: string;
+  tenantId: string;
   email: string;
   displayName?: string;
   tenantName: string;
@@ -166,7 +167,12 @@ async function sendAndTrackInvitationEmail(input: {
 
   const db = await getMongoDb();
   const collections = getTenantDomainCollections(db);
-  const inviteUrl = buildMemberInviteLoginUrl(input.token, input.language);
+  const inviteUrl = buildMemberInviteUrl({
+    token: input.token,
+    tenantId: input.tenantId,
+    roles: input.roles,
+    language: input.language,
+  });
 
   try {
     const messageId = await sendTenantMemberInviteEmail({
@@ -370,6 +376,7 @@ export async function inviteTenantMemberByEmail(
 
   const emailSent = await sendAndTrackInvitationEmail({
     invitationId,
+    tenantId: access.tenantId,
     email: invitedIdentity.normalizedEmail,
     displayName: input.displayName,
     tenantName: tenant?.organizationName ?? 'Nexus',
@@ -390,7 +397,12 @@ export async function inviteTenantMemberByEmail(
     status: 'active',
     groupIds,
     invitationId,
-    inviteUrl: buildMemberInviteLoginUrl(rawToken, input.language),
+    inviteUrl: buildMemberInviteUrl({
+      token: rawToken,
+      tenantId: access.tenantId,
+      roles: uniqueRoles,
+      language: input.language,
+    }),
     expiresAt: expiresAt.toISOString(),
     emailSent,
   };

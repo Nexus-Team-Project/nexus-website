@@ -1219,7 +1219,7 @@ export const articlesEn: Article[] = [
     metaDescription:
       'Discover how digital wallet infrastructure is transforming loyalty programs, employee benefits, and community rewards. Learn about key use cases and the future of wallet-based benefits.',
     category: 'loyalty',
-    heroImage: 'https://images.unsplash.com/photo-1563986768609-322da13575f2?w=800&q=80',
+    heroImage: 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&q=80',
     author: { name: 'Nexus Team', role: 'Loyalty & Payments Infrastructure' },
     publishDate: '2026-03-09',
     readTime: 7,

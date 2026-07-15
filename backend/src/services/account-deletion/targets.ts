@@ -5,12 +5,12 @@
  * Mongo cleanup module so destructive logic stays separate from lookup logic.
  */
 import { ObjectId } from 'mongodb';
-import { getMongoDb } from '../../src/config/mongo';
-import { getIdentityDomainCollections } from '../../src/models/domain/identity.models';
-import { getOrchestrationDomainCollections } from '../../src/models/domain/orchestration.models';
-import { getTenantDomainCollections } from '../../src/models/domain/tenant.models';
-import { getSupplyDomainCollections } from '../../src/models/domain/supply.models';
-import { getOnboardingCollections } from '../../src/models/onboarding.models';
+import { getMongoDb } from '../../config/mongo';
+import { getIdentityDomainCollections } from '../../models/domain/identity.models';
+import { getOrchestrationDomainCollections } from '../../models/domain/orchestration.models';
+import { getTenantDomainCollections } from '../../models/domain/tenant.models';
+import { getSupplyDomainCollections } from '../../models/domain/supply.models';
+import { getOnboardingCollections } from '../../models/onboarding.models';
 import type {
   MongoDeletionTargets,
   OrchestrationDeletionTargets,

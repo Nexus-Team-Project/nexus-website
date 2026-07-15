@@ -1,0 +1,15 @@
+{
+  // Type-checks seed.ts (run via tsx, never compiled by the backend build - see
+  // scripts/tsconfig.json for the same rationale). Includes the website's static
+  // blog data because seed.ts dynamic-imports it across the project boundary.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../..",
+    "declaration": false,
+    "declarationMap": false,
+    // TS7 defaults `types` to [] (no auto @types discovery) - list node explicitly.
+    "types": ["node"]
+  },
+  "include": ["./*.ts", "../../src/data/blog/**/*.ts"]
+}

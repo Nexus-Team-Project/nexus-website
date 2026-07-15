@@ -3,6 +3,7 @@ import { verifyAccessToken, AccessTokenPayload } from '../utils/jwt';
 
 // Extend Express Request with user info
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- ambient augmentation of the Express namespace requires namespace syntax
   namespace Express {
     interface Request {
       user?: AccessTokenPayload;

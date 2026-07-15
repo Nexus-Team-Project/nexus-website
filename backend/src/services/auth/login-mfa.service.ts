@@ -91,6 +91,9 @@ export async function completeLoginOtp(args: {
     challengeToken: args.challengeToken,
     code: args.code,
   });
+  // Wallet signup challenges carry no user id; they never reach this
+  // website-MFA completion path.
+  if (!prismaUserId) throw createError('Invalid email or password', 401);
 
   const user = await prisma.user.findUnique({ where: { id: prismaUserId } });
   if (!user) throw createError('Invalid email or password', 401);

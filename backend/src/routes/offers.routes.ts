@@ -59,7 +59,7 @@ import {
 import { getIdentityDomainCollections } from '../models/domain/identity.models';
 import { getOnboardingStatus } from '../services/onboarding.service';
 import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
-import { canTenantCreateOffer, canTenantAdoptOffer } from '../services/business-setup-approval.helper';
+import { canTenantCreateOffer } from '../services/business-setup-approval.helper';
 import { resolveCreateAttribution } from '../services/supply-on-behalf.helper';
 
 const router = Router();
@@ -131,8 +131,8 @@ const variantInputSchema = z.object({
   voucherStackable: z.boolean().nullable().optional(),
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
   tags: z.array(z.string().max(50)).max(10).optional(),
-  terms: z.string().max(2000).optional(),
-  implementationInstructions: z.string().max(1000).optional(),
+  terms: z.string().max(6000).optional(),
+  implementationInstructions: z.string().max(4000).optional(),
 });
 
 /**
@@ -265,7 +265,7 @@ const createOfferSchema = z.object({
   executionType: z.enum(OFFER_EXECUTION_TYPES).default('voucher'),
   stockLimit: z.coerce.number().int().positive().nullable().optional().default(null),
   implementationLink: z.string().url().nullable().optional(),
-  implementationInstructions: z.string().max(1000).optional(),
+  implementationInstructions: z.string().max(4000).optional(),
   // ISO string from multipart form; convert to Date in handler.
   // validFrom is optional - null/undefined means the offer goes live as soon as approved.
   // No future-date refinement on validFrom: setting it to today (or the past) is valid
@@ -282,7 +282,7 @@ const createOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // optional for pre-variant clients). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
-  terms: z.string().max(2000).optional(),
+  terms: z.string().max(6000).optional(),
   // JSON-encoded array string from multipart form.
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
@@ -330,12 +330,19 @@ const updateOfferSchema = z.object({
     .enum(['draft', 'active', 'inactive', 'pending_approval', 'denied', 'disabled', 'expired', 'archived'])
     .optional(),
   statusReason: z.string().min(1).max(1000).optional(),
+  // Offer visibility. Accepted from the body but honored ONLY for platform
+  // admins - the PATCH handler strips it for everyone else before updateOffer.
+  visibility: z.enum(OFFER_VISIBILITY).optional(),
+  // Reassign the owning tenant (platform-admin only; stripped for others). When
+  // set to a different tenant, the offer is re-stamped to that tenant + its owner
+  // identity. Mirrors the create-time onBehalfOfTenantId.
+  onBehalfOfTenantId: z.string().trim().min(1).optional(),
   executionType: z.enum(OFFER_EXECUTION_TYPES).optional(),
   // Empty string from the multipart edit form means "no value / clear it".
   // Map it to null before validation so an untouched empty field does not 400.
   stockLimit: z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().positive().nullable().optional()),
   implementationLink: z.preprocess((v) => (v === '' ? null : v), z.string().url().nullable().optional()),
-  implementationInstructions: z.string().max(1000).optional(),
+  implementationInstructions: z.string().max(4000).optional(),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
   // Voucher combine-with-promotions + background color (voucher-only).
@@ -343,7 +350,7 @@ const updateOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // replaces the array wholesale when sent). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
-  terms: z.string().max(2000).optional(),
+  terms: z.string().max(6000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
     (v) => {
@@ -667,6 +674,7 @@ router.post(
             mimetype: f.mimetype,
           }))
         : [];
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit these keys from the rest payload
       const { keptImageUrls: _ignoredKept, keptImageCrops: _ignoredKeptCrops, onBehalfOfTenantId: _obo, ...createPayload } = restParsed;
       const offer = await createOffer({
         ...createPayload,
@@ -803,8 +811,36 @@ router.patch(
       // owning tenant may change its sale price + face value. Enforcing it there
       // (it loads the offer) avoids a redundant load + a split rule in two places.
 
+      // Visibility is platform-admin-only. Strip it for everyone else so a
+      // non-admin cannot change who sees the offer (the frontend hides the
+      // control too, but this is the real guard).
+      if (!ctx.isPlatformAdmin && parsed.data.visibility !== undefined) {
+        delete parsed.data.visibility;
+      }
+
+      // Owner reassignment is platform-admin-only. Strip it for everyone else; for
+      // an admin, resolve + validate the target tenant so the offer can be
+      // re-stamped to it + its owner identity (mirrors the create-time on-behalf
+      // attribution). updateOffer removes the offer from the old owner.
+      let ownerReassign: { ownerTenantId: string; ownerIdentityId: string } | undefined;
+      if (parsed.data.onBehalfOfTenantId !== undefined) {
+        if (!ctx.isPlatformAdmin) {
+          delete parsed.data.onBehalfOfTenantId;
+        } else {
+          const db = await getMongoDb();
+          const t = await getTenantDomainCollections(db).domainTenants.findOne(
+            { tenantId: parsed.data.onBehalfOfTenantId },
+            { projection: { tenantId: 1, createdByIdentityId: 1 } },
+          );
+          if (!t) { res.status(404).json({ error: 'tenant_not_found' }); return; }
+          ownerReassign = { ownerTenantId: t.tenantId, ownerIdentityId: t.createdByIdentityId };
+        }
+      }
+
       // Convert validFrom/validUntil ISO strings (from multipart form) to Date objects.
-      const { validFrom: validFromStr, validUntil: validUntilStr, ...restParsed } = parsed.data;
+      // onBehalfOfTenantId is consumed above (not an updateOffer field) - drop it.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to omit the key from the rest payload
+      const { validFrom: validFromStr, validUntil: validUntilStr, onBehalfOfTenantId: _obo, ...restParsed } = parsed.data;
       const validFromDate = validFromStr !== undefined
         ? (validFromStr ? new Date(validFromStr) : null)
         : undefined;
@@ -861,6 +897,7 @@ router.patch(
       const { keptImageUrls, ...restNoKept } = restParsed;
       const result = await updateOffer(req.params.offerId, ctx.tenantId, {
         ...restNoKept,
+        ...(ownerReassign ?? {}),
         ...(validFromDate !== undefined && { validFrom: validFromDate }),
         ...(validUntilDate !== undefined && { validUntil: validUntilDate }),
         imageFiles,
@@ -1105,13 +1142,11 @@ router.delete(
  * Adopts a platform offer into the tenant's member-facing catalog.
  * Requires: catalog.adopt_offer permission.
  *
- * Business rule: the tenant must have completed business setup before adopting
- * offers. Uses getOnboardingStatus (same logic as /api/me) so the check is
- * consistent for all tenant types and survives future identity model changes.
+ * No business-setup gate: any tenant with the permission may adopt, regardless
+ * of business-setup approval status (gate removed 2026-07-15).
  *
  * Input: offerId as path param.
  * Output: { success: true } on adoption.
- *         403 when business setup is not yet submitted.
  *         404 when the offer is not found or not visible to this tenant.
  */
 router.post(
@@ -1119,35 +1154,10 @@ router.post(
   authenticate,
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { tenantId, identityId, isPlatformAdmin } = await resolveTenantContextWithPermission(
+      const { tenantId, identityId } = await resolveTenantContextWithPermission(
         req,
         'catalog.adopt_offer',
       );
-
-      // Business setup is only required when adopting another tenant's offer.
-      // Tenants can always adopt their own offers (e.g. re-adopting a tenant_only
-      // offer after unadopting it) regardless of setup status.
-      const db = await getMongoDb();
-      const { nexusOffers } = getSupplyDomainCollections(db);
-      const targetOffer = await nexusOffers.findOne(
-        { offerId: req.params.offerId, ...NOT_DELETED },
-        { projection: { createdByTenantId: 1 } },
-      );
-      const isOwnOffer = targetOffer?.createdByTenantId === tenantId;
-
-      // M9: adopting an offer into your member catalog requires a NEXUS-admin
-      // APPROVED business setup (dev + prod). Re-adopting your OWN offer and
-      // platform admins bypass.
-      const adoptApproved = (isOwnOffer || (isPlatformAdmin ?? false))
-        ? true
-        : await isTenantBusinessSetupApproved(tenantId);
-      if (!canTenantAdoptOffer(isOwnOffer, isPlatformAdmin ?? false, adoptApproved)) {
-        res.status(403).json({
-          error: 'Your business setup is pending platform approval before you can adopt offers',
-          errorHe: 'הגדרת העסק שלך ממתינה לאישור הפלטפורמה לפני אימוץ הצעות',
-        });
-        return;
-      }
 
       await adoptOffer(tenantId, req.params.offerId, identityId);
       res.json({ success: true });

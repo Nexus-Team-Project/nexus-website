@@ -14,7 +14,7 @@ import {
   type TenantUserRoleName,
 } from '../models/domain';
 import { syncDomainIdentityForMemberInvite } from './domain-identity.service';
-import { buildMemberInviteLoginUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
+import { buildMemberInviteUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
 import { sendTenantMemberRemovedEmail, sendTenantInviteRevokedEmail } from './domain-member-remove-email.service';
 import { requireTenantMemberPermission } from './domain-member.service';
 import { assertSeatAvailable, identityAlreadyHoldsNonMemberSeat } from './domain-tenant-plan.service';
@@ -331,7 +331,12 @@ export async function updateTenantMemberEmail(
     to: newNormalized,
     tenantName,
     roles: oldRoles,
-    inviteUrl: buildMemberInviteLoginUrl(rawToken, 'he'),
+    inviteUrl: buildMemberInviteUrl({
+      token: rawToken,
+      tenantId: access.tenantId,
+      roles: oldRoles,
+      language: 'he',
+    }),
     expiresAt,
     language: 'he',
   }).catch(() => undefined);

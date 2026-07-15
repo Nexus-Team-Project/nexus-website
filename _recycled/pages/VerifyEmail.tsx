@@ -7,16 +7,16 @@ type State = 'loading' | 'success' | 'already' | 'error';
 
 export default function VerifyEmail() {
   const [params] = useSearchParams();
-  const [state, setState] = useState<State>('loading');
-  const [message, setMessage] = useState('');
+  // Missing token is knowable at first render - initialize the error state lazily
+  // instead of setting it synchronously inside the effect.
+  const [state, setState] = useState<State>(() => (params.get('token') ? 'loading' : 'error'));
+  const [message, setMessage] = useState(() =>
+    params.get('token') ? '' : 'Verification link is missing a token.',
+  );
 
   useEffect(() => {
     const token = params.get('token');
-    if (!token) {
-      setState('error');
-      setMessage('Verification link is missing a token.');
-      return;
-    }
+    if (!token) return;
 
     api.get<{ message: string }>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`)
       .then(({ message: msg }) => {
@@ -27,9 +27,10 @@ export default function VerifyEmail() {
         }
         setMessage(msg);
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         setState('error');
-        setMessage(err?.error ?? 'Verification failed. The link may have expired.');
+        // The api client throws plain objects shaped { error, status }.
+        setMessage((err as { error?: string })?.error ?? 'Verification failed. The link may have expired.');
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

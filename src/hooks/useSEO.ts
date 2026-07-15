@@ -119,9 +119,16 @@ interface SEOProps {
  * on top of the component's hardcoded defaults — no deploy needed.
  */
 export function useSEO({ title, description, canonical, alternates }: SEOProps) {
+  // Depend on the two URL strings (stable across renders), not the alternates
+  // object identity, so callers passing a fresh object literal don't thrash head tags.
+  const alternateEn = alternates?.en;
+  const alternateHe = alternates?.he;
+
   useEffect(() => {
+    const alt = alternateEn || alternateHe ? { en: alternateEn, he: alternateHe } : undefined;
+
     // 1. Apply component defaults immediately (synchronous, no flash)
-    applyMetaTags(title, description, canonical, alternates);
+    applyMetaTags(title, description, canonical, alt);
 
     // 2. Load agent overrides and re-apply if present for this page
     const slug = window.location.pathname;
@@ -133,7 +140,7 @@ export function useSEO({ title, description, canonical, alternates }: SEOProps) 
         const safeTitle = isCorrupted(override.metaTitle) ? null : override.metaTitle;
         const safeDesc  = isCorrupted(override.metaDescription) ? null : override.metaDescription;
         if (safeTitle || safeDesc) {
-          applyMetaTags(safeTitle ?? title, safeDesc ?? description, canonical, alternates);
+          applyMetaTags(safeTitle ?? title, safeDesc ?? description, canonical, alt);
         }
       }
     });
@@ -142,7 +149,7 @@ export function useSEO({ title, description, canonical, alternates }: SEOProps) 
     return () => {
       document.querySelectorAll('link[data-hreflang]').forEach((el) => el.remove());
     };
-  }, [title, description, canonical, alternates?.en, alternates?.he]);
+  }, [title, description, canonical, alternateEn, alternateHe]);
 }
 
 // Re-export so callers don't need a separate import

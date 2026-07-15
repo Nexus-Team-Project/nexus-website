@@ -1,4 +1,3 @@
-import NexusLogo from './NexusLogo';
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -6,8 +5,8 @@ import { useLanguage } from '../i18n/LanguageContext';
 const LANG_PREF_KEY = 'nexus-lang-preference';
 
 const languages = [
-  { code: 'en', name: 'English', flag: '🇺🇸' },
-  { code: 'he', name: 'עברית', flag: '🇮🇱' },
+  { code: 'en' as const, name: 'English', flag: '🇺🇸' },
+  { code: 'he' as const, name: 'עברית', flag: '🇮🇱' },
 ];
 
 const FlagIcon = ({ code }: { code: string }) => {

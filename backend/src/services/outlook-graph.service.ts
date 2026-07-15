@@ -148,8 +148,8 @@ export async function findEmailBySubject(
         console.log(`[OutlookGraph] Found email for [Chat-${shortId}] on attempt ${attempt + 1}`);
         return result.value[0];
       }
-    } catch (err: any) {
-      console.error(`[OutlookGraph] Search attempt ${attempt + 1} failed:`, err?.message);
+    } catch (err) {
+      console.error(`[OutlookGraph] Search attempt ${attempt + 1} failed:`, err instanceof Error ? err.message : err);
     }
   }
 

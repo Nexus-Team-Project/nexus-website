@@ -10,7 +10,6 @@
 
 import { randomUUID } from 'node:crypto';
 import { getMongoDb } from '../config/mongo';
-import { createError } from '../middleware/errorHandler';
 import {
   getSupplyDomainCollections,
   deriveValueTypeFromExecutionType,
@@ -159,6 +158,22 @@ export interface UpdateOfferInput {
   status?: OfferStatus;
   /** Required when transitioning to 'disabled' or 'archived'. */
   statusReason?: string;
+  /**
+   * Change who can see the offer: 'ecosystem' (all tenants) or 'tenant_only'
+   * (owning tenant's members only). Honored ONLY for platform admins (the route
+   * strips it for everyone else) - a platform admin editing implicitly approves,
+   * so the offer goes 'active' immediately on change.
+   */
+  visibility?: OfferVisibility;
+  /**
+   * Reassign the owning tenant (platform-admin only). When set to a tenant other
+   * than the current owner, the offer is re-stamped to it and removed from the
+   * old owner's catalog. The route resolves + validates the tenant and supplies
+   * its owner identity via ownerIdentityId.
+   */
+  ownerTenantId?: string;
+  /** New owner's identity id (the target tenant's createdByIdentityId). Set with ownerTenantId. */
+  ownerIdentityId?: string;
   /** Updated fulfillment/redemption type. */
   executionType?: OfferExecutionType;
   /** Updated stock cap. Set to null to make unlimited; omit to leave unchanged. */
@@ -416,20 +431,40 @@ export async function updateOffer(
   isPlatformAdmin = false,
 ): Promise<{ offer: NexusOffer; wasResubmitted: boolean; wasUpdatedWhilePending: boolean } | null> {
   const db = await getMongoDb();
-  const { nexusOffers } = getSupplyDomainCollections(db);
+  const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
 
-  // Read current offer to detect denied status for resubmit flow.
-  // Ownership is checked here to avoid a redundant DB round trip on not-found.
-  // A tenant may NOT edit an offer a Nexus admin uploaded on its behalf
-  // (uploadedByIdentityId set) - Nexus manages those. Excluding it from the owner
-  // lookup makes update return null (404) for that tenant. Platform admins are exempt.
-  const currentOffer = await nexusOffers.findOne({
-    offerId,
-    createdByTenantId: tenantId,
-    ...(isPlatformAdmin ? {} : { uploadedByIdentityId: { $exists: false } }),
-    ...NOT_DELETED,
-  });
+  // Ownership scope. Platform admins may edit ANY offer (mirrors deleteOffer),
+  // including ones uploaded on behalf of a tenant (whose createdByTenantId is the
+  // TARGET tenant, not the admin's). Tenant editors are restricted to offers their
+  // own tenant created and may NOT touch Nexus-managed on-behalf offers.
+  const ownerFilter = isPlatformAdmin
+    ? { offerId, ...NOT_DELETED }
+    : { offerId, createdByTenantId: tenantId, uploadedByIdentityId: { $exists: false }, ...NOT_DELETED };
+
+  const currentOffer = await nexusOffers.findOne(ownerFilter);
   if (!currentOffer) return null;
+
+  // Visibility change (platform-admin only; the route strips it for everyone
+  // else). Flipping to tenant_only scopes the read query via invitedByTenantId
+  // (reads match a tenant_only offer only when invitedByTenantId === the viewer);
+  // flipping to ecosystem needs no unset (the ecosystem read clause ignores that
+  // field). The admin implicitly approves, so the offer goes active immediately.
+  const visibilityChange =
+    isPlatformAdmin &&
+    input.visibility !== undefined &&
+    input.visibility !== currentOffer.visibility;
+
+  // Owner reassignment (platform-admin only; the route resolves + validates the
+  // target tenant and strips this for everyone else). Re-stamps the offer to the
+  // new tenant + its owner identity. The effective owner/visibility below fold in
+  // whichever of the two changed so invitedByTenantId (tenant_only scope) lands on
+  // the right tenant even when only one of them changed.
+  const ownerChange =
+    isPlatformAdmin &&
+    input.ownerTenantId !== undefined &&
+    input.ownerTenantId !== currentOffer.createdByTenantId;
+  const effectiveOwner = ownerChange ? input.ownerTenantId! : currentOffer.createdByTenantId;
+  const effectiveVisibility = visibilityChange ? input.visibility! : currentOffer.visibility;
 
   // When a denied offer is edited and saved, it re-enters the approval queue.
   const wasResubmitted = currentOffer.status === 'denied';
@@ -620,6 +655,26 @@ export async function updateOffer(
     ...(nextImageCrops !== undefined && { imageCrops: nextImageCrops }),
     ...(statusActuallyChanged && { statusChangedAt: now }),
     ...(resolvedStatusReason !== undefined && { statusReason: resolvedStatusReason }),
+    // Platform-admin visibility change: set the new visibility, publish it live
+    // (admin approves), and for tenant_only pin invitedByTenantId to the owner so
+    // only that tenant sees it. Placed before the resubmit spread so a denied
+    // offer's resubmit status still wins if both apply.
+    ...(visibilityChange && {
+      visibility: input.visibility,
+      status: 'active' as const,
+      statusChangedAt: now,
+      denial_reason: '',
+    }),
+    // Re-stamp ownership to the new tenant + its owner identity.
+    ...(ownerChange && {
+      createdByTenantId: input.ownerTenantId,
+      ...(input.ownerIdentityId ? { createdByIdentityId: input.ownerIdentityId } : {}),
+    }),
+    // tenant_only scope pins invitedByTenantId to the (effective) owner. Recompute
+    // whenever visibility OR owner changed so it always tracks the current owner;
+    // ecosystem needs no value (the ecosystem read clause ignores this field).
+    ...((visibilityChange || ownerChange) && effectiveVisibility === 'tenant_only'
+      && { invitedByTenantId: effectiveOwner }),
     // Resubmit: clear denial and move to the resubmit target status (queue, or
     // live for a trusted tenant).
     ...(wasResubmitted && { status: resubmitStatus, denial_reason: '' }),
@@ -630,14 +685,26 @@ export async function updateOffer(
   };
 
   const result = await nexusOffers.findOneAndUpdate(
-    // Ownership guard: only the creating tenant can update this offer. Deleted
-    // offers are excluded so an edit can never resurrect a deleted offer.
-    { offerId, createdByTenantId: tenantId, ...NOT_DELETED },
+    // Same ownership scope as the load above (admins: any offer; tenants: own,
+    // non-on-behalf). Deleted offers excluded so an edit can never resurrect one.
+    ownerFilter,
     { $set: update },
     { returnDocument: 'after' }
   );
 
   if (!result) return null;
+
+  // On owner reassignment, remove the offer from the ORIGINAL tenant: drop its
+  // adoption / per-tenant pricing record so the offer disappears from the old
+  // owner's catalog (own-offers list already follows the new createdByTenantId).
+  // Best-effort: never fails the save.
+  if (ownerChange) {
+    try {
+      await tenantOfferConfigs.deleteMany({ offerId, tenantId: currentOffer.createdByTenantId });
+    } catch (err) {
+      console.error('[SUPPLY] Old-owner config cleanup on reassignment failed:', err);
+    }
+  }
 
   // After a deal-pricing edit on a voucher, re-sync per-tenant price overrides
   // (TenantOfferConfig.variantPrices + legacy offer-level memberPrice) so the

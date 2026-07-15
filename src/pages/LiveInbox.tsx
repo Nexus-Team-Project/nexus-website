@@ -410,7 +410,7 @@ function InboxContent() {
   useEffect(() => {
     if (!activeSessionId) return;
     const session = sessions.find(s => s.id === activeSessionId);
-    if (!session?.messages?.some(m => (m as any).channel === 'WHATSAPP') && !session?.waContactName) return;
+    if (!session?.messages?.some(m => m.channel === 'WHATSAPP') && !session?.waContactName) return;
     // Already have cached data
     if (session.waContactName || session.waContactAvatar) return;
 

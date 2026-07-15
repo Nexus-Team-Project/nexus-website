@@ -18,7 +18,8 @@
  * Idempotent: re-running syncs content into the existing DRAFT and reuses an
  * existing PENDING request instead of creating a duplicate.
  */
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
+import type { Article } from '../../src/data/blog/types';
 
 const prisma = new PrismaClient();
 
@@ -32,12 +33,10 @@ async function main() {
   }
 
   // Dynamic import to avoid rootDir restrictions (same pattern as prisma/seed.ts)
-  // @ts-ignore
   const { articlesHe } = await import('../../src/data/blog/articles-he');
-  // @ts-ignore
   const { articlesEn } = await import('../../src/data/blog/articles-en');
 
-  const source: any[] = lang === 'he' ? articlesHe : articlesEn;
+  const source: Article[] = lang === 'he' ? articlesHe : articlesEn;
   const article = source.find((a) => a.slug === slug);
 
   if (!article) {
@@ -61,7 +60,8 @@ async function main() {
     publishDate: article.publishDate ? new Date(article.publishDate) : null,
     readTime: article.readTime ?? null,
     sectionsJson: article.sections ?? [],
-    faqJson: article.faq ?? null,
+    // ArticleFAQ is an interface (no index signature), so cast for Prisma's Json input.
+    faqJson: (article.faq ?? []) as unknown as Prisma.InputJsonValue,
   };
 
   // 1. Upsert as DRAFT (status only set on create; never demote an existing article).
@@ -82,7 +82,7 @@ async function main() {
     where: { action: 'BLOG_PUBLISH', status: 'PENDING' },
   });
   const alreadyQueued =
-    existing && (existing.payload as any)?.articleId === row.id;
+    existing && (existing.payload as { articleId?: string } | null)?.articleId === row.id;
 
   if (alreadyQueued) {
     console.log(`ℹ️  A PENDING BLOG_PUBLISH request already exists: id=${existing!.id}`);

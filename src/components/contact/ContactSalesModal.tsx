@@ -122,14 +122,18 @@ export default function ContactSalesModal({ open, onClose }: ContactSalesModalPr
   useEscapeToClose(open, onClose);
 
   // Reset form whenever the modal re-opens so a previous send doesn't linger.
+  // The reset + focus run in a rAF callback (not the effect body): same
+  // post-paint timing as before, but no synchronous setState in the effect.
   useEffect(() => {
     if (!open) return;
-    setValues(EMPTY_STATE);
-    setErrors({});
-    setServerError(null);
-    setSubmitState('idle');
-    // Defer focus so the input is actually mounted.
-    requestAnimationFrame(() => firstFieldRef.current?.focus());
+    const raf = requestAnimationFrame(() => {
+      setValues(EMPTY_STATE);
+      setErrors({});
+      setServerError(null);
+      setSubmitState('idle');
+      firstFieldRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
   }, [open]);
 
   const charactersLeft = useMemo(

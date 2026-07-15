@@ -44,7 +44,7 @@ export default function PartnersPage() {
   const [sortBy, setSortBy] = useState<SortBy>('default');
   const [currentPage, setCurrentPage] = useState(1);
 
-  const pT = (t as any).partnersPage as Record<string, string>;
+  const pT = t.partnersPage as Record<string, string>;
 
   // Fetch partners (waits for auth to resolve so the token is ready)
   const fetchPartners = useCallback(async () => {

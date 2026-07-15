@@ -13,6 +13,7 @@ export async function notifyAgent(message: string): Promise<void> {
   return MetaWhatsApp.notifyAgent(message);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- keeps the provider-abstraction signature; Meta has no contact-info lookup yet
 export async function getContactInfo(_chatId: string): Promise<{
   name: string | null;
   avatar: string | null;

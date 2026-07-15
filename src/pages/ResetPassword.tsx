@@ -19,11 +19,21 @@ export default function ResetPassword() {
 
   const token = new URLSearchParams(window.location.search).get('token');
 
+  // Enforced password policy (mirrors backend utils/password-policy.ts):
+  // 8-128 chars, a digit, upper+lower case, and a special character.
+  const isPasswordCompliant =
+    password.length >= 8 && password.length <= 128 &&
+    /\d/.test(password) &&
+    /[a-z]/.test(password) && /[A-Z]/.test(password) &&
+    /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    if (password.length < 8) {
-      setError(isHe ? 'הסיסמה חייבת להכיל לפחות 8 תווים.' : 'Password must be at least 8 characters.');
+    if (!isPasswordCompliant) {
+      setError(isHe
+        ? 'הסיסמה חייבת להכיל לפחות 8 תווים, ספרה, אותיות גדולות וקטנות ותו מיוחד.'
+        : 'Password must be 8+ characters and include a digit, upper and lower case letters, and a special character.');
       return;
     }
     setIsLoading(true);
@@ -32,8 +42,16 @@ export default function ResetPassword() {
       await api.post('/api/auth/reset-password', { token, newPassword: password });
       setSuccess(true);
       setTimeout(() => navigate(loginPath), 2500);
-    } catch (err: any) {
-      setError(err?.error ?? (isHe ? 'הקישור פג תוקף או לא תקין. בקש קישור חדש.' : 'Link expired or invalid. Please request a new one.'));
+    } catch (err) {
+      // The api client throws plain objects shaped { error, status }.
+      const code = (err as { error?: string })?.error;
+      if (code === 'password_unchanged') {
+        setError(isHe
+          ? 'הסיסמה החדשה חייבת להיות שונה מהסיסמה הנוכחית.'
+          : 'The new password must be different from your current password.');
+      } else {
+        setError(code ?? (isHe ? 'הקישור פג תוקף או לא תקין. בקש קישור חדש.' : 'Link expired or invalid. Please request a new one.'));
+      }
     } finally {
       setIsLoading(false);
     }

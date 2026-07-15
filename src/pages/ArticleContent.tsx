@@ -135,7 +135,7 @@ export default function ArticleContent() {
     }
 
     // ── JSON-LD BlogPosting ──
-    const jsonLd: Record<string, any> = {
+    const jsonLd: Record<string, unknown> = {
       '@context': 'https://schema.org',
       '@type': 'BlogPosting',
       headline: article.title,

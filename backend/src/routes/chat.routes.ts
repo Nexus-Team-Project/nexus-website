@@ -146,9 +146,9 @@ router.post(
         sender: customerMsg.sender,
         channel: customerMsg.channel,
         timestamp: customerMsg.createdAt,
-        mediaUrl: (customerMsg as any).mediaUrl ?? undefined,
-        mediaType: (customerMsg as any).mediaType ?? undefined,
-        fileName: (customerMsg as any).fileName ?? undefined,
+        mediaUrl: customerMsg.mediaUrl ?? undefined,
+        mediaType: customerMsg.mediaType ?? undefined,
+        fileName: customerMsg.fileName ?? undefined,
       });
 
       // 2b. Browser push notification for new customer message
@@ -160,9 +160,9 @@ router.post(
 
       // 3. Mirror customer message to email thread (all modes)
       const shortId = sessionId.slice(-8);
-      let emailMsgId = (session as any).emailMessageId as string | undefined;
-      let outlookConvId = (session as any).outlookConversationId as string | undefined;
-      let outlookLastMsgId = (session as any).outlookLastMessageId as string | undefined;
+      let emailMsgId = session.emailMessageId ?? undefined;
+      let outlookConvId = session.outlookConversationId ?? undefined;
+      let outlookLastMsgId = session.outlookLastMessageId ?? undefined;
       let customerEmailDone: Promise<void> = Promise.resolve();
 
       console.log(`[Chat] Email mirror: AGENT_EMAIL=${env.AGENT_EMAIL ? 'SET' : 'NOT SET'}, emailMsgId=${emailMsgId ?? 'none'}, outlookConvId=${outlookConvId ?? 'none'}, session=${sessionId}`);
@@ -205,8 +205,8 @@ router.post(
                 }).catch(() => {});
                 console.log(`[Chat] Outlook thread anchor: convId=${found.conversationId}, msgId=${found.id}`);
               }
-            } catch (err: any) {
-              console.error('[Chat] Outlook search FAILED:', err?.message ?? err);
+            } catch (err) {
+              console.error('[Chat] Outlook search FAILED:', err instanceof Error ? err.message : err);
             }
           }
         }).catch((err) => {
@@ -220,7 +220,7 @@ router.post(
         res.status(201).json(customerMsg);
 
         // Detect language from session metadata or default to Hebrew
-        const sessionMeta = (session as any).metadata ?? {};
+        const sessionMeta = (session.metadata ?? {}) as { language?: string; page?: string };
         const sessionLang = sessionMeta.language?.startsWith?.('en') ? 'en' : 'he';
 
         // Generate AI reply: try nexus-agents first, fall back to local AiService
@@ -229,7 +229,7 @@ router.post(
           const agentReply = await SalesAgentClient.requestAiReply({
             sessionId,
             userMessage: text,
-            recentMessages: session.messages.map((m: any) => ({ sender: m.sender, text: m.text })),
+            recentMessages: session.messages.map((m) => ({ sender: m.sender, text: m.text })),
             language: sessionLang,
             context: { visitorId: session.visitorId, page: sessionMeta.page },
           });
@@ -297,8 +297,8 @@ router.post(
                       emailMessageId: emailMsgId,
                     });
                   }
-                } catch (err: any) {
-                  console.error('[Chat] Graph API AI reply FAILED, falling back to SendPulse:', err?.message ?? err);
+                } catch (err) {
+                  console.error('[Chat] Graph API AI reply FAILED, falling back to SendPulse:', err instanceof Error ? err.message : err);
                   await EmailService.sendChatMessageEmail({
                     to: env.AGENT_EMAIL,
                     sessionId,
@@ -443,7 +443,7 @@ router.post(
       }
 
       // Determine if this is a WhatsApp session
-      const isWaSession = !!(session as any).waThreadId;
+      const isWaSession = !!session.waThreadId;
 
       // Save agent message
       const agentMsg = await ChatService.saveMessage({
@@ -461,14 +461,14 @@ router.post(
         sender: agentMsg.sender,
         channel: agentMsg.channel,
         timestamp: agentMsg.createdAt,
-        mediaUrl: (agentMsg as any).mediaUrl ?? undefined,
-        mediaType: (agentMsg as any).mediaType ?? undefined,
-        fileName: (agentMsg as any).fileName ?? undefined,
+        mediaUrl: agentMsg.mediaUrl ?? undefined,
+        mediaType: agentMsg.mediaType ?? undefined,
+        fileName: agentMsg.fileName ?? undefined,
       });
 
       // If WhatsApp session — also send message to customer on WhatsApp
       if (isWaSession) {
-        const waContact = (session as any).waThreadId as string;
+        const waContact = session.waThreadId as string;
         try {
           const waId = await WhatsAppProvider.sendText(waContact, text);
           // Pre-register the outgoing message ID to prevent duplicate processing
@@ -479,8 +479,8 @@ router.post(
             }).catch(() => {}); // Ignore duplicate key
           }
           console.log(`[Chat] Forwarded admin reply to WhatsApp ${waContact} (waId=${waId})`);
-        } catch (err: any) {
-          console.error(`[Chat] Failed to send WhatsApp reply to ${waContact}:`, err.message);
+        } catch (err) {
+          console.error(`[Chat] Failed to send WhatsApp reply to ${waContact}:`, err instanceof Error ? err.message : err);
         }
       }
 
@@ -506,7 +506,7 @@ router.post(
         return;
       }
 
-      const sessionMeta = (session as any).metadata ?? {};
+      const sessionMeta = (session.metadata ?? {}) as { language?: string; page?: string };
       const sessionLang = sessionMeta.language?.startsWith?.('en') ? 'en' : 'he';
 
       const customerMessages = session.messages.filter(m => m.sender === 'CUSTOMER');
@@ -643,7 +643,7 @@ router.get(
       }
 
       // No cached data — fetch from Green API
-      const waThread = (session as any).waThreadId as string | undefined;
+      const waThread = session.waThreadId ?? undefined;
       if (!waThread) {
         res.json({ name: null, avatar: null });
         return;

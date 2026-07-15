@@ -58,12 +58,3 @@ export function approvalAuthFields(a: BusinessSetupApproval | null | undefined):
 export function canTenantCreateOffer(isPlatformAdmin: boolean, approved: boolean): boolean {
   return isPlatformAdmin || approved;
 }
-
-/**
- * True when a caller may ADOPT an offer (M9). Re-adopting one's OWN offer is
- * always allowed; platform admins always may; otherwise the tenant's business
- * setup must be approved. Input: isOwnOffer, isPlatformAdmin, approved.
- */
-export function canTenantAdoptOffer(isOwnOffer: boolean, isPlatformAdmin: boolean, approved: boolean): boolean {
-  return isOwnOffer || isPlatformAdmin || approved;
-}

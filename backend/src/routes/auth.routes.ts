@@ -14,6 +14,7 @@ import * as EmailService from '../services/email.service';
 import { signEmailVerificationToken, verifyEmailVerificationToken } from '../utils/jwt';
 import * as LoginMfaService from '../services/auth/login-mfa.service';
 import { REFRESH_COOKIE, refreshCookieOpts, TRUSTED_DEVICE_COOKIE } from '../utils/auth-cookies';
+import { passwordSchema } from '../utils/password-policy';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ const registerSchema = z.object({
   body: z.object({
     email: z.string().email(),
     fullName: z.string().min(2).max(100),
-    password: z.string().min(8).max(128),
+    password: passwordSchema,
     country: z.string().length(2).optional(),
     emailUpdates: z.boolean().optional(),
     dashboardRedirect: z.string().min(1).max(500).optional(),
@@ -300,7 +301,7 @@ router.post(
 const resetSchema = z.object({
   body: z.object({
     token: z.string().min(1),
-    newPassword: z.string().min(8).max(128),
+    newPassword: passwordSchema,
   }),
 });
 

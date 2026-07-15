@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
-  ArrowLeft, ArrowRight, Bot, Play, Pause, CheckCircle, XCircle, Clock,
-  AlertTriangle, Zap, Settings, List, BarChart3, ScrollText, Plus,
+  ArrowLeft, ArrowRight, Bot, Play, Pause, CheckCircle, XCircle,
+  Zap, Settings, List, BarChart3, ScrollText, Plus,
   ChevronDown, ChevronRight, Loader2, Save, FileText,
 } from 'lucide-react';
 import { api } from '../../lib/api';
@@ -71,8 +71,43 @@ interface BudgetSummary {
   limit: number;
 }
 
+// Raw wire shapes - the agent backends return slightly different field names,
+// so the normalizers below map either variant onto the UI types above.
+interface RawBudget {
+  today?: number;
+  limit?: number;
+  costUsd?: number;
+  budgetUsd?: number;
+}
+
+type RawLog = Omit<AgentLog, 'cost'> & { cost?: number | null; costUsd?: number | null };
+
+interface RawRun {
+  id: string;
+  status: AutomationRun['status'];
+  durationMs?: number | null;
+  cost?: number | null;
+  costUsd?: number | null;
+  summary?: string | null;
+  createdAt?: string;
+  startedAt?: string;
+}
+
+interface RawAutomation {
+  id: string;
+  name: string;
+  skill: string;
+  cron?: string;
+  cronExpr?: string;
+  enabled?: boolean;
+  status?: string;
+  lastRunAt?: string | null;
+  nextRunAt?: string | null;
+  recentRuns?: RawRun[];
+}
+
 /** Normalize budget response — agents-admin returns { today, limit }, agents-crud returns { costUsd, budgetUsd } */
-function normalizeBudget(raw: any): BudgetSummary | null {
+function normalizeBudget(raw: RawBudget | null): BudgetSummary | null {
   if (!raw) return null;
   return {
     today: raw.today ?? raw.costUsd ?? 0,
@@ -81,7 +116,7 @@ function normalizeBudget(raw: any): BudgetSummary | null {
 }
 
 /** Normalize log — backend may return `costUsd` instead of `cost` */
-function normalizeLog(raw: any): AgentLog {
+function normalizeLog(raw: RawLog): AgentLog {
   return {
     ...raw,
     cost: raw.cost ?? raw.costUsd ?? null,
@@ -89,7 +124,7 @@ function normalizeLog(raw: any): AgentLog {
 }
 
 /** Normalize automation — backend may return raw Prisma fields */
-function normalizeAutomation(raw: any): AgentAutomation {
+function normalizeAutomation(raw: RawAutomation): AgentAutomation {
   return {
     id: raw.id,
     name: raw.name,
@@ -98,7 +133,7 @@ function normalizeAutomation(raw: any): AgentAutomation {
     enabled: raw.enabled ?? (raw.status === 'ACTIVE'),
     lastRunAt: raw.lastRunAt ?? null,
     nextRunAt: raw.nextRunAt ?? null,
-    recentRuns: raw.recentRuns?.map((r: any) => ({
+    recentRuns: raw.recentRuns?.map((r) => ({
       id: r.id,
       status: r.status,
       durationMs: r.durationMs ?? null,
@@ -159,8 +194,9 @@ export default function AgentDetailPage() {
     try {
       const data = await api.get<AgentDetail>(`/api/admin/agents/${slug}`);
       setAgent(data);
-    } catch (e: any) {
-      setError(e?.error ?? 'Failed to load agent');
+    } catch (e) {
+      // The api client throws plain objects shaped { error, status }.
+      setError((e as { error?: string })?.error ?? 'Failed to load agent');
     } finally {
       setLoading(false);
     }
@@ -322,7 +358,7 @@ export default function AgentDetailPage() {
       {activeTab === 'tasks'       && <TasksTab slug={slug!} isHe={isHe} />}
       {activeTab === 'automations' && <AutomationsTab slug={slug!} isHe={isHe} />}
       {activeTab === 'logs'        && <LogsTab slug={slug!} isHe={isHe} />}
-      {activeTab === 'prompts'     && <PromptsTab slug={slug!} isHe={isHe} />}
+      {activeTab === 'prompts'     && <PromptsTab key={slug} slug={slug!} isHe={isHe} />}
       {activeTab === 'settings'    && <SettingsTab agent={agent} slug={slug!} isHe={isHe} onUpdate={setAgent} />}
     </div>
   );
@@ -330,15 +366,15 @@ export default function AgentDetailPage() {
 
 // ─── Overview Tab ─────────────────────────────────────────
 
-function OverviewTab({ agent, slug, isHe, color }: { agent: AgentDetail; slug: string; isHe: boolean; color: string }) {
+function OverviewTab({ agent, slug, isHe }: { agent: AgentDetail; slug: string; isHe: boolean; color: string }) {
   const [logs, setLogs] = useState<AgentLog[]>([]);
   const [budget, setBudget] = useState<BudgetSummary | null>(null);
   const [loadingLogs, setLoadingLogs] = useState(true);
 
   useEffect(() => {
     Promise.all([
-      api.get<any[]>(`/api/admin/agents/${slug}/logs?limit=10`).catch(() => []),
-      api.get<any>(`/api/admin/agents/${slug}/budget`).catch(() => null),
+      api.get<RawLog[]>(`/api/admin/agents/${slug}/logs?limit=10`).catch(() => [] as RawLog[]),
+      api.get<RawBudget | null>(`/api/admin/agents/${slug}/budget`).catch(() => null),
     ]).then(([l, b]) => {
       setLogs(l.map(normalizeLog));
       setBudget(normalizeBudget(b));
@@ -627,7 +663,7 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    api.get<any[]>(`/api/admin/agents/${slug}/automations`)
+    api.get<RawAutomation[]>(`/api/admin/agents/${slug}/automations`)
       .then((data) => setAutomations(data.map(normalizeAutomation)))
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -649,7 +685,7 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
     if (!newName.trim() || !newSkill.trim() || !newCron.trim()) return;
     setCreating(true);
     try {
-      const raw = await api.post<any>(`/api/admin/agents/${slug}/automations`, {
+      const raw = await api.post<RawAutomation>(`/api/admin/agents/${slug}/automations`, {
         name: newName.trim(),
         skill: newSkill.trim(),
         cronExpr: newCron.trim(),
@@ -677,7 +713,7 @@ function AutomationsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
     const auto = automations.find((a) => a.id === id);
     if (auto && !auto.recentRuns) {
       try {
-        const rawRuns = await api.get<any[]>(`/api/admin/agents/${slug}/automations/${id}/runs?limit=5`);
+        const rawRuns = await api.get<RawRun[]>(`/api/admin/agents/${slug}/automations/${id}/runs?limit=5`);
         const runs: AutomationRun[] = rawRuns.map((r) => ({
           id: r.id,
           status: r.status,
@@ -872,7 +908,7 @@ function LogsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
     if (isMore) setLoadingMore(true); else setLoading(true);
 
     try {
-      const rawData = await api.get<any[]>(`/api/admin/agents/${slug}/logs?limit=${PAGE_SIZE}&offset=${offset}`);
+      const rawData = await api.get<RawLog[]>(`/api/admin/agents/${slug}/logs?limit=${PAGE_SIZE}&offset=${offset}`);
       const data = rawData.map(normalizeLog);
       if (isMore) {
         setLogs((prev) => [...prev, ...data]);
@@ -968,13 +1004,13 @@ interface PromptEntry {
 
 function PromptsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
   const [prompts, setPrompts] = useState<PromptEntry[]>([]);
+  // loading starts true; the component is keyed by slug at the render site,
+  // so a slug change remounts it with fresh loading state (no setState in effect body).
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
 
   useEffect(() => {
-    setLoading(true);
-    setError(null);
     api.get<PromptEntry[]>(`/api/admin/agents/${slug}/prompts`)
       .then((data) => {
         setPrompts(data);
@@ -982,7 +1018,7 @@ function PromptsTab({ slug, isHe }: { slug: string; isHe: boolean }) {
         const first = data.find((p) => p.content);
         if (first) setExpandedSkill(first.skill);
       })
-      .catch((e: any) => setError(e?.error ?? 'Failed to load prompts'))
+      .catch((e: unknown) => setError((e as { error?: string })?.error ?? 'Failed to load prompts'))
       .finally(() => setLoading(false));
   }, [slug]);
 
