@@ -1,6 +1,6 @@
 /**
- * Behavior tests for the wallet email+password auth orchestration: single-flow
- * login/auto-signup with mandatory 2FA, per-account lockout, and the
+ * Behavior tests for the wallet email+password auth orchestration: separate
+ * login vs register intents with mandatory 2FA, per-account lockout, and the
  * code-based forgot-password flow (decoy tokens for unknown emails).
  * Prisma + identity resolution + mail transport mocked; Mongo is real.
  * Spec: docs/superpowers/specs/2026-07-14-wallet-email-password-auth-design.md
@@ -134,9 +134,17 @@ describe('startPasswordLogin', () => {
     await expect(startPasswordLogin(db, LOGIN_ARGS)).rejects.toThrow('account_locked');
   });
 
-  it('unknown email + compliant password -> signup challenge with a stashed bcrypt hash', async () => {
+  it('login intent + unknown email -> invalid_credentials, nothing created, no failure recorded', async () => {
     mocks.userFindUnique.mockResolvedValue(null);
-    const out = await startPasswordLogin(db, LOGIN_ARGS);
+    await expect(startPasswordLogin(db, LOGIN_ARGS)).rejects.toThrow('invalid_credentials');
+    expect(await db.collection(LOGIN_OTP_COLLECTION).countDocuments({})).toBe(0);
+    // Unknown emails must not count toward the lockout (no account to protect).
+    expect(await countRecentEvents(db, { bucket: 'pwd_fail', key: 'user@wallet.test', windowSec: 900 })).toBe(0);
+  });
+
+  it('signup intent + unknown email + compliant password -> signup challenge with a stashed bcrypt hash', async () => {
+    mocks.userFindUnique.mockResolvedValue(null);
+    const out = await startPasswordLogin(db, { ...LOGIN_ARGS, intent: 'signup' });
     expect(out.challengeToken.length).toBeGreaterThanOrEqual(48);
     const doc = await db.collection(LOGIN_OTP_COLLECTION).findOne({});
     expect(doc?.purpose).toBe('wallet_signup');
@@ -144,10 +152,18 @@ describe('startPasswordLogin', () => {
     expect(await bcrypt.compare(PASSWORD, doc?.pendingPasswordHash as string)).toBe(true);
   });
 
-  it('unknown email + weak password -> weak_password, nothing stored', async () => {
+  it('signup intent + existing email -> account_exists, nothing stored', async () => {
+    // userFindUnique defaults to an existing user.
+    await expect(
+      startPasswordLogin(db, { ...LOGIN_ARGS, intent: 'signup' }),
+    ).rejects.toThrow('account_exists');
+    expect(await db.collection(LOGIN_OTP_COLLECTION).countDocuments({})).toBe(0);
+  });
+
+  it('signup intent + unknown email + weak password -> weak_password, nothing stored', async () => {
     mocks.userFindUnique.mockResolvedValue(null);
     await expect(
-      startPasswordLogin(db, { ...LOGIN_ARGS, password: 'weakpass' }),
+      startPasswordLogin(db, { ...LOGIN_ARGS, intent: 'signup', password: 'weakpass' }),
     ).rejects.toThrow('weak_password');
     expect(await db.collection(LOGIN_OTP_COLLECTION).countDocuments({})).toBe(0);
   });
@@ -173,7 +189,7 @@ describe('completePasswordChallenge', () => {
 
   it('wallet_signup -> sets the stashed hash only where passwordHash is null (race guard)', async () => {
     mocks.userFindUnique.mockResolvedValue(null);
-    const start = await startPasswordLogin(db, LOGIN_ARGS);
+    const start = await startPasswordLogin(db, { ...LOGIN_ARGS, intent: 'signup' });
     mocks.resolveWalletIdentity.mockResolvedValue({ ...RESOLVED, identityCreated: true });
     const out = await completePasswordChallenge(db, {
       challengeToken: start.challengeToken,

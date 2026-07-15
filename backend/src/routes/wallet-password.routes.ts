@@ -33,6 +33,9 @@ const loginSchema = z.object({
   // The policy gates only NEW passwords (signup path, reset completion).
   password: z.string().min(1).max(128),
   lang: langSchema,
+  // Explicit action: 'login' (default) never creates an account; 'signup'
+  // refuses an existing email. Splits the two so a login typo cannot register.
+  intent: z.enum(['login', 'signup']).optional(),
 });
 const verifySchema = z.object({
   challengeToken: z.string().min(32).max(256),
@@ -49,6 +52,7 @@ const forgotCompleteSchema = z.object({
 function clientError(e: unknown): { status: number; code: string } {
   const msg = e instanceof Error ? e.message : 'unknown';
   if (msg === 'invalid_credentials') return { status: 401, code: 'invalid_credentials' };
+  if (msg === 'account_exists') return { status: 409, code: 'account_exists' };
   if (msg === 'account_locked') return { status: 429, code: 'account_locked' };
   if (msg === 'weak_password') return { status: 400, code: 'weak_password' };
   if (msg === 'password_unchanged') return { status: 400, code: 'password_unchanged' };
@@ -78,6 +82,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
       password: parsed.data.password,
       ip: req.ip ?? null,
       lang: parsed.data.lang ?? 'he',
+      intent: parsed.data.intent ?? 'login',
     });
     // Never echo the test-only __testCode field back to a client.
     res.json({ mode: '2fa_required', challengeToken: out.challengeToken });
