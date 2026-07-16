@@ -66,6 +66,7 @@ export async function deliverOutreachItem(item: ServiceOutreachJobItem): Promise
       await sendServiceOutreachEmail({
         to: item.email,
         tenantName: item.tenantName,
+        tenantId: item.tenantId,
         ctaUrl: shortUrl,
         language: item.language,
       });

@@ -213,6 +213,7 @@ export async function updateTenantMemberEmail(
     void sendTenantInviteRevokedEmail({
       to: oldNormalizedEmail,
       tenantName,
+      tenantId: access.tenantId,
       language: 'he',
     }).catch(() => undefined);
   }
@@ -342,6 +343,7 @@ export async function updateTenantMemberEmail(
   void sendTenantMemberInviteEmail({
     to: newNormalized,
     tenantName,
+    tenantId: access.tenantId,
     roles: oldRoles,
     inviteUrl: buildMemberInviteUrl({
       token: rawToken,
@@ -436,6 +438,7 @@ export async function removeTenantMemberFromTenant(
       to: identity.normalizedEmail,
       displayName: identity.displayName,
       tenantName,
+      tenantId: access.tenantId,
       language: (identity.locale as 'he' | 'en') ?? 'he',
     }).catch(() => undefined);
   }

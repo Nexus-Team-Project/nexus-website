@@ -81,6 +81,7 @@ export async function processClaimedItem(item: InviteJobItem): Promise<void> {
     to: item.email,
     displayName: item.displayName,
     tenantName: item.tenantName,
+    tenantId: item.tenantId,
     roles: item.roles as never,
     services: item.services,
     inviteUrl,

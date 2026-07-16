@@ -7,7 +7,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../src/services/email.service', () => ({
   sendMail: vi.fn(async () => 'msg_1'),
-  buildAuthEmailBannerHtml: vi.fn(() => '<img alt="banner"/>'),
+  buildTenantEmailBannerHtml: vi.fn(() => '<img alt="banner"/>'),
+}));
+vi.mock('../../../src/services/email/tenant-email-logo.helper', () => ({
+  fetchTenantEmailLogoUrl: vi.fn(async () => null),
 }));
 
 import { sendServiceOutreachEmail } from '../../../src/services/email/service-outreach-email.service';

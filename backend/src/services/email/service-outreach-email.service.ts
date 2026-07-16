@@ -6,12 +6,15 @@
  * short link - this is marketing/notification traffic, so the OTP
  * no-shortener rule does not apply.
  */
-import { buildAuthEmailBannerHtml, sendMail } from '../email.service';
+import { buildTenantEmailBannerHtml, sendMail } from '../email.service';
+import { fetchTenantEmailLogoUrl } from './tenant-email-logo.helper';
 
 export interface ServiceOutreachEmailInput {
   to: string;
   displayName?: string;
   tenantName: string;
+  /** When provided, the tenant's logo (if set) is shown beside the Nexus logo. */
+  tenantId?: string;
   /** Absolute short link (getOrCreateShortLink output). */
   ctaUrl: string;
   language: 'he' | 'en';
@@ -42,7 +45,7 @@ export async function sendServiceOutreachEmail(
   const dir = isHebrew ? 'rtl' : 'ltr';
   const tenantName = escapeHtml(input.tenantName);
   const escapedUrl = escapeHtml(input.ctaUrl);
-  const bannerHtml = buildAuthEmailBannerHtml();
+  const bannerHtml = buildTenantEmailBannerHtml(await fetchTenantEmailLogoUrl(input.tenantId));
 
   const subject = isHebrew
     ? `${input.tenantName} מזמין אותך ל-Nexus Wallet`

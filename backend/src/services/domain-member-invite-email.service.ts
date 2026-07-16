@@ -9,7 +9,8 @@
  * login first, then into dashboard accept (those roles only exist in the dashboard).
  */
 import { env } from '../config/env';
-import { buildAuthEmailBannerHtml, sendMail } from './email.service';
+import { buildTenantEmailBannerHtml, sendMail } from './email.service';
+import { fetchTenantEmailLogoUrl } from './email/tenant-email-logo.helper';
 import type { TenantUserRoleName } from '../models/domain';
 
 /**
@@ -26,6 +27,8 @@ export interface TenantMemberInviteEmailInput {
   to: string;
   displayName?: string;
   tenantName: string;
+  /** When provided, the tenant's logo (if set) is shown beside the Nexus logo. */
+  tenantId?: string;
   roles: TenantUserRoleName[];
   /** Service keys granted to this member (e.g. benefits_catalog). */
   services?: string[];
@@ -210,7 +213,7 @@ export async function sendTenantMemberInviteEmail(
   const servicesBadges = buildServicesBadgesHtml(input.services, input.language);
   const expiry = escapeHtml(formatExpiryDate(input.expiresAt, input.language));
   const escapedUrl = escapeHtml(input.inviteUrl);
-  const bannerHtml = buildAuthEmailBannerHtml();
+  const bannerHtml = buildTenantEmailBannerHtml(await fetchTenantEmailLogoUrl(input.tenantId));
 
   const subject = isHebrew
     ? `הוזמנת להצטרף ל-${tenantName} ב-Nexus`

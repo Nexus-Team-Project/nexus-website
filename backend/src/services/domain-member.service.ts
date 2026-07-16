@@ -180,6 +180,7 @@ async function sendAndTrackInvitationEmail(input: {
       to: input.email,
       displayName: input.displayName,
       tenantName: input.tenantName,
+      tenantId: input.tenantId,
       roles: input.roles,
       services: input.services,
       inviteUrl,
