@@ -42,7 +42,7 @@ import {
 } from '../services/catalog.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, VOUCHER_PAYMENTS_MIN, VOUCHER_PAYMENTS_MAX, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
-import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
+import { assertVoucherValidity, assertVoucherStackable, assertUniqueVariantValueStack } from '../services/supply-voucher.helper';
 import { addBarcodes, addLinks, getInventorySummary, getOfferVariantInventoryCounts, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
@@ -181,6 +181,10 @@ function validateVoucherVariants(
     const s = assertVoucherStackable(v.voucherStackable);
     if (!s.ok) return { ok: false, error: s.error, errorHe: s.errorHe };
   }
+  // Uniqueness (owner decision 2026-07-16): at most ONE variant per
+  // (face_value, stackable) pair - see assertUniqueVariantValueStack.
+  const unique = assertUniqueVariantValueStack(variants);
+  if (!unique.ok) return { ok: false, error: unique.error, errorHe: unique.errorHe };
   return { ok: true };
 }
 
