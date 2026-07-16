@@ -16,6 +16,7 @@ import { env } from '../../../src/config/env';
 import { hashToken } from '../../../src/utils/crypto';
 import { WALLET_MAGIC_LINK_COLLECTION } from '../../../src/models/auth/wallet-magic-link.models';
 import { startMagicLink, consumeMagicLink } from '../../../src/services/auth/wallet-magic-link.service';
+import { sendWalletMagicLinkMessage } from '../../../src/services/email/wallet-magic-link-email.service';
 
 let client: MongoClient;
 let db: Db;
@@ -49,9 +50,19 @@ describe('wallet-magic-link.service', () => {
     expect(JSON.stringify(doc)).not.toContain(__testToken as string);
   });
 
-  it('start throws magic_unavailable when WALLET_URL is unset', async () => {
+  it('emails a link built from WALLET_URL', async () => {
+    await startMagicLink(db, { email: 'b@example.com', ip: '1.1.1.1', lang: 'he' });
+    expect(sendWalletMagicLinkMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'b@example.com',
+        link: expect.stringMatching(/^http:\/\/localhost:8080\/he\/auth\/magic\?token=/),
+      }),
+    );
+  });
+
+  it('throws magic_unavailable when WALLET_URL is unset', async () => {
     env.WALLET_URL = undefined;
-    await expect(startMagicLink(db, { email: 'b@example.com', ip: '1.1.1.1' })).rejects.toThrow(
+    await expect(startMagicLink(db, { email: 'z@example.com', ip: '1.1.1.1' })).rejects.toThrow(
       'magic_unavailable',
     );
     env.WALLET_URL = 'http://localhost:8080';

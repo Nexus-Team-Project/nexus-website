@@ -54,22 +54,19 @@ describe('buildMemberInviteWalletUrl', () => {
     expect(new URL(url).pathname).toBe('/en');
   });
 
-  it('outside production, ALWAYS uses the local dev wallet port, ignoring WALLET_URL', () => {
-    env.NODE_ENV = 'development';
-    env.WALLET_URL = 'https://wallet.nexus-payment.com';
-    const url = buildMemberInviteWalletUrl('tenant_123', 'he');
-    expect(new URL(url).host).toBe('localhost:8080');
-  });
-
-  it('in production, follows WALLET_URL', () => {
-    env.NODE_ENV = 'production';
+  it('follows WALLET_URL when set (any environment)', () => {
     env.WALLET_URL = 'https://wallet.nexus-payment.com';
     const url = buildMemberInviteWalletUrl('tenant_123', 'he');
     expect(new URL(url).host).toBe('wallet.nexus-payment.com');
   });
 
-  it('in production with WALLET_URL unset, falls back to the local dev port', () => {
-    env.NODE_ENV = 'production';
+  it('follows a localhost WALLET_URL in local dev', () => {
+    env.WALLET_URL = 'http://localhost:8080';
+    const url = buildMemberInviteWalletUrl('tenant_123', 'he');
+    expect(new URL(url).host).toBe('localhost:8080');
+  });
+
+  it('falls back to the local dev port when WALLET_URL is unset', () => {
     env.WALLET_URL = undefined;
     const url = buildMemberInviteWalletUrl('tenant_123', 'he');
     expect(new URL(url).host).toBe('localhost:8080');
