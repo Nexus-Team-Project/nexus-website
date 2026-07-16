@@ -18,6 +18,7 @@ import { PHONE_OTP_COLLECTION } from '../../models/auth/phone-otp.models';
 import { EMAIL_OTP_COLLECTION } from '../../models/auth/email-otp.models';
 import { PHONE_SIGNUP_TICKET_COLLECTION } from '../../models/auth/phone-signup-ticket.models';
 import { LOGIN_OTP_COLLECTION } from '../../models/auth/login-otp.models';
+import { WALLET_MAGIC_LINK_COLLECTION } from '../../models/auth/wallet-magic-link.models';
 import { TRUSTED_DEVICE_COLLECTION } from '../../models/auth/trusted-device.models';
 import { ONBOARDING_PHONE_VERIFICATION_COLLECTION } from '../../models/auth/onboarding-phone-verification.models';
 import { TENANT_JOIN_REQUEST_COLLECTION } from '../../models/auth/tenant-join-request.models';
@@ -112,6 +113,7 @@ export async function collectMongoCounts(
     phoneSignupTickets,
     walletRateLimits,
     loginOtpChallenges,
+    walletMagicLinks,
     trustedDevices,
     onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
@@ -239,6 +241,8 @@ export async function collectMongoCounts(
     }),
     // Login new-device OTP challenges keyed by email.
     db.collection(LOGIN_OTP_COLLECTION).countDocuments({ email }),
+    // Wallet magic-link tokens keyed by email.
+    db.collection(WALLET_MAGIC_LINK_COLLECTION).countDocuments({ email }),
     // Trusted login devices keyed by the Prisma user id.
     db.collection(TRUSTED_DEVICE_COLLECTION).countDocuments(
       targets.prismaUserIds.length
@@ -310,6 +314,7 @@ export async function collectMongoCounts(
     phoneSignupTickets,
     walletRateLimits,
     loginOtpChallenges,
+    walletMagicLinks,
     trustedDevices,
     onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
@@ -355,6 +360,8 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   await db.collection(EMAIL_OTP_COLLECTION).deleteMany({ email });
   // Login new-device OTP challenges + trusted devices (login-device-otp).
   await db.collection(LOGIN_OTP_COLLECTION).deleteMany({ email });
+  // Wallet magic-link tokens keyed by email.
+  await db.collection(WALLET_MAGIC_LINK_COLLECTION).deleteMany({ email });
   if (targets.prismaUserIds.length > 0) {
     await db.collection(TRUSTED_DEVICE_COLLECTION).deleteMany({
       prismaUserId: { $in: targets.prismaUserIds },

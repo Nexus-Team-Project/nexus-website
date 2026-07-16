@@ -20,6 +20,7 @@ import { prisma } from './config/database';
 import { closeMongoConnection, getMongoDb, verifyMongoConnection } from './config/mongo';
 import { ensureDomainIndexes } from './models/domain';
 import { ensureOnboardingIndexes } from './models/onboarding.models';
+import { ensureWalletMagicLinkIndexes } from './models/auth/wallet-magic-link.models';
 import { ensureDefaultRolePermissions } from './services/domain-permissions.service';
 import { getSupplyDomainCollections } from './models/domain/supply.models';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
@@ -190,6 +191,7 @@ async function bootstrap() {
     const mongoDb = await getMongoDb();
     await ensureOnboardingIndexes(mongoDb);
     await ensureDomainIndexes(mongoDb);
+    await ensureWalletMagicLinkIndexes(mongoDb);
     await ensureDefaultRolePermissions();
     // One-shot idempotent backfill: legacy offers carry only `imageUrl`. Copy
     // that into `imageUrls` so the new gallery field is consistent with the
