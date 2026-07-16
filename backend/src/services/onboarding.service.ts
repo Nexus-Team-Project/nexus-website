@@ -63,6 +63,8 @@ export interface DashboardAuthorization {
   canManageMembers: boolean;
   /** True when the user can create or manage supply catalog offers. */
   canManageSupply: boolean;
+  /** True when the user can adopt/cancel catalog offers (catalog.adopt_offer). */
+  canAdoptOffers: boolean;
   /** Catalog activation mode derived from TenantServiceActivation + Tenant.status. */
   catalogMode: 'inactive' | 'sandbox' | 'live';
   /** True when the benefits_catalog service is active for this tenant. */
@@ -117,6 +119,8 @@ export interface MeResponse {
     tenantLogoCrop?: LogoCrop | null;
     /** Org brand color ("#rrggbb"), or null -> wallet derives one from the id. */
     tenantBrandColor?: string | null;
+    /** Auto-adopt NEXUS-admin offers setting (absent tenant field = true). */
+    autoAdoptAdminOffers?: boolean;
   };
   authorization: DashboardAuthorization;
   onboarding: OnboardingInfo;
@@ -222,6 +226,9 @@ function getDashboardAuthorization(
     canManageMembers: permissions.includes('team.invite_member') && permissions.includes('roles.assign'),
     // Platform admins can always manage supply; tenant supply_managers get it via domain permissions.
     canManageSupply: adminByEmail || permissions.includes('supply.ingest') || permissions.includes('supply.manage_offers'),
+    // Drives the dashboard Settings auto-adopt toggle visibility; the route
+    // enforces the same permission server-side.
+    canAdoptOffers: adminByEmail || permissions.includes('catalog.adopt_offer'),
     // Catalog fields are overwritten in getMe() after async resolution.
     catalogMode: 'inactive',
     catalogServiceActive: false,
@@ -531,7 +538,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const tenantBrandingDoc = context.tenantId
     ? await getTenantDomainCollections(db).domainTenants.findOne(
         { tenantId: context.tenantId },
-        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, businessSetupApproval: 1, autoApproveOffers: 1 } },
+        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, businessSetupApproval: 1, autoApproveOffers: 1, autoAdoptAdminOffers: 1 } },
       )
     : null;
 
@@ -543,6 +550,8 @@ export async function getMe(userId: string): Promise<MeResponse> {
       tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
       tenantLogoCrop: tenantBrandingDoc?.logoCrop ?? null,
       tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
+      // Settings toggle: auto-adopt NEXUS-admin offers (absent field = true).
+      autoAdoptAdminOffers: tenantBrandingDoc ? tenantBrandingDoc.autoAdoptAdminOffers !== false : true,
       ...(planSummary && {
         plan: planSummary.plan,
         seats: {
