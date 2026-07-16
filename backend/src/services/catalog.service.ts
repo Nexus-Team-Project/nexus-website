@@ -613,6 +613,20 @@ export async function getMemberCatalogView(
     offers = page;
   }
 
+  // Uploader identity: batch-fetch the creating tenants for this page in ONE
+  // query (no N+1), mirroring getTenantCatalogView, so wallet/member cards can
+  // show the real "created by <org>" name + logo instead of the NEXUS fallback.
+  const uploaderTenantIds = [...new Set(offers.map((o) => o.createdByTenantId).filter(Boolean))];
+  const uploaderTenants = uploaderTenantIds.length === 0
+    ? []
+    : await getTenantDomainCollections(db).domainTenants
+        .find(
+          { tenantId: { $in: uploaderTenantIds } },
+          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } },
+        )
+        .toArray();
+  const uploaderMap = new Map(uploaderTenants.map((tn) => [tn.tenantId, tn]));
+
   const items = offers.map((o) => {
     const toc = configMap.get(o.offerId);
     const effectiveMemberPrice = toc?.memberPrice ?? o.member_price;
@@ -622,6 +636,7 @@ export async function getMemberCatalogView(
       canSeeNexusCost: false,
       effectiveMemberPrice,
       ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+      uploaderTenant: uploaderMap.get(o.createdByTenantId) ?? undefined,
     });
   });
 

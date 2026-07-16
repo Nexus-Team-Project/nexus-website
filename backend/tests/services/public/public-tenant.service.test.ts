@@ -19,6 +19,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.collection(DOMAIN_COLLECTIONS.domainTenants).deleteMany({});
   await db.collection(DOMAIN_COLLECTIONS.tenantServiceActivations).deleteMany({});
+  await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).deleteMany({});
 });
 
 async function seedTenant(tenantId: string, opts: { catalogActive: boolean; name?: string }) {
@@ -67,5 +68,38 @@ describe('getPublicTenantInfo', () => {
       createdAt: new Date(), updatedAt: new Date(),
     });
     expect(await getPublicTenantInfo(db, 't_susp')).toBeNull();
+  });
+
+  it('includes businessDescription from tenantProfiles when authored', async () => {
+    await seedTenant('t_desc', { catalogActive: true });
+    await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).insertOne({
+      tenantProfileId: 'tp_desc', tenantId: 't_desc',
+      businessDescription: 'Leading Israeli fashion brand for the whole family.',
+      selectedUseCases: [], createdAt: new Date(), updatedAt: new Date(),
+    });
+    const r = await getPublicTenantInfo(db, 't_desc');
+    expect(r?.businessDescription).toBe('Leading Israeli fashion brand for the whole family.');
+  });
+
+  it('omits businessDescription when the profile is missing or blank', async () => {
+    await seedTenant('t_nodesc', { catalogActive: true });
+    expect((await getPublicTenantInfo(db, 't_nodesc'))?.businessDescription).toBeUndefined();
+
+    await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).insertOne({
+      tenantProfileId: 'tp_blank', tenantId: 't_nodesc',
+      businessDescription: '   ', selectedUseCases: [],
+      createdAt: new Date(), updatedAt: new Date(),
+    });
+    expect((await getPublicTenantInfo(db, 't_nodesc'))?.businessDescription).toBeUndefined();
+  });
+
+  it('still returns null for a described tenant without an active catalog (gate unchanged)', async () => {
+    await seedTenant('t_desc_gated', { catalogActive: false });
+    await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).insertOne({
+      tenantProfileId: 'tp_gated', tenantId: 't_desc_gated',
+      businessDescription: 'Hidden until catalog active.', selectedUseCases: [],
+      createdAt: new Date(), updatedAt: new Date(),
+    });
+    expect(await getPublicTenantInfo(db, 't_desc_gated')).toBeNull();
   });
 });
