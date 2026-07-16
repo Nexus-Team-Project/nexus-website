@@ -52,7 +52,11 @@ export async function getOrCreateShortLink(
   serviceKey: string,
   targetUrl: string,
 ): Promise<string> {
-  const base = env.BACKEND_URL?.replace(/\/+$/, '');
+  // Outside production a missing BACKEND_URL falls back to the local server
+  // so dev outreach sends work out of the box; production must configure it
+  // (a localhost link in a real SMS would be useless).
+  const fallback = env.NODE_ENV !== 'production' ? `http://localhost:${env.PORT}` : undefined;
+  const base = (env.BACKEND_URL ?? fallback)?.replace(/\/+$/, '');
   if (!base) throw createError('BACKEND_URL is not configured', 500);
   const col = getShortLinkCollection(await getMongoDb());
 
