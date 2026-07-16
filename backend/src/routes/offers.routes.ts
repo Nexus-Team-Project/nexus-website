@@ -40,6 +40,7 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
+import { autoAdoptOfferForAllTenants } from '../services/admin-offer-auto-adopt.service';
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, VOUCHER_PAYMENTS_MIN, VOUCHER_PAYMENTS_MAX, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
@@ -710,6 +711,17 @@ router.post(
         } catch (err) {
           // Log but do not fail the response - offer was created successfully.
           console.error('[OFFERS] Auto-adopt failed for tenant_only offer:', err);
+        }
+      }
+
+      // Admin-offer auto-adopt: an on-behalf ECOSYSTEM offer (admin-uploaded,
+      // publishes active) is adopted into every eligible tenant's catalog.
+      // Best-effort: never fails the creation response.
+      if (onBehalfOfTenantId && offer.visibility === 'ecosystem' && offer.status === 'active') {
+        try {
+          await autoAdoptOfferForAllTenants(offer.offerId);
+        } catch (err) {
+          console.error('[OFFERS] Admin-offer auto-adopt fan-out failed:', err);
         }
       }
 

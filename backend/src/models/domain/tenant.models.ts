@@ -127,6 +127,15 @@ export const domainTenantSchema = z.object({
    */
   autoApproveOffers: z.boolean().default(false),
   /**
+   * When true (the default), offers uploaded by a NEXUS platform admin
+   * (ecosystem + uploadedByIdentityId) are automatically adopted into this
+   * tenant's catalog - both on future admin uploads and as a catch-up when the
+   * benefits catalog is activated or this flag is re-enabled. When false, no
+   * NEW auto-adoptions happen (already-adopted offers stay; the tenant removes
+   * them per offer). Absent on tenants created before this field = true.
+   */
+  autoAdoptAdminOffers: z.boolean().default(true),
+  /**
    * NEXUS-admin approval of this tenant's business setup (Phase 2 M8). Absent =
    * never submitted. Set to 'pending' when business setup is submitted (or via
    * the dev-only shortcut, which also sets devMode:true); a platform admin moves

@@ -16,6 +16,7 @@ import { getSupplyDomainCollections, NOT_DELETED } from '../models/domain/supply
 import { getOnboardingCollections } from '../models/onboarding.models';
 import type { BenefitsCatalogActivationInput } from '../schemas/domain-service-activation.schemas';
 import { getDomainAuthorizationContext, hasDomainPermission } from './domain-authorization.service';
+import { autoAdoptAdminOffersForTenant } from './admin-offer-auto-adopt.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
 import { syncDomainTenantMembership } from './domain-tenant-sync.service';
 import { getUserContext } from './onboarding.service';
@@ -244,6 +245,16 @@ export async function activateBenefitsCatalogForUser(
       },
     },
   );
+
+  // Admin-offer auto-adopt catch-up: a tenant activating (or re-activating)
+  // the catalog service adopts all current admin offers it has no adoption
+  // row for (explicit exclusions are respected). Best-effort: activation
+  // never fails because of it.
+  try {
+    await autoAdoptAdminOffersForTenant(access.tenantId);
+  } catch (err) {
+    console.error('[SERVICE-ACTIVATION] Admin-offer auto-adopt catch-up failed:', err);
+  }
 
   return {
     tenantId: access.tenantObjectId.toHexString(),
