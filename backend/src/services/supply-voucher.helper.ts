@@ -119,3 +119,39 @@ export function assertVoucherStackable(
     errorHe: 'שובר מחייב בחירה אם ניתן לכפל מבצעים',
   };
 }
+
+/** The minimal variant shape the uniqueness rule needs. */
+export interface VariantValueStack {
+  face_value?: number;
+  voucherStackable?: boolean | null;
+}
+
+/**
+ * Validates variant uniqueness (owner decision 2026-07-16): at most ONE
+ * variant per (face_value, stackable) pair. A different selling price never
+ * makes a duplicate value legal, so a value appears at most twice - once
+ * stackable and once not. The wallet's card deck resolves a variant by
+ * (value, stackable choice), which must be unambiguous. A null/undefined
+ * stackable counts as not-stackable (the mandatory-choice rule fires
+ * separately per variant).
+ *
+ * Input:  variants - the offer's variant inputs.
+ * Output: { ok: true }, or { ok: false, error, errorHe } naming the conflict.
+ */
+export function assertUniqueVariantValueStack(
+  variants: VariantValueStack[],
+): VoucherValidityResult {
+  const seen = new Set<string>();
+  for (const v of variants) {
+    const key = `${v.face_value}|${v.voucherStackable === true}`;
+    if (seen.has(key)) {
+      return {
+        ok: false,
+        error: 'Two variants cannot share the same value and the same promo-stacking setting',
+        errorHe: 'לא ניתן ליצור שני וריאנטים עם אותו שווי ואותה הגדרת כפל מבצעים',
+      };
+    }
+    seen.add(key);
+  }
+  return { ok: true };
+}

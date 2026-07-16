@@ -8,6 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   assertVoucherValidity,
   assertVoucherStackable,
+  assertUniqueVariantValueStack,
   isValidHexColor,
 } from '../../src/services/supply-voucher.helper';
 import { VOUCHER_VALIDITY_MAX, SKU_REGEX, SKU_MIN_LENGTH, SKU_MAX_LENGTH } from '../../src/models/domain/supply.models';
@@ -113,5 +114,54 @@ describe('SKU rule (regex + length 4-20)', () => {
     expect(isValidSku('GIFT 100')).toBe(false);   // space
     expect(isValidSku('GIFT@100')).toBe(false);   // special char
     expect(isValidSku('GIFT.100')).toBe(false);   // dot
+  });
+});
+
+describe('assertUniqueVariantValueStack (one variant per value+stackable)', () => {
+  it('allows the same value twice when stackable differs (screenshot V2+V4)', () => {
+    expect(assertUniqueVariantValueStack([
+      { face_value: 400, voucherStackable: true },
+      { face_value: 400, voucherStackable: false },
+    ]).ok).toBe(true);
+  });
+
+  it('allows different values with the same stackable', () => {
+    expect(assertUniqueVariantValueStack([
+      { face_value: 100, voucherStackable: false },
+      { face_value: 200, voucherStackable: false },
+    ]).ok).toBe(true);
+  });
+
+  it('blocks the same value + same stackable even with different prices (V3+V4)', () => {
+    const r = assertUniqueVariantValueStack([
+      { face_value: 400, voucherStackable: false },
+      { face_value: 400, voucherStackable: false },
+    ]);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.errorHe).toContain('כפל מבצעים');
+  });
+
+  it('null/undefined stackable counts as not-stackable for uniqueness', () => {
+    expect(assertUniqueVariantValueStack([
+      { face_value: 400, voucherStackable: null },
+      { face_value: 400, voucherStackable: false },
+    ]).ok).toBe(false);
+    expect(assertUniqueVariantValueStack([
+      { face_value: 400 },
+      { face_value: 400, voucherStackable: true },
+    ]).ok).toBe(true);
+  });
+
+  it('a third variant on an exhausted value is impossible (both slots taken)', () => {
+    expect(assertUniqueVariantValueStack([
+      { face_value: 400, voucherStackable: true },
+      { face_value: 400, voucherStackable: false },
+      { face_value: 400, voucherStackable: true },
+    ]).ok).toBe(false);
+  });
+
+  it('empty and single-variant lists pass', () => {
+    expect(assertUniqueVariantValueStack([]).ok).toBe(true);
+    expect(assertUniqueVariantValueStack([{ face_value: 100, voucherStackable: true }]).ok).toBe(true);
   });
 });
