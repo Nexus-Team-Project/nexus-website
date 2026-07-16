@@ -14,10 +14,16 @@ export interface PublicTenantInfo {
   logoUrl?: string;
   /** Org brand color ("#rrggbb"); drives the wallet first-login accent. */
   brandColor?: string;
+  /**
+   * The owner-authored business description from the onboarding wizard
+   * (tenantProfiles.businessDescription, plain text <=2000 chars). Absent when
+   * never filled. Powers the wallet tenant page + offer-page tenant card.
+   */
+  businessDescription?: string;
 }
 
 /**
- * Resolve the public-facing name/logo for a tenant.
+ * Resolve the public-facing name/logo/description for a tenant.
  *
  * @param db        Mongo handle
  * @param tenantId  domain tenantId
@@ -38,10 +44,19 @@ export async function getPublicTenantInfo(
     .findOne({ tenantId });
   if (!tenant) return null;
 
+  const profile = await db
+    .collection(DOMAIN_COLLECTIONS.tenantProfiles)
+    .findOne({ tenantId }, { projection: { businessDescription: 1 } });
+  const businessDescription =
+    typeof profile?.businessDescription === 'string' && profile.businessDescription.trim() !== ''
+      ? profile.businessDescription
+      : undefined;
+
   return {
     tenantId,
     organizationName: tenant.organizationName as string,
     logoUrl: (tenant.logoUrl as string | undefined) ?? undefined,
     brandColor: (tenant.brandColor as string | undefined) ?? undefined,
+    ...(businessDescription !== undefined ? { businessDescription } : {}),
   };
 }
