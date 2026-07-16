@@ -16,6 +16,7 @@ import { randomInt } from 'crypto';
 import {
   EMAIL_OTP_COLLECTION,
   type EmailOtpChallenge,
+  type EmailOtpPurpose,
 } from '../../models/auth/email-otp.models';
 import { assertRateLimit } from './wallet-rate-limit';
 import { sendEmailOtpMessage } from '../email/email-otp-email.service';
@@ -45,7 +46,14 @@ export interface StartEmailOtpResult {
  */
 export async function startEmailOtp(
   db: Db,
-  args: { email: string; ip: string; signupTicketId: string | null; lang?: 'he' | 'en' },
+  args: {
+    email: string;
+    ip: string;
+    signupTicketId: string | null;
+    /** Explicit purpose override; default derives from signupTicketId. */
+    purpose?: EmailOtpPurpose;
+    lang?: 'he' | 'en';
+  },
 ): Promise<StartEmailOtpResult> {
   const email = normalize(args.email);
   await assertRateLimit(db, { bucket: 'email_otp_send', key: email, windowSec: 30, max: 1 });
@@ -56,7 +64,7 @@ export async function startEmailOtp(
   const now = new Date();
   const insert: EmailOtpChallenge = {
     email,
-    purpose: args.signupTicketId ? 'attach_to_phone_signup' : 'login_recovery',
+    purpose: args.purpose ?? (args.signupTicketId ? 'attach_to_phone_signup' : 'login_recovery'),
     codeHash,
     createdAt: now,
     expiresAt: new Date(now.getTime() + TTL_MS),
@@ -84,16 +92,22 @@ export async function startEmailOtp(
  * so the caller can consume it.
  *
  * @throws otp_invalid (bad code, malformed id, expired, already verified)
- *         or otp_locked
+ *         or otp_locked. With opts.distinguishExpired, an expired challenge
+ *         throws otp_expired instead of otp_invalid (login routes keep the
+ *         collapsed vocabulary; the wallet email-attach flow opts in).
  */
 export async function verifyEmailOtp(
   db: Db,
   args: { challengeId: string; code: string },
+  opts?: { distinguishExpired?: boolean },
 ): Promise<{ email: string; linkedPhoneSignupTicketId: string | null }> {
   if (!ObjectId.isValid(args.challengeId)) throw new Error('otp_invalid');
   const col = db.collection<EmailOtpChallenge>(EMAIL_OTP_COLLECTION);
   const doc = await col.findOne({ _id: new ObjectId(args.challengeId) });
-  if (!doc || doc.verifiedAt || doc.expiresAt < new Date()) throw new Error('otp_invalid');
+  if (!doc || doc.verifiedAt) throw new Error('otp_invalid');
+  if (doc.expiresAt < new Date()) {
+    throw new Error(opts?.distinguishExpired ? 'otp_expired' : 'otp_invalid');
+  }
   if (doc.attempts >= MAX_ATTEMPTS) throw new Error('otp_locked');
 
   const ok = await bcrypt.compare(args.code, doc.codeHash);

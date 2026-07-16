@@ -42,6 +42,10 @@ export function normalizeIsraeliPhone(raw: string | undefined | null): string | 
     local = compact;
   }
 
+  // A bare 9-digit mobile missing its leading zero ("508465832") is
+  // unambiguous - restore the "0" (same number InforU receives either way).
+  if (/^5\d{8}$/.test(local)) local = '0' + local;
+
   // Must be exactly 10 digits starting with "05" (Israeli mobile prefix).
   if (!/^05\d{8}$/.test(local)) return null;
   return local;

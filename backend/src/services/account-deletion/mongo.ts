@@ -21,6 +21,7 @@ import { LOGIN_OTP_COLLECTION } from '../../models/auth/login-otp.models';
 import { TRUSTED_DEVICE_COLLECTION } from '../../models/auth/trusted-device.models';
 import { ONBOARDING_PHONE_VERIFICATION_COLLECTION } from '../../models/auth/onboarding-phone-verification.models';
 import { TENANT_JOIN_REQUEST_COLLECTION } from '../../models/auth/tenant-join-request.models';
+import { SHORT_LINK_COLLECTION } from '../../models/domain/short-links.models';
 import {
   resolveMongoDeletionTargets,
   resolveOrchestrationDeletionTargets,
@@ -105,6 +106,7 @@ export async function collectMongoCounts(
     tenantContactFields,
     memberInviteJobs,
     memberInviteJobItems,
+    shortLinks,
     phoneOtpChallenges,
     emailOtpChallenges,
     phoneSignupTickets,
@@ -214,6 +216,10 @@ export async function collectMongoCounts(
     // Bulk member-invite jobs + their items for the owned tenants.
     inviteJobs.memberInviteJobs.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
     inviteJobs.memberInviteJobItems.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
+    // Outreach short links are tenant-linked (one per tenant+service).
+    db.collection(SHORT_LINK_COLLECTION).countDocuments({
+      tenantId: { $in: targets.domainOwnedTenantIds },
+    }),
     // Plan #1: phone-OTP challenges keyed by the user's phone.
     db.collection(PHONE_OTP_COLLECTION).countDocuments({
       phone: { $in: targets.walletPhones },
@@ -298,6 +304,7 @@ export async function collectMongoCounts(
     tenantContactFields,
     memberInviteJobs,
     memberInviteJobItems,
+    shortLinks,
     phoneOtpChallenges,
     emailOtpChallenges,
     phoneSignupTickets,
@@ -422,6 +429,10 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   // item ever outlives its parent job).
   await inviteJobs.memberInviteJobItems.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await inviteJobs.memberInviteJobs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
+  // Outreach short links for the owned tenants (spec s.3 deletion completeness).
+  await db.collection(SHORT_LINK_COLLECTION).deleteMany({
+    tenantId: { $in: targets.domainOwnedTenantIds },
+  });
   // Delete adoption records (tenant chose to show these platform offers to members).
   await supply.tenantOfferConfigs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   // Collect image URLs before deleting offer documents so we can clean up Cloudinary.

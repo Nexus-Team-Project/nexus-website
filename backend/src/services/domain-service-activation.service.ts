@@ -10,6 +10,7 @@ import {
   getTenantDomainCollections,
   type CatalogAdoptionMode,
   type DefaultPricingRule,
+  type TenantServiceKey,
 } from '../models/domain';
 import { getSupplyDomainCollections, NOT_DELETED } from '../models/domain/supply.models';
 import { getOnboardingCollections } from '../models/onboarding.models';
@@ -303,4 +304,20 @@ export async function deactivateBenefitsCatalogForUser(
     status: 'suspended',
     offersDeactivated: offerResult.modifiedCount,
   };
+}
+
+/**
+ * Lists the tenant's ACTIVE service activations for the outreach modal.
+ * Input: tenant id (permission already enforced by the calling route).
+ * Output: { services: [{ serviceKey, status: 'active' }] }.
+ */
+export async function listActiveTenantServices(tenantId: string): Promise<{
+  services: { serviceKey: TenantServiceKey; status: 'active' }[];
+}> {
+  const db = await getMongoDb();
+  const col = getTenantDomainCollections(db).tenantServiceActivations;
+  const docs = await col
+    .find({ tenantId, status: 'active' }, { projection: { serviceKey: 1 } })
+    .toArray();
+  return { services: docs.map((doc) => ({ serviceKey: doc.serviceKey, status: 'active' as const })) };
 }

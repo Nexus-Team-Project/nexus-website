@@ -11,6 +11,7 @@ import { createError } from '../middleware/errorHandler';
 import {
   getIdentityDomainCollections,
   getTenantDomainCollections,
+  SERVICE_KEYS,
   type TenantUserRoleName,
 } from '../models/domain';
 import { syncDomainIdentityForMemberInvite } from './domain-identity.service';
@@ -122,10 +123,21 @@ export async function updateTenantMemberRoles(
     );
   }
 
-  // Sync roles on any still-pending invitation so the email/acceptance record stays consistent.
+  // Decision 7 (2026-07-15): TenantMember.services is a privileged-staff
+  // concept. Any non-member role grants ALL service surfaces; a plain
+  // ['member'] set clears them (regular members gate on membership +
+  // tenant catalog activation instead).
+  const services = uniqueRoles.some((r) => r !== 'member') ? [...SERVICE_KEYS] : [];
+  await tenantCollections.tenantMembers.updateOne(
+    { tenantMemberId, tenantId: access.tenantId },
+    { $set: { services, updatedAt: now } },
+  );
+
+  // Sync roles + services on any still-pending invitation so the
+  // email/acceptance record stays consistent.
   await tenantCollections.tenantMemberInvitations.updateOne(
     { tenantMemberId, tenantId: access.tenantId, status: 'pending' },
-    { $set: { roles: uniqueRoles, updatedAt: now } },
+    { $set: { roles: uniqueRoles, services, updatedAt: now } },
   );
 
   return { roles: uniqueRoles };
@@ -201,6 +213,7 @@ export async function updateTenantMemberEmail(
     void sendTenantInviteRevokedEmail({
       to: oldNormalizedEmail,
       tenantName,
+      tenantId: access.tenantId,
       language: 'he',
     }).catch(() => undefined);
   }
@@ -330,6 +343,7 @@ export async function updateTenantMemberEmail(
   void sendTenantMemberInviteEmail({
     to: newNormalized,
     tenantName,
+    tenantId: access.tenantId,
     roles: oldRoles,
     inviteUrl: buildMemberInviteUrl({
       token: rawToken,
@@ -424,6 +438,7 @@ export async function removeTenantMemberFromTenant(
       to: identity.normalizedEmail,
       displayName: identity.displayName,
       tenantName,
+      tenantId: access.tenantId,
       language: (identity.locale as 'he' | 'en') ?? 'he',
     }).catch(() => undefined);
   }
@@ -452,11 +467,16 @@ export async function removeTenantContact(
   if (!contact) throw createError('Contact not found', 404);
 
   // Resolve NexusIdentity by normalizedEmail, then find the TenantMember.
+  // Phone-only contacts (email-or-phone rule, spec s.4) have no email and can
+  // never be linked members - skip the lookup entirely (an undefined filter
+  // value would serialize to null and could mismatch).
   const identityCollections2 = getIdentityDomainCollections(db);
-  const linkedIdentity = await identityCollections2.nexusIdentities.findOne(
-    { normalizedEmail: contact.normalizedEmail },
-    { projection: { nexusIdentityId: 1 } },
-  );
+  const linkedIdentity = contact.normalizedEmail
+    ? await identityCollections2.nexusIdentities.findOne(
+        { normalizedEmail: contact.normalizedEmail },
+        { projection: { nexusIdentityId: 1 } },
+      )
+    : null;
   const linkedMember = linkedIdentity
     ? await tenantCollections.tenantMembers.findOne({
         tenantId: access.tenantId,
@@ -520,12 +540,15 @@ export async function updateTenantContactEmail(
     return;
   }
 
-  // Pending or expired: resolve identity → member, then delegate.
+  // Pending or expired: resolve identity -> member, then delegate.
+  // Phone-only contacts carry no email; the null identity falls through to 404.
   const identityCollections3 = getIdentityDomainCollections(db);
-  const linkedIdentity3 = await identityCollections3.nexusIdentities.findOne(
-    { normalizedEmail: contact.normalizedEmail },
-    { projection: { nexusIdentityId: 1 } },
-  );
+  const linkedIdentity3 = contact.normalizedEmail
+    ? await identityCollections3.nexusIdentities.findOne(
+        { normalizedEmail: contact.normalizedEmail },
+        { projection: { nexusIdentityId: 1 } },
+      )
+    : null;
   const linkedMember = linkedIdentity3
     ? await tenantCollections.tenantMembers.findOne({
         tenantId: access.tenantId,

@@ -5,6 +5,7 @@
  * All mutations require members.update permission; reads require members.view.
  */
 import { randomUUID } from 'crypto';
+import { MongoBulkWriteError } from 'mongodb';
 import { getMongoDb } from '../config/mongo';
 import { getTenantDomainCollections, type TenantContactDocument } from '../models/domain';
 import { requireTenantMemberPermission } from './domain-member.service';
@@ -16,7 +17,8 @@ import { planCustomWrites, buildCustomFilterClauses, type CustomFilter } from '.
 /** One row returned in the paginated contact list. */
 export interface TenantContactListItem {
   tenantContactId: string;
-  email: string;
+  /** Contact email, or null for phone-only contacts. */
+  email: string | null;
   displayName: string;
   status: string;
   address: string | null;
@@ -30,6 +32,8 @@ export interface TenantContactListItem {
   phoneVerified: boolean;
   /** Custom-column values keyed by fieldId; empty when none set. */
   customFields: Record<string, unknown>;
+  /** Per-service outreach stamps ({} when never invited): lastSentAt ISO + delivered channels. */
+  serviceInvites: Record<string, { lastSentAt: string; channels: string[] }>;
   lastActivityAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -69,13 +73,19 @@ function normalizeEmail(email: string): string {
 function toListItem(doc: TenantContactDocument): TenantContactListItem {
   return {
     tenantContactId: doc.tenantContactId,
-    email: doc.email,
+    email: doc.email ?? null,
     displayName: doc.displayName,
     status: doc.status,
     address: doc.address ?? null,
     phone: doc.phone ?? null,
     phoneVerified: doc.phoneVerified ?? false,
     customFields: (doc.customFields as Record<string, unknown>) ?? {},
+    serviceInvites: Object.fromEntries(
+      Object.entries(doc.serviceInvites ?? {}).map(([key, stamp]) => [
+        key,
+        { lastSentAt: stamp.lastSentAt.toISOString(), channels: stamp.channels },
+      ]),
+    ),
     lastActivityAt: doc.lastActivityAt ? doc.lastActivityAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -128,9 +138,12 @@ export async function listTenantContacts(
 }
 
 /**
- * Creates a single tenant contact record, or updates it if the email already exists.
+ * Creates a single tenant contact record, or updates it if the identifier
+ * already exists. Dedup key: normalizedEmail when the contact has an email,
+ * else phone (the schema refine guarantees at least one exists).
  * Input: Prisma user id, validated create payload.
- * Output: created or updated contact.
+ * Output: created or updated contact. 409 when a new email contact carries a
+ * phone already owned by another contact (partial unique phone index).
  */
 export async function createTenantContact(
   userId: string,
@@ -140,41 +153,63 @@ export async function createTenantContact(
   const db = await getMongoDb();
   const col = getTenantDomainCollections(db).tenantContacts;
 
-  const normalized = normalizeEmail(data.email);
+  const normalized = data.email !== undefined ? normalizeEmail(data.email) : undefined;
   const now = new Date();
 
   // Validate custom-column values against the tenant's definitions (strict:
-  // an invalid value is a 400 so the admin gets feedback).
+  // an invalid value is a 400 so the admin gets feedback). Wallet-mirror
+  // columns are member-owned (wallet onboarding / profile update only) - a
+  // payload trying to set one is rejected outright.
   let customSet: Record<string, unknown> = {};
   if (data.customFields) {
     const defs = await fetchContactFieldDefs(db, access.tenantId);
     const plan = planCustomWrites(defs, data.customFields);
+    if (plan.readOnly.length) {
+      throw createError(`Read-only wallet fields: ${plan.readOnly.join(', ')}`, 400);
+    }
     if (plan.invalid.length) throw createError(`Invalid value for: ${plan.invalid.join(', ')}`, 400);
     customSet = plan.set;
   }
 
-  const result = await col.findOneAndUpdate(
-    { tenantId: access.tenantId, normalizedEmail: normalized },
-    {
-      $setOnInsert: {
-        tenantContactId: randomUUID(),
-        tenantId: access.tenantId,
-        email: data.email.trim(),
-        normalizedEmail: normalized,
-        createdAt: now,
+  // Dedup key: normalizedEmail when the contact has an email, else phone
+  // (schema refine guarantees at least one exists).
+  const filter =
+    normalized !== undefined
+      ? { tenantId: access.tenantId, normalizedEmail: normalized }
+      : { tenantId: access.tenantId, phone: data.phone as string };
+
+  let result: TenantContactDocument | null;
+  try {
+    result = await col.findOneAndUpdate(
+      filter,
+      {
+        $setOnInsert: {
+          tenantContactId: randomUUID(),
+          tenantId: access.tenantId,
+          ...(data.email !== undefined && normalized !== undefined
+            ? { email: data.email.trim(), normalizedEmail: normalized }
+            : {}),
+          createdAt: now,
+        },
+        $set: {
+          displayName: data.displayName,
+          status: 'inactive', // all contacts start inactive; status advances via invite lifecycle
+          ...(data.address !== undefined && { address: data.address }),
+          // A tenant-entered phone is a guess -> unverified until the user confirms.
+          ...(data.phone !== undefined && { phone: data.phone, phoneVerified: false }),
+          ...customSet,
+          updatedAt: now,
+        },
       },
-      $set: {
-        displayName: data.displayName,
-        status: 'inactive', // all contacts start inactive; status advances via invite lifecycle
-        ...(data.address !== undefined && { address: data.address }),
-        // A tenant-entered phone is a guess -> unverified until the user confirms.
-        ...(data.phone !== undefined && { phone: data.phone, phoneVerified: false }),
-        ...customSet,
-        updatedAt: now,
-      },
-    },
-    { upsert: true, returnDocument: 'after' },
-  );
+      { upsert: true, returnDocument: 'after' },
+    );
+  } catch (error) {
+    // uniq_tenant_phone_partial: the phone already belongs to another contact.
+    if (typeof error === 'object' && error !== null && (error as { code?: number }).code === 11000) {
+      throw createError('A contact with this phone already exists', 409);
+    }
+    throw error;
+  }
 
   if (!result) throw createError('Failed to create contact', 500);
   return toListItem(result);
@@ -202,6 +237,11 @@ export async function updateTenantContact(
   if (rawCustom) {
     const defs = await fetchContactFieldDefs(db, access.tenantId);
     const plan = planCustomWrites(defs, rawCustom);
+    // Wallet-mirror columns are member-owned (wallet onboarding / profile
+    // update only) - a tenant edit trying to set one is rejected outright.
+    if (plan.readOnly.length) {
+      throw createError(`Read-only wallet fields: ${plan.readOnly.join(', ')}`, 400);
+    }
     if (plan.invalid.length) throw createError(`Invalid value for: ${plan.invalid.join(', ')}`, 400);
     Object.assign(customSet, plan.set);
     for (const key of plan.clearKeys) customUnset[`customFields.${key}`] = '';
@@ -245,13 +285,22 @@ export async function importTenantContacts(
   // Load the tenant's column definitions once for the whole batch.
   const defs = await fetchContactFieldDefs(db, access.tenantId);
 
-  for (const row of rows) {
-    const normalized = normalizeEmail(row.email);
-    if (seen.has(normalized)) {
-      errors.push(`Duplicate email in batch: ${row.email}`);
+  for (const [index, row] of rows.entries()) {
+    const normalized = row.email !== undefined ? normalizeEmail(row.email) : undefined;
+    // Dedup key: normalizedEmail when the row has an email, else the phone
+    // (prefixed so an email can never collide with a phone string).
+    const dedupKey = normalized ?? (row.phone !== undefined ? `phone:${row.phone}` : undefined);
+    if (dedupKey === undefined) {
+      // Defense in depth: the row schema refine already rejects this shape,
+      // but direct service callers still get a counted skip, never a drop.
+      errors.push(`Row ${index + 1}: missing both email and phone`);
       continue;
     }
-    seen.add(normalized);
+    if (seen.has(dedupKey)) {
+      errors.push(`Duplicate identifier in batch: ${normalized ?? row.phone}`);
+      continue;
+    }
+    seen.add(dedupKey);
 
     // Lenient: an invalid custom value is simply left blank (cell omitted), the
     // row is still imported. Only validated values become dot-path $set entries.
@@ -259,13 +308,17 @@ export async function importTenantContacts(
 
     ops.push({
       updateOne: {
-        filter: { tenantId: access.tenantId, normalizedEmail: normalized },
+        filter:
+          normalized !== undefined
+            ? { tenantId: access.tenantId, normalizedEmail: normalized }
+            : { tenantId: access.tenantId, phone: row.phone as string },
         update: {
           $setOnInsert: {
             tenantContactId: randomUUID(),
             tenantId: access.tenantId,
-            email: row.email.trim(),
-            normalizedEmail: normalized,
+            ...(row.email !== undefined && normalized !== undefined
+              ? { email: row.email.trim(), normalizedEmail: normalized }
+              : {}),
             createdAt: now,
           },
           $set: {
@@ -287,7 +340,19 @@ export async function importTenantContacts(
     return { imported: 0, skipped: rows.length, errors };
   }
 
-  const result = await col.bulkWrite(ops, { ordered: false });
+  let result: import('mongodb').BulkWriteResult;
+  try {
+    result = await col.bulkWrite(ops, { ordered: false });
+  } catch (error) {
+    // Unordered bulkWrite throws AFTER processing every op; cross-row phone/email
+    // uniqueness conflicts land here. Surface them in errors, keep the partial result.
+    if (error instanceof MongoBulkWriteError) {
+      errors.push('Some rows conflicted with an existing contact email or phone');
+      result = error.result;
+    } else {
+      throw error;
+    }
+  }
   const imported = (result.upsertedCount ?? 0) + (result.modifiedCount ?? 0);
   const skipped = rows.length - ops.length;
 

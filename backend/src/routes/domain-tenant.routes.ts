@@ -28,6 +28,7 @@ import {
 import {
   activateBenefitsCatalogForUser,
   deactivateBenefitsCatalogForUser,
+  listActiveTenantServices,
 } from '../services/domain-service-activation.service';
 import { triggerGoLive } from '../services/onboarding.service';
 import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
@@ -75,6 +76,31 @@ router.post(
     try {
       const result = await deactivateBenefitsCatalogForUser(req.user!.sub);
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/tenant/services
+ *
+ * Lists the tenant's ACTIVE service activations for the Members-page
+ * outreach modal. Gated with team.invite_member - the exact permission
+ * invite creation enforces (requireMemberManagementAccess) - via
+ * resolveTenantContextWithPermission because the tenant id is not in the URL.
+ *
+ * Returns: { services: [{ serviceKey, status: 'active' }] }
+ * Errors:  401 unauthenticated, 403 without team.invite_member.
+ */
+router.get(
+  '/services',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { tenantId } = await resolveTenantContextWithPermission(req, 'team.invite_member');
+      res.json(await listActiveTenantServices(tenantId));
     } catch (error) {
       next(error);
     }
@@ -226,6 +252,49 @@ router.post(
       const access = await requireMemberManagementAccess(req.user!.sub);
       const result = await retryFailedInviteJobItems(access.tenantId, jobId);
       res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * GET /api/v1/tenant/jobs/:jobId
+ *
+ * Kind-agnostic alias of /members/invitations/jobs/:jobId - aggregate
+ * progress for ANY invite-queue job (member_invite or service_outreach).
+ * The dashboard outreach modal polls THIS path. Tenant scope enforced from
+ * the caller's membership.
+ */
+router.get(
+  '/jobs/:jobId',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = inviteJobIdParamsSchema.parse(req.params);
+      const access = await requireMemberManagementAccess(req.user!.sub);
+      res.json(await getInviteJobStatus(access.tenantId, jobId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * POST /api/v1/tenant/jobs/:jobId/retry-failed
+ *
+ * Kind-agnostic alias of /members/invitations/jobs/:jobId/retry-failed.
+ */
+router.post(
+  '/jobs/:jobId/retry-failed',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { jobId } = inviteJobIdParamsSchema.parse(req.params);
+      const access = await requireMemberManagementAccess(req.user!.sub);
+      res.json(await retryFailedInviteJobItems(access.tenantId, jobId));
     } catch (error) {
       next(error);
     }

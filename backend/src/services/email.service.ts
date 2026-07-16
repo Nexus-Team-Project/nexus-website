@@ -101,6 +101,32 @@ export function buildAuthEmailBannerHtml(): string {
 </div>`;
 }
 
+/**
+ * Banner for TENANT-sent emails (invites, outreach, removals): the Nexus logo
+ * with the tenant's logo beside it when one exists. Falls back to the plain
+ * Nexus banner when the tenant has no logo. Table layout for email-client
+ * compatibility; the tenant logo is height-capped so any aspect ratio fits.
+ * Input: the tenant's logo URL (Cloudinary), or null/undefined for none.
+ * Output: banner HTML fragment.
+ */
+export function buildTenantEmailBannerHtml(tenantLogoUrl?: string | null): string {
+  if (!tenantLogoUrl) return buildAuthEmailBannerHtml();
+  const bannerUrl = buildPublicAssetUrl(AUTH_EMAIL_BANNER_PATH);
+
+  return `<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:22px 20px;margin-bottom:30px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
+<tr>
+<td style="vertical-align:middle;padding:0 14px;">
+<img src="${bannerUrl}" width="180" style="display:block;max-width:180px;width:100%;height:auto;border:0;outline:none;text-decoration:none;" alt="Nexus">
+</td>
+<td style="vertical-align:middle;border-left:1px solid #e5e7eb;padding:0 14px;">
+<img src="${tenantLogoUrl}" height="44" style="display:block;height:44px;max-height:44px;width:auto;max-width:140px;border:0;outline:none;text-decoration:none;border-radius:8px;" alt="">
+</td>
+</tr>
+</table>
+</div>`;
+}
+
 // ─── Unified send interface ──────────────────────────────────
 
 export interface SendMailOptions {
