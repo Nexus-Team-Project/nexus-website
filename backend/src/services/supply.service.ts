@@ -49,6 +49,7 @@ import { resolveVoucherMaxPayments } from './supply-voucher.helper';
 import { isTenantAutoApprove } from './admin-tenants.service';
 import { getVoucherCodeCollection } from '../models/domain/voucher-codes.models';
 import { clampTenantVariantPricesToBounds, resetTenantPricesForChangedVariants } from './tenant-pricing.service';
+import { autoAdoptOfferForAllTenants } from './admin-offer-auto-adopt.service';
 
 // ---------------------------------------------------------------------------
 // Public input/output interfaces
@@ -713,6 +714,19 @@ export async function updateOffer(
       await tenantOfferConfigs.deleteMany({ offerId, tenantId: currentOffer.createdByTenantId });
     } catch (err) {
       console.error('[SUPPLY] Old-owner config cleanup on reassignment failed:', err);
+    }
+  }
+
+  // Admin-offer auto-adopt: an admin flipping an ON-BEHALF offer (marked by
+  // uploadedByIdentityId) to ecosystem publishes it live, so fan it out to all
+  // eligible tenants' catalogs - same behavior as an on-behalf ecosystem
+  // create. Regular tenant offers (no uploadedByIdentityId) never auto-adopt.
+  // Best-effort: never fails the save.
+  if (visibilityChange && input.visibility === 'ecosystem' && result.uploadedByIdentityId) {
+    try {
+      await autoAdoptOfferForAllTenants(offerId);
+    } catch (err) {
+      console.error('[SUPPLY] Admin-offer auto-adopt fan-out failed:', err);
     }
   }
 
