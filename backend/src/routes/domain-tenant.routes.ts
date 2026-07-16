@@ -3,6 +3,7 @@
  * These routes are separate from legacy Prisma organization routes.
  */
 import { Router, Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import {
@@ -30,11 +31,15 @@ import {
   deactivateBenefitsCatalogForUser,
   listActiveTenantServices,
 } from '../services/domain-service-activation.service';
+import { setAutoAdoptAdminOffers } from '../services/admin-offer-auto-adopt.service';
 import { triggerGoLive } from '../services/onboarding.service';
 import { isTenantBusinessSetupApproved } from '../services/business-setup-approval.service';
 import { resolveTenantContextWithPermission } from '../utils/resolve-tenant-context';
 
 const router = Router();
+
+/** Body of PATCH /auto-adopt-admin-offers. */
+const autoAdoptSettingSchema = z.object({ enabled: z.boolean() });
 
 router.post(
   '/services/benefits-catalog/activate',
@@ -101,6 +106,38 @@ router.get(
     try {
       const { tenantId } = await resolveTenantContextWithPermission(req, 'team.invite_member');
       res.json(await listActiveTenantServices(tenantId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/tenant/auto-adopt-admin-offers
+ *
+ * Tenant setting: auto-adopt NEXUS-admin-uploaded ecosystem offers.
+ * Body: { enabled: boolean }. Enabling also runs an immediate catch-up
+ * (adopts all admin offers the tenant has no adoption row for) and returns
+ * how many were adopted; disabling only stops FUTURE auto-adopts (already
+ * adopted offers stay until removed per offer).
+ *
+ * Gate: catalog.adopt_offer (same permission as manual adopt/cancel), via
+ * resolveTenantContextWithPermission because the tenant id is not in the URL.
+ *
+ * Returns: { ok: true, adoptedCount }
+ * Errors:  400 invalid body (thrown ZodError -> errorHandler), 401
+ *          unauthenticated, 403 without catalog.adopt_offer.
+ */
+router.patch(
+  '/auto-adopt-admin-offers',
+  authenticate,
+  apiLimiter,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = autoAdoptSettingSchema.parse(req.body);
+      const { tenantId } = await resolveTenantContextWithPermission(req, 'catalog.adopt_offer');
+      const result = await setAutoAdoptAdminOffers(tenantId, parsed.enabled);
+      res.json({ ok: true, adoptedCount: result.adoptedCount });
     } catch (error) {
       next(error);
     }
