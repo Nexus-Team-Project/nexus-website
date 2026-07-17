@@ -7,6 +7,7 @@
  */
 import type { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
+import type { TenantCoverImage } from '../../models/domain/tenant.models';
 
 export interface PublicTenantInfo {
   tenantId: string;
@@ -14,6 +15,12 @@ export interface PublicTenantInfo {
   logoUrl?: string;
   /** Org brand color ("#rrggbb"); drives the wallet first-login accent. */
   brandColor?: string;
+  /**
+   * Ordered cover-image gallery (max 5): pristine Cloudinary URL + display
+   * crop per entry. Powers the wallet offer-page hero (>1 = slideshow).
+   * Always OUR re-hosted Cloudinary URLs; empty when the tenant set none.
+   */
+  coverImages?: TenantCoverImage[];
   /**
    * The owner-authored business description from the onboarding wizard
    * (tenantProfiles.businessDescription, plain text <=2000 chars). Absent when
@@ -52,11 +59,14 @@ export async function getPublicTenantInfo(
       ? profile.businessDescription
       : undefined;
 
+  const coverImages = (tenant.coverImages as TenantCoverImage[] | undefined) ?? [];
+
   return {
     tenantId,
     organizationName: tenant.organizationName as string,
     logoUrl: (tenant.logoUrl as string | undefined) ?? undefined,
     brandColor: (tenant.brandColor as string | undefined) ?? undefined,
+    ...(coverImages.length > 0 ? { coverImages } : {}),
     ...(businessDescription !== undefined ? { businessDescription } : {}),
   };
 }

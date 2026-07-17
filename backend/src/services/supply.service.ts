@@ -31,7 +31,7 @@ import {
   lowestMemberPrice,
   type OfferVariantInput,
 } from './supply-variants.helper';
-import { defaultOfferImageUrl } from '../utils/cloudinary';
+import { defaultOfferImageUrl, uploadOfferImageFromUrl } from '../utils/cloudinary';
 import {
   assertStatusReasonProvided,
   resolveStatusReasonValue,
@@ -131,6 +131,13 @@ export interface CreateOfferInput {
    * as metadata and applied at display time via Cloudinary transform URLs.
    */
   newImageCrops?: (ImageCrop | null)[];
+  /**
+   * URL-sourced images (route-validated http(s) only): each is RE-HOSTED via
+   * Cloudinary fetch-by-URL (Cloudinary downloads it, never this server) and
+   * appended to the gallery AFTER the uploaded files. Only the re-hosted
+   * Cloudinary URL is ever stored - the user's URL is never persisted.
+   */
+  remoteImages?: { url: string; crop: ImageCrop | null }[];
   /** MongoDB tenantId of the creator (derived from server-side auth, not browser). */
   createdByTenantId: string;
   /** MongoDB identityId of the authenticated user creating the offer. */
@@ -245,6 +252,12 @@ export interface UpdateOfferInput {
    * full image). Combined with `keptImageCrops` to rebuild the gallery's crops.
    */
   newImageCrops?: (ImageCrop | null)[];
+  /**
+   * URL-sourced images to append (route-validated http(s) only): re-hosted via
+   * Cloudinary fetch-by-URL and appended after uploaded files. Only the
+   * re-hosted Cloudinary URL is stored - the user's URL is never persisted.
+   */
+  remoteImages?: { url: string; crop: ImageCrop | null }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -263,6 +276,31 @@ export interface UpdateOfferInput {
  * Output: Promise resolving to the persisted NexusOffer document.
  * Throws: on Cloudinary failure or MongoDB write error.
  */
+/**
+ * Re-hosts URL-sourced images and appends them (URLs + aligned crops) after
+ * the freshly-uploaded file URLs. Pads the file-crop list to the uploaded
+ * count first so the remote crops align correctly even when the caller sent
+ * no file crops. Shared by createOffer + updateOffer.
+ */
+async function appendRemoteImages(
+  uploaded: string[],
+  newImageCrops: (ImageCrop | null)[] | undefined,
+  remoteImages: { url: string; crop: ImageCrop | null }[] | undefined,
+): Promise<{ urls: string[]; crops: (ImageCrop | null)[] | undefined }> {
+  if (!remoteImages || remoteImages.length === 0) {
+    return { urls: uploaded, crops: newImageCrops };
+  }
+  const rehosted: string[] = [];
+  for (const remote of remoteImages) {
+    rehosted.push(await uploadOfferImageFromUrl(remote.url));
+  }
+  const paddedFileCrops = uploaded.map((_, index) => newImageCrops?.[index] ?? null);
+  return {
+    urls: [...uploaded, ...rehosted],
+    crops: [...paddedFileCrops, ...remoteImages.map((remote) => remote.crop)],
+  };
+}
+
 export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> {
   const db = await getMongoDb();
   const { nexusOffers } = getSupplyDomainCollections(db);
@@ -279,8 +317,14 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     imageUrls = input.imageUrls;
   } else {
     const uploaded = await uploadOfferImages(input.imageFiles ?? []);
-    imageUrls = uploaded.length > 0 ? uploaded : [defaultOfferImageUrl()];
-    imageCrops = reconcileImageCrops(imageUrls, uploaded, undefined, input.newImageCrops);
+    // URL-sourced images: re-host each via Cloudinary fetch-by-URL (route
+    // pre-validated http(s)), appended AFTER the uploaded files. Crops align
+    // per source list, so pad the file crops before appending remote crops.
+    const { urls: allNew, crops: allNewCrops } = await appendRemoteImages(
+      uploaded, input.newImageCrops, input.remoteImages,
+    );
+    imageUrls = allNew.length > 0 ? allNew : [defaultOfferImageUrl()];
+    imageCrops = reconcileImageCrops(imageUrls, allNew, undefined, allNewCrops);
   }
   const imageUrl = imageUrls[0];
 
@@ -503,15 +547,20 @@ export async function updateOffer(
   // image without adding/removing/reordering). undefined = leave crops intact.
   let nextImageCrops: ImageCropEntry[] | undefined;
   const galleryTouched = input.keptImageUrls !== undefined
-    || (input.imageFiles && input.imageFiles.length > 0);
+    || (input.imageFiles && input.imageFiles.length > 0)
+    || (input.remoteImages && input.remoteImages.length > 0);
   const cropsTouched = input.keptImageCrops !== undefined || input.newImageCrops !== undefined;
   if (galleryTouched) {
     const uploaded = await uploadOfferImages(input.imageFiles ?? []);
+    // URL-sourced images re-host + append after the files (crops aligned).
+    const { urls: allNew, crops: allNewCrops } = await appendRemoteImages(
+      uploaded, input.newImageCrops, input.remoteImages,
+    );
     const kept = input.keptImageUrls ?? currentOffer.imageUrls ?? [];
     const { finalUrls, orphanedUrls } = reconcileImageUrls(
       currentOffer.imageUrls,
       kept,
-      uploaded,
+      allNew,
     );
     // Fire-and-forget orphan deletion: failure must not block the save.
     deleteOrphanedImages(orphanedUrls).catch((err) =>
@@ -521,9 +570,9 @@ export async function updateOffer(
     nextImageUrl = finalUrls[0] ?? defaultOfferImageUrl();
     nextImageCrops = reconcileImageCrops(
       finalUrls,
-      uploaded,
+      allNew,
       input.keptImageCrops ?? currentOffer.imageCrops,
-      input.newImageCrops,
+      allNewCrops,
     );
   } else if (cropsTouched) {
     // Crop-only edit: no URL/file change. Recompute against the existing gallery.

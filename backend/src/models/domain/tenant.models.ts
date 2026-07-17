@@ -71,6 +71,20 @@ export const logoCropSchema = z.object({
 });
 export type LogoCrop = z.infer<typeof logoCropSchema>;
 
+/** Hard cap on tenant cover-gallery size (owner decision 2026-07-17). */
+export const TENANT_COVER_IMAGES_MAX = 5;
+
+/**
+ * One tenant cover-gallery entry: the pristine Cloudinary original + its
+ * display-time crop (null = full image). Same pristine+crop pattern as the
+ * logo, but as an ordered array (the offer-page hero slideshow order).
+ */
+export const tenantCoverImageSchema = z.object({
+  url: z.string().url().max(2048),
+  crop: logoCropSchema.nullable(),
+});
+export type TenantCoverImage = z.infer<typeof tenantCoverImageSchema>;
+
 /** Audit stamp for tenants created from the admin "Create & Manage Organizations" page. */
 export const tenantAdminCreatedSchema = z.object({
   /** Email of the NEXUS platform admin who created this tenant. */
@@ -102,6 +116,12 @@ export const domainTenantSchema = z.object({
   // Crop of the logo (normalized fractions), applied at display time. Absent/null =
   // show the full logo. Lets the crop be adjusted or reverted without re-upload.
   logoCrop: logoCropSchema.nullable().optional(),
+  // ORDERED cover-image gallery (max TENANT_COVER_IMAGES_MAX): each entry holds
+  // the PRISTINE Cloudinary original + a display-time crop (same fraction shape
+  // as the logo crop). Powers the wallet offer-page hero (index 0 first; >1
+  // entries loop as a slideshow). Absent/empty -> the wallet renders its
+  // placeholder. Only OUR re-hosted Cloudinary URLs are ever stored here.
+  coverImages: z.array(tenantCoverImageSchema).max(TENANT_COVER_IMAGES_MAX).optional(),
   // Organization brand color as a 6-digit hex (e.g. "#635bff"). This is the
   // accent color wallet members see the first time they sign in to this
   // tenant's benefits. Absent -> the wallet derives a deterministic color from

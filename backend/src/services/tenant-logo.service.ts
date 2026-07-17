@@ -19,26 +19,40 @@ export async function setTenantLogo(
   db: Db,
   args: { tenantId: string; buffer: Buffer; filename: string; crop?: LogoCrop | null },
 ): Promise<{ logoUrl: string; logoCrop: LogoCrop | null }> {
+  const logoUrl = await uploadTenantLogo(args.buffer, args.filename);
+  return setTenantLogoHosted(db, { tenantId: args.tenantId, logoUrl, crop: args.crop });
+}
+
+/**
+ * Set an ALREADY-HOSTED Cloudinary URL as the tenant logo (the URL-source
+ * path: the route re-hosts the remote image first, then calls this). Same
+ * semantics as setTenantLogo minus the buffer upload: the provided crop is
+ * stored (or cleared when none) and the previous asset is best-effort deleted.
+ * @returns the new logo URL + the stored crop.
+ */
+export async function setTenantLogoHosted(
+  db: Db,
+  args: { tenantId: string; logoUrl: string; crop?: LogoCrop | null },
+): Promise<{ logoUrl: string; logoCrop: LogoCrop | null }> {
   const { domainTenants } = getTenantDomainCollections(db);
   const existing = await domainTenants.findOne(
     { tenantId: args.tenantId },
     { projection: { logoUrl: 1 } },
   );
 
-  const logoUrl = await uploadTenantLogo(args.buffer, args.filename);
   const crop = args.crop ?? null;
   await domainTenants.updateOne(
     { tenantId: args.tenantId },
     crop
-      ? { $set: { logoUrl, logoCrop: crop, updatedAt: new Date() } }
-      : { $set: { logoUrl, updatedAt: new Date() }, $unset: { logoCrop: '' } },
+      ? { $set: { logoUrl: args.logoUrl, logoCrop: crop, updatedAt: new Date() } }
+      : { $set: { logoUrl: args.logoUrl, updatedAt: new Date() }, $unset: { logoCrop: '' } },
   );
 
   // Best-effort: drop the previous Cloudinary asset (never blocks the response).
-  if (existing?.logoUrl && existing.logoUrl !== logoUrl) {
+  if (existing?.logoUrl && existing.logoUrl !== args.logoUrl) {
     void deleteOfferImage(existing.logoUrl);
   }
-  return { logoUrl, logoCrop: crop };
+  return { logoUrl: args.logoUrl, logoCrop: crop };
 }
 
 /**

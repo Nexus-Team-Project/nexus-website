@@ -89,25 +89,30 @@ function buildSignature(params: Record<string, string>, apiSecret: string): stri
 // ---------------------------------------------------------------------------
 
 /**
- * Uploads an image buffer to Cloudinary under the `nexus/offers` folder
- * using a signed REST request (no SDK required).
+ * Shared signed-upload implementation for image buffers. Every buffer upload
+ * (offer image, tenant logo, tenant cover) is the same signed REST request
+ * differing only by target folder and error label.
  *
  * Input:
- *   buffer   - raw image data.
+ *   buffer  - raw image data.
  *   filename - original file name used to derive a readable public_id.
+ *   folder  - Cloudinary folder (e.g. 'nexus/offers').
+ *   label   - human label for the unavailable/failure error messages.
  * Output: Promise resolving to the secure HTTPS URL of the stored image.
- * Throws:
- *   - If CLOUDINARY_URL is not set in env.
- *   - If the Cloudinary API returns a non-2xx response.
+ * Throws: if CLOUDINARY_URL is unset or Cloudinary returns a non-2xx.
  */
-export async function uploadOfferImage(buffer: Buffer, filename: string): Promise<string> {
+async function uploadImageBuffer(
+  buffer: Buffer,
+  filename: string,
+  folder: string,
+  label: string,
+): Promise<string> {
   if (!env.CLOUDINARY_URL) {
-    throw new Error('CLOUDINARY_URL is not configured - offer image upload is unavailable');
+    throw new Error(`CLOUDINARY_URL is not configured - ${label} upload is unavailable`);
   }
 
   const { apiKey, apiSecret, cloudName } = parseCloudinaryUrl(env.CLOUDINARY_URL);
 
-  const folder = 'nexus/offers';
   const publicId = `${folder}/${Date.now()}-${sanitizeFilename(filename)}`;
   const timestamp = String(Math.round(Date.now() / 1000));
 
@@ -135,7 +140,7 @@ export async function uploadOfferImage(buffer: Buffer, filename: string): Promis
 
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Cloudinary upload failed (HTTP ${res.status}): ${body}`);
+    throw new Error(`Cloudinary ${label} upload failed (HTTP ${res.status}): ${body}`);
   }
 
   const data = (await res.json()) as CloudinaryUploadResult;
@@ -143,16 +148,42 @@ export async function uploadOfferImage(buffer: Buffer, filename: string): Promis
 }
 
 /**
- * Cheap pre-check before asking Cloudinary to fetch a remote image: the value
- * must be a non-empty http(s) URL string. This does NOT verify the URL points
- * at a real image — Cloudinary's fetch decides that; callers fall back when the
- * upload throws. Blocks free text and non-http schemes (e.g. javascript:, data:).
+ * Uploads an image buffer to Cloudinary under the `nexus/offers` folder
+ * using a signed REST request (no SDK required).
  *
- * Input:  any value (typically a CSV cell).
- * Output: true only for a string that starts with http:// or https://.
+ * Input:
+ *   buffer   - raw image data.
+ *   filename - original file name used to derive a readable public_id.
+ * Output: Promise resolving to the secure HTTPS URL of the stored image.
+ * Throws:
+ *   - If CLOUDINARY_URL is not set in env.
+ *   - If the Cloudinary API returns a non-2xx response.
+ */
+export async function uploadOfferImage(buffer: Buffer, filename: string): Promise<string> {
+  return uploadImageBuffer(buffer, filename, 'nexus/offers', 'offer image');
+}
+
+/**
+ * Hard cap on accepted remote-image URL length (abuse guard - a legitimate
+ * image URL never approaches this). Mirrored by the route-level Zod schemas.
+ */
+export const MAX_IMAGE_URL_LENGTH = 2048;
+
+/**
+ * Cheap pre-check before asking Cloudinary to fetch a remote image: the value
+ * must be a non-empty http(s) URL string within the length cap. This does NOT
+ * verify the URL points at a real image — Cloudinary's fetch decides that;
+ * callers fall back when the upload throws. Blocks free text and non-http
+ * schemes (javascript:, data:, file:, blob:) so a dangerous scheme can never
+ * reach a fetch or a stored field.
+ *
+ * Input:  any value (typically a CSV cell or a route body field).
+ * Output: true only for an http(s) URL string within MAX_IMAGE_URL_LENGTH.
  */
 export function isUploadableImageUrl(value: unknown): value is string {
-  return typeof value === 'string' && /^https?:\/\/\S+$/i.test(value.trim());
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  return trimmed.length <= MAX_IMAGE_URL_LENGTH && /^https?:\/\/\S+$/i.test(trimmed);
 }
 
 /**
@@ -160,16 +191,26 @@ export function isUploadableImageUrl(value: unknown): value is string {
  * stores it in our account, and returns a permanent secure_url) so the asset is
  * owned/managed by us rather than the supplier's link. Same signed REST request
  * as `uploadOfferImage`, but the `file` field is the remote URL string instead
- * of a Blob. Lands in the `nexus/offers` folder.
+ * of a Blob.
+ *
+ * SECURITY: the remote fetch is performed by CLOUDINARY's infrastructure, never
+ * by this server - no outbound request to the user's URL leaves our backend,
+ * so internal hosts/metadata endpoints are unreachable by construction. The
+ * scheme/length check here is defense-in-depth, not the SSRF boundary.
  *
  * Input:  remoteUrl - a public http(s) image URL.
+ *         folder    - target Cloudinary folder (default 'nexus/offers'; tenant
+ *                     logo/cover callers pass their own folders).
  * Output: Promise resolving to the secure HTTPS Cloudinary URL.
  * Throws:
  *   - If remoteUrl is not a valid http(s) URL (caller should fall back).
  *   - If CLOUDINARY_URL is not configured.
  *   - If Cloudinary returns a non-2xx (e.g. the URL is unreachable / not an image).
  */
-export async function uploadOfferImageFromUrl(remoteUrl: string): Promise<string> {
+export async function uploadOfferImageFromUrl(
+  remoteUrl: string,
+  folder = 'nexus/offers',
+): Promise<string> {
   if (!isUploadableImageUrl(remoteUrl)) {
     throw new Error('uploadOfferImageFromUrl requires an http(s) URL');
   }
@@ -179,7 +220,6 @@ export async function uploadOfferImageFromUrl(remoteUrl: string): Promise<string
 
   const { apiKey, apiSecret, cloudName } = parseCloudinaryUrl(env.CLOUDINARY_URL);
 
-  const folder = 'nexus/offers';
   const publicId = `${folder}/${Date.now()}-url`;
   const timestamp = String(Math.round(Date.now() / 1000));
 
@@ -221,39 +261,24 @@ export async function uploadOfferImageFromUrl(remoteUrl: string): Promise<string
  * Throws: if CLOUDINARY_URL is unset or Cloudinary returns a non-2xx.
  */
 export async function uploadTenantLogo(buffer: Buffer, filename: string): Promise<string> {
-  if (!env.CLOUDINARY_URL) {
-    throw new Error('CLOUDINARY_URL is not configured - tenant logo upload is unavailable');
-  }
+  return uploadImageBuffer(buffer, filename, TENANT_LOGO_FOLDER, 'tenant logo');
+}
 
-  const { apiKey, apiSecret, cloudName } = parseCloudinaryUrl(env.CLOUDINARY_URL);
+/** Cloudinary folders for tenant branding assets (also used by URL re-hosts). */
+export const TENANT_LOGO_FOLDER = 'nexus/tenant-logos';
+export const TENANT_COVER_FOLDER = 'nexus/tenant-covers';
 
-  const folder = 'nexus/tenant-logos';
-  const publicId = `${folder}/${Date.now()}-${sanitizeFilename(filename)}`;
-  const timestamp = String(Math.round(Date.now() / 1000));
-
-  const signedParams: Record<string, string> = { folder, public_id: publicId, timestamp };
-  const signature = buildSignature(signedParams, apiSecret);
-
-  const form = new FormData();
-  form.append('file', new Blob([buffer]));
-  form.append('api_key', apiKey);
-  form.append('timestamp', timestamp);
-  form.append('signature', signature);
-  form.append('folder', folder);
-  form.append('public_id', publicId);
-
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-    method: 'POST',
-    body: form,
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Cloudinary tenant-logo upload failed (HTTP ${res.status}): ${body}`);
-  }
-
-  const data = (await res.json()) as CloudinaryUploadResult;
-  return data.secure_url;
+/**
+ * Uploads a tenant cover image to Cloudinary under `nexus/tenant-covers`.
+ * Same pristine-original semantics as the logo: callers delete replaced assets
+ * via deleteOfferImage so there are no orphans.
+ *
+ * Input:  buffer - raw image data; filename - original name for the public_id.
+ * Output: Promise resolving to the secure HTTPS URL.
+ * Throws: if CLOUDINARY_URL is unset or Cloudinary returns a non-2xx.
+ */
+export async function uploadTenantCover(buffer: Buffer, filename: string): Promise<string> {
+  return uploadImageBuffer(buffer, filename, TENANT_COVER_FOLDER, 'tenant cover');
 }
 
 /**

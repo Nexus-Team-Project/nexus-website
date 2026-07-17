@@ -44,6 +44,7 @@ import { autoAdoptOfferForAllTenants } from '../services/admin-offer-auto-adopt.
 import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, VOUCHER_PAYMENTS_MIN, VOUCHER_PAYMENTS_MAX, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
 import { assertVoucherValidity, assertVoucherStackable, assertUniqueVariantValueStack } from '../services/supply-voucher.helper';
+import { isUploadableImageUrl, MAX_IMAGE_URL_LENGTH } from '../utils/cloudinary';
 import { addBarcodes, addLinks, getInventorySummary, getOfferVariantInventoryCounts, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
 import { getOfferVariantValiditySummaries } from '../services/voucher-validity-summary.service';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
@@ -118,6 +119,29 @@ function parseVariantsField(v: unknown): unknown {
   if (typeof v !== 'string') return v;
   try { return JSON.parse(v); } catch { return null; }
 }
+
+/**
+ * Multipart `remoteImages` field: JSON-encoded [{url, crop|null}] of
+ * URL-sourced gallery images. The UI exposes this for VOUCHER offers only
+ * (owner decision 2026-07-16); the server accepts it for any type because
+ * re-hosting yields the exact result of uploading the same file - the voucher
+ * gate is a UI rollout scope, not a security boundary.
+ *
+ * SECURITY: each URL is http(s)-only + length-capped (rejecting javascript:/
+ * data:/file: and free text) BEFORE any fetch; the fetch itself is performed
+ * by Cloudinary (never this server) and only the re-hosted Cloudinary URL is
+ * persisted - the user's URL string never reaches storage or an HTML sink.
+ */
+const remoteImagesField = z.preprocess(
+  parseImageCropsField,
+  z.array(z.object({
+    url: z.string().max(MAX_IMAGE_URL_LENGTH).refine(
+      (value) => isUploadableImageUrl(value),
+      'remote image URLs must be http(s)',
+    ),
+    crop: imageCropSchema.nullable(),
+  })).max(OFFER_IMAGES_MAX).optional(),
+);
 
 /**
  * One voucher variant as received from a client. Numbers arrive as real numbers
@@ -327,6 +351,8 @@ const createOfferSchema = z.object({
     parseImageCropsField,
     z.array(imageCropEntrySchema).max(OFFER_IMAGES_MAX).optional(),
   ),
+  // URL-sourced images (re-hosted server-side; see remoteImagesField).
+  remoteImages: remoteImagesField,
 });
 
 /**
@@ -401,6 +427,8 @@ const updateOfferSchema = z.object({
     parseImageCropsField,
     z.array(imageCropSchema.nullable()).max(OFFER_IMAGES_MAX).optional(),
   ),
+  // URL-sourced images (re-hosted server-side; see remoteImagesField).
+  remoteImages: remoteImagesField,
 });
 
 /**
@@ -662,14 +690,23 @@ router.post(
         }
       }
 
-      // Voucher single-image rule: a voucher carries exactly one card image.
-      // multer already caps total file count at OFFER_IMAGES_MAX; this narrows
-      // it to 1 for vouchers. Re-enforced server-side regardless of the UI.
+      // Voucher single-image rule: a voucher carries exactly one card image
+      // (uploaded file OR URL-sourced). multer already caps total file count
+      // at OFFER_IMAGES_MAX; this narrows the combined count to 1 for
+      // vouchers. Re-enforced server-side regardless of the UI.
       const uploadedFileCount = Array.isArray(req.files) ? req.files.length : 0;
-      if (d.executionType === 'voucher' && uploadedFileCount > 1) {
+      const remoteCount = d.remoteImages?.length ?? 0;
+      if (d.executionType === 'voucher' && uploadedFileCount + remoteCount > 1) {
         res.status(400).json({
           error: 'A voucher offer can have at most one image',
           errorHe: 'שובר יכול לכלול תמונה אחת בלבד',
+        });
+        return;
+      }
+      // Combined cap across sources (multer only caps the file field).
+      if (uploadedFileCount + remoteCount > OFFER_IMAGES_MAX) {
+        res.status(400).json({
+          error: `An offer can have at most ${OFFER_IMAGES_MAX} images.`,
         });
         return;
       }
@@ -889,18 +926,20 @@ router.patch(
             mimetype: f.mimetype,
           }))
         : [];
-      // Belt+suspenders cap: kept + new uploaded must not exceed OFFER_IMAGES_MAX.
-      // multer already caps file count, but kept can be sent without files.
+      // Belt+suspenders cap: kept + new uploaded + URL-sourced must not exceed
+      // OFFER_IMAGES_MAX. multer only caps the file field.
       const keptCount = restParsed.keptImageUrls?.length ?? 0;
-      if (keptCount + imageFiles.length > OFFER_IMAGES_MAX) {
+      const remoteCount = restParsed.remoteImages?.length ?? 0;
+      if (keptCount + imageFiles.length + remoteCount > OFFER_IMAGES_MAX) {
         res.status(400).json({
           error: `An offer can have at most ${OFFER_IMAGES_MAX} images.`,
         });
         return;
       }
       // Voucher single-image rule. The frontend always sends executionType on
-      // save; when it indicates a voucher, kept + uploaded must be at most 1.
-      if (restParsed.executionType === 'voucher' && keptCount + imageFiles.length > 1) {
+      // save; when it indicates a voucher, kept + uploaded + URL-sourced must
+      // be at most 1.
+      if (restParsed.executionType === 'voucher' && keptCount + imageFiles.length + remoteCount > 1) {
         res.status(400).json({
           error: 'A voucher offer can have at most one image',
           errorHe: 'שובר יכול לכלול תמונה אחת בלבד',

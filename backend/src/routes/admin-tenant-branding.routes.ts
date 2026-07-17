@@ -2,10 +2,15 @@
  * Platform-admin tenant branding routes - edit ANY organization's logo + brand
  * color (rate-limited, platform-admin only):
  *
- *   POST   /api/v1/admin/tenants/:tenantId/logo         - multipart 'logo' + optional 'crop' JSON
+ *   POST   /api/v1/admin/tenants/:tenantId/logo         - multipart 'logo' OR 'imageUrl' field
+ *                                                         (exactly one; URL re-hosted) + optional 'crop' JSON
  *   PATCH  /api/v1/admin/tenants/:tenantId/logo/crop    - JSON { crop: LogoCrop | null }
  *   DELETE /api/v1/admin/tenants/:tenantId/logo         - clear logo (revert to initials)
  *   PATCH  /api/v1/admin/tenants/:tenantId/brand-color  - JSON { brandColor: "#rrggbb" | null }
+ *   POST   /api/v1/admin/tenants/:tenantId/cover        - reconcile the cover gallery (max 5):
+ *                                                         multipart covers[] + newFileCrops +
+ *                                                         remoteImages + keptImages JSON fields
+ *   DELETE /api/v1/admin/tenants/:tenantId/cover        - clear the whole cover set (+ assets)
  *
  * Unlike the tenant self-service routes (tenant-logo.routes.ts) the tenant id
  * comes from the URL because a platform admin has no membership in the target
@@ -20,13 +25,17 @@ import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { resolveTenantContext } from '../utils/resolve-tenant-context';
-import { getTenantDomainCollections, logoCropSchema, type LogoCrop } from '../models/domain/tenant.models';
+import { getTenantDomainCollections, logoCropSchema, TENANT_COVER_IMAGES_MAX, type LogoCrop } from '../models/domain/tenant.models';
 import {
   setTenantLogo,
+  setTenantLogoHosted,
   setTenantLogoCrop,
   removeTenantLogo,
   setTenantBrandColor,
 } from '../services/tenant-logo.service';
+import { setTenantCovers, clearTenantCovers } from '../services/tenant-cover.service';
+import { buildCoverEntriesFromRequest } from '../services/tenant-cover.helper';
+import { isUploadableImageUrl, TENANT_LOGO_FOLDER, uploadOfferImageFromUrl } from '../utils/cloudinary';
 
 /** 6-digit hex color, with the leading '#'. */
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -100,12 +109,57 @@ router.post('/:tenantId/logo', upload.single('logo'), async (req: Request, res: 
     const { tenantId } = req.params;
     await assertTenantExists(tenantId);
     const file = req.file;
-    if (!file) { res.status(400).json({ error: 'no_file' }); return; }
-    if (!ALLOWED_TYPES.has(file.mimetype)) { res.status(400).json({ error: 'invalid_type' }); return; }
+    const rawImageUrl = (req.body as { imageUrl?: unknown }).imageUrl;
+    const hasImageUrl = typeof rawImageUrl === 'string' && rawImageUrl.trim() !== '';
+    // Exactly ONE source: a file or a URL, never both / neither.
+    if (file && hasImageUrl) { res.status(400).json({ error: 'file_and_url' }); return; }
+    if (!file && !hasImageUrl) { res.status(400).json({ error: 'no_file' }); return; }
     const crop = parseLogoCrop((req.body as { crop?: unknown }).crop);
     const db = await getMongoDb();
-    const out = await setTenantLogo(db, { tenantId, buffer: file.buffer, filename: file.originalname, crop });
+    if (file) {
+      if (!ALLOWED_TYPES.has(file.mimetype)) { res.status(400).json({ error: 'invalid_type' }); return; }
+      const out = await setTenantLogo(db, { tenantId, buffer: file.buffer, filename: file.originalname, crop });
+      res.json(out);
+      return;
+    }
+    // URL source: http(s)-only + length cap; Cloudinary performs the fetch.
+    if (!isUploadableImageUrl(rawImageUrl)) { res.status(400).json({ error: 'invalid_image_url' }); return; }
+    const logoUrl = await uploadOfferImageFromUrl(rawImageUrl, TENANT_LOGO_FOLDER);
+    const out = await setTenantLogoHosted(db, { tenantId, logoUrl, crop });
     res.json(out);
+  } catch (e) {
+    handleError(e, res);
+  }
+});
+
+router.post(
+  '/:tenantId/cover',
+  upload.array('covers', TENANT_COVER_IMAGES_MAX),
+  async (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      await assertTenantExists(tenantId);
+      const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+      for (const file of files) {
+        if (!ALLOWED_TYPES.has(file.mimetype)) { res.status(400).json({ error: 'invalid_type' }); return; }
+      }
+      const entries = await buildCoverEntriesFromRequest(files, req.body as Record<string, unknown>);
+      const db = await getMongoDb();
+      const out = await setTenantCovers(db, { tenantId, entries });
+      res.json(out);
+    } catch (e) {
+      handleError(e, res);
+    }
+  },
+);
+
+router.delete('/:tenantId/cover', async (req: Request, res: Response) => {
+  try {
+    const { tenantId } = req.params;
+    await assertTenantExists(tenantId);
+    const db = await getMongoDb();
+    await clearTenantCovers(db, { tenantId });
+    res.json({ ok: true });
   } catch (e) {
     handleError(e, res);
   }
