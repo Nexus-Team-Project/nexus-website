@@ -103,3 +103,23 @@ describe('getPublicTenantInfo', () => {
     expect(await getPublicTenantInfo(db, 't_desc_gated')).toBeNull();
   });
 });
+
+describe('getPublicTenantInfo cover images', () => {
+  it('exposes the ordered cover set for a catalog-active tenant', async () => {
+    await seedTenant('t_covers', { catalogActive: true });
+    const covers = [
+      { url: 'https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/1.jpg', crop: null },
+      { url: 'https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/2.jpg', crop: { x: 0, y: 0.2, width: 1, height: 0.6 } },
+    ];
+    await db.collection(DOMAIN_COLLECTIONS.domainTenants).updateOne(
+      { tenantId: 't_covers' }, { $set: { coverImages: covers } },
+    );
+    const r = await getPublicTenantInfo(db, 't_covers');
+    expect(r?.coverImages).toEqual(covers);
+  });
+
+  it('omits coverImages when the tenant has none', async () => {
+    await seedTenant('t_nocover', { catalogActive: true });
+    expect((await getPublicTenantInfo(db, 't_nocover'))?.coverImages).toBeUndefined();
+  });
+});

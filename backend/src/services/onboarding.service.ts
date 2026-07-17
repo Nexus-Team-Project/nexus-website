@@ -17,7 +17,7 @@ import {
   getOnboardingCollections,
 } from '../models/onboarding.models';
 import { getIdentityDomainCollections, getTenantDomainCollections } from '../models/domain';
-import { DEFAULT_MEMBER_SERVICES, type LogoCrop } from '../models/domain/tenant.models';
+import { DEFAULT_MEMBER_SERVICES, type LogoCrop, type TenantCoverImage } from '../models/domain/tenant.models';
 import { BusinessSetupInput, SkipWorkspaceInput, WorkspaceSetupInput } from '../schemas/onboarding.schemas';
 import { getDomainAuthorizationContext, getPrimaryTenantRole, hasDomainPermission } from './domain-authorization.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
@@ -117,6 +117,9 @@ export interface MeResponse {
     tenantLogoUrl?: string | null;
     /** Crop of the logo (normalized fractions), or null -> show the full logo. */
     tenantLogoCrop?: LogoCrop | null;
+    /** Ordered cover-image gallery (max 5): pristine Cloudinary URL + crop per
+     *  entry. Powers the Appearance cover card; empty = no cover set. */
+    tenantCoverImages?: TenantCoverImage[];
     /** Org brand color ("#rrggbb"), or null -> wallet derives one from the id. */
     tenantBrandColor?: string | null;
     /** Auto-adopt NEXUS-admin offers setting (absent tenant field = true). */
@@ -538,7 +541,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const tenantBrandingDoc = context.tenantId
     ? await getTenantDomainCollections(db).domainTenants.findOne(
         { tenantId: context.tenantId },
-        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, businessSetupApproval: 1, autoApproveOffers: 1, autoAdoptAdminOffers: 1 } },
+        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, coverImages: 1, businessSetupApproval: 1, autoApproveOffers: 1, autoAdoptAdminOffers: 1 } },
       )
     : null;
 
@@ -549,6 +552,7 @@ export async function getMe(userId: string): Promise<MeResponse> {
       mode: resolvedMode,
       tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
       tenantLogoCrop: tenantBrandingDoc?.logoCrop ?? null,
+      tenantCoverImages: (tenantBrandingDoc?.coverImages ?? []) as TenantCoverImage[],
       tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
       // Settings toggle: auto-adopt NEXUS-admin offers (absent field = true).
       autoAdoptAdminOffers: tenantBrandingDoc ? tenantBrandingDoc.autoAdoptAdminOffers !== false : true,
