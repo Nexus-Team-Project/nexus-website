@@ -46,6 +46,7 @@ import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALI
 import { assertVoucherValidity, assertVoucherStackable, assertUniqueVariantValueStack } from '../services/supply-voucher.helper';
 import { isUploadableImageUrl, MAX_IMAGE_URL_LENGTH } from '../utils/cloudinary';
 import { addBarcodes, addLinks, getInventorySummary, getOfferVariantInventoryCounts, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
+import { getOfferVariantValiditySummaries } from '../services/voucher-validity-summary.service';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
 import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX, VOUCHER_CODE_REGEX } from '../models/domain/voucher-codes.models';
@@ -1488,13 +1489,14 @@ router.get(
 
 /**
  * GET /api/v1/offers/:offerId/inventory/counts
- * Per-variant inventory unit COUNTS for an offer the caller can SEE in the
- * catalog: their own offers, or an ACTIVE ecosystem offer (platform admins see
- * any). Unlike the owner-only summaries above, this returns numbers only -
- * never code values - so the Benefits table can show another supplier's stock
- * without exposing redeemable codes. Anything else 404s without revealing
- * whether the offer exists. Rate-limited by the router-level apiLimiter like
- * every offers route; requires only catalog.view (read-only, non-sensitive).
+ * Per-variant inventory unit COUNTS + real VALIDITY batches for an offer the
+ * caller can SEE in the catalog: their own offers, or an ACTIVE ecosystem
+ * offer (platform admins see any). Unlike the owner-only summaries above, this
+ * returns numbers/dates only - never code values - so the Benefits table can
+ * show another supplier's stock and each variant's actual validity without
+ * exposing redeemable codes. Anything else 404s without revealing whether the
+ * offer exists. Rate-limited by the router-level apiLimiter like every offers
+ * route; requires only catalog.view (read-only, non-sensitive).
  */
 router.get(
   '/:offerId/inventory/counts',
@@ -1517,8 +1519,14 @@ router.get(
         res.status(404).json({ error: 'Offer not found' });
         return;
       }
-      const counts = await getOfferVariantInventoryCounts(req.params.offerId);
-      res.json({ counts });
+      // Counts + per-variant validity batches ride one response: both are
+      // numbers/dates only (never code values), sharing the same exposure
+      // envelope, and the variant table consumes them together.
+      const [counts, validity] = await Promise.all([
+        getOfferVariantInventoryCounts(req.params.offerId),
+        getOfferVariantValiditySummaries(req.params.offerId),
+      ]);
+      res.json({ counts, validity });
     } catch (err) {
       next(err);
     }
