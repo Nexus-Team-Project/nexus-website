@@ -50,6 +50,12 @@ export interface CatalogQuery {
   page: number;
   limit: number;
   search?: string;
+  /**
+   * Free-text filter on the CREATING tenant's organization name (the
+   * "uploaded by" column). Resolved to tenantIds server-side against
+   * domainTenants, then matched on createdByTenantId.
+   */
+  orgSearch?: string;
   category?: string;
   approvalStatus?: 'active' | 'pending_approval' | 'denied' | 'expired';
   adoptionStatus?: 'adopted' | 'not_adopted';
@@ -401,6 +407,24 @@ export async function getTenantCatalogView(
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
   andClauses.push(...buildFilterClauses(query));
+
+  // Org (uploader) filter: free-text, case-insensitive contains on the CREATING
+  // tenant's organization name. Names live on domainTenants, so resolve the
+  // matching tenantIds first (same pre-fetch pattern as the adoption filter;
+  // the tenant collection is small) and match offers on createdByTenantId.
+  // The $in is capped at 200 ids to bound the clause; regex specials escaped.
+  if (query.orgSearch?.trim()) {
+    const escaped = query.orgSearch.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const orgs = await getTenantDomainCollections(db).domainTenants
+      .find(
+        { organizationName: { $regex: escaped, $options: 'i' } },
+        { projection: { tenantId: 1 } },
+      )
+      .limit(200)
+      .toArray();
+    if (orgs.length === 0) return { items: [], total: 0 };
+    andClauses.push({ createdByTenantId: { $in: orgs.map((t) => t.tenantId) } });
+  }
 
   // 'expired' is computed (validUntil<now, still status=active). Other approval
   // statuses are exact matches.

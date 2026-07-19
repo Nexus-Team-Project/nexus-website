@@ -251,6 +251,8 @@ const catalogListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),
+  /** Free-text filter on the creating tenant's organization name. */
+  orgSearch: z.string().trim().min(1).max(100).optional(),
   category: z.enum(OFFER_CATEGORIES).optional(),
   approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
   adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
