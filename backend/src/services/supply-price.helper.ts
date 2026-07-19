@@ -108,3 +108,22 @@ export function priceToMarkupPct(price: number, base: number, faceValue: number)
   if (typeof base !== 'number' || base <= 0) return 0;
   return clampMarkupPct(roundAgorot((price / base - 1) * 100), base, faceValue);
 }
+
+/**
+ * Raw nexus fee amount for one variant: pct% of the margin (face - cost),
+ * rounded to agorot. This is the exact amount Nexus takes on the variant,
+ * independent of any adopter's own price override (receipts read this).
+ * Inputs must satisfy cost <= face; pct in [0, 100] (Zod-enforced at the API).
+ */
+export function nexusFeeAmount(cost: number, face: number, pct: number): number {
+  return roundAgorot((pct / 100) * (face - cost));
+}
+
+/**
+ * Fee-inflated base price for one variant: cost + fee, rounded UP to a whole
+ * shekel, capped at the face value. pct 0 -> cost; pct 100 -> face exactly.
+ * This is the value baked into variant.member_price.
+ */
+export function applyNexusFee(cost: number, face: number, pct: number): number {
+  return Math.min(face, Math.ceil(cost + (pct / 100) * (face - cost)));
+}
