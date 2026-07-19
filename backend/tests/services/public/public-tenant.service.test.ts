@@ -51,23 +51,30 @@ describe('getPublicTenantInfo', () => {
     expect(r).toEqual({ tenantId: 't_active', organizationName: 'Acme Co', logoUrl: undefined });
   });
 
-  it('returns null when benefits_catalog is not activated', async () => {
-    await seedTenant('t_no_catalog', { catalogActive: false });
-    expect(await getPublicTenantInfo(db, 't_no_catalog')).toBeNull();
+  it('returns tenant info even when benefits_catalog is not activated (2026-07-19: an ecosystem-offer creator/supplier need not run its own member catalog to be viewable)', async () => {
+    await seedTenant('t_no_catalog', { catalogActive: false, name: 'Supplier Co' });
+    const r = await getPublicTenantInfo(db, 't_no_catalog');
+    expect(r).toEqual({ tenantId: 't_no_catalog', organizationName: 'Supplier Co', logoUrl: undefined });
   });
 
   it('returns null for an unknown tenant', async () => {
     expect(await getPublicTenantInfo(db, 't_missing')).toBeNull();
   });
 
-  it('returns null when activation exists but status is suspended', async () => {
+  it('returns null for a suspended tenant', async () => {
     await seedTenant('t_susp', { catalogActive: false });
-    await db.collection(DOMAIN_COLLECTIONS.tenantServiceActivations).insertOne({
-      tenantServiceActivationId: 'act_susp', tenantId: 't_susp',
-      serviceKey: 'benefits_catalog', status: 'suspended',
-      createdAt: new Date(), updatedAt: new Date(),
-    });
+    await db.collection(DOMAIN_COLLECTIONS.domainTenants).updateOne(
+      { tenantId: 't_susp' }, { $set: { status: 'suspended' } },
+    );
     expect(await getPublicTenantInfo(db, 't_susp')).toBeNull();
+  });
+
+  it('returns null for an archived tenant', async () => {
+    await seedTenant('t_archived', { catalogActive: false });
+    await db.collection(DOMAIN_COLLECTIONS.domainTenants).updateOne(
+      { tenantId: 't_archived' }, { $set: { status: 'archived' } },
+    );
+    expect(await getPublicTenantInfo(db, 't_archived')).toBeNull();
   });
 
   it('includes businessDescription from tenantProfiles when authored', async () => {
@@ -93,14 +100,16 @@ describe('getPublicTenantInfo', () => {
     expect((await getPublicTenantInfo(db, 't_nodesc'))?.businessDescription).toBeUndefined();
   });
 
-  it('still returns null for a described tenant without an active catalog (gate unchanged)', async () => {
+  it('returns the description for a described tenant without an active catalog (2026-07-19: no longer gated on it)', async () => {
     await seedTenant('t_desc_gated', { catalogActive: false });
     await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).insertOne({
       tenantProfileId: 'tp_gated', tenantId: 't_desc_gated',
-      businessDescription: 'Hidden until catalog active.', selectedUseCases: [],
+      businessDescription: 'Visible even without an active catalog.', selectedUseCases: [],
       createdAt: new Date(), updatedAt: new Date(),
     });
-    expect(await getPublicTenantInfo(db, 't_desc_gated')).toBeNull();
+    expect((await getPublicTenantInfo(db, 't_desc_gated'))?.businessDescription).toBe(
+      'Visible even without an active catalog.',
+    );
   });
 });
 

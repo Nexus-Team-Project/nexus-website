@@ -1,9 +1,14 @@
 /**
  * Public (unauthenticated) tenant-info lookup. Returns a tenant's public
- * name/logo ONLY when that tenant has an active benefits_catalog service
- * activation, so half-set-up or suspended tenants are not exposed. Go-live
- * status is intentionally disregarded (sandbox-but-catalog-active tenants
- * are publicly viewable). Exposes no membership, pricing, or secret fields.
+ * name/logo for any real, non-suspended/archived tenant - it does NOT
+ * require that tenant to have activated its OWN Benefits Catalog (2026-07-19
+ * fix: an ecosystem-offer creator/supplier tenant that never turned on its
+ * own member-facing catalog was otherwise invisible, so the wallet's "Visit
+ * tenant" link from an offer page 404'd for those creators even though their
+ * name/logo/brand color are already shown on the offer page via creator
+ * attribution - this lookup just makes the dedicated page consistent with
+ * that). Suspended/archived tenants stay hidden. Exposes no membership,
+ * pricing, or secret fields.
  */
 import type { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
@@ -42,27 +47,26 @@ export interface PublicTenantInfo {
   rating?: TenantRatingSummary;
 }
 
+/** Tenant statuses hidden from the public lookup - everything else is visible. */
+const HIDDEN_TENANT_STATUSES = new Set(['suspended', 'archived']);
+
 /**
  * Resolve the public-facing name/logo/description for a tenant.
  *
  * @param db        Mongo handle
  * @param tenantId  domain tenantId
- * @returns public tenant info, or null when the tenant does not exist or
- *          has no active benefits_catalog activation.
+ * @returns public tenant info, or null when the tenant does not exist or is
+ *          suspended/archived.
  */
 export async function getPublicTenantInfo(
   db: Db,
   tenantId: string,
 ): Promise<PublicTenantInfo | null> {
-  const activation = await db
-    .collection(DOMAIN_COLLECTIONS.tenantServiceActivations)
-    .findOne({ tenantId, serviceKey: 'benefits_catalog', status: 'active' });
-  if (!activation) return null;
-
   const tenant = await db
     .collection(DOMAIN_COLLECTIONS.domainTenants)
     .findOne({ tenantId });
   if (!tenant) return null;
+  if (HIDDEN_TENANT_STATUSES.has(tenant.status as string)) return null;
 
   const [profile, ratingSummary] = await Promise.all([
     db
