@@ -24,6 +24,7 @@ import {
   getSupplyDomainCollections,
   NOT_DELETED,
   VOUCHER_PAYMENTS_DEFAULT,
+  NEXUS_FEE_DEFAULT_PCT,
   type NexusOffer,
   type TenantOfferConfig,
   type ImageCropEntry,
@@ -126,6 +127,8 @@ export interface CatalogItem {
    * Must never be returned to adopting tenants or members.
    */
   nexus_cost?: number;
+  /** Platform fee % of the margin. PLATFORM ADMINS ONLY - stripped for everyone else. */
+  nexusFeePct?: number;
   /** Current lifecycle status of the offer (e.g. active, pending_approval, denied, expired). */
   approval_status?: string;
   /** Denial reason from the platform admin. Only populated for the creating tenant. */
@@ -282,6 +285,10 @@ function toItem(
       context.canSeeNexusCost &&
       offer.nexus_cost !== undefined && { nexus_cost: offer.nexus_cost }
     ),
+    // Fee % - platform admins only (tenants must never see it). Vouchers that
+    // predate the field read as the default so the admin slider has a value.
+    ...(context.isPlatformAdmin && (offer.executionType ?? 'voucher') === 'voucher'
+      && { nexusFeePct: offer.nexusFeePct ?? NEXUS_FEE_DEFAULT_PCT }),
     approval_status: effectiveStatus,
     ...(context.isOwnOffer && offer.denial_reason && { denial_reason: offer.denial_reason }),
     isAdopted: config?.adoptionStatus === 'active',
