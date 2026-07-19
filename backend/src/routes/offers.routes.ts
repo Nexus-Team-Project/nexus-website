@@ -32,6 +32,7 @@ import {
 import { createOffer, updateOffer, deleteOffer } from '../services/supply.service';
 import { resolveMemberCatalogAccess } from '../services/catalog-member-gate.service';
 import { setTenantVoucherPrice } from '../services/tenant-pricing.service';
+import { setNexusFeePct } from '../services/nexus-fee.service';
 import { approveOffer, denyOffer } from '../services/supply-approval.service';
 import {
   getTenantCatalogView,
@@ -449,6 +450,9 @@ const setTenantVoucherPriceSchema = z
   .refine((d) => d.memberPrice !== undefined || d.markupPct !== undefined, {
     message: 'memberPrice or markupPct required',
   });
+
+/** Body for PATCH /:offerId/nexus-fee - the platform fee % of the margin. */
+const setNexusFeeSchema = z.object({ pct: z.number().int().min(0).max(100) });
 
 /**
  * Validates the voucher inventory body. `kind` selects barcode generation
@@ -1316,6 +1320,49 @@ router.patch(
       }
 
       res.json({ config: result.config });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/offers/:offerId/nexus-fee
+ *
+ * Sets the offer's platform fee percentage (nexusFeePct) and re-bakes all
+ * derived pricing (variant member_price, mirror, displayPrice, adopter floors).
+ * The fee is never exposed to tenants; this route is PLATFORM ADMIN ONLY.
+ *
+ * Input body: { pct: int 0..100 }.
+ * Output: { success: true, nexusFeePct } on 200; error JSON otherwise.
+ *   403 - caller is not a platform admin
+ *   404 - offer_not_found
+ *   400 - invalid body or not_voucher
+ */
+router.patch(
+  '/:offerId/nexus-fee',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContext(req);
+      if (!ctx.isPlatformAdmin) {
+        res.status(403).json({ error: 'Only platform admins can set the nexus fee' });
+        return;
+      }
+
+      const parsed = setNexusFeeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'pct must be an integer between 0 and 100' });
+        return;
+      }
+
+      const result = await setNexusFeePct(req.params.offerId, parsed.data.pct);
+      if (!result.ok) {
+        res.status(result.reason === 'offer_not_found' ? 404 : 400).json({ error: result.reason });
+        return;
+      }
+
+      res.json({ success: true, nexusFeePct: parsed.data.pct });
     } catch (err) {
       next(err);
     }
