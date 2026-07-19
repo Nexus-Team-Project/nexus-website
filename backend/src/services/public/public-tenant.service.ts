@@ -8,6 +8,7 @@
 import type { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import type { TenantCoverImage } from '../../models/domain/tenant.models';
+import { getTenantRatingSummary, type TenantRatingSummary } from '../wallet/tenant-rating.service';
 
 export interface PublicTenantInfo {
   tenantId: string;
@@ -27,6 +28,18 @@ export interface PublicTenantInfo {
    * never filled. Powers the wallet tenant page + offer-page tenant card.
    */
   businessDescription?: string;
+  /**
+   * The owner-authored website URL from the onboarding wizard
+   * (tenantProfiles.website). Absent when never filled. Powers the wallet
+   * tenant page share row.
+   */
+  website?: string;
+  /**
+   * Aggregate member rating for this tenant (average/count/star
+   * distribution). Absent when nobody has rated this tenant yet - the wallet
+   * must render a "no ratings yet" state rather than a fabricated 0.0.
+   */
+  rating?: TenantRatingSummary;
 }
 
 /**
@@ -51,13 +64,18 @@ export async function getPublicTenantInfo(
     .findOne({ tenantId });
   if (!tenant) return null;
 
-  const profile = await db
-    .collection(DOMAIN_COLLECTIONS.tenantProfiles)
-    .findOne({ tenantId }, { projection: { businessDescription: 1 } });
+  const [profile, ratingSummary] = await Promise.all([
+    db
+      .collection(DOMAIN_COLLECTIONS.tenantProfiles)
+      .findOne({ tenantId }, { projection: { businessDescription: 1, website: 1 } }),
+    getTenantRatingSummary(db, tenantId),
+  ]);
   const businessDescription =
     typeof profile?.businessDescription === 'string' && profile.businessDescription.trim() !== ''
       ? profile.businessDescription
       : undefined;
+  const website =
+    typeof profile?.website === 'string' && profile.website.trim() !== '' ? profile.website : undefined;
 
   const coverImages = (tenant.coverImages as TenantCoverImage[] | undefined) ?? [];
 
@@ -68,5 +86,7 @@ export async function getPublicTenantInfo(
     brandColor: (tenant.brandColor as string | undefined) ?? undefined,
     ...(coverImages.length > 0 ? { coverImages } : {}),
     ...(businessDescription !== undefined ? { businessDescription } : {}),
+    ...(website !== undefined ? { website } : {}),
+    ...(ratingSummary !== null ? { rating: ratingSummary } : {}),
   };
 }
