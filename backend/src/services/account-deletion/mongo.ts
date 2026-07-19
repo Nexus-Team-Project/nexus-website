@@ -22,6 +22,7 @@ import { WALLET_MAGIC_LINK_COLLECTION } from '../../models/auth/wallet-magic-lin
 import { TRUSTED_DEVICE_COLLECTION } from '../../models/auth/trusted-device.models';
 import { ONBOARDING_PHONE_VERIFICATION_COLLECTION } from '../../models/auth/onboarding-phone-verification.models';
 import { TENANT_JOIN_REQUEST_COLLECTION } from '../../models/auth/tenant-join-request.models';
+import { TENANT_RATING_COLLECTION } from '../../models/domain/tenant-rating.models';
 import { SHORT_LINK_COLLECTION } from '../../models/domain/short-links.models';
 import {
   resolveMongoDeletionTargets,
@@ -118,6 +119,8 @@ export async function collectMongoCounts(
     onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
+    tenantRatingsByUser,
+    tenantRatingsForOwnedTenants,
     ownerAssignmentsCleared,
   ] = await Promise.all([
     identity.nexusIdentities.countDocuments({
@@ -268,6 +271,14 @@ export async function collectMongoCounts(
     db.collection(TENANT_JOIN_REQUEST_COLLECTION).countDocuments({
       tenantId: { $in: targets.domainOwnedTenantIds },
     }),
+    // Tenant ratings authored by this user.
+    db.collection(TENANT_RATING_COLLECTION).countDocuments({
+      nexusIdentityId: { $in: targets.nexusIdentityIds },
+    }),
+    // Tenant ratings ON tenants the user owns.
+    db.collection(TENANT_RATING_COLLECTION).countDocuments({
+      tenantId: { $in: targets.domainOwnedTenantIds },
+    }),
     // Admin-created orgs where this user is the ASSIGNED owner: the tenant is
     // kept but its ownerAssignment is cleared (reverts to "no owner").
     tenants.domainTenants.countDocuments({
@@ -319,6 +330,8 @@ export async function collectMongoCounts(
     onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
+    tenantRatingsByUser,
+    tenantRatingsForOwnedTenants,
     ownerAssignmentsCleared,
   };
 }
@@ -383,6 +396,17 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
         ? [{ nexusIdentityId: { $in: targets.nexusIdentityIds } }]
         : []),
       { email },
+      ...(targets.domainOwnedTenantIds.length
+        ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }]
+        : []),
+    ],
+  });
+  // Tenant ratings authored by this user + ratings on tenants the user owns.
+  await db.collection(TENANT_RATING_COLLECTION).deleteMany({
+    $or: [
+      ...(targets.nexusIdentityIds.length
+        ? [{ nexusIdentityId: { $in: targets.nexusIdentityIds } }]
+        : []),
       ...(targets.domainOwnedTenantIds.length
         ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }]
         : []),
