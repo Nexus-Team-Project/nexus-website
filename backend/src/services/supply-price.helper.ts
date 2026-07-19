@@ -123,7 +123,11 @@ export function nexusFeeAmount(cost: number, face: number, pct: number): number 
  * Fee-inflated base price for one variant: cost + fee, rounded UP to a whole
  * shekel, capped at the face value. pct 0 -> cost; pct 100 -> face exactly.
  * This is the value baked into variant.member_price.
+ *
+ * roundAgorot before the ceil kills float dust (e.g. 123.00000000000001 must
+ * bake to 123, not 124) so a pct derived from a whole-shekel customer-price
+ * pick round-trips to exactly that price.
  */
 export function applyNexusFee(cost: number, face: number, pct: number): number {
-  return Math.min(face, Math.ceil(cost + (pct / 100) * (face - cost)));
+  return Math.min(face, Math.ceil(roundAgorot(cost + (pct / 100) * (face - cost))));
 }
