@@ -32,7 +32,7 @@ import {
 import { createOffer, updateOffer, deleteOffer } from '../services/supply.service';
 import { resolveMemberCatalogAccess } from '../services/catalog-member-gate.service';
 import { setTenantVoucherPrice } from '../services/tenant-pricing.service';
-import { setNexusFeePct, setVariantBaseSalePrice } from '../services/nexus-fee.service';
+import { setNexusFeePct } from '../services/nexus-fee.service';
 import { approveOffer, denyOffer } from '../services/supply-approval.service';
 import {
   getTenantCatalogView,
@@ -451,11 +451,9 @@ const setTenantVoucherPriceSchema = z
     message: 'memberPrice or markupPct required',
   });
 
-/** Body for PATCH /:offerId/nexus-fee - the platform fee % of the margin. */
-const setNexusFeeSchema = z.object({ pct: z.number().int().min(0).max(100) });
-
-/** Body for PATCH /:offerId/variants/:variantId/sale-price - the raw sale price. */
-const setBaseSalePriceSchema = z.object({ salePrice: z.number().positive() });
+/** Body for PATCH /:offerId/nexus-fee - the platform fee % of the margin.
+ *  May be fractional (derived from a whole-shekel customer-price pick). */
+const setNexusFeeSchema = z.object({ pct: z.number().min(0).max(100) });
 
 /**
  * Validates the voucher inventory body. `kind` selects barcode generation
@@ -1366,59 +1364,6 @@ router.patch(
       }
 
       res.json({ success: true, nexusFeePct: parsed.data.pct });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
-
-/**
- * PATCH /api/v1/offers/:offerId/variants/:variantId/sale-price
- *
- * PLATFORM-ADMIN edit of one variant's ORIGINAL sale price (nexus_cost) from
- * the price popover - equivalent to the owner editing it in the Edit Offer
- * modal: member_price re-bakes from the offer's fee %, mirror + displayPrice
- * recompute, and adopter overrides re-sync (tenant_only snaps to the new base;
- * ecosystem preserves margins above the fee floor).
- *
- * Input body: { salePrice: number > 0, <= variant face_value }.
- * Output: { success: true } on 200; error JSON otherwise.
- *   403 - caller is not a platform admin
- *   404 - offer_not_found / variant_not_found
- *   400 - invalid body, not_voucher, or out_of_bounds
- */
-router.patch(
-  '/:offerId/variants/:variantId/sale-price',
-  authenticate,
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const ctx = await resolveTenantContext(req);
-      if (!ctx.isPlatformAdmin) {
-        res.status(403).json({ error: 'Only platform admins can set the base sale price' });
-        return;
-      }
-
-      const parsed = setBaseSalePriceSchema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json({ error: 'salePrice must be a positive number' });
-        return;
-      }
-
-      const result = await setVariantBaseSalePrice(
-        req.params.offerId,
-        req.params.variantId,
-        parsed.data.salePrice,
-      );
-      if (!result.ok) {
-        const code =
-          result.reason === 'offer_not_found' ? 404 :
-          result.reason === 'variant_not_found' ? 404 :
-          400;
-        res.status(code).json({ error: result.reason });
-        return;
-      }
-
-      res.json({ success: true });
     } catch (err) {
       next(err);
     }

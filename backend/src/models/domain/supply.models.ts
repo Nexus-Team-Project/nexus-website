@@ -325,8 +325,10 @@ export const nexusOfferSchema = z.object({
    * (face_value - nexus_cost). Voucher offers only. Never exposed to
    * non-platform-admin callers. The fee-inflated price is BAKED into
    * variant.member_price; this stores the intent for recompute + receipts.
+   * May be fractional: the admin picks a whole-shekel customer price and the
+   * pct is derived from it, e.g. (97-51)/(500-51) -> 10.24%.
    */
-  nexusFeePct: z.number().int().min(0).max(100).optional(),
+  nexusFeePct: z.number().min(0).max(100).optional(),
   /** Reason provided by platform admin when denying a voucher offer. Cleared on resubmit. */
   denial_reason: z.string().max(1000).optional(),
   status: z.enum(OFFER_STATUSES).default('active'),

@@ -9,7 +9,7 @@ import { MongoClient, Db } from 'mongodb';
 let db: Db;
 vi.mock('../../src/config/mongo', () => ({ getMongoDb: vi.fn(async () => db) }));
 
-import { setNexusFeePct, setVariantBaseSalePrice } from '../../src/services/nexus-fee.service';
+import { setNexusFeePct } from '../../src/services/nexus-fee.service';
 import { getSupplyDomainCollections } from '../../src/models/domain/supply.models';
 
 let client: MongoClient;
@@ -76,47 +76,17 @@ describe('setNexusFeePct', () => {
   });
 });
 
-describe('setVariantBaseSalePrice', () => {
-  it('updates the target variant cost + re-bakes member_price from the stored fee', async () => {
-    await seedVoucher('b1');
-    const res = await setVariantBaseSalePrice('b1', 'var_aaaaaaaaaaaa', 300);
+describe('setNexusFeePct with a fractional pct (derived from a whole-shekel price pick)', () => {
+  it('bakes a fractional pct exactly and round-trips the picked price', async () => {
+    await seedVoucher('f1');
+    // Admin picked customers-pay 97 on cost 51 / face 500 handled per variant;
+    // here: cost 200 face 500, picked 297 -> pct (97/300)*100 = 32.33...
+    const pct = ((297 - 200) / 300) * 100;
+    const res = await setNexusFeePct('f1', Math.round(pct * 100) / 100); // 32.33
     expect(res.ok).toBe(true);
-    const offer = await getSupplyDomainCollections(db).nexusOffers.findOne({ offerId: 'b1' });
+    const offer = await getSupplyDomainCollections(db).nexusOffers.findOne({ offerId: 'f1' });
+    // ceil(200 + 32.33% of 300) = ceil(296.99) = 297 - the picked price.
     const v = offer?.variants?.find((x) => x.variantId === 'var_aaaaaaaaaaaa');
-    expect(v?.nexus_cost).toBe(300);
-    expect(v?.member_price).toBe(320); // 300 + 10% of (500-300)
-    // Untouched sibling variant keeps its price.
-    const other = offer?.variants?.find((x) => x.variantId === 'var_bbbbbbbbbbbb');
-    expect(other?.member_price).toBe(55);
-  });
-
-  it('snaps an ecosystem adopter override under the new fee floor UP to it', async () => {
-    await seedVoucher('b2');
-    await getSupplyDomainCollections(db).tenantOfferConfigs.insertOne({
-      configId: 'bc1', tenantId: 't_a', offerId: 'b2', adoptionStatus: 'active',
-      variantPrices: { var_aaaaaaaaaaaa: 240 }, createdAt: new Date(), updatedAt: new Date(),
-    } as never);
-    await setVariantBaseSalePrice('b2', 'var_aaaaaaaaaaaa', 300); // new floor 320
-    const cfg = await getSupplyDomainCollections(db).tenantOfferConfigs.findOne({ configId: 'bc1' });
-    expect(cfg?.variantPrices?.var_aaaaaaaaaaaa).toBe(320);
-  });
-
-  it('tenant_only: drops the changed variant override so it snaps to the new base', async () => {
-    await seedVoucher('b3', { visibility: 'tenant_only' });
-    await getSupplyDomainCollections(db).tenantOfferConfigs.insertOne({
-      configId: 'bc2', tenantId: 't_a', offerId: 'b3', adoptionStatus: 'active',
-      variantPrices: { var_aaaaaaaaaaaa: 400 }, createdAt: new Date(), updatedAt: new Date(),
-    } as never);
-    await setVariantBaseSalePrice('b3', 'var_aaaaaaaaaaaa', 300);
-    const cfg = await getSupplyDomainCollections(db).tenantOfferConfigs.findOne({ configId: 'bc2' });
-    expect(cfg?.variantPrices?.var_aaaaaaaaaaaa).toBeUndefined();
-  });
-
-  it('rejects out-of-bounds, unknown variant, and unknown offer', async () => {
-    await seedVoucher('b4');
-    expect(await setVariantBaseSalePrice('b4', 'var_aaaaaaaaaaaa', 0)).toEqual({ ok: false, reason: 'out_of_bounds' });
-    expect(await setVariantBaseSalePrice('b4', 'var_aaaaaaaaaaaa', 501)).toEqual({ ok: false, reason: 'out_of_bounds' });
-    expect(await setVariantBaseSalePrice('b4', 'var_missing00000', 100)).toEqual({ ok: false, reason: 'variant_not_found' });
-    expect(await setVariantBaseSalePrice('missing', 'var_aaaaaaaaaaaa', 100)).toEqual({ ok: false, reason: 'offer_not_found' });
+    expect(v?.member_price).toBe(297);
   });
 });
