@@ -274,6 +274,7 @@ Every service page in the dashboard must show a professional teaser when `servic
 - **Design consistency:** read 2+ existing pages before adding a new one. No ad-hoc color tokens.
 - **Skeleton loading mandatory:** `animate-pulse` skeleton on every API-dependent page. No blank screens while loading.
 - **NEVER commit or push without explicit user approval.** Workflow: stage → diff summary → caveman-commit message → wait for "yes/go ahead" → commit/push. No exceptions.
+- **Never add the agent as a co-author, coworker, or helper in commits or PRs.** No `Co-Authored-By: Claude ...` trailer (or any AI-attribution line) in commit messages or PR descriptions.
 
 ## Unbreakable Rules
 
