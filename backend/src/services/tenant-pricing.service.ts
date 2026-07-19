@@ -50,6 +50,13 @@ export interface SetTenantVoucherPriceInput {
    * multi-variant vouchers; the base/ceiling come from the variant, not the offer.
    */
   variantId?: string;
+  /**
+   * True when the caller is a NEXUS platform admin. Platform admins bypass the
+   * owning-tenant price lock (the tenant that UPLOADED an offer may not set a
+   * per-tenant selling price on it - it sets the real sale price on the offer
+   * itself via Edit Offer). Defaults to false.
+   */
+  isPlatformAdmin?: boolean;
 }
 
 /**
@@ -286,7 +293,7 @@ export async function setTenantVoucherPrice(
   | { ok: true; config: TenantOfferConfig }
   | { ok: false; reason: SetTenantVoucherPriceError }
 > {
-  const { tenantId, offerId, memberPrice, markupPct, variantId } = input;
+  const { tenantId, offerId, memberPrice, markupPct, variantId, isPlatformAdmin } = input;
 
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
@@ -303,11 +310,13 @@ export async function setTenantVoucherPrice(
     return { ok: false, reason: 'not_voucher' };
   }
 
-  // 2b. A Nexus admin uploaded this offer on behalf of its owning tenant
-  //     (uploadedByIdentityId set). That tenant may NOT change its own selling
-  //     price - Nexus manages it. Adopting tenants (createdByTenantId !== caller)
-  //     are unaffected and keep their per-tenant price.
-  if (offer.uploadedByIdentityId && offer.createdByTenantId === tenantId) {
+  // 2b. The tenant that UPLOADED this offer (createdByTenantId === caller) may NOT
+  //     set a per-tenant selling price on it via the markup slider - it sets the
+  //     real sale price on the offer itself (Edit Offer). This holds whether or
+  //     not the owner adopted the offer, and whether or not a Nexus admin uploaded
+  //     it on their behalf. Platform admins are exempt. Adopting tenants
+  //     (createdByTenantId !== caller) are unaffected and keep their own price.
+  if (!isPlatformAdmin && offer.createdByTenantId === tenantId) {
     return { ok: false, reason: 'owner_locked' };
   }
 

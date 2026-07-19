@@ -1290,7 +1290,7 @@ router.patch(
         return;
       }
 
-      const { tenantId } = await resolveTenantContextWithPermission(
+      const { tenantId, isPlatformAdmin } = await resolveTenantContextWithPermission(
         req,
         'catalog.adopt_offer',
       );
@@ -1298,6 +1298,7 @@ router.patch(
       const result = await setTenantVoucherPrice({
         tenantId,
         offerId: req.params.offerId,
+        isPlatformAdmin: isPlatformAdmin ?? false,
         ...(parsed.data.memberPrice !== undefined && { memberPrice: parsed.data.memberPrice }),
         ...(parsed.data.markupPct !== undefined && { markupPct: parsed.data.markupPct }),
         ...(parsed.data.variantId !== undefined && { variantId: parsed.data.variantId }),

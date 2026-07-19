@@ -460,15 +460,20 @@ export async function getTenantCatalogView(
       isOwnOffer,
       isPlatformAdmin,
       canSeeNexusCost,
-      ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
-      ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+      // The tenant that UPLOADED an offer never has a per-tenant selling price on
+      // it (it sets the real sale price via Edit Offer, and is blocked from the
+      // per-variant slider). So a stale/leftover per-tenant override on its OWN
+      // offer must NOT drive display - show the base member_price. Adopting
+      // tenants (not their own offer) keep their per-tenant override.
+      ...(!isOwnOffer && toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+      ...(!isOwnOffer && toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
       uploaderTenant: uploaderMap.get(o.createdByTenantId) ?? undefined,
     });
 
     return {
       ...base,
-      ...(toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
-      ...(toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
+      ...(!isOwnOffer && toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
+      ...(!isOwnOffer && toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
     };
   });
 
@@ -519,14 +524,16 @@ export async function getTenantOfferDetail(
     isOwnOffer,
     isPlatformAdmin,
     canSeeNexusCost,
-    ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
-    ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+    // See getTenantCatalogView: the uploading tenant's OWN offer never shows a
+    // per-tenant override - only adopters do.
+    ...(!isOwnOffer && toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+    ...(!isOwnOffer && toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
     uploaderTenant: uploaderTenant ?? undefined,
   });
   return {
     ...base,
-    ...(toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
-    ...(toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
+    ...(!isOwnOffer && toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
+    ...(!isOwnOffer && toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
   };
 }
 
