@@ -2,8 +2,11 @@
  * Catalog query helpers used by catalog.service.
  *
  * Extracted so the main service file stays inside the 350-line guideline.
- * Pure functions; no Mongo I/O here.
+ * Pure functions, except buildInStockClause (voucher stock lives in
+ * voucherCodes units, so it needs one distinct() pre-fetch).
  */
+import type { Db } from 'mongodb';
+import { getVoucherCodeCollection } from '../models/domain/voucher-codes.models';
 
 /**
  * Builds a Mongo `$or` clause that matches the supplied search string against
@@ -79,16 +82,38 @@ export function buildFilterClauses(query: CatalogQuery): Array<Record<string, un
     clauses.push({ tags: { $in: query.tags } });
   }
 
-  if (query.inStockOnly) {
-    clauses.push({
-      $or: [
-        { stockLimit: null },
-        { $expr: { $lt: ['$stockUsed', '$stockLimit'] } },
-      ],
-    });
-  }
+  // inStockOnly is NOT handled here: voucher stock lives in voucherCodes units
+  // and needs an async pre-fetch - see buildInStockClause below, which the view
+  // functions await and push themselves.
 
   return clauses;
+}
+
+/**
+ * Builds the inStockOnly clause. Vouchers derive stock from their inventory
+ * units (an offer is in stock when it has at least one AVAILABLE voucherCodes
+ * unit - offer.stockLimit may be null/stale for variant vouchers, and null must
+ * NOT read as "unlimited" for them). Non-voucher offers keep the legacy
+ * semantics: null stockLimit = unlimited, else stockUsed < stockLimit.
+ *
+ * Async (unlike buildFilterClauses) because the voucher offerIds are resolved
+ * with a distinct() pre-fetch.
+ * ponytail: unindexed distinct on status - add a status index when the
+ * voucherCodes collection grows past what a scan tolerates.
+ *
+ * Input:  db - the Mongo database handle.
+ * Output: one Mongo $or clause ready to push into the view's $and array.
+ */
+export async function buildInStockClause(db: Db): Promise<Record<string, unknown>> {
+  const inStockVoucherIds = await getVoucherCodeCollection(db)
+    .distinct('offerId', { status: 'available' });
+  return {
+    $or: [
+      { executionType: { $ne: 'voucher' }, stockLimit: null },
+      { executionType: { $ne: 'voucher' }, $expr: { $lt: ['$stockUsed', '$stockLimit'] } },
+      { executionType: 'voucher', offerId: { $in: inStockVoucherIds } },
+    ],
+  };
 }
 
 /**

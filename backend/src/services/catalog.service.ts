@@ -29,7 +29,7 @@ import {
   type TenantOfferConfig,
   type ImageCropEntry,
 } from '../models/domain/supply.models';
-import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
+import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap } from './catalog-query.helper';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
 import type { LogoCrop } from '../models/domain/tenant.models';
@@ -407,6 +407,8 @@ export async function getTenantCatalogView(
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
   andClauses.push(...buildFilterClauses(query));
+  // Voucher stock lives in voucherCodes units - async clause, see the helper.
+  if (query.inStockOnly) andClauses.push(await buildInStockClause(db));
 
   // Org (uploader) filter: free-text, case-insensitive contains on the CREATING
   // tenant's organization name. Names live on domainTenants, so resolve the
@@ -605,6 +607,8 @@ export async function getMemberCatalogView(
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
   andClauses.push(...buildFilterClauses(query));
+  // Voucher stock lives in voucherCodes units - async clause, see the helper.
+  if (query.inStockOnly) andClauses.push(await buildInStockClause(db));
 
   const offerFilter = { $and: andClauses };
   const skip = (query.page - 1) * query.limit;
