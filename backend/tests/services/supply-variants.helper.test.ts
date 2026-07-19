@@ -87,7 +87,8 @@ describe('variantSignature / hasDuplicateVariants', () => {
 
 describe('buildVoucherVariants', () => {
   it('synthesizes one variant from the flat fields when no array is given', () => {
-    const out = buildVoucherVariants(undefined, { face_value: 100, nexus_cost: 60, voucherStackable: true });
+    // feePct 0 -> member_price stays the raw nexus_cost (legacy seeding).
+    const out = buildVoucherVariants(undefined, { face_value: 100, nexus_cost: 60, voucherStackable: true }, 0);
     expect(out).toHaveLength(1);
     expect(out[0].variantId).toMatch(VARIANT_ID_REGEX);
     // member_price defaults to nexus_cost when omitted.
@@ -100,6 +101,7 @@ describe('buildVoucherVariants', () => {
     const out = buildVoucherVariants(
       [{ variantId: kept, face_value: 100, nexus_cost: 60, member_price: 80 }, { face_value: 50, nexus_cost: 30 }],
       {},
+      0,
     );
     expect(out[0].variantId).toBe(kept);
     expect(out[1].variantId).toMatch(VARIANT_ID_REGEX);
@@ -108,7 +110,7 @@ describe('buildVoucherVariants', () => {
   it('rejects duplicate variants (400)', () => {
     const dup = { face_value: 100, nexus_cost: 60, member_price: 80 };
     try {
-      buildVoucherVariants([dup, { ...dup }], {});
+      buildVoucherVariants([dup, { ...dup }], {}, 0);
       expect.unreachable('should have thrown');
     } catch (err) {
       expect((err as { statusCode?: number }).statusCode).toBe(400);
@@ -120,7 +122,7 @@ describe('buildVoucherVariants', () => {
       face_value: 100, nexus_cost: 60, member_price: 50 + i,
     }));
     try {
-      buildVoucherVariants(many, {});
+      buildVoucherVariants(many, {}, 0);
       expect.unreachable('should have thrown');
     } catch (err) {
       expect((err as { statusCode?: number }).statusCode).toBe(400);
@@ -141,6 +143,7 @@ describe('validity is not a variant field (value + type are per inventory unit)'
     const [out] = buildVoucherVariants(
       [{ face_value: 100, nexus_cost: 60, member_price: 80 }],
       {},
+      0,
     );
     expect(out).not.toHaveProperty('validityTypeOverride');
     expect(out).not.toHaveProperty('voucherValidityValue');
