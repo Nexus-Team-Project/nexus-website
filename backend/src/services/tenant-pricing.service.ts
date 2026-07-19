@@ -24,7 +24,6 @@ import {
   computeTenantDisplayPrice,
   markupToPrice,
   clampMarkupPct,
-  roundAgorot,
 } from './supply-price.helper';
 
 /** Input contract for setTenantVoucherPrice. */
@@ -353,17 +352,25 @@ export async function setTenantVoucherPrice(
   }
 
   // 6. Resolve the cached effective price. The dashboard sends an ABSOLUTE price
-  //    (memberPrice) clamped into [0, face_value] - 0 = free, and any value below
-  //    the base cost is a subsidy the tenant gives the member. The legacy path
-  //    (markupPct only) clamps a % into the headroom and applies it. variantPrices
-  //    / memberPrice is the cached projection so the catalog read/sort/filter path
-  //    is unchanged. When an absolute price is set, the stored markup % for the
-  //    target is cleared ($unset) so a later deal-price re-sync treats it as an
-  //    absolute override (preserved) rather than recomputing it from a stale %.
+  //    (memberPrice) clamped into [base, face_value] and rounded UP to a whole
+  //    shekel: the tenant may never price below the base sale price, and every
+  //    stored price is a round number (mirrors + enforces the popover UI so a
+  //    crafted request cannot bypass either rule). The legacy path (markupPct
+  //    only) clamps a % into the headroom and applies it - its floor is already
+  //    the base (0% = base). variantPrices / memberPrice is the cached projection
+  //    so the catalog read/sort/filter path is unchanged. When an absolute price
+  //    is set, the stored markup % for the target is cleared ($unset) so a later
+  //    deal-price re-sync treats it as an absolute override (preserved) rather
+  //    than recomputing it from a stale %.
+  // Both branches produce a WHOLE-shekel price rounded UP and capped at the
+  // face value. The absolute path floors at the base (no below-base pricing);
+  // the legacy markup path is already floored at the base (0% = base), so it
+  // only needs the same whole-shekel rounding applied to its projection.
   const useAbsolute = memberPrice !== undefined;
-  const price = useAbsolute
-    ? roundAgorot(Math.min(Math.max(memberPrice, 0), ceiling))
+  const rawPrice = useAbsolute
+    ? Math.max(memberPrice, base)
     : markupToPrice(base, ceiling, clampMarkupPct(markupPct ?? 0, base, ceiling));
+  const price = Math.min(Math.ceil(rawPrice), ceiling);
 
   let setOps: Record<string, unknown>;
   let unsetOps: Record<string, ''> | undefined;
