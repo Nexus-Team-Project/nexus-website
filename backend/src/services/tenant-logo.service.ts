@@ -1,13 +1,16 @@
 /**
  * Tenant (organization) logo lifecycle. Uploads the square-cropped logo to
- * Cloudinary, stores the secure URL on the Tenant, and best-effort cleans up the
- * previous Cloudinary asset. Removing clears the URL (the UI falls back to the
- * tenant-name initials).
+ * Cloudinary, runs background removal on it (the transparent PNG becomes the
+ * stored asset; the original is kept only when removal fails), stores the
+ * secure URL on the Tenant, and best-effort cleans up the previous Cloudinary
+ * asset. Removing clears the URL (the UI falls back to the tenant-name
+ * initials).
  */
 import { Db } from 'mongodb';
 import { getTenantDomainCollections } from '../models/domain';
 import type { LogoCrop } from '../models/domain/tenant.models';
 import { uploadTenantLogo, deleteOfferImage } from '../utils/cloudinary';
+import { removeLogoBackground } from '../utils/cloudinary-background';
 
 /**
  * Upload a new (pristine) logo and set it on the tenant, along with an optional
@@ -28,6 +31,11 @@ export async function setTenantLogo(
  * path: the route re-hosts the remote image first, then calls this). Same
  * semantics as setTenantLogo minus the buffer upload: the provided crop is
  * stored (or cleared when none) and the previous asset is best-effort deleted.
+ *
+ * Every stored logo goes through Cloudinary background removal first: the
+ * transparent version becomes the stored asset and the just-uploaded original
+ * is deleted. When removal fails (timeout, transform error, Cloudinary down)
+ * the original is stored as-is - a removal hiccup never fails the upload.
  * @returns the new logo URL + the stored crop.
  */
 export async function setTenantLogoHosted(
@@ -40,19 +48,24 @@ export async function setTenantLogoHosted(
     { projection: { logoUrl: 1 } },
   );
 
+  const processed = await removeLogoBackground(args.logoUrl);
+  const logoUrl = processed ?? args.logoUrl;
+  // Removal succeeded: the intermediate original asset is no longer referenced.
+  if (processed) void deleteOfferImage(args.logoUrl);
+
   const crop = args.crop ?? null;
   await domainTenants.updateOne(
     { tenantId: args.tenantId },
     crop
-      ? { $set: { logoUrl: args.logoUrl, logoCrop: crop, updatedAt: new Date() } }
-      : { $set: { logoUrl: args.logoUrl, updatedAt: new Date() }, $unset: { logoCrop: '' } },
+      ? { $set: { logoUrl, logoCrop: crop, updatedAt: new Date() } }
+      : { $set: { logoUrl, updatedAt: new Date() }, $unset: { logoCrop: '' } },
   );
 
   // Best-effort: drop the previous Cloudinary asset (never blocks the response).
-  if (existing?.logoUrl && existing.logoUrl !== args.logoUrl) {
+  if (existing?.logoUrl && existing.logoUrl !== logoUrl) {
     void deleteOfferImage(existing.logoUrl);
   }
-  return { logoUrl: args.logoUrl, logoCrop: crop };
+  return { logoUrl, logoCrop: crop };
 }
 
 /**
