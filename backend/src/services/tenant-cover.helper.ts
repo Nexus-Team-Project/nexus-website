@@ -25,10 +25,10 @@ import {
 import {
   isUploadableImageUrl,
   MAX_IMAGE_URL_LENGTH,
-  TENANT_COVER_FOLDER,
-  uploadOfferImageFromUrl,
   uploadTenantCover,
+  uploadTenantCoverFromUrl,
 } from '../utils/cloudinary';
+import { pickDominantColors } from '../utils/dominant-color';
 
 /** A kept (already-hosted) entry: must point at OUR Cloudinary account. */
 const keptImageSchema = z.object({
@@ -87,17 +87,21 @@ export async function buildCoverEntriesFromRequest(
   }
 
   // Upload new files (order preserved), pairing each with its aligned crop.
+  // Cover uploads carry Cloudinary's dominant-color analysis; the picked hexes
+  // are stored on the entry (wallet store-tile fade). Empty pick = no field.
   const fileEntries: TenantCoverImage[] = [];
   for (const [index, file] of files.entries()) {
-    const url = await uploadTenantCover(file.buffer, file.originalname);
-    fileEntries.push({ url, crop: cropsParsed.data[index] ?? null });
+    const { url, palette } = await uploadTenantCover(file.buffer, file.originalname);
+    const colors = pickDominantColors(palette);
+    fileEntries.push({ url, crop: cropsParsed.data[index] ?? null, ...(colors.length ? { colors } : {}) });
   }
 
   // Re-host each remote source via Cloudinary fetch-by-URL (never our server).
   const remoteEntries: TenantCoverImage[] = [];
   for (const remote of remoteParsed.data) {
-    const url = await uploadOfferImageFromUrl(remote.url, TENANT_COVER_FOLDER);
-    remoteEntries.push({ url, crop: remote.crop });
+    const { url, palette } = await uploadTenantCoverFromUrl(remote.url);
+    const colors = pickDominantColors(palette);
+    remoteEntries.push({ url, crop: remote.crop, ...(colors.length ? { colors } : {}) });
   }
 
   return [...keptParsed.data, ...fileEntries, ...remoteEntries];
