@@ -366,6 +366,13 @@ export const nexusOfferSchema = z.object({
   /** Human-readable redemption instructions. */
   implementationInstructions: z.string().max(1000).optional().default(''),
   /**
+   * Optional https:// URL to a page listing the tenant's participating
+   * branches/locations for this voucher. Voucher-only; null for other offer
+   * types. Scheme is re-checked (https only, no http) at the route schema -
+   * this model-level check only requires a well-formed URL.
+   */
+  branchListUrl: z.string().url().nullable().optional(),
+  /**
    * Spec OfferVersion.valid_from - the offer is hidden from member catalogs
    * until this date. null means the offer is live as soon as it is approved.
    */

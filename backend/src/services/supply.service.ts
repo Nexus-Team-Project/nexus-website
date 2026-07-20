@@ -78,6 +78,8 @@ export interface CreateOfferInput {
   implementationLink?: string | null;
   /** Human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Optional https:// link to a page listing participating branches. Voucher-only. */
+  branchListUrl?: string | null;
   /** Offer goes live on this date. null means immediately available after approval. */
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Ignored for vouchers (forced null). */
@@ -195,6 +197,8 @@ export interface UpdateOfferInput {
   implementationLink?: string | null;
   /** Updated human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Updated branch-list link. null clears it. Voucher-only. */
+  branchListUrl?: string | null;
   /** Updated offer go-live date. null clears the gate (immediately live). */
   validFrom?: Date | null;
   /** Updated offer expiry date. null clears the expiry. Ignored for vouchers (forced null). */
@@ -431,6 +435,8 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     // offer-level link, so implementationLink is never stored for vouchers.
     implementationLink: isVoucher ? null : (input.implementationLink ?? null),
     implementationInstructions: input.implementationInstructions ?? '',
+    // Branch list is the opposite of implementationLink: voucher-only.
+    branchListUrl: isVoucher ? (input.branchListUrl ?? null) : null,
     validFrom: resolvedValidFrom,
     validUntil: resolvedValidUntil,
     // Legacy parent validity mirror is no longer populated (per-unit now).
@@ -706,6 +712,9 @@ export async function updateOffer(
     // redemption); force it null when the merged type is voucher.
     ...(isVoucherUpdate && { implementationLink: null }),
     ...(input.implementationInstructions !== undefined && { implementationInstructions: input.implementationInstructions }),
+    ...(input.branchListUrl !== undefined && { branchListUrl: input.branchListUrl }),
+    // Branch list is voucher-only - force null when the merged type is not a voucher.
+    ...(!isVoucherUpdate && { branchListUrl: null }),
     // Voucher/non-voucher expiry + validity normalization (computed above).
     ...validityUpdate,
     ...(input.terms !== undefined && { terms: input.terms }),
