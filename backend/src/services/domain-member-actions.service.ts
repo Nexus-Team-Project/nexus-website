@@ -14,6 +14,7 @@ import {
   SERVICE_KEYS,
   type TenantUserRoleName,
 } from '../models/domain';
+import { TENANT_JOIN_REQUEST_COLLECTION } from '../models/auth/tenant-join-request.models';
 import { syncDomainIdentityForMemberInvite } from './domain-identity.service';
 import { buildMemberInviteUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
 import { sendTenantMemberRemovedEmail, sendTenantInviteRevokedEmail } from './domain-member-remove-email.service';
@@ -361,8 +362,12 @@ export async function updateTenantMemberEmail(
 /**
  * Removes a tenant member from the tenant.
  * Deletes all tenant-scoped Mongo records: TenantMember, TenantUserRole,
- * MemberGroupAssignment, TenantContact. Revokes pending invitations.
- * Never touches NexusIdentity, ContactProfile, or Prisma User.
+ * MemberGroupAssignment, TenantContact, TenantJoinRequest. Revokes pending
+ * invitations. Never touches NexusIdentity, ContactProfile, or Prisma User.
+ * Clearing the join-request history (not just membership) matters: the
+ * wallet's discovery sheet treats any pending/approved/auto_accepted request
+ * as "already handled" and hides that tenant from the joinable list - without
+ * this, a removed member could never be offered that tenant again.
  * Input: manager user id, target member id, optional email suppress flag.
  * Output: void on success.
  */
@@ -422,6 +427,12 @@ export async function removeTenantMemberFromTenant(
   await tenantCollections.memberGroupAssignments.deleteMany({
     tenantId: access.tenantId,
     tenantMemberId,
+  });
+  // Clear join-request history so the tenant becomes discoverable/joinable
+  // again (see the function doc above for why this is necessary).
+  await db.collection(TENANT_JOIN_REQUEST_COLLECTION).deleteMany({
+    tenantId: access.tenantId,
+    nexusIdentityId: member.nexusIdentityId,
   });
   // Remove the tenant contact record (tenant-scoped address book entry).
   if (identity?.normalizedEmail) {
