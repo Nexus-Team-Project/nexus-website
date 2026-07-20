@@ -4,15 +4,18 @@
  * Hard delete by owner decision (spec 2026-07-20-wallet-leave-tenant-design):
  * the tenantMembers row and the 'member' tenantUserRoles row are deleted, so
  * the user disappears from the dashboard Registered Members tab immediately.
- * The tenantContacts row is deliberately KEPT (the business keeps its contact),
- * and tenantJoinRequests history rows are kept (only *pending* rows are
- * unique-indexed, so a later rejoin runs the normal join flow).
+ * The tenantContacts row is deliberately KEPT (the business keeps its contact).
+ * The caller's tenantJoinRequests rows for the tenant are DELETED: the wallet
+ * discovery sheet treats an approved/auto_accepted request as "already joined"
+ * and hides the org, so leftover history would make the org unjoinable forever
+ * (amendment 2026-07-20b to the leave-tenant spec).
  *
  * Only plain members may leave: any privileged role (owner/admin/...) in the
  * tenant blocks the wallet leave - staff are managed from the dashboard.
  */
 import type { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
+import { TENANT_JOIN_REQUEST_COLLECTION } from '../../models/auth/tenant-join-request.models';
 
 /**
  * Remove the caller's own membership in a tenant.
@@ -52,6 +55,12 @@ export async function leaveTenant(
   await db
     .collection(DOMAIN_COLLECTIONS.tenantUserRoles)
     .deleteMany({ nexusIdentityId: args.nexusIdentityId, tenantId: args.tenantId, role: 'member' });
+  // Drop the caller's join-request rows for this tenant so the discovery
+  // sheet lists the org as joinable again (it hides orgs with an
+  // approved/auto_accepted request as an "already a member" proxy).
+  await db
+    .collection(TENANT_JOIN_REQUEST_COLLECTION)
+    .deleteMany({ nexusIdentityId: args.nexusIdentityId, tenantId: args.tenantId });
 
   // If this tenant was the member's default landing context, clear it; the
   // effective-default computation in computeWalletMeRouter falls back cleanly.

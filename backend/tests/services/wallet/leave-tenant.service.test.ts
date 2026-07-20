@@ -57,7 +57,7 @@ async function seedMember(opts?: { extraRole?: string; defaultTenantId?: string 
 }
 
 describe('leaveTenant', () => {
-  it('deletes the member row + member role, keeps contact + join history', async () => {
+  it('deletes the member row + member role + join-request rows, keeps contact', async () => {
     await seedMember();
     await leaveTenant(db, { nexusIdentityId: 'id1', tenantId: 't1' });
     expect(await db.collection(DOMAIN_COLLECTIONS.tenantMembers)
@@ -66,8 +66,21 @@ describe('leaveTenant', () => {
       .findOne({ nexusIdentityId: 'id1', tenantId: 't1' })).toBeNull();
     expect(await db.collection(DOMAIN_COLLECTIONS.tenantContacts)
       .findOne({ tenantId: 't1', nexusIdentityId: 'id1' })).not.toBeNull();
+    // Join-request rows are deleted so the discovery sheet (which hides orgs
+    // with an approved/auto_accepted request) lists the org as joinable again.
     expect(await db.collection(TENANT_JOIN_REQUEST_COLLECTION)
-      .findOne({ nexusIdentityId: 'id1', tenantId: 't1' })).not.toBeNull();
+      .findOne({ nexusIdentityId: 'id1', tenantId: 't1' })).toBeNull();
+  });
+
+  it('leaves OTHER tenants join-request rows untouched', async () => {
+    await seedMember();
+    await db.collection(TENANT_JOIN_REQUEST_COLLECTION).insertOne({
+      nexusIdentityId: 'id1', tenantId: 't2', email: 'a@b.com',
+      status: 'pending', createdAt: new Date(),
+    });
+    await leaveTenant(db, { nexusIdentityId: 'id1', tenantId: 't1' });
+    expect(await db.collection(TENANT_JOIN_REQUEST_COLLECTION)
+      .findOne({ nexusIdentityId: 'id1', tenantId: 't2' })).not.toBeNull();
   });
 
   it('refuses when the caller holds a privileged role in the tenant', async () => {
