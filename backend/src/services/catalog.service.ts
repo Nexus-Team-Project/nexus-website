@@ -14,6 +14,8 @@
  * Exports:
  *   getTenantCatalogView  - paginated admin/supply-manager catalog
  *   getMemberCatalogView  - paginated member-facing catalog (adopted offers)
+ *   toItem                - NexusOffer -> CatalogItem mapper (reused by the
+ *                           wallet ecosystem/"Nexus catalog" view for base pricing)
  *   adoptOffer            - mark an offer as active for a tenant
  *   excludeOffer          - remove an offer from a tenant's catalog
  */
@@ -242,7 +244,7 @@ export interface CatalogVariant {
  * the underlying document, so the same offer can appear as 'active' to admins
  * paginating without an expiry filter and 'expired' once it crosses validUntil.
  */
-function toItem(
+export function toItem(
   offer: NexusOffer,
   config: TenantOfferConfig | undefined,
   context: {

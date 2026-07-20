@@ -15,7 +15,8 @@ import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { discoverTenants } from '../services/wallet/tenant-discovery.service';
-import { getEcosystemCatalogForWallet } from '../services/wallet/ecosystem-catalog.service';
+import { getEcosystemCatalogView } from '../services/wallet/ecosystem-catalog-view.service';
+import { catalogListQuerySchema } from './offers.routes';
 import { setWalletDefaultTenant } from '../services/wallet/wallet-default-tenant.service';
 import {
   createJoinRequests,
@@ -126,6 +127,13 @@ async function resolveAdminTenantForJoinRequests(
 
 // ── Wallet user endpoints ───────────────────────────────────────────────────
 
+// The wallet "Nexus catalog": every ecosystem offer at its DEFAULT (base)
+// price, as a non-member would see it - no per-tenant overrides and no
+// adopted-offer exclusion, so an offer a caller's tenant re-priced still shows
+// here at base price. Authenticated (logged-in members only); shares the member
+// catalog list query + `{ items, pagination }` envelope so the wallet renders
+// both feeds with the same components. The frontend maps the `?q=` search box
+// onto the shared `search` field.
 router.get('/ecosystem-offers', authenticate, async (req: Request, res: Response) => {
   try {
     const me = await getCallingNexusIdentity(req);
@@ -133,15 +141,23 @@ router.get('/ecosystem-offers', authenticate, async (req: Request, res: Response
       res.status(404).json({ error: 'identity_not_found' });
       return;
     }
-    const db = await getMongoDb();
-    const q = typeof req.query.q === 'string' ? req.query.q : undefined;
-    const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
-    const result = await getEcosystemCatalogForWallet(db, {
-      nexusIdentityId: me.nexusIdentityId,
-      query: q,
-      limit: Number.isFinite(limit) ? (limit as number) : undefined,
+    const rawQuery = typeof req.query.q === 'string' ? { ...req.query, search: req.query.q } : req.query;
+    const parsed = catalogListQuerySchema.safeParse(rawQuery);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.flatten() });
+      return;
+    }
+    const result = await getEcosystemCatalogView(parsed.data);
+    const pages = Math.max(1, Math.ceil(result.total / parsed.data.limit));
+    res.json({
+      items: result.items,
+      pagination: {
+        page: parsed.data.page,
+        limit: parsed.data.limit,
+        total: result.total,
+        pages,
+      },
     });
-    res.json(result);
   } catch (e) {
     console.error('[wallet-tenants] ecosystem-offers failed:', e);
     res.status(500).json({ error: 'internal_error' });
