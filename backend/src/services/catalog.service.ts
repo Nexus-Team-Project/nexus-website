@@ -24,11 +24,12 @@ import {
   getSupplyDomainCollections,
   NOT_DELETED,
   VOUCHER_PAYMENTS_DEFAULT,
+  NEXUS_FEE_DEFAULT_PCT,
   type NexusOffer,
   type TenantOfferConfig,
   type ImageCropEntry,
 } from '../models/domain/supply.models';
-import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
+import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap } from './catalog-query.helper';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
 import type { LogoCrop } from '../models/domain/tenant.models';
@@ -49,6 +50,12 @@ export interface CatalogQuery {
   page: number;
   limit: number;
   search?: string;
+  /**
+   * Free-text filter on the CREATING tenant's organization name (the
+   * "uploaded by" column). Resolved to tenantIds server-side against
+   * domainTenants, then matched on createdByTenantId.
+   */
+  orgSearch?: string;
   category?: string;
   approvalStatus?: 'active' | 'pending_approval' | 'denied' | 'expired';
   adoptionStatus?: 'adopted' | 'not_adopted';
@@ -126,6 +133,8 @@ export interface CatalogItem {
    * Must never be returned to adopting tenants or members.
    */
   nexus_cost?: number;
+  /** Platform fee % of the margin. PLATFORM ADMINS ONLY - stripped for everyone else. */
+  nexusFeePct?: number;
   /** Current lifecycle status of the offer (e.g. active, pending_approval, denied, expired). */
   approval_status?: string;
   /** Denial reason from the platform admin. Only populated for the creating tenant. */
@@ -282,6 +291,10 @@ function toItem(
       context.canSeeNexusCost &&
       offer.nexus_cost !== undefined && { nexus_cost: offer.nexus_cost }
     ),
+    // Fee % - platform admins only (tenants must never see it). Vouchers that
+    // predate the field read as the default so the admin slider has a value.
+    ...(context.isPlatformAdmin && (offer.executionType ?? 'voucher') === 'voucher'
+      && { nexusFeePct: offer.nexusFeePct ?? NEXUS_FEE_DEFAULT_PCT }),
     approval_status: effectiveStatus,
     ...(context.isOwnOffer && offer.denial_reason && { denial_reason: offer.denial_reason }),
     isAdopted: config?.adoptionStatus === 'active',
@@ -394,6 +407,26 @@ export async function getTenantCatalogView(
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
   andClauses.push(...buildFilterClauses(query));
+  // Voucher stock lives in voucherCodes units - async clause, see the helper.
+  if (query.inStockOnly) andClauses.push(await buildInStockClause(db));
+
+  // Org (uploader) filter: free-text, case-insensitive contains on the CREATING
+  // tenant's organization name. Names live on domainTenants, so resolve the
+  // matching tenantIds first (same pre-fetch pattern as the adoption filter;
+  // the tenant collection is small) and match offers on createdByTenantId.
+  // The $in is capped at 200 ids to bound the clause; regex specials escaped.
+  if (query.orgSearch?.trim()) {
+    const escaped = query.orgSearch.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const orgs = await getTenantDomainCollections(db).domainTenants
+      .find(
+        { organizationName: { $regex: escaped, $options: 'i' } },
+        { projection: { tenantId: 1 } },
+      )
+      .limit(200)
+      .toArray();
+    if (orgs.length === 0) return { items: [], total: 0 };
+    andClauses.push({ createdByTenantId: { $in: orgs.map((t) => t.tenantId) } });
+  }
 
   // 'expired' is computed (validUntil<now, still status=active). Other approval
   // statuses are exact matches.
@@ -574,6 +607,8 @@ export async function getMemberCatalogView(
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
   andClauses.push(...buildFilterClauses(query));
+  // Voucher stock lives in voucherCodes units - async clause, see the helper.
+  if (query.inStockOnly) andClauses.push(await buildInStockClause(db));
 
   const offerFilter = { $and: andClauses };
   const skip = (query.page - 1) * query.limit;
