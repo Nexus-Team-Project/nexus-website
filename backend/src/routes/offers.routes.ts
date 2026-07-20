@@ -32,6 +32,7 @@ import {
 import { createOffer, updateOffer, deleteOffer } from '../services/supply.service';
 import { resolveMemberCatalogAccess } from '../services/catalog-member-gate.service';
 import { setTenantVoucherPrice } from '../services/tenant-pricing.service';
+import { setNexusFeePct, setVariantBaseSalePrice } from '../services/nexus-fee.service';
 import { approveOffer, denyOffer } from '../services/supply-approval.service';
 import {
   getTenantCatalogView,
@@ -250,6 +251,8 @@ export const catalogListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),
+  /** Free-text filter on the creating tenant's organization name. */
+  orgSearch: z.string().trim().min(1).max(100).optional(),
   category: z.enum(OFFER_CATEGORIES).optional(),
   approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
   adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
@@ -449,6 +452,13 @@ const setTenantVoucherPriceSchema = z
   .refine((d) => d.memberPrice !== undefined || d.markupPct !== undefined, {
     message: 'memberPrice or markupPct required',
   });
+
+/** Body for PATCH /:offerId/nexus-fee - the platform fee % of the margin.
+ *  May be fractional. */
+const setNexusFeeSchema = z.object({ pct: z.number().min(0).max(100) });
+
+/** Body for PATCH /:offerId/variants/:variantId/sale-price - the raw sale price. */
+const setBaseSalePriceSchema = z.object({ salePrice: z.number().positive() });
 
 /**
  * Validates the voucher inventory body. `kind` selects barcode generation
@@ -1316,6 +1326,100 @@ router.patch(
       }
 
       res.json({ config: result.config });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/offers/:offerId/nexus-fee
+ *
+ * Sets the offer's platform fee percentage (nexusFeePct) and re-bakes all
+ * derived pricing (variant member_price, mirror, displayPrice, adopter floors).
+ * The fee is never exposed to tenants; this route is PLATFORM ADMIN ONLY.
+ *
+ * Input body: { pct: int 0..100 }.
+ * Output: { success: true, nexusFeePct } on 200; error JSON otherwise.
+ *   403 - caller is not a platform admin
+ *   404 - offer_not_found
+ *   400 - invalid body or not_voucher
+ */
+router.patch(
+  '/:offerId/nexus-fee',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContext(req);
+      if (!ctx.isPlatformAdmin) {
+        res.status(403).json({ error: 'Only platform admins can set the nexus fee' });
+        return;
+      }
+
+      const parsed = setNexusFeeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'pct must be an integer between 0 and 100' });
+        return;
+      }
+
+      const result = await setNexusFeePct(req.params.offerId, parsed.data.pct);
+      if (!result.ok) {
+        res.status(result.reason === 'offer_not_found' ? 404 : 400).json({ error: result.reason });
+        return;
+      }
+
+      res.json({ success: true, nexusFeePct: parsed.data.pct });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/offers/:offerId/variants/:variantId/sale-price
+ *
+ * PLATFORM-ADMIN edit of one variant's sale price (nexus_cost) from the price
+ * popover's main slider. The fee % is untouched; member_price re-bakes from the
+ * stored fee, mirror + displayPrice recompute, adopter overrides re-sync.
+ *
+ * Input body: { salePrice: number > 0, <= variant face_value }.
+ * Output: { success: true } on 200; error JSON otherwise.
+ *   403 - caller is not a platform admin
+ *   404 - offer_not_found / variant_not_found
+ *   400 - invalid body, not_voucher, or out_of_bounds
+ */
+router.patch(
+  '/:offerId/variants/:variantId/sale-price',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContext(req);
+      if (!ctx.isPlatformAdmin) {
+        res.status(403).json({ error: 'Only platform admins can set the base sale price' });
+        return;
+      }
+
+      const parsed = setBaseSalePriceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'salePrice must be a positive number' });
+        return;
+      }
+
+      const result = await setVariantBaseSalePrice(
+        req.params.offerId,
+        req.params.variantId,
+        parsed.data.salePrice,
+      );
+      if (!result.ok) {
+        const code =
+          result.reason === 'offer_not_found' ? 404 :
+          result.reason === 'variant_not_found' ? 404 :
+          400;
+        res.status(code).json({ error: result.reason });
+        return;
+      }
+
+      res.json({ success: true });
     } catch (err) {
       next(err);
     }

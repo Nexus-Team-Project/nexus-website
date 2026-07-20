@@ -7,6 +7,8 @@
  *   PATCH  /api/v1/admin/tenants/:tenantId/logo/crop    - JSON { crop: LogoCrop | null }
  *   DELETE /api/v1/admin/tenants/:tenantId/logo         - clear logo (revert to initials)
  *   PATCH  /api/v1/admin/tenants/:tenantId/brand-color  - JSON { brandColor: "#rrggbb" | null }
+ *   PATCH  /api/v1/admin/tenants/:tenantId/social-links - JSON { instagramHandle?, facebookHandle?, twitterHandle? }
+ *                                                         (same body contract as the tenant self route)
  *   POST   /api/v1/admin/tenants/:tenantId/cover        - reconcile the cover gallery (max 5):
  *                                                         multipart covers[] + newFileCrops +
  *                                                         remoteImages + keptImages JSON fields
@@ -34,6 +36,8 @@ import {
   setTenantBrandColor,
 } from '../services/tenant-logo.service';
 import { setTenantCovers, clearTenantCovers } from '../services/tenant-cover.service';
+import { setTenantSocialLinks } from '../services/tenant-social-links.service';
+import { tenantSocialLinksBodySchema } from '../schemas/socialHandle.schemas';
 import { buildCoverEntriesFromRequest } from '../services/tenant-cover.helper';
 import { isUploadableImageUrl, TENANT_LOGO_FOLDER, uploadOfferImageFromUrl } from '../utils/cloudinary';
 
@@ -208,6 +212,23 @@ router.patch('/:tenantId/brand-color', async (req: Request, res: Response) => {
     const out = await setTenantBrandColor(db, { tenantId, brandColor });
     res.json(out);
   } catch (e) {
+    handleError(e, res);
+  }
+});
+
+router.patch('/:tenantId/social-links', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { tenantId } = req.params;
+    await assertTenantExists(tenantId);
+    // Same body contract + normalization as the tenant self route (bare handle /
+    // @handle / pasted profile URL all reduce to the stored bare handle; null
+    // clears; absent keys untouched). Thrown ZodError -> 400 via errorHandler.
+    const body = tenantSocialLinksBodySchema.parse(req.body);
+    const db = await getMongoDb();
+    const out = await setTenantSocialLinks(db, { tenantId, ...body });
+    res.json(out);
+  } catch (e) {
+    if (e instanceof Error && e.name === 'ZodError') { next(e); return; }
     handleError(e, res);
   }
 });

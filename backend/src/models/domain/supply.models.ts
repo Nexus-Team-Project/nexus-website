@@ -158,6 +158,13 @@ export const VOUCHER_PAYMENTS_MIN = 1;
 export const VOUCHER_PAYMENTS_MAX = 6;
 export const VOUCHER_PAYMENTS_DEFAULT = 1;
 
+/**
+ * Default platform fee percentage on a voucher offer's margin
+ * (face_value - nexus_cost). Baked into each variant's member_price at write
+ * time; editable per offer by platform admins only, range [0, 100].
+ */
+export const NEXUS_FEE_DEFAULT_PCT = 10;
+
 export type OfferStatus = typeof OFFER_STATUSES[number];
 export type OfferCategory = typeof OFFER_CATEGORIES[number];
 export type OfferAdoptionStatus = typeof OFFER_ADOPTION_STATUSES[number];
@@ -313,6 +320,15 @@ export const nexusOfferSchema = z.object({
   nexus_cost: z.number().positive().optional(),
   /** What end customers pay. Must satisfy: nexus_cost <= member_price <= face_value. */
   member_price: z.number().positive().optional(),
+  /**
+   * Platform fee percentage taken from each variant's margin
+   * (face_value - nexus_cost). Voucher offers only. Never exposed to
+   * non-platform-admin callers. The fee-inflated price is BAKED into
+   * variant.member_price; this stores the intent for recompute + receipts.
+   * May be fractional: the admin picks a whole-shekel customer price and the
+   * pct is derived from it, e.g. (97-51)/(500-51) -> 10.24%.
+   */
+  nexusFeePct: z.number().min(0).max(100).optional(),
   /** Reason provided by platform admin when denying a voucher offer. Cleared on resubmit. */
   denial_reason: z.string().max(1000).optional(),
   status: z.enum(OFFER_STATUSES).default('active'),

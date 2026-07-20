@@ -193,6 +193,55 @@ export async function clampTenantVariantPricesToBounds(
 }
 
 /**
+ * Re-sync per-tenant price overrides after a NEXUS FEE change re-baked the
+ * offer's variant member_price (the per-tenant floor). Differs from
+ * clampTenantVariantPricesToBounds (deal-price edits, floor 0): here the floor
+ * is the NEW fee-inflated base - an override below it snaps UP (the fee must
+ * always be collectable), an override above it is preserved (adopter margins
+ * kept), and everything stays capped at face_value. %-backed prices recompute
+ * from the new base via recomputeConfigMarkup. Cached displayPrice recomputed.
+ *
+ * Input:  offerId + the freshly re-baked variant array (carrying the new bounds).
+ * Output: resolves when all affected configs are updated (no-op when none).
+ */
+export async function syncTenantPricesToFeeFloor(
+  offerId: string,
+  variants: OfferVariant[],
+): Promise<void> {
+  const bounds = boundsByVariant(variants);
+  if (bounds.size === 0) return;
+
+  const db = await getMongoDb();
+  const { tenantOfferConfigs } = getSupplyDomainCollections(db);
+  const configs = await tenantOfferConfigs
+    .find({ offerId, $or: [{ variantMarkupPct: { $exists: true } }, { variantPrices: { $exists: true } }] })
+    .toArray();
+
+  for (const cfg of configs) {
+    const rec = recomputeConfigMarkup(cfg.variantMarkupPct ?? {}, cfg.variantPrices ?? {}, bounds);
+    const nextMarkup = rec.markup;
+    const nextPrices = rec.prices;
+    let changed = rec.changed;
+
+    // Absolute overrides (no stored %): clamp into [new floor, face_value].
+    for (const [variantId, price] of Object.entries(nextPrices)) {
+      if (variantId in nextMarkup) continue;
+      const b = bounds.get(variantId);
+      if (!b) continue;
+      const clamped = Math.min(Math.max(price, b.base), b.face);
+      if (clamped !== price) { nextPrices[variantId] = clamped; changed = true; }
+    }
+
+    if (!changed) continue;
+    const displayPrice = lowestEffectiveVariantPrice(variants, nextPrices);
+    await tenantOfferConfigs.updateOne(
+      { configId: cfg.configId },
+      { $set: { variantMarkupPct: nextMarkup, variantPrices: nextPrices, ...(displayPrice !== undefined ? { displayPrice } : {}) } },
+    );
+  }
+}
+
+/**
  * Re-sync per-tenant price overrides after a tenant_only offer's OWNER edited its
  * OWN sale price (nexus_cost) in the Edit Offer modal. The displayed Sale Price must
  * SNAP to the new value, so for every TenantOfferConfig of the offer:

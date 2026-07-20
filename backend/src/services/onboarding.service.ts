@@ -122,6 +122,11 @@ export interface MeResponse {
     tenantCoverImages?: TenantCoverImage[];
     /** Org brand color ("#rrggbb"), or null -> wallet derives one from the id. */
     tenantBrandColor?: string | null;
+    /** Social handles (bare handle, no domain), or null when unset. The
+     *  Appearance settings card reads these to show current saved values. */
+    tenantInstagramHandle?: string | null;
+    tenantFacebookHandle?: string | null;
+    tenantTwitterHandle?: string | null;
     /** Auto-adopt NEXUS-admin offers setting (absent tenant field = true). */
     autoAdoptAdminOffers?: boolean;
   };
@@ -541,7 +546,20 @@ export async function getMe(userId: string): Promise<MeResponse> {
   const tenantBrandingDoc = context.tenantId
     ? await getTenantDomainCollections(db).domainTenants.findOne(
         { tenantId: context.tenantId },
-        { projection: { logoUrl: 1, brandColor: 1, logoCrop: 1, coverImages: 1, businessSetupApproval: 1, autoApproveOffers: 1, autoAdoptAdminOffers: 1 } },
+        {
+          projection: {
+            logoUrl: 1,
+            brandColor: 1,
+            logoCrop: 1,
+            coverImages: 1,
+            businessSetupApproval: 1,
+            autoApproveOffers: 1,
+            autoAdoptAdminOffers: 1,
+            instagramHandle: 1,
+            facebookHandle: 1,
+            twitterHandle: 1,
+          },
+        },
       )
     : null;
 
@@ -554,6 +572,9 @@ export async function getMe(userId: string): Promise<MeResponse> {
       tenantLogoCrop: tenantBrandingDoc?.logoCrop ?? null,
       tenantCoverImages: (tenantBrandingDoc?.coverImages ?? []) as TenantCoverImage[],
       tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
+      tenantInstagramHandle: tenantBrandingDoc?.instagramHandle ?? null,
+      tenantFacebookHandle: tenantBrandingDoc?.facebookHandle ?? null,
+      tenantTwitterHandle: tenantBrandingDoc?.twitterHandle ?? null,
       // Settings toggle: auto-adopt NEXUS-admin offers (absent field = true).
       autoAdoptAdminOffers: tenantBrandingDoc ? tenantBrandingDoc.autoAdoptAdminOffers !== false : true,
       ...(planSummary && {

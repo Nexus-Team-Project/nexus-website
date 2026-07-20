@@ -14,6 +14,7 @@ import {
   getSupplyDomainCollections,
   deriveValueTypeFromExecutionType,
   NOT_DELETED,
+  NEXUS_FEE_DEFAULT_PCT,
   type NexusOffer,
   type OfferVariant,
   type OfferCategory,
@@ -341,8 +342,8 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     ? buildVoucherVariants(input.variants, {
         face_value: input.face_value,
         nexus_cost: input.nexus_cost,
-        // Default member_price to nexus_cost when omitted (per-variant); each
-        // adopting tenant later sets their own price via TenantOfferConfig.
+        // member_price here is only the legacy fallback for variants missing
+        // cost/face; priced variants get member_price DERIVED from the nexus fee.
         member_price: input.member_price,
         // Validity VALUE is per inventory unit, not the variant. The flat
         // single-variant inherits the offer's defaultValidityType (override null).
@@ -351,7 +352,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
         tags: input.tags,
         terms: input.terms,
         implementationInstructions: input.implementationInstructions,
-      })
+      }, NEXUS_FEE_DEFAULT_PCT)
     : undefined;
   const mirror = mirrorRepresentativeOntoOffer(voucherVariants);
 
@@ -410,6 +411,9 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     ...(resolvedFaceValue !== undefined && { face_value: resolvedFaceValue }),
     ...(resolvedNexusCost !== undefined && { nexus_cost: resolvedNexusCost }),
     ...(resolvedMemberPrice !== undefined && { member_price: resolvedMemberPrice }),
+    // Platform fee intent; the fee-inflated price is already baked into each
+    // variant's member_price above. Voucher-only.
+    ...(isVoucher && { nexusFeePct: NEXUS_FEE_DEFAULT_PCT }),
     status,
     visibility: input.visibility,
     executionType,
@@ -665,7 +669,7 @@ export async function updateOffer(
       tags: input.tags,
       terms: input.terms,
       implementationInstructions: input.implementationInstructions,
-    });
+    }, currentOffer.nexusFeePct ?? NEXUS_FEE_DEFAULT_PCT);
     // Detect which variants had their sale price (nexus_cost) changed. A brand-new
     // variant (no stored match) counts as changed.
     const storedForPricing = new Map((currentOffer.variants ?? []).map((v) => [v.variantId, v]));
@@ -738,6 +742,9 @@ export async function updateOffer(
     // Resubmit: clear denial and move to the resubmit target status (queue, or
     // live for a trusted tenant).
     ...(wasResubmitted && { status: resubmitStatus, denial_reason: '' }),
+    // Stamp the fee intent on voucher offers that predate the field (the bake
+    // above already used the default), so reads + the admin slider see it.
+    ...(isVoucherUpdate && currentOffer.nexusFeePct === undefined && { nexusFeePct: NEXUS_FEE_DEFAULT_PCT }),
     // Variant mirror + array win over the flat spreads above (voucher edit only).
     ...variantMirror,
     ...variantSet,
