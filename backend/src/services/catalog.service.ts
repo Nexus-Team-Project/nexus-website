@@ -175,6 +175,8 @@ export interface CatalogItem {
   implementationLink?: string | null;
   /** Human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Optional https URL to a page listing participating branches. Voucher-only; null otherwise. */
+  branchListUrl?: string | null;
   /** Date the offer goes live. null = live immediately on approval. */
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Always null for vouchers. */
@@ -315,6 +317,7 @@ export function toItem(
       && (offer.stockUsed ?? 0) >= offer.stockLimit,
     implementationLink: offer.implementationLink ?? null,
     implementationInstructions: offer.implementationInstructions ?? '',
+    branchListUrl: offer.branchListUrl ?? null,
     validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
     defaultValidityType: offer.defaultValidityType ?? null,

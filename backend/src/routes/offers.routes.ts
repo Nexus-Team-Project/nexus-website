@@ -145,6 +145,17 @@ const remoteImagesField = z.preprocess(
 );
 
 /**
+ * Strict https-only URL schema for the voucher branch-list link
+ * (`NexusOffer.branchListUrl`): well-formed URL AND scheme === 'https:' - a
+ * plain http(s)-agnostic `.url()` (used elsewhere, e.g. implementationLink)
+ * would accept http, which this field explicitly must not.
+ */
+const httpsUrlSchema = z.string().trim().url().refine(
+  (value) => new URL(value).protocol === 'https:',
+  { message: 'must be a valid https:// URL' },
+);
+
+/**
  * One voucher variant as received from a client. Numbers arrive as real numbers
  * (the array is JSON-encoded), so no coercion is needed. `variantId` is optional:
  * present preserves an existing variant on edit; absent = the service generates one.
@@ -300,6 +311,9 @@ const createOfferSchema = z.object({
   stockLimit: z.coerce.number().int().positive().nullable().optional().default(null),
   implementationLink: z.string().url().nullable().optional(),
   implementationInstructions: z.string().max(4000).optional(),
+  // Voucher-only: optional https:// link to a page listing participating
+  // branches/locations. Forced null server-side for non-voucher offers.
+  branchListUrl: httpsUrlSchema.nullable().optional(),
   // ISO string from multipart form; convert to Date in handler.
   // validFrom is optional - null/undefined means the offer goes live as soon as approved.
   // No future-date refinement on validFrom: setting it to today (or the past) is valid
@@ -385,6 +399,8 @@ const updateOfferSchema = z.object({
   stockLimit: z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().positive().nullable().optional()),
   implementationLink: z.preprocess((v) => (v === '' ? null : v), z.string().url().nullable().optional()),
   implementationInstructions: z.string().max(4000).optional(),
+  // Empty string from the edit form means "clear it" -> null.
+  branchListUrl: z.preprocess((v) => (v === '' ? null : v), httpsUrlSchema.nullable().optional()),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
   // Voucher combine-with-promotions + background color (voucher-only).
