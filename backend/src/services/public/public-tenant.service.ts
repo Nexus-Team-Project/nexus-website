@@ -14,6 +14,7 @@ import type { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import type { TenantCoverImage } from '../../models/domain/tenant.models';
 import { getTenantRatingSummary, type TenantRatingSummary } from '../wallet/tenant-rating.service';
+import { buildSocialUrl } from '../../schemas/socialHandle.schemas';
 
 export interface PublicTenantInfo {
   tenantId: string;
@@ -39,6 +40,15 @@ export interface PublicTenantInfo {
    * tenant page share row.
    */
   website?: string;
+  /**
+   * Public profile URLs, built from the tenant's stored HANDLE (never a
+   * user-supplied domain) + our own hardcoded per-platform domain. Absent
+   * when the tenant never set that handle. Powers the wallet tenant page
+   * share row alongside `website`.
+   */
+  instagramUrl?: string;
+  facebookUrl?: string;
+  twitterUrl?: string;
   /**
    * Aggregate member rating for this tenant (average/count/star
    * distribution). Absent when nobody has rated this tenant yet - the wallet
@@ -83,6 +93,10 @@ export async function getPublicTenantInfo(
 
   const coverImages = (tenant.coverImages as TenantCoverImage[] | undefined) ?? [];
 
+  const instagramHandle = tenant.instagramHandle as string | undefined;
+  const facebookHandle = tenant.facebookHandle as string | undefined;
+  const twitterHandle = tenant.twitterHandle as string | undefined;
+
   return {
     tenantId,
     organizationName: tenant.organizationName as string,
@@ -91,6 +105,9 @@ export async function getPublicTenantInfo(
     ...(coverImages.length > 0 ? { coverImages } : {}),
     ...(businessDescription !== undefined ? { businessDescription } : {}),
     ...(website !== undefined ? { website } : {}),
+    ...(instagramHandle ? { instagramUrl: buildSocialUrl('instagram', instagramHandle) } : {}),
+    ...(facebookHandle ? { facebookUrl: buildSocialUrl('facebook', facebookHandle) } : {}),
+    ...(twitterHandle ? { twitterUrl: buildSocialUrl('twitter', twitterHandle) } : {}),
     ...(ratingSummary !== null ? { rating: ratingSummary } : {}),
   };
 }

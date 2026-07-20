@@ -127,6 +127,13 @@ export const domainTenantSchema = z.object({
   // tenant's benefits. Absent -> the wallet derives a deterministic color from
   // the tenantId so every tenant still looks distinct.
   brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  // Social-media HANDLES only (never a full URL/domain) - set from tenant
+  // settings, editable any time. The public tenant lookup builds the actual
+  // profile URL from OUR hardcoded per-platform domain + this handle, so a
+  // tenant can never store an arbitrary/malicious link under these labels.
+  instagramHandle: z.string().optional(),
+  facebookHandle: z.string().optional(),
+  twitterHandle: z.string().optional(),
   status: z.enum(TENANT_STATUSES),
   // Billing plan that controls how many non-member seats this tenant has.
   // Defaults to 'basic'. Updated manually in MongoDB until PayMe billing lands.
