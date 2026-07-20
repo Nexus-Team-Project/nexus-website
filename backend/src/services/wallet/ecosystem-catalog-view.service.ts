@@ -93,7 +93,7 @@ export async function getEcosystemCatalogView(query: CatalogQuery): Promise<Cata
     : await getTenantDomainCollections(db).domainTenants
         .find(
           { tenantId: { $in: uploaderTenantIds } },
-          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } },
+          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1, coverImages: 1 } },
         )
         .toArray();
   const uploaderMap = new Map(uploaderTenants.map((tn) => [tn.tenantId, tn]));
