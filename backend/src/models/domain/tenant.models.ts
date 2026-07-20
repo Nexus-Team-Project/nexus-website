@@ -82,6 +82,12 @@ export const TENANT_COVER_IMAGES_MAX = 5;
 export const tenantCoverImageSchema = z.object({
   url: z.string().url().max(2048),
   crop: logoCropSchema.nullable(),
+  // Dominant palette of the PRISTINE image (up to 3 lowercase '#rrggbb', most
+  // common first, near-white/near-black filtered - see utils/dominant-color).
+  // Extracted by Cloudinary at upload time; powers the wallet store-tile
+  // bottom color fade. Absent on entries stored before 2026-07-20 until
+  // scripts/backfill-cover-colors.ts runs.
+  colors: z.array(z.string().regex(/^#[0-9a-f]{6}$/)).max(3).optional(),
 });
 export type TenantCoverImage = z.infer<typeof tenantCoverImageSchema>;
 

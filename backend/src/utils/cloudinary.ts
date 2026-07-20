@@ -17,17 +17,35 @@ import { env } from '../config/env.js';
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Dominant-color palette as returned by Cloudinary when `colors` analysis is
+ * requested: `[hex, percentage]` pairs sorted by share (most common first).
+ */
+export type CloudinaryPalette = [string, number][];
+
 /** Shape of a successful Cloudinary upload API response (partial). */
 interface CloudinaryUploadResult {
   secure_url: string;
   public_id: string;
+  /** Present only when the upload requested `colors: true`. */
+  colors?: CloudinaryPalette;
 }
 
 /** Parsed credentials extracted from CLOUDINARY_URL. */
-interface CloudinaryCredentials {
+export interface CloudinaryCredentials {
   apiKey: string;
   apiSecret: string;
   cloudName: string;
+}
+
+/**
+ * Returns the environment's parsed Cloudinary credentials, or null when
+ * CLOUDINARY_URL is unset. For BACKEND-ONLY consumers that must call a
+ * Cloudinary endpoint this module does not wrap (e.g. the cover-colors
+ * backfill script's Admin API reads). Never expose any of it to a client.
+ */
+export function getCloudinaryCredentials(): CloudinaryCredentials | null {
+  return env.CLOUDINARY_URL ? parseCloudinaryUrl(env.CLOUDINARY_URL) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +116,9 @@ function buildSignature(params: Record<string, string>, apiSecret: string): stri
  *   filename - original file name used to derive a readable public_id.
  *   folder  - Cloudinary folder (e.g. 'nexus/offers').
  *   label   - human label for the unavailable/failure error messages.
- * Output: Promise resolving to the secure HTTPS URL of the stored image.
+ *   requestColors - when true, asks Cloudinary to also analyze the image's
+ *                   dominant colors (returned on the result's `colors`).
+ * Output: Promise resolving to the (partial) Cloudinary upload response.
  * Throws: if CLOUDINARY_URL is unset or Cloudinary returns a non-2xx.
  */
 async function uploadImageBuffer(
@@ -106,7 +126,8 @@ async function uploadImageBuffer(
   filename: string,
   folder: string,
   label: string,
-): Promise<string> {
+  requestColors = false,
+): Promise<CloudinaryUploadResult> {
   if (!env.CLOUDINARY_URL) {
     throw new Error(`CLOUDINARY_URL is not configured - ${label} upload is unavailable`);
   }
@@ -117,11 +138,13 @@ async function uploadImageBuffer(
   const timestamp = String(Math.round(Date.now() / 1000));
 
   // Parameters that are included in the signature (alphabetical order matters
-  // only for the signature string; the form fields themselves can be in any order).
+  // only for the signature string; the form fields themselves can be in any
+  // order). The `colors` analysis flag is a signed param like any other.
   const signedParams: Record<string, string> = {
     folder,
     public_id: publicId,
     timestamp,
+    ...(requestColors ? { colors: 'true' } : {}),
   };
 
   const signature = buildSignature(signedParams, apiSecret);
@@ -133,6 +156,7 @@ async function uploadImageBuffer(
   form.append('signature', signature);
   form.append('folder', folder);
   form.append('public_id', publicId);
+  if (requestColors) form.append('colors', 'true');
 
   const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;
 
@@ -143,8 +167,7 @@ async function uploadImageBuffer(
     throw new Error(`Cloudinary ${label} upload failed (HTTP ${res.status}): ${body}`);
   }
 
-  const data = (await res.json()) as CloudinaryUploadResult;
-  return data.secure_url;
+  return (await res.json()) as CloudinaryUploadResult;
 }
 
 /**
@@ -160,7 +183,7 @@ async function uploadImageBuffer(
  *   - If the Cloudinary API returns a non-2xx response.
  */
 export async function uploadOfferImage(buffer: Buffer, filename: string): Promise<string> {
-  return uploadImageBuffer(buffer, filename, 'nexus/offers', 'offer image');
+  return (await uploadImageBuffer(buffer, filename, 'nexus/offers', 'offer image')).secure_url;
 }
 
 /**
@@ -211,6 +234,34 @@ export async function uploadOfferImageFromUrl(
   remoteUrl: string,
   folder = 'nexus/offers',
 ): Promise<string> {
+  return (await uploadFromUrlCore(remoteUrl, folder, false)).secure_url;
+}
+
+/**
+ * Re-hosts a remote image as a TENANT COVER (`nexus/tenant-covers`) and also
+ * returns Cloudinary's dominant-color palette (same analysis as the buffer
+ * cover upload) so URL-sourced covers get fade colors too.
+ *
+ * Input:  remoteUrl - a public http(s) image URL.
+ * Output: Promise resolving to { url, palette } (palette null when absent).
+ * Throws: same conditions as {@link uploadOfferImageFromUrl}.
+ */
+export async function uploadTenantCoverFromUrl(
+  remoteUrl: string,
+): Promise<{ url: string; palette: CloudinaryPalette | null }> {
+  const data = await uploadFromUrlCore(remoteUrl, TENANT_COVER_FOLDER, true);
+  return { url: data.secure_url, palette: data.colors ?? null };
+}
+
+/**
+ * Shared signed upload-BY-URL request (see {@link uploadOfferImageFromUrl} for
+ * the security notes). `requestColors` adds the signed `colors` analysis flag.
+ */
+async function uploadFromUrlCore(
+  remoteUrl: string,
+  folder: string,
+  requestColors: boolean,
+): Promise<CloudinaryUploadResult> {
   if (!isUploadableImageUrl(remoteUrl)) {
     throw new Error('uploadOfferImageFromUrl requires an http(s) URL');
   }
@@ -223,7 +274,12 @@ export async function uploadOfferImageFromUrl(
   const publicId = `${folder}/${Date.now()}-url`;
   const timestamp = String(Math.round(Date.now() / 1000));
 
-  const signedParams: Record<string, string> = { folder, public_id: publicId, timestamp };
+  const signedParams: Record<string, string> = {
+    folder,
+    public_id: publicId,
+    timestamp,
+    ...(requestColors ? { colors: 'true' } : {}),
+  };
   const signature = buildSignature(signedParams, apiSecret);
 
   const form = new FormData();
@@ -234,6 +290,7 @@ export async function uploadOfferImageFromUrl(
   form.append('signature', signature);
   form.append('folder', folder);
   form.append('public_id', publicId);
+  if (requestColors) form.append('colors', 'true');
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
     method: 'POST',
@@ -245,8 +302,7 @@ export async function uploadOfferImageFromUrl(
     throw new Error(`Cloudinary upload-from-URL failed (HTTP ${res.status}): ${body}`);
   }
 
-  const data = (await res.json()) as CloudinaryUploadResult;
-  return data.secure_url;
+  return (await res.json()) as CloudinaryUploadResult;
 }
 
 /**
@@ -261,7 +317,7 @@ export async function uploadOfferImageFromUrl(
  * Throws: if CLOUDINARY_URL is unset or Cloudinary returns a non-2xx.
  */
 export async function uploadTenantLogo(buffer: Buffer, filename: string): Promise<string> {
-  return uploadImageBuffer(buffer, filename, TENANT_LOGO_FOLDER, 'tenant logo');
+  return (await uploadImageBuffer(buffer, filename, TENANT_LOGO_FOLDER, 'tenant logo')).secure_url;
 }
 
 /** Cloudinary folders for tenant branding assets (also used by URL re-hosts). */
@@ -271,14 +327,21 @@ export const TENANT_COVER_FOLDER = 'nexus/tenant-covers';
 /**
  * Uploads a tenant cover image to Cloudinary under `nexus/tenant-covers`.
  * Same pristine-original semantics as the logo: callers delete replaced assets
- * via deleteOfferImage so there are no orphans.
+ * via deleteOfferImage so there are no orphans. Cover uploads always request
+ * the dominant-color analysis (free - part of the upload response) so the
+ * wallet store tiles can tint their bottom fade with the image's own color.
  *
  * Input:  buffer - raw image data; filename - original name for the public_id.
- * Output: Promise resolving to the secure HTTPS URL.
+ * Output: Promise resolving to { url, palette } (palette null when Cloudinary
+ *         returned no color data - callers store no colors in that case).
  * Throws: if CLOUDINARY_URL is unset or Cloudinary returns a non-2xx.
  */
-export async function uploadTenantCover(buffer: Buffer, filename: string): Promise<string> {
-  return uploadImageBuffer(buffer, filename, TENANT_COVER_FOLDER, 'tenant cover');
+export async function uploadTenantCover(
+  buffer: Buffer,
+  filename: string,
+): Promise<{ url: string; palette: CloudinaryPalette | null }> {
+  const data = await uploadImageBuffer(buffer, filename, TENANT_COVER_FOLDER, 'tenant cover', true);
+  return { url: data.secure_url, palette: data.colors ?? null };
 }
 
 /**

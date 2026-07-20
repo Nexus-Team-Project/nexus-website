@@ -7,15 +7,22 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const uploadTenantCoverMock = vi.fn(async (_b: Buffer, name: string) =>
-  `https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/file-${name}`);
-const uploadFromUrlMock = vi.fn(async (url: string) =>
-  `https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/remote-${url.split('/').pop()}`);
+// Cover uploads return { url, palette } (palette feeds the stored dominant
+// colors); the mocks return a fixed palette so the colors contract is covered.
+const MOCK_PALETTE: [string, number][] = [['#FFFFFF', 60], ['#3366aa', 40]];
+const uploadTenantCoverMock = vi.fn(async (_b: Buffer, name: string) => ({
+  url: `https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/file-${name}`,
+  palette: MOCK_PALETTE,
+}));
+const uploadFromUrlMock = vi.fn(async (url: string) => ({
+  url: `https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/remote-${url.split('/').pop()}`,
+  palette: MOCK_PALETTE,
+}));
 
 vi.mock('../../src/utils/cloudinary', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/utils/cloudinary')>()),
   uploadTenantCover: (b: Buffer, n: string) => uploadTenantCoverMock(b, n),
-  uploadOfferImageFromUrl: (u: string, f?: string) => uploadFromUrlMock(u, f as never),
+  uploadTenantCoverFromUrl: (u: string) => uploadFromUrlMock(u),
 }));
 
 import { buildCoverEntriesFromRequest } from '../../src/services/tenant-cover.helper';
@@ -46,6 +53,11 @@ describe('buildCoverEntriesFromRequest', () => {
     expect(entries[0]!.crop).toEqual(crop);
     expect(entries[1]!.crop).toBeNull();
     expect(entries[2]!.crop).toEqual(crop);
+    // New uploads store the PICKED dominant colors (white filtered out);
+    // kept entries never carry colors on the wire (re-attached in the service).
+    expect(entries[0]!.colors).toBeUndefined();
+    expect(entries[1]!.colors).toEqual(['#3366aa']);
+    expect(entries[2]!.colors).toEqual(['#3366aa']);
   });
 
   it('rejects dangerous remote schemes BEFORE any fetch', async () => {

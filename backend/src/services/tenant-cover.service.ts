@@ -36,22 +36,34 @@ export async function setTenantCovers(
     { tenantId: args.tenantId },
     { projection: { coverImages: 1 } },
   );
+  const previous = (existing?.coverImages ?? []) as TenantCoverImage[];
+
+  // Kept entries arrive from the client with only url+crop (the wire contract
+  // never carries colors), so re-attach each kept URL's stored dominant colors
+  // here - otherwise every reconcile save would silently wipe them.
+  const colorsByUrl = new Map(
+    previous.filter((entry) => entry.colors?.length).map((entry) => [entry.url, entry.colors as string[]]),
+  );
+  const entries = args.entries.map((entry) => {
+    if (entry.colors?.length) return entry;
+    const stored = colorsByUrl.get(entry.url);
+    return stored ? { ...entry, colors: stored } : entry;
+  });
 
   await domainTenants.updateOne(
     { tenantId: args.tenantId },
-    args.entries.length > 0
-      ? { $set: { coverImages: args.entries, updatedAt: new Date() } }
+    entries.length > 0
+      ? { $set: { coverImages: entries, updatedAt: new Date() } }
       : { $unset: { coverImages: '' }, $set: { updatedAt: new Date() } },
   );
 
   // Best-effort: destroy Cloudinary assets no longer referenced by the set.
-  const keptUrls = new Set(args.entries.map((entry) => entry.url));
-  const previous = (existing?.coverImages ?? []) as TenantCoverImage[];
+  const keptUrls = new Set(entries.map((entry) => entry.url));
   for (const entry of previous) {
     if (entry.url && !keptUrls.has(entry.url)) void deleteOfferImage(entry.url);
   }
 
-  return { coverImages: args.entries };
+  return { coverImages: entries };
 }
 
 /**
