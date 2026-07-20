@@ -14,6 +14,8 @@
  * Exports:
  *   getTenantCatalogView  - paginated admin/supply-manager catalog
  *   getMemberCatalogView  - paginated member-facing catalog (adopted offers)
+ *   toItem                - NexusOffer -> CatalogItem mapper (reused by the
+ *                           wallet ecosystem/"Nexus catalog" view for base pricing)
  *   adoptOffer            - mark an offer as active for a tenant
  *   excludeOffer          - remove an offer from a tenant's catalog
  */
@@ -32,7 +34,7 @@ import {
 import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap } from './catalog-query.helper';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
-import type { LogoCrop } from '../models/domain/tenant.models';
+import type { LogoCrop, TenantCoverImage } from '../models/domain/tenant.models';
 import { uploaderFieldsFromTenant, type UploaderTenantDoc } from './catalog-uploader.helper';
 
 // ---------------------------------------------------------------------------
@@ -159,6 +161,8 @@ export interface CatalogItem {
   createdByTenantBrandColor?: string;
   /** Crop of the creating tenant's logo (normalized fractions), applied at display time. */
   createdByTenantLogoCrop?: LogoCrop | null;
+  /** Creating tenant's FIRST cover-gallery image (url + crop), for card backgrounds. */
+  createdByTenantCoverImage?: TenantCoverImage;
   /** How the offer is fulfilled/redeemed (voucher, coupon, gift_card, product, service). */
   executionType: string;
   /** Maximum total units available (null = unlimited). */
@@ -242,7 +246,7 @@ export interface CatalogVariant {
  * the underlying document, so the same offer can appear as 'active' to admins
  * paginating without an expiry filter and 'expired' once it crosses validUntil.
  */
-function toItem(
+export function toItem(
   offer: NexusOffer,
   config: TenantOfferConfig | undefined,
   context: {
@@ -658,13 +662,15 @@ export async function getMemberCatalogView(
   // Uploader identity: batch-fetch the creating tenants for this page in ONE
   // query (no N+1), mirroring getTenantCatalogView, so wallet/member cards can
   // show the real "created by <org>" name + logo instead of the NEXUS fallback.
+  // coverImages rides along so cards get the creator's first cover background
+  // without a per-tenant public lookup (only the first entry is exposed).
   const uploaderTenantIds = [...new Set(offers.map((o) => o.createdByTenantId).filter(Boolean))];
   const uploaderTenants = uploaderTenantIds.length === 0
     ? []
     : await getTenantDomainCollections(db).domainTenants
         .find(
           { tenantId: { $in: uploaderTenantIds } },
-          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } },
+          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1, coverImages: 1 } },
         )
         .toArray();
   const uploaderMap = new Map(uploaderTenants.map((tn) => [tn.tenantId, tn]));
