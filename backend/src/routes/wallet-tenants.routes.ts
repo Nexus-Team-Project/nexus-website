@@ -2,6 +2,7 @@
  * Wallet tenant-discovery + join-request routes.
  *
  * GET /api/v1/wallet/tenants/discover         - search discoverable tenants
+ * POST /api/v1/wallet/tenants/:tenantId/leave - leave a tenant (plain members only)
  * POST /api/v1/wallet/join-requests           - submit one or more requests
  * GET /api/v1/wallet/join-requests/mine       - list own requests
  * GET /api/v1/tenant/join-requests            - tenant admin: pending list
@@ -24,6 +25,7 @@ import {
   approveJoinRequest,
   denyJoinRequest,
 } from '../services/wallet/join-request.service';
+import { leaveTenant } from '../services/wallet/leave-tenant.service';
 import { getIdentityDomainCollections } from '../models/domain';
 import { resolveTenantContextWithPermission } from '../utils/resolve-tenant-context';
 import {
@@ -161,6 +163,46 @@ router.get('/tenants/discover', authenticate, async (req: Request, res: Response
     res.json({ tenants });
   } catch (e) {
     console.error('[wallet-tenants] discover failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+// Leave a tenant the caller is a plain member of. Self-only: the identity
+// comes from the session; the tenantId param is re-checked against the
+// caller's OWN membership inside the service. Member-only by owner decision -
+// privileged staff must be managed from the dashboard. Hard delete of the
+// membership; the tenant's contact row is kept.
+const leaveTenantParamSchema = z.string().min(1).max(200);
+
+router.post('/tenants/:tenantId/leave', authenticate, async (req: Request, res: Response) => {
+  const parsedTenantId = leaveTenantParamSchema.safeParse(req.params.tenantId);
+  if (!parsedTenantId.success) {
+    res.status(400).json({ error: 'invalid_request' });
+    return;
+  }
+  try {
+    const me = await getCallingNexusIdentity(req);
+    if (!me) {
+      res.status(404).json({ error: 'identity_not_found' });
+      return;
+    }
+    const db = await getMongoDb();
+    await leaveTenant(db, {
+      nexusIdentityId: me.nexusIdentityId,
+      tenantId: parsedTenantId.data,
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown';
+    if (msg === 'privileged_role') {
+      res.status(403).json({ error: 'privileged_role' });
+      return;
+    }
+    if (msg === 'not_a_member') {
+      res.status(404).json({ error: 'not_a_member' });
+      return;
+    }
+    console.error('[wallet-tenants] leave failed:', e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
