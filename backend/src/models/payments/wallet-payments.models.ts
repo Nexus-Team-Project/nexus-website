@@ -20,6 +20,20 @@ import type { Db } from 'mongodb';
 
 export const WALLET_PAYMENT_CARDS_COLLECTION = 'walletPaymentCards';
 export const WALLET_PURCHASES_COLLECTION = 'walletPurchases';
+export const WALLET_BALANCES_COLLECTION = 'walletBalances';
+
+/**
+ * A member's Nexus wallet balance. One doc per identity, created lazily (no
+ * doc = balance 0). Amount is INTEGER AGOROT (ILS), ledger-ready: top-ups,
+ * gift credits, and spend will adjust it (and later append ledger entries).
+ */
+export interface WalletBalance {
+  identityId: string;
+  balanceAgorot: number;
+  currency: 'ILS';
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 /** A saved card = a PayMe multi-use token + display metadata. */
 export interface WalletPaymentCard {
@@ -80,4 +94,9 @@ export async function ensureWalletPaymentIndexes(db: Db): Promise<void> {
   const purchases = db.collection(WALLET_PURCHASES_COLLECTION);
   await purchases.createIndex({ identityId: 1, status: 1, createdAt: -1 }, { name: 'identity_status_lookup' });
   await purchases.createIndex({ paymeSaleId: 1 }, { name: 'payme_sale_lookup' });
+
+  await db.collection(WALLET_BALANCES_COLLECTION).createIndex(
+    { identityId: 1 },
+    { unique: true, name: 'uniq_identity_balance' },
+  );
 }

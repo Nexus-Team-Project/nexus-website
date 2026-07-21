@@ -21,6 +21,7 @@ import { PURCHASE_MAX_QUANTITY } from '../models/payments/wallet-payments.models
 import { createPurchase } from '../services/wallet/purchase.service';
 import { listMyPurchases, getAvailableVariantStock } from '../services/wallet/purchase-read.service';
 import { getReceiptPdf } from '../services/wallet/purchase-receipt.service';
+import { getBalance } from '../services/wallet/balance.service';
 
 const router = Router();
 
@@ -100,6 +101,20 @@ router.post('/purchases', authenticate, async (req: Request, res: Response) => {
       return;
     }
     console.error('[wallet-purchases] create failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+router.get('/balance', authenticate, async (req: Request, res: Response) => {
+  try {
+    const caller = await getCallingIdentity(req);
+    if (!caller) {
+      res.status(404).json({ error: 'identity_not_found' });
+      return;
+    }
+    res.json({ balance: await getBalance(caller.identityId) });
+  } catch (e) {
+    console.error('[wallet-purchases] balance failed:', e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
