@@ -47,7 +47,8 @@ import partnersRoutes from './partners.route';
 import paymentsRoutes from './payments.routes';
 import publicRoutes from './public.routes';
 import offersRoutes from './offers.routes';
-import purchaseRoutes from './purchase.routes';
+import walletPurchasesRoutes from './wallet-purchases.routes';
+import paymeCallbackRoutes from './payme-callback.routes';
 import pushRoutes from './push.routes';
 import seoRoutes from './seo.routes';
 import userRoutes from './user.routes';
@@ -104,6 +105,9 @@ router.use('/orgs', orgsRoutes);
 router.use('/invites', invitesRoutes);
 router.use('/push', pushRoutes);
 router.use('/offers', offersRoutes);
-router.use('/purchase', purchaseRoutes);
+// Wallet voucher purchases (real PayMe flow - replaced the mock /purchase stub).
+router.use('/wallet', walletPurchasesRoutes);
+// PayMe IPN callback (public, urlencoded, always-200).
+router.use('/payments', paymeCallbackRoutes);
 
 export default router;

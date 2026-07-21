@@ -12,11 +12,8 @@
  *      None -> purchase failed + out_of_stock (slot freed via $unset active).
  *   5. Charge the saved token via the PayMe client. Failure -> release the
  *      unit + mark failed (card_declined). Success -> completed + paidAt.
- *   6. Receipt issuing (SUMIT) is fire-and-forget - wired in
- *      purchase-receipt.service; a receipt failure never fails a purchase.
- *
- * The IPN callback reconciliation (handlePaymeCallback) lives with the routes
- * task and reuses the same collections.
+ *   6. Receipt issuing (SUMIT) is fire-and-forget - a receipt failure never
+ *      fails a purchase (purchase-receipt.service).
  *
  * Throws stable-coded Errors: card_not_found | offer_not_found |
  * variant_not_found | not_purchasable | no_catalog_access |
@@ -250,6 +247,66 @@ export async function createPurchase(args: {
       throw new Error('payment_unavailable');
     }
     throw new Error('card_declined');
+  }
+}
+
+/**
+ * Reconciles one PayMe IPN callback (x-www-form-urlencoded body, already
+ * parsed to a string map). Matching is strict: our purchaseId
+ * (transaction_id) must exist AND the callback's payme_sale_id + price must
+ * equal what WE stored - a mismatched or unknown callback is logged and
+ * ignored (never trusted). Idempotent per notify_type. Never throws - the
+ * route always answers 200 so PayMe stops retrying.
+ */
+export async function handlePaymeCallback(body: Record<string, string>): Promise<void> {
+  try {
+    const purchaseId = body.transaction_id ?? '';
+    const notifyType = body.notify_type ?? '';
+    if (!purchaseId || !notifyType) return;
+
+    const db = await getMongoDb();
+    const purchase = await purchases(db).findOne({ purchaseId });
+    if (!purchase) {
+      console.warn(`[payme-callback] unknown purchase ${purchaseId} (${notifyType}) - ignored`);
+      return;
+    }
+    const price = Number(body.price ?? '');
+    const saleId = body.payme_sale_id ?? '';
+    const saleMatches = !purchase.paymeSaleId || purchase.paymeSaleId === saleId;
+    if (price !== purchase.priceAgorot || !saleId || !saleMatches) {
+      console.warn(`[payme-callback] mismatch for ${purchaseId}: price=${price} sale=${saleId} - ignored`);
+      return;
+    }
+
+    if (notifyType === 'sale-complete' && purchase.status === 'pending') {
+      // The synchronous charge path may have raced or crashed - finish it here.
+      const unit = await voucherUnits(db).findOne({ assignedPurchaseId: purchaseId });
+      await purchases(db).updateOne(
+        { purchaseId, status: 'pending' },
+        {
+          $set: {
+            status: 'completed' satisfies WalletPurchaseStatus,
+            paymeSaleId: saleId,
+            paymeTransactionId: body.payme_transaction_id ?? null,
+            ...(unit ? { voucherCodeId: unit.codeId } : {}),
+            paidAt: new Date(),
+          },
+        },
+      );
+    } else if (notifyType === 'sale-failure' && purchase.status === 'pending') {
+      const unit = await voucherUnits(db).findOne({ assignedPurchaseId: purchaseId });
+      if (unit) await releaseUnit(db, unit.codeId);
+      await markFailed(db, purchaseId);
+    } else if (notifyType === 'refund' && purchase.status === 'completed') {
+      // Refund policy is a pending management decision - mark refunded but
+      // KEEP `active` so the variant cannot be re-bought until decided.
+      await purchases(db).updateOne(
+        { purchaseId },
+        { $set: { status: 'refunded' satisfies WalletPurchaseStatus } },
+      );
+    }
+  } catch (e) {
+    console.error('[payme-callback] handler error (ignored, 200 returned):', e);
   }
 }
 
