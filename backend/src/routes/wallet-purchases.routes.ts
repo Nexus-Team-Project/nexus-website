@@ -22,6 +22,7 @@ import { createPurchase } from '../services/wallet/purchase.service';
 import { listMyPurchases, getAvailableVariantStock } from '../services/wallet/purchase-read.service';
 import { getReceiptPdf } from '../services/wallet/purchase-receipt.service';
 import { getBalance } from '../services/wallet/balance.service';
+import { listCards } from '../services/wallet/payment-cards.service';
 
 const router = Router();
 
@@ -115,6 +116,32 @@ router.get('/balance', authenticate, async (req: Request, res: Response) => {
     res.json({ balance: await getBalance(caller.identityId) });
   } catch (e) {
     console.error('[wallet-purchases] balance failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+/**
+ * One batched read for the wallet home: balance + saved cards + purchases in a
+ * single round-trip (the home would otherwise fire three GETs). Purely a read
+ * aggregate over the same services; the individual endpoints remain for
+ * mutations and other pages.
+ */
+router.get('/summary', authenticate, async (req: Request, res: Response) => {
+  try {
+    const caller = await getCallingIdentity(req);
+    if (!caller) {
+      res.status(404).json({ error: 'identity_not_found' });
+      return;
+    }
+    const db = await getMongoDb();
+    const [balance, cards, purchases] = await Promise.all([
+      getBalance(caller.identityId),
+      listCards(db, caller.identityId),
+      listMyPurchases(caller.identityId),
+    ]);
+    res.json({ balance, cards, purchases });
+  } catch (e) {
+    console.error('[wallet-purchases] summary failed:', e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
