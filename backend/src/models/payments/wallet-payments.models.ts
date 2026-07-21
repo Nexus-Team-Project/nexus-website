@@ -46,7 +46,7 @@ export interface WalletPurchaseReceipt {
 }
 
 /** Max units a single purchase may buy of one variant (stock still caps it). */
-export const PURCHASE_MAX_QUANTITY = 10;
+export const PURCHASE_MAX_QUANTITY = 5;
 
 /** One purchase of one voucher variant (quantity units) by one wallet user. */
 export interface WalletPurchase {
