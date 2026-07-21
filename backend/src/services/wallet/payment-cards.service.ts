@@ -54,13 +54,24 @@ export async function listCards(db: Db, identityId: string): Promise<PaymentCard
   return cards.map(toView);
 }
 
+/**
+ * Reduce any incoming masked PAN to LAST-4 only (`****1234`). PayMe sends the
+ * PCI-max first6+last4; we never use the BIN, so we drop it before storing -
+ * only the last 4 digits ever persist or leave the server. Display + receipt
+ * code reads the last 4 via slice(-4), so `****<last4>` keeps them working.
+ */
+function toLast4Mask(rawMask: string): string {
+  const last4 = rawMask.replace(/\D/g, '').slice(-4);
+  return `****${last4}`;
+}
+
 /** Saves a new card token for the caller. Multiple cards per user allowed. */
 export async function addCard(db: Db, identityId: string, input: AddCardInput): Promise<PaymentCardView> {
   const card: WalletPaymentCard = {
     cardId: randomUUID(),
     identityId,
     buyerKey: input.token,
-    cardMask: input.cardMask,
+    cardMask: toLast4Mask(input.cardMask),
     cardBrand: input.cardBrand,
     expiry: input.expiry,
     createdAt: new Date(),

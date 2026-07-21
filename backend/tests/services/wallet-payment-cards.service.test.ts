@@ -49,7 +49,7 @@ describe('addCard + listCards', () => {
     expect(cards).toHaveLength(1);
     expect(cards[0]).toEqual({
       cardId: created.cardId,
-      cardMask: '532610******5846',
+      cardMask: '****5846',
       cardBrand: 'mastercard',
       expiry: '1230',
     });
@@ -77,7 +77,7 @@ describe('getCardForCharge', () => {
     expect(forCharge).toEqual({
       cardId: created.cardId,
       buyerKey: CARD_INPUT.token,
-      cardMask: CARD_INPUT.cardMask,
+      cardMask: '****5846',
     });
     await expect(getCardForCharge(db, 'intruder', created.cardId)).rejects.toThrow('card_not_found');
   });
