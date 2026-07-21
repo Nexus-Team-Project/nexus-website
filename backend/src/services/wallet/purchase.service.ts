@@ -35,6 +35,7 @@ import {
 import { paymeChargeToken, isPaymeConfigured, PaymeError } from '../payme/payme.client';
 import { getCardForCharge } from './payment-cards.service';
 import { resolvePurchaseOffer } from './purchase-pricing.helper';
+import { issueReceiptForPurchase } from './purchase-receipt.service';
 
 /** Single seam for the future multi-installment support (spec: 1 for now). */
 export const PURCHASE_INSTALLMENTS = 1;
@@ -220,6 +221,18 @@ export async function createPurchase(args: {
         },
       },
     );
+    // 6. Receipt: fire-and-forget - a receipt failure never fails a purchase.
+    if (args.email) {
+      void issueReceiptForPurchase({
+        purchaseId,
+        buyerName: args.name ?? args.email,
+        buyerEmail: args.email,
+        itemName: `${offer.offerTitle} ${offer.variantTitle}`,
+        cardMask: card.cardMask,
+        language: args.language,
+      });
+    }
+
     return toView(
       { ...doc, status: 'completed', paymeSaleId: sale.paymeSaleId, paymeTransactionId: sale.paymeTransactionId, voucherCodeId: unit.codeId, paidAt },
       {
