@@ -314,6 +314,23 @@ export const nexusOfferSchema = z.object({
    * `scripts/backfill-display-price.ts`.
    */
   displayPrice: z.number().nonnegative().optional(),
+  /**
+   * Plain-text mirror of `description` (HTML stripped), stamped on every write
+   * that touches the description. Search engines match against this field only
+   * (never the raw HTML). Absent on docs that predate the backfill.
+   */
+  descriptionText: z.string().max(10000).optional(),
+  /**
+   * BASE cashback range across the offer's priced variants, derived from
+   * face_value vs the fee-baked base member_price (integer percent, same
+   * formula the wallet renders). Recomputed wherever displayPrice recomputes;
+   * indexed for catalog cashback sorting. null = no variant yields cashback
+   * (non-vouchers / unpriced / price >= face); absent = pre-backfill doc.
+   * Per-tenant price overrides do NOT affect these - the member feed adjusts
+   * effective cashback at query time (see services/catalog-search).
+   */
+  cashbackMinPct: z.number().min(0).max(100).nullable().optional(),
+  cashbackMaxPct: z.number().min(0).max(100).nullable().optional(),
   /** Voucher face value (e.g. ₪100). Only applicable when executionType === 'voucher'. */
   face_value: z.number().positive().optional(),
   /** What the supplier charges Nexus. Stored only - never returned to adopting tenants or members. */

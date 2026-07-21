@@ -46,6 +46,7 @@ import {
   type ImageUploadFile,
 } from './supply-images.helper';
 import { computeDisplayPrice } from './supply-price.helper';
+import { offerSearchWriteFields } from './offer-search-fields.helper';
 import { resolveVoucherMaxPayments } from './supply-voucher.helper';
 import { isTenantAutoApprove } from './admin-tenants.service';
 import { getVoucherCodeCollection } from '../models/domain/voucher-codes.models';
@@ -410,6 +411,14 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     category: input.category,
     market_price: input.market_price,
     ...(displayPrice !== undefined && { displayPrice }),
+    // Derived search fields: plain-text description mirror + base cashback
+    // range (see offer-search-fields.helper).
+    ...offerSearchWriteFields({
+      description: input.description,
+      variants: voucherVariants,
+      flatFaceValue: resolvedFaceValue,
+      flatMemberPrice: resolvedMemberPrice,
+    }),
     // Voucher pricing fields - only populated when executionType === 'voucher'
     // (mirrored from the representative variant).
     ...(resolvedFaceValue !== undefined && { face_value: resolvedFaceValue }),
@@ -758,6 +767,16 @@ export async function updateOffer(
     ...variantMirror,
     ...variantSet,
     ...(variantDisplayPrice !== undefined && { displayPrice: variantDisplayPrice }),
+    // Derived search fields recompute from the MERGED state (existing + patch):
+    // descriptionText only when the description changed; the base cashback
+    // range ALWAYS (cheap, idempotent - variant/price edits must never leave
+    // the stored range stale).
+    ...offerSearchWriteFields({
+      description: input.description,
+      variants: variantSet.variants ?? currentOffer.variants,
+      flatFaceValue: input.face_value ?? currentOffer.face_value,
+      flatMemberPrice: mergedMemberPrice,
+    }),
   };
 
   const result = await nexusOffers.findOneAndUpdate(

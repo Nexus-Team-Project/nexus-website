@@ -17,6 +17,7 @@ import {
   type NexusOffer,
 } from '../models/domain/supply.models';
 import { applyNexusFee, computeDisplayPrice } from './supply-price.helper';
+import { offerSearchWriteFields } from './offer-search-fields.helper';
 import { mirrorRepresentativeOntoOffer, lowestMemberPrice } from './supply-variants.helper';
 import {
   syncTenantPricesToFeeFloor,
@@ -58,6 +59,12 @@ export async function setNexusFeePct(offerId: string, pct: number): Promise<SetN
         ...(rebaked.length > 0 && { variants: rebaked }),
         ...mirror,
         ...(displayPrice !== undefined && { displayPrice }),
+        // Re-baked member prices move the base cashback range with them.
+        ...offerSearchWriteFields({
+          variants: rebaked,
+          flatFaceValue: offer.face_value,
+          flatMemberPrice: mirror.member_price ?? offer.member_price,
+        }),
         updatedAt: new Date(),
       },
     },
@@ -125,6 +132,12 @@ export async function setVariantBaseSalePrice(
         variants: rebaked,
         ...mirror,
         ...(displayPrice !== undefined && { displayPrice }),
+        // The re-baked variant price moves the base cashback range with it.
+        ...offerSearchWriteFields({
+          variants: rebaked,
+          flatFaceValue: offer.face_value,
+          flatMemberPrice: mirror.member_price ?? offer.member_price,
+        }),
         updatedAt: new Date(),
       },
     },
