@@ -21,6 +21,7 @@ import { closeMongoConnection, getMongoDb, verifyMongoConnection } from './confi
 import { ensureDomainIndexes } from './models/domain';
 import { ensureOnboardingIndexes } from './models/onboarding.models';
 import { ensureWalletMagicLinkIndexes } from './models/auth/wallet-magic-link.models';
+import { ensureWalletPaymentIndexes } from './models/payments/wallet-payments.models';
 import { ensureDefaultRolePermissions } from './services/domain-permissions.service';
 import { getSupplyDomainCollections } from './models/domain/supply.models';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
@@ -192,6 +193,7 @@ async function bootstrap() {
     await ensureOnboardingIndexes(mongoDb);
     await ensureDomainIndexes(mongoDb);
     await ensureWalletMagicLinkIndexes(mongoDb);
+    await ensureWalletPaymentIndexes(mongoDb);
     await ensureDefaultRolePermissions();
     // One-shot idempotent backfill: legacy offers carry only `imageUrl`. Copy
     // that into `imageUrls` so the new gallery field is consistent with the
