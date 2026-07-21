@@ -9,80 +9,37 @@
  * So a member who switches to the Nexus catalog always sees the base sale price
  * plus the cashback that follows from it, "as if not a member of any tenant".
  *
- * It reuses the exact member-catalog item mapper (`toItem`) with an EMPTY
- * per-tenant override context, so nexus_cost stays stripped and the full item
- * shape (variants, creator attribution, crops, terms, stock) matches
- * GET /api/v1/offers/:tenantId - the wallet store list + offer page render both
- * feeds with the same components.
+ * Matching, filtering (search/category/stackable/price/tags/stock), sorting
+ * (incl. cashback + Hebrew title), and pagination are owned by the
+ * catalog-search module (engine + cache invisible here). This view keeps the
+ * ecosystem gating context, the creator-attribution join, and the item
+ * mapping: it reuses the exact member-catalog item mapper (`toItem`) with an
+ * EMPTY per-tenant override context, so nexus_cost stays stripped and the full
+ * item shape matches GET /api/v1/offers/:tenantId - the wallet store list +
+ * offer page render both feeds with the same components.
  */
 import { getMongoDb } from '../../config/mongo';
-import { getSupplyDomainCollections, NOT_DELETED, type NexusOffer } from '../../models/domain/supply.models';
 import { getTenantDomainCollections } from '../../models/domain';
-import { buildSearchFilter, buildFilterClauses, buildSortMap, markVoucherSoldOut } from '../catalog-query.helper';
+import { markVoucherSoldOut } from '../catalog-query.helper';
+import { searchCatalog } from '../catalog-search';
 import { toItem, type CatalogQuery, type CatalogPage } from '../catalog.service';
 
 /**
  * Returns one page of the whole ecosystem catalog at base (default) pricing.
  *
- * Honors the same search / category / offer-type / price / tag / stock / sort
- * filters as the member catalog (approval + adoption filters are admin concepts
- * and are ignored here). Offers are gated to visibility 'ecosystem' + status
- * 'active' + a currently-open validity window.
+ * Honors the same search / category / offer-type / price / stackable / tag /
+ * stock / sort filters as the member catalog (approval + adoption filters are
+ * admin concepts and are ignored here). Offers are gated to visibility
+ * 'ecosystem' + status 'active' + a currently-open validity window (enforced
+ * inside the catalog-search module's context gates).
  *
  * @param query - the shared catalog list query (page, limit, filters, sort)
  * @returns the page of default-priced CatalogItems + the total match count
  */
 export async function getEcosystemCatalogView(query: CatalogQuery): Promise<CatalogPage> {
   const db = await getMongoDb();
-  const { nexusOffers } = getSupplyDomainCollections(db);
 
-  const nowDate = new Date();
-  const andClauses: Array<Record<string, unknown>> = [
-    { visibility: 'ecosystem' },
-    { status: 'active' },
-    NOT_DELETED,
-    { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
-    { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
-  ];
-
-  if (query.category) andClauses.push({ category: query.category });
-  const searchFilter = buildSearchFilter(query.search);
-  if (searchFilter) andClauses.push(searchFilter);
-  andClauses.push(...buildFilterClauses(query));
-
-  const offerFilter = { $and: andClauses };
-  const skip = (query.page - 1) * query.limit;
-
-  // Price sorts must rank by the offer's own displayPrice (no per-tenant
-  // override exists in this view). Mongo can sort by that column directly, but
-  // we keep the member view's JS-sort shape for parity + a stable newest-first
-  // tie-breaker.
-  const isPriceSort = query.sort === 'price_asc' || query.sort === 'price_desc';
-
-  let total: number;
-  let offers: NexusOffer[];
-
-  if (isPriceSort) {
-    const all = await nexusOffers.find(offerFilter).toArray();
-    total = all.length;
-    const direction = query.sort === 'price_asc' ? 1 : -1;
-    all.sort((a, b) => {
-      const aEff = a.displayPrice ?? 0;
-      const bEff = b.displayPrice ?? 0;
-      if (aEff !== bEff) return (aEff - bEff) * direction;
-      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bTime - aTime;
-    });
-    offers = all.slice(skip, skip + query.limit);
-  } else {
-    const [count, page] = await Promise.all([
-      nexusOffers.countDocuments(offerFilter),
-      nexusOffers.find(offerFilter).sort(buildSortMap(query.sort)).skip(skip).limit(query.limit).toArray(),
-    ]);
-    total = count;
-    offers = page;
-  }
+  const { offers, total } = await searchCatalog({ context: { kind: 'ecosystem' }, query });
 
   // Uploader identity: batch-fetch the creating tenants for this page in ONE
   // query (no N+1), mirroring getMemberCatalogView, so cards can show the real

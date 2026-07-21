@@ -39,6 +39,12 @@ const envSchema = z.object({
   // set on http://localhost.
   CROSS_SITE_COOKIES: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
 
+  // Catalog search engine. 'true' requires MongoDB hosted on Atlas (the module
+  // runs $search aggregations + creates Atlas Search indexes at startup).
+  // 'false' (default) selects the regex fallback engine - same contract, no
+  // typo tolerance. Tests and non-Atlas environments stay on the fallback.
+  ATLAS_SEARCH_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+
   // Google OAuth — client ID required, secret optional (OAuth code flow disabled when absent)
   GOOGLE_CLIENT_ID: z.string().min(1),
   GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),

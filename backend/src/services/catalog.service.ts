@@ -32,6 +32,7 @@ import {
   type ImageCropEntry,
 } from '../models/domain/supply.models';
 import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap, markVoucherSoldOut } from './catalog-query.helper';
+import { searchCatalog, type TenantPriceOverride } from './catalog-search';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
 import type { LogoCrop, TenantCoverImage } from '../models/domain/tenant.models';
@@ -82,8 +83,16 @@ export interface CatalogQuery {
   tags?: string[];
   /** Hide sold-out offers (stockUsed >= stockLimit). */
   inStockOnly?: boolean;
+  /**
+   * Voucher stacking filter: 'with' = at least one stackable variant
+   * (offer-level fallback when no variants), 'without' = at least one
+   * non-stackable. No stackable signal anywhere = matches neither.
+   */
+  stackable?: 'with' | 'without';
   /** Sort mode. Default 'newest' (createdAt desc). */
-  sort?: 'newest' | 'price_asc' | 'price_desc' | 'expiry_soon' | 'expiry_far';
+  sort?:
+    | 'newest' | 'price_asc' | 'price_desc' | 'expiry_soon' | 'expiry_far'
+    | 'cashback_desc' | 'cashback_asc' | 'title_asc';
 }
 
 /** Page result returned by both catalog views. Total drives UI page count. */
@@ -593,7 +602,7 @@ export async function getMemberCatalogView(
   query: CatalogQuery,
 ): Promise<CatalogPage> {
   const db = await getMongoDb();
-  const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
+  const { tenantOfferConfigs } = getSupplyDomainCollections(db);
 
   // Pre-fetch the adopted set; bail early when the tenant has adopted nothing.
   const adoptedConfigs = await tenantOfferConfigs
@@ -601,66 +610,35 @@ export async function getMemberCatalogView(
     .toArray();
   if (adoptedConfigs.length === 0) return { items: [], total: 0 };
 
-  const nowDate = new Date();
-  const andClauses: Array<Record<string, unknown>> = [
-    { offerId: { $in: adoptedConfigs.map((c) => c.offerId) } },
-    { status: 'active' },
-    NOT_DELETED,
-    { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
-    { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
-  ];
-
-  if (query.category) andClauses.push({ category: query.category });
-  const searchFilter = buildSearchFilter(query.search);
-  if (searchFilter) andClauses.push(searchFilter);
-  andClauses.push(...buildFilterClauses(query));
-  // Voucher stock lives in voucherCodes units - async clause, see the helper.
-  if (query.inStockOnly) andClauses.push(await buildInStockClause(db));
-
-  const offerFilter = { $and: andClauses };
-  const skip = (query.page - 1) * query.limit;
-
-  // Build the configMap up-front so the price-sort branch can resolve the
-  // effective per-tenant displayPrice without an additional fetch.
+  // configMap feeds the pricing projection below; the overrides map is the
+  // same data narrowed to what the catalog-search module needs for its
+  // effective-value sorts (price + cashback rank by the TENANT's numbers).
   const configMap = new Map<string, TenantOfferConfig>(
     adoptedConfigs.map((c) => [c.offerId, c]),
   );
+  const overrides = new Map<string, TenantPriceOverride>(
+    adoptedConfigs.map((c) => [c.offerId, {
+      ...(c.displayPrice !== undefined && { displayPrice: c.displayPrice }),
+      ...(c.memberPrice !== undefined && { memberPrice: c.memberPrice }),
+      ...(c.variantPrices !== undefined && { variantPrices: c.variantPrices }),
+    }]),
+  );
 
-  // When the member sort is by price, we must rank by the EFFECTIVE price -
-  // TenantOfferConfig.displayPrice when present, else NexusOffer.displayPrice.
-  // Mongo cannot sort by that without a $lookup, and the project rule is to
-  // preserve the two-query + JS-map join pattern. So for price sorts only,
-  // fetch the full filtered set (bounded by this tenant's adopted offers,
-  // already in memory), JS-sort by effective price, then paginate in memory.
-  // Non-price sorts keep the cheap Mongo-side sort + skip/limit path so the
-  // catalog stays fast for the common "newest" / expiry sorts.
-  const isPriceSort = query.sort === 'price_asc' || query.sort === 'price_desc';
-
-  let total: number;
-  let offers: NexusOffer[];
-
-  if (isPriceSort) {
-    const all = await nexusOffers.find(offerFilter).toArray();
-    total = all.length;
-    const direction = query.sort === 'price_asc' ? 1 : -1;
-    all.sort((a, b) => {
-      const aEff = configMap.get(a.offerId)?.displayPrice ?? a.displayPrice ?? 0;
-      const bEff = configMap.get(b.offerId)?.displayPrice ?? b.displayPrice ?? 0;
-      if (aEff !== bEff) return (aEff - bEff) * direction;
-      // Stable tie-breaker matches the Mongo-side sort: newest first.
-      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bTime - aTime;
-    });
-    offers = all.slice(skip, skip + query.limit);
-  } else {
-    const [count, page] = await Promise.all([
-      nexusOffers.countDocuments(offerFilter),
-      nexusOffers.find(offerFilter).sort(buildSortMap(query.sort)).skip(skip).limit(query.limit).toArray(),
-    ]);
-    total = count;
-    offers = page;
-  }
+  // Matching, filtering (search/category/stackable/price/tags/stock), sorting,
+  // and pagination live in the catalog-search module - engine (Atlas Search /
+  // regex fallback) and cache are invisible here. Context gates (adopted set,
+  // active status, open validity window) are enforced inside the module and
+  // are never search-scored. This view keeps the member gate, the pricing
+  // projection, and the item mapping.
+  const { offers, total } = await searchCatalog({
+    context: {
+      kind: 'tenant',
+      tenantId,
+      adoptedOfferIds: adoptedConfigs.map((c) => c.offerId),
+      overrides,
+    },
+    query,
+  });
 
   // Uploader identity: batch-fetch the creating tenants for this page in ONE
   // query (no N+1), mirroring getTenantCatalogView, so wallet/member cards can

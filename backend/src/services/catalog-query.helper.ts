@@ -82,6 +82,25 @@ export function buildFilterClauses(query: CatalogQuery): Array<Record<string, un
     clauses.push({ tags: { $in: query.tags } });
   }
 
+  // Stackable tri-state: match on the per-variant flags (multikey), falling
+  // back to the offer-level flag for docs with no variants array. An offer
+  // with NO stackable signal anywhere (non-vouchers) matches neither value -
+  // it only appears when the filter is absent.
+  if (query.stackable === 'with' || query.stackable === 'without') {
+    const wanted = query.stackable === 'with';
+    clauses.push({
+      $or: [
+        { 'variants.voucherStackable': wanted },
+        {
+          $and: [
+            { $or: [{ variants: { $exists: false } }, { variants: { $size: 0 } }] },
+            { voucherStackable: wanted },
+          ],
+        },
+      ],
+    });
+  }
+
   // inStockOnly is NOT handled here: voucher stock lives in voucherCodes units
   // and needs an async pre-fetch - see buildInStockClause below, which the view
   // functions await and push themselves.
@@ -170,6 +189,14 @@ export function buildSortMap(
     case 'price_desc':  return { displayPrice: -1, createdAt: -1 };
     case 'expiry_soon': return { validUntil: 1, createdAt: -1 };
     case 'expiry_far':  return { validUntil: -1, createdAt: -1 };
+    // Stored BASE cashback range. Descending puts nulls (no cashback) last
+    // naturally; ascending would put them FIRST, so the catalog-search module
+    // uses its JS nulls-last path for cashback_asc - this Mongo mapping is the
+    // legacy/admin-path approximation only.
+    case 'cashback_desc': return { cashbackMaxPct: -1, createdAt: -1 };
+    case 'cashback_asc':  return { cashbackMinPct: 1, createdAt: -1 };
+    // Title order; the catalog-search module adds the Hebrew collation.
+    case 'title_asc':   return { title: 1, createdAt: -1 };
     case 'newest':
     default:            return { createdAt: -1 };
   }
