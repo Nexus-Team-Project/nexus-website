@@ -18,7 +18,7 @@
 import { getMongoDb } from '../../config/mongo';
 import { getSupplyDomainCollections, NOT_DELETED, type NexusOffer } from '../../models/domain/supply.models';
 import { getTenantDomainCollections } from '../../models/domain';
-import { buildSearchFilter, buildFilterClauses, buildSortMap } from '../catalog-query.helper';
+import { buildSearchFilter, buildFilterClauses, buildSortMap, markVoucherSoldOut } from '../catalog-query.helper';
 import { toItem, type CatalogQuery, type CatalogPage } from '../catalog.service';
 
 /**
@@ -110,5 +110,7 @@ export async function getEcosystemCatalogView(query: CatalogQuery): Promise<Cata
     }),
   );
 
+  // Real voucher stock overrides offer-level isSoldOut for store-tile badges.
+  await markVoucherSoldOut(db, items);
   return { items, total };
 }

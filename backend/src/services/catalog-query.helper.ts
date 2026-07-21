@@ -116,6 +116,36 @@ export async function buildInStockClause(db: Db): Promise<Record<string, unknown
   };
 }
 
+/** The minimal item shape markVoucherSoldOut needs to read + mutate. */
+interface SoldOutMarkable {
+  offerId: string;
+  executionType?: string | null;
+  isSoldOut: boolean;
+}
+
+/**
+ * Sets `isSoldOut` on VOUCHER items from real voucherCodes availability (a
+ * voucher offer is sold out when it has zero AVAILABLE units) - the offer-level
+ * stockLimit toItem uses does not track voucher units. One distinct() over the
+ * page's offerIds; non-voucher items are left untouched. Mutates in place.
+ */
+export async function markVoucherSoldOut<T extends SoldOutMarkable>(db: Db, items: T[]): Promise<T[]> {
+  const voucherIds = items
+    .filter((i) => (i.executionType ?? 'voucher') === 'voucher')
+    .map((i) => i.offerId);
+  if (voucherIds.length === 0) return items;
+  const inStock = new Set(
+    await getVoucherCodeCollection(db).distinct('offerId', {
+      offerId: { $in: voucherIds },
+      status: 'available',
+    }),
+  );
+  for (const item of items) {
+    if ((item.executionType ?? 'voucher') === 'voucher') item.isSoldOut = !inStock.has(item.offerId);
+  }
+  return items;
+}
+
 /**
  * Maps a CatalogQuery.sort value to a Mongo sort document. The default
  * (newest) matches the legacy behavior.
