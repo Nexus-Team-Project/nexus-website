@@ -17,6 +17,7 @@ import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { getIdentityDomainCollections } from '../models/domain';
+import { PURCHASE_MAX_QUANTITY } from '../models/payments/wallet-payments.models';
 import { createPurchase } from '../services/wallet/purchase.service';
 import { listMyPurchases } from '../services/wallet/purchase-read.service';
 import { getReceiptPdf } from '../services/wallet/purchase-receipt.service';
@@ -30,6 +31,7 @@ const purchaseBodySchema = z.object({
   variantId: z.string().min(1).max(128),
   cardId: z.string().uuid(),
   tenantId: z.string().min(1).max(128).optional(),
+  quantity: z.number().int().min(1).max(PURCHASE_MAX_QUANTITY).default(1),
   language: z.enum(['he', 'en']).default('he'),
 });
 
@@ -42,7 +44,7 @@ const PURCHASE_ERROR_STATUS: Record<string, number> = {
   variant_not_found: 404,
   not_purchasable: 409,
   no_catalog_access: 403,
-  already_purchased: 409,
+  invalid_quantity: 400,
   out_of_stock: 409,
   card_declined: 402,
   payment_unavailable: 503,
@@ -86,6 +88,7 @@ router.post('/purchases', authenticate, async (req: Request, res: Response) => {
       variantId: parsed.data.variantId,
       cardId: parsed.data.cardId,
       tenantId: parsed.data.tenantId ?? null,
+      quantity: parsed.data.quantity,
       language: parsed.data.language,
     });
     res.status(201).json({ purchase });

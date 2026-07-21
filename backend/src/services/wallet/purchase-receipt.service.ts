@@ -41,6 +41,7 @@ export async function issueReceiptForPurchase(args: {
   buyerName: string;
   buyerEmail: string;
   itemName: string;
+  quantity: number;
   cardMask: string;
   language: 'he' | 'en';
 }): Promise<void> {
@@ -57,8 +58,9 @@ export async function issueReceiptForPurchase(args: {
       customerName: args.buyerName,
       customerEmail: args.buyerEmail,
       itemName: args.itemName,
-      // Purchases store integer agorot; SUMIT wants decimal shekels.
+      // Purchases store integer agorot; SUMIT wants decimal shekels (per unit).
       priceShekels: purchase.priceAgorot / 100,
+      quantity: args.quantity,
       cardLast4: args.cardMask.slice(-4),
       language: args.language,
       externalReference: args.purchaseId,

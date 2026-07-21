@@ -27,7 +27,7 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   if (docs.length === 0) return [];
 
   const offerIds = [...new Set(docs.map((d) => d.offerId))];
-  const codeIds = docs.map((d) => d.voucherCodeId).filter((id): id is string => Boolean(id));
+  const codeIds = docs.flatMap((d) => d.voucherCodeIds ?? []);
   const cardIds = [...new Set(docs.map((d) => d.cardId))];
   const [offers, units, cards] = await Promise.all([
     db.collection(DOMAIN_COLLECTIONS.nexusOffers)
@@ -49,13 +49,16 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   return docs.map((d) => {
     const offer = offerMap.get(d.offerId);
     const variant = offer?.variants?.find((v) => v.variantId === d.variantId);
-    const unit = d.voucherCodeId ? unitMap.get(d.voucherCodeId) : undefined;
+    const vouchers = (d.voucherCodeIds ?? [])
+      .map((id) => unitMap.get(id))
+      .filter((u): u is VoucherUnitDoc => Boolean(u))
+      .map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null }));
     return toPurchaseView(d, {
       offerTitle: offer?.title ?? d.offerId,
       variantTitle: variant?.face_value !== undefined ? `₪${variant.face_value}` : d.variantId,
       faceValueAgorot: variant?.face_value !== undefined ? Math.round(variant.face_value * 100) : null,
       cardMask: cardMaskMap.get(d.cardId) ?? null,
-      voucher: unit ? { kind: unit.kind, value: unit.value, code: unit.code ?? null } : null,
+      vouchers,
     });
   });
 }

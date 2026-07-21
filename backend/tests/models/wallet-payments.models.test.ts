@@ -34,6 +34,7 @@ function purchaseDoc(overrides: Partial<WalletPurchase>): WalletPurchase {
     tenantId: null,
     offerId: 'offer1',
     variantId: 'var1',
+    quantity: 1,
     priceAgorot: 9000,
     currency: 'ILS',
     installments: 1,
@@ -41,8 +42,7 @@ function purchaseDoc(overrides: Partial<WalletPurchase>): WalletPurchase {
     paymeSaleId: null,
     paymeTransactionId: null,
     status: 'pending',
-    active: true,
-    voucherCodeId: null,
+    voucherCodeIds: [],
     receipt: null,
     createdAt: new Date(),
     paidAt: null,
@@ -50,23 +50,11 @@ function purchaseDoc(overrides: Partial<WalletPurchase>): WalletPurchase {
   };
 }
 
-describe('uniq_active_purchase_per_variant', () => {
-  it('rejects a second ACTIVE purchase of the same variant by the same identity', async () => {
+describe('walletPurchases', () => {
+  it('allows repeated purchases of the same variant by the same identity (no 1-per-variant limit)', async () => {
     const col = db.collection<WalletPurchase>(WALLET_PURCHASES_COLLECTION);
-    await col.insertOne(purchaseDoc({ identityId: 'dup1' }));
-    await expect(col.insertOne(purchaseDoc({ identityId: 'dup1' }))).rejects.toMatchObject({ code: 11000 });
-  });
-
-  it('allows a retry after a FAILED (inactive) attempt and other variants/identities', async () => {
-    const col = db.collection<WalletPurchase>(WALLET_PURCHASES_COLLECTION);
-    // failed attempt: no `active` field at all
-    const failed = purchaseDoc({ identityId: 'retry1', status: 'failed' });
-    delete failed.active;
-    await col.insertOne(failed);
-    // retry with active succeeds
-    await expect(col.insertOne(purchaseDoc({ identityId: 'retry1' }))).resolves.toBeTruthy();
-    // different variant + different identity both fine
-    await expect(col.insertOne(purchaseDoc({ identityId: 'retry1', variantId: 'var2' }))).resolves.toBeTruthy();
-    await expect(col.insertOne(purchaseDoc({ identityId: 'other' }))).resolves.toBeTruthy();
+    await expect(col.insertOne(purchaseDoc({ identityId: 'dup1' }))).resolves.toBeTruthy();
+    await expect(col.insertOne(purchaseDoc({ identityId: 'dup1' }))).resolves.toBeTruthy();
+    await expect(col.insertOne(purchaseDoc({ identityId: 'dup1', variantId: 'var2' }))).resolves.toBeTruthy();
   });
 });

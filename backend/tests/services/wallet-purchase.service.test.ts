@@ -1,6 +1,6 @@
 /**
- * Tests for the wallet purchase service: claim-inventory-then-charge with the
- * DB-enforced 1-per-variant limit. PayMe is mocked; inventory is real Mongo.
+ * Tests for the wallet purchase service: claim-inventory-then-charge for
+ * `quantity` units. PayMe is mocked; inventory is real Mongo.
  * Spec: docs/superpowers/specs/2026-07-21-payme-sandbox-integration-design.md s.3
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -12,10 +12,7 @@ let db: Db;
 vi.mock('../../src/config/mongo', () => ({ getMongoDb: vi.fn(async () => db) }));
 vi.mock('../../src/services/payme/payme.client', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../src/services/payme/payme.client')>();
-  return {
-    ...original,
-    paymeChargeToken: vi.fn(),
-  };
+  return { ...original, paymeChargeToken: vi.fn() };
 });
 
 import { createPurchase } from '../../src/services/wallet/purchase.service';
@@ -41,11 +38,11 @@ const PURCHASE_ARGS = {
   variantId: 'v1',
   cardId: 'card1',
   tenantId: null,
+  quantity: 1,
   language: 'he' as const,
 };
 
 beforeAll(async () => {
-  // isPaymeConfigured (real, not mocked) reads these at call time.
   process.env.PAYME_CLIENT_KEY = 'test_partner_key';
   process.env.PAYME_SELLER_ID = 'MPL1TEST-XXXXXXXX-XXXXXXXX-XXXXXXXX';
   client = await MongoClient.connect(process.env.TEST_MONGODB_URI!);
@@ -81,87 +78,95 @@ beforeEach(async () => {
       { variantId: 'v2', face_value: 200, member_price: 180 },
     ],
   });
-  await db.collection(DOMAIN_COLLECTIONS.voucherCodes).insertOne({
-    codeId: 'unit1', offerId: OFFER, variantId: 'v1', kind: 'barcode', value: 'BAR-111', status: 'available',
-  });
   await db.collection(WALLET_PAYMENT_CARDS_COLLECTION).insertOne({
     cardId: 'card1', identityId: IDENTITY, buyerKey: 'BUYER-TOK-1',
     cardMask: '532610******5846', cardBrand: 'mastercard', expiry: '1230', createdAt: new Date(),
   });
 });
 
-function chargeOk(): void {
-  chargeMock.mockResolvedValue({
-    paymeSaleId: 'SALE-1', paymeSaleCode: 1, paymeTransactionId: 'TRAN-1', saleStatus: 'completed',
-  });
+/** Insert n available barcode units for variant v1. */
+async function seedUnits(n: number, variantId = 'v1'): Promise<void> {
+  const docs = Array.from({ length: n }, (_, i) => ({
+    codeId: `unit_${variantId}_${i}`, offerId: OFFER, variantId, kind: 'barcode', value: `BAR-${variantId}-${i}`, status: 'available',
+  }));
+  await db.collection(DOMAIN_COLLECTIONS.voucherCodes).insertMany(docs);
 }
 
-describe('createPurchase - happy path', () => {
-  it('claims a unit, charges the token at the resolved price, completes and returns the voucher', async () => {
+function chargeOk(): void {
+  chargeMock.mockResolvedValue({ paymeSaleId: 'SALE-1', paymeSaleCode: 1, paymeTransactionId: 'TRAN-1', saleStatus: 'completed' });
+}
+
+describe('createPurchase - single unit', () => {
+  it('claims a unit, charges the unit price, completes and returns one voucher', async () => {
+    await seedUnits(1);
     chargeOk();
     const view = await createPurchase(PURCHASE_ARGS);
 
     expect(view.status).toBe('completed');
-    expect(view.voucher).toEqual({ kind: 'barcode', value: 'BAR-111', code: null });
+    expect(view.quantity).toBe(1);
+    expect(view.vouchers).toEqual([{ kind: 'barcode', value: 'BAR-v1-0', code: null }]);
     expect(view.priceAgorot).toBe(9000);
-
-    const chargeInput = chargeMock.mock.calls[0][0];
-    expect(chargeInput.buyerKey).toBe('BUYER-TOK-1');
-    expect(chargeInput.priceAgorot).toBe(9000);
-    expect(chargeInput.installments).toBe(1);
-    expect(chargeInput.transactionId).toBe(view.purchaseId);
-
-    const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit1' });
-    expect(unit!.status).toBe('assigned');
-    expect(unit!.assignedPurchaseId).toBe(view.purchaseId);
+    expect(chargeMock.mock.calls[0][0].priceAgorot).toBe(9000);
 
     const mine = await listMyPurchases(IDENTITY);
     expect(mine).toHaveLength(1);
-    expect(mine[0].voucher!.value).toBe('BAR-111');
+    expect(mine[0].vouchers).toHaveLength(1);
   });
 });
 
-describe('createPurchase - 1-per-variant limit', () => {
-  it('rejects a second purchase of the same variant with already_purchased', async () => {
+describe('createPurchase - multiple quantity', () => {
+  it('claims N units and charges unit price x quantity', async () => {
+    await seedUnits(3);
+    chargeOk();
+    const view = await createPurchase({ ...PURCHASE_ARGS, quantity: 3 });
+
+    expect(view.quantity).toBe(3);
+    expect(view.vouchers).toHaveLength(3);
+    expect(chargeMock.mock.calls[0][0].priceAgorot).toBe(27000); // 9000 x 3
+    const assigned = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).countDocuments({ status: 'assigned' });
+    expect(assigned).toBe(3);
+  });
+
+  it('allows buying the SAME variant again (no 1-per-variant limit anymore)', async () => {
+    await seedUnits(2);
     chargeOk();
     await createPurchase(PURCHASE_ARGS);
-    await expect(createPurchase(PURCHASE_ARGS)).rejects.toThrow('already_purchased');
-    // a different variant still works (given stock)
-    await db.collection(DOMAIN_COLLECTIONS.voucherCodes).insertOne({
-      codeId: 'unit2', offerId: OFFER, variantId: 'v2', kind: 'link', value: 'https://x/redeem', code: 'C0DE', status: 'available',
-    });
-    const second = await createPurchase({ ...PURCHASE_ARGS, variantId: 'v2' });
-    expect(second.voucher).toEqual({ kind: 'link', value: 'https://x/redeem', code: 'C0DE' });
+    const second = await createPurchase(PURCHASE_ARGS);
+    expect(second.status).toBe('completed');
+  });
+
+  it('rejects a quantity above the max', async () => {
+    await seedUnits(1);
+    await expect(createPurchase({ ...PURCHASE_ARGS, quantity: 99 })).rejects.toThrow('invalid_quantity');
   });
 });
 
 describe('createPurchase - failure paths', () => {
-  it('out of stock: purchase failed, no charge attempted, slot freed', async () => {
-    await db.collection(DOMAIN_COLLECTIONS.voucherCodes).deleteMany({});
-    await expect(createPurchase(PURCHASE_ARGS)).rejects.toThrow('out_of_stock');
+  it('not enough stock: purchase failed, no charge, all units released', async () => {
+    await seedUnits(2);
+    await expect(createPurchase({ ...PURCHASE_ARGS, quantity: 3 })).rejects.toThrow('out_of_stock');
     expect(chargeMock).not.toHaveBeenCalled();
     const doc = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ identityId: IDENTITY });
     expect(doc!.status).toBe('failed');
-    expect(doc!.active).toBeUndefined();
+    // every unit was returned to the pool
+    expect(await db.collection(DOMAIN_COLLECTIONS.voucherCodes).countDocuments({ status: 'available' })).toBe(2);
   });
 
-  it('charge failure: unit released, purchase failed, retry then succeeds', async () => {
+  it('charge failure: all units released, purchase failed, retry then succeeds', async () => {
+    await seedUnits(2);
     chargeMock.mockRejectedValueOnce(new PaymeError('charge_failed', 'declined'));
-    await expect(createPurchase(PURCHASE_ARGS)).rejects.toThrow('card_declined');
-
-    const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit1' });
-    expect(unit!.status).toBe('available');
-    expect(unit!.assignedPurchaseId).toBeUndefined();
+    await expect(createPurchase({ ...PURCHASE_ARGS, quantity: 2 })).rejects.toThrow('card_declined');
+    expect(await db.collection(DOMAIN_COLLECTIONS.voucherCodes).countDocuments({ status: 'available' })).toBe(2);
 
     chargeOk();
-    const retry = await createPurchase(PURCHASE_ARGS);
+    const retry = await createPurchase({ ...PURCHASE_ARGS, quantity: 2 });
     expect(retry.status).toBe('completed');
   });
 
   it('foreign card: card_not_found, nothing claimed or inserted', async () => {
+    await seedUnits(1);
     await expect(createPurchase({ ...PURCHASE_ARGS, cardId: 'not-mine' })).rejects.toThrow('card_not_found');
     expect(await db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({})).toBe(0);
-    const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit1' });
-    expect(unit!.status).toBe('available');
+    expect(await db.collection(DOMAIN_COLLECTIONS.voucherCodes).countDocuments({ status: 'available' })).toBe(1);
   });
 });

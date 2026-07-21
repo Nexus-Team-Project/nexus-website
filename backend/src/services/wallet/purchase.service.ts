@@ -25,6 +25,7 @@ import { getMongoDb } from '../../config/mongo';
 import { env } from '../../config/env';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import {
+  PURCHASE_MAX_QUANTITY,
   WALLET_PURCHASES_COLLECTION,
   type WalletPurchase,
   type WalletPurchaseStatus,
@@ -56,21 +57,44 @@ function voucherUnits(db: Db) {
 }
 
 async function markFailed(db: Db, purchaseId: string): Promise<void> {
-  await purchases(db).updateOne(
-    { purchaseId },
-    { $set: { status: 'failed' }, $unset: { active: '' } },
-  );
+  await purchases(db).updateOne({ purchaseId }, { $set: { status: 'failed' } });
 }
 
-async function releaseUnit(db: Db, codeId: string): Promise<void> {
-  await voucherUnits(db).updateOne(
-    { codeId },
+/** Return every unit claimed by a purchase back to the available pool. */
+async function releaseUnitsForPurchase(db: Db, purchaseId: string): Promise<void> {
+  await voucherUnits(db).updateMany(
+    { assignedPurchaseId: purchaseId },
     { $set: { status: 'available', updatedAt: new Date() }, $unset: { assignedPurchaseId: '' } },
   );
 }
 
 /**
- * Buys ONE unit of one voucher variant with a saved card.
+ * Atomically claim `quantity` available units of a variant for a purchase.
+ * Returns the claimed unit docs, or null when fewer than `quantity` are
+ * available (any partially-claimed units are released before returning).
+ */
+async function claimUnits(
+  db: Db,
+  args: { offerId: string; variantId: string; purchaseId: string; quantity: number },
+): Promise<VoucherUnitDoc[] | null> {
+  const claimed: VoucherUnitDoc[] = [];
+  for (let i = 0; i < args.quantity; i += 1) {
+    const unit = await voucherUnits(db).findOneAndUpdate(
+      { offerId: args.offerId, variantId: args.variantId, status: 'available' },
+      { $set: { status: 'assigned', assignedPurchaseId: args.purchaseId, updatedAt: new Date() } },
+      { returnDocument: 'after' },
+    );
+    if (!unit) {
+      await releaseUnitsForPurchase(db, args.purchaseId);
+      return null;
+    }
+    claimed.push(unit);
+  }
+  return claimed;
+}
+
+/**
+ * Buys `quantity` units of one voucher variant with a saved card.
  * See the module doc for the exact flow + error codes.
  */
 export async function createPurchase(args: {
@@ -81,10 +105,16 @@ export async function createPurchase(args: {
   variantId: string;
   cardId: string;
   tenantId: string | null;
+  quantity: number;
   language: 'he' | 'en';
 }): Promise<PurchaseView> {
   const db = await getMongoDb();
   if (!isPaymeConfigured()) throw new Error('payment_unavailable');
+
+  const quantity = Math.floor(args.quantity);
+  if (!Number.isFinite(quantity) || quantity < 1 || quantity > PURCHASE_MAX_QUANTITY) {
+    throw new Error('invalid_quantity');
+  }
 
   // 1. Card ownership (throws card_not_found) + 2. server-side pricing.
   const card = await getCardForCharge(db, args.identityId, args.cardId);
@@ -94,8 +124,9 @@ export async function createPurchase(args: {
     variantId: args.variantId,
     tenantId: args.tenantId,
   });
+  const totalAgorot = offer.priceAgorot * quantity;
 
-  // 3. Pending purchase doc - the unique index enforces 1-per-variant.
+  // 3. Pending purchase doc.
   const purchaseId = randomUUID();
   const doc: WalletPurchase = {
     purchaseId,
@@ -103,6 +134,7 @@ export async function createPurchase(args: {
     tenantId: offer.tenantId,
     offerId: args.offerId,
     variantId: args.variantId,
+    quantity,
     priceAgorot: offer.priceAgorot,
     currency: 'ILS',
     installments: PURCHASE_INSTALLMENTS,
@@ -110,39 +142,29 @@ export async function createPurchase(args: {
     paymeSaleId: null,
     paymeTransactionId: null,
     status: 'pending',
-    active: true,
-    voucherCodeId: null,
+    voucherCodeIds: [],
     receipt: null,
     createdAt: new Date(),
     paidAt: null,
   };
-  try {
-    await purchases(db).insertOne(doc);
-  } catch (e) {
-    if (e instanceof Error && 'code' in e && (e as { code?: number }).code === 11000) {
-      throw new Error('already_purchased');
-    }
-    throw e;
-  }
+  await purchases(db).insertOne(doc);
 
-  // 4. Claim inventory BEFORE charging - never charge without stock.
-  const unit = await voucherUnits(db).findOneAndUpdate(
-    { offerId: args.offerId, variantId: args.variantId, status: 'available' },
-    { $set: { status: 'assigned', assignedPurchaseId: purchaseId, updatedAt: new Date() } },
-    { returnDocument: 'after' },
-  );
-  if (!unit) {
+  // 4. Claim `quantity` units BEFORE charging - never charge without stock.
+  const units = await claimUnits(db, { offerId: args.offerId, variantId: args.variantId, purchaseId, quantity });
+  if (!units) {
     await markFailed(db, purchaseId);
     throw new Error('out_of_stock');
   }
+  const voucherCodeIds = units.map((u) => u.codeId);
 
-  // 5. Charge the saved token.
+  // 5. Charge the saved token for the full quantity.
   try {
+    const productName = quantity > 1 ? `${offer.offerTitle} x${quantity}` : offer.offerTitle;
     const sale = await paymeChargeToken({
       buyerKey: card.buyerKey,
-      priceAgorot: offer.priceAgorot,
+      priceAgorot: totalAgorot,
       currency: 'ILS',
-      productName: offer.offerTitle,
+      productName,
       transactionId: purchaseId,
       callbackUrl: paymeCallbackUrl(),
       installments: PURCHASE_INSTALLMENTS,
@@ -158,7 +180,7 @@ export async function createPurchase(args: {
           status: 'completed' satisfies WalletPurchaseStatus,
           paymeSaleId: sale.paymeSaleId,
           paymeTransactionId: sale.paymeTransactionId,
-          voucherCodeId: unit.codeId,
+          voucherCodeIds,
           paidAt,
         },
       },
@@ -170,23 +192,24 @@ export async function createPurchase(args: {
         buyerName: args.name ?? args.email,
         buyerEmail: args.email,
         itemName: `${offer.offerTitle} ${offer.variantTitle}`,
+        quantity,
         cardMask: card.cardMask,
         language: args.language,
       });
     }
 
     return toPurchaseView(
-      { ...doc, status: 'completed', paymeSaleId: sale.paymeSaleId, paymeTransactionId: sale.paymeTransactionId, voucherCodeId: unit.codeId, paidAt },
+      { ...doc, status: 'completed', paymeSaleId: sale.paymeSaleId, paymeTransactionId: sale.paymeTransactionId, voucherCodeIds, paidAt },
       {
         offerTitle: offer.offerTitle,
         variantTitle: offer.variantTitle,
         faceValueAgorot: offer.faceValueAgorot,
         cardMask: card.cardMask,
-        voucher: { kind: unit.kind, value: unit.value, code: unit.code ?? null },
+        vouchers: units.map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null })),
       },
     );
   } catch (e) {
-    await releaseUnit(db, unit.codeId);
+    await releaseUnitsForPurchase(db, purchaseId);
     await markFailed(db, purchaseId);
     if (e instanceof PaymeError && e.code !== 'charge_failed') {
       // configuration/transport problems are not the buyer's card's fault
@@ -220,14 +243,16 @@ export async function handlePaymeCallback(body: Record<string, string>): Promise
     const price = Number(body.price ?? '');
     const saleId = body.payme_sale_id ?? '';
     const saleMatches = !purchase.paymeSaleId || purchase.paymeSaleId === saleId;
-    if (price !== purchase.priceAgorot || !saleId || !saleMatches) {
+    // PayMe reports the full charge (unit price x quantity); match on the total.
+    const expectedTotal = purchase.priceAgorot * purchase.quantity;
+    if (price !== expectedTotal || !saleId || !saleMatches) {
       console.warn(`[payme-callback] mismatch for ${purchaseId}: price=${price} sale=${saleId} - ignored`);
       return;
     }
 
     if (notifyType === 'sale-complete' && purchase.status === 'pending') {
       // The synchronous charge path may have raced or crashed - finish it here.
-      const unit = await voucherUnits(db).findOne({ assignedPurchaseId: purchaseId });
+      const units = await voucherUnits(db).find({ assignedPurchaseId: purchaseId }).toArray();
       await purchases(db).updateOne(
         { purchaseId, status: 'pending' },
         {
@@ -235,18 +260,16 @@ export async function handlePaymeCallback(body: Record<string, string>): Promise
             status: 'completed' satisfies WalletPurchaseStatus,
             paymeSaleId: saleId,
             paymeTransactionId: body.payme_transaction_id ?? null,
-            ...(unit ? { voucherCodeId: unit.codeId } : {}),
+            ...(units.length ? { voucherCodeIds: units.map((u) => u.codeId) } : {}),
             paidAt: new Date(),
           },
         },
       );
     } else if (notifyType === 'sale-failure' && purchase.status === 'pending') {
-      const unit = await voucherUnits(db).findOne({ assignedPurchaseId: purchaseId });
-      if (unit) await releaseUnit(db, unit.codeId);
+      await releaseUnitsForPurchase(db, purchaseId);
       await markFailed(db, purchaseId);
     } else if (notifyType === 'refund' && purchase.status === 'completed') {
-      // Refund policy is a pending management decision - mark refunded but
-      // KEEP `active` so the variant cannot be re-bought until decided.
+      // Refund policy is a pending management decision - mark refunded only.
       await purchases(db).updateOne(
         { purchaseId },
         { $set: { status: 'refunded' satisfies WalletPurchaseStatus } },

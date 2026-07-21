@@ -48,8 +48,10 @@ export interface SumitReceiptInput {
   customerName: string;
   customerEmail: string;
   itemName: string;
-  /** Decimal shekels (e.g. 90 or 90.5) - SUMIT convention, NOT agorot. */
+  /** Per-unit price in decimal shekels (e.g. 90 or 90.5) - NOT agorot. */
   priceShekels: number;
+  /** Units bought; the document total is priceShekels * quantity. Default 1. */
+  quantity?: number;
   cardLast4?: string;
   language: 'he' | 'en';
   /** Our purchaseId - stored on the document for correlation. */
@@ -81,6 +83,8 @@ export async function sumitCreateReceipt(
   const { companyId, apiKey, documentType } = readCreds();
   if (!isSumitConfigured()) throw new SumitError('sumit_not_configured', 'SUMIT env vars missing');
 
+  const quantity = input.quantity ?? 1;
+  const total = input.priceShekels * quantity;
   const body = {
     Credentials: { CompanyID: companyId, APIKey: apiKey },
     Details: {
@@ -103,15 +107,15 @@ export async function sumitCreateReceipt(
     },
     Items: [
       {
-        Quantity: 1,
+        Quantity: quantity,
         UnitPrice: input.priceShekels,
-        TotalPrice: input.priceShekels,
+        TotalPrice: total,
         Item: { Name: input.itemName, SearchMode: 0 },
       },
     ],
     Payments: [
       {
-        Amount: input.priceShekels,
+        Amount: total,
         ...(input.cardLast4 ? { Details_CreditCard: { Last4Digits: input.cardLast4 } } : {}),
       },
     ],

@@ -22,6 +22,9 @@ export interface PurchaseView {
   tenantId: string | null;
   offerTitle: string;
   variantTitle: string;
+  /** Units bought in this purchase. */
+  quantity: number;
+  /** Per-unit price in agorot; the total charged is priceAgorot * quantity. */
   priceAgorot: number;
   /** Variant face value in agorot (receipt cashback row), when known. */
   faceValueAgorot: number | null;
@@ -31,8 +34,8 @@ export interface PurchaseView {
   createdAt: string;
   /** Masked pan of the paying card (last-4 display); null if the card was deleted. */
   cardMask: string | null;
-  /** Present when completed - what the buyer redeems. */
-  voucher: PurchaseVoucherView | null;
+  /** Present when completed - the redeemable units (one per quantity). */
+  vouchers: PurchaseVoucherView[];
   hasReceipt: boolean;
 }
 
@@ -54,7 +57,7 @@ export interface PurchaseViewExtras {
   variantTitle: string;
   faceValueAgorot: number | null;
   cardMask: string | null;
-  voucher: PurchaseVoucherView | null;
+  vouchers: PurchaseVoucherView[];
 }
 
 /** Project a stored purchase + resolved extras into the client view. */
@@ -66,6 +69,7 @@ export function toPurchaseView(doc: WalletPurchase, extras: PurchaseViewExtras):
     tenantId: doc.tenantId,
     offerTitle: extras.offerTitle,
     variantTitle: extras.variantTitle,
+    quantity: doc.quantity,
     priceAgorot: doc.priceAgorot,
     faceValueAgorot: extras.faceValueAgorot,
     currency: doc.currency,
@@ -73,7 +77,7 @@ export function toPurchaseView(doc: WalletPurchase, extras: PurchaseViewExtras):
     paidAt: doc.paidAt ? doc.paidAt.toISOString() : null,
     createdAt: doc.createdAt.toISOString(),
     cardMask: extras.cardMask,
-    voucher: extras.voucher,
+    vouchers: extras.vouchers,
     hasReceipt: doc.receipt?.status === 'sent',
   };
 }

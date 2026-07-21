@@ -45,7 +45,10 @@ export interface WalletPurchaseReceipt {
   status: 'sent' | 'failed' | 'skipped';
 }
 
-/** One purchase attempt of one voucher variant by one wallet user. */
+/** Max units a single purchase may buy of one variant (stock still caps it). */
+export const PURCHASE_MAX_QUANTITY = 10;
+
+/** One purchase of one voucher variant (quantity units) by one wallet user. */
 export interface WalletPurchase {
   purchaseId: string;
   identityId: string;
@@ -53,6 +56,9 @@ export interface WalletPurchase {
   tenantId: string | null;
   offerId: string;
   variantId: string;
+  /** Number of voucher units bought in this purchase (1..PURCHASE_MAX_QUANTITY). */
+  quantity: number;
+  /** Per-unit price in agorot; the charge total is priceAgorot * quantity. */
   priceAgorot: number;
   currency: 'ILS';
   installments: number;
@@ -60,13 +66,8 @@ export interface WalletPurchase {
   paymeSaleId: string | null;
   paymeTransactionId: string | null;
   status: WalletPurchaseStatus;
-  /**
-   * Present (true) only while the purchase occupies the 1-per-variant slot
-   * (pending/completed/refunded). $unset on failure so retries are allowed.
-   */
-  active?: true;
-  /** The claimed voucherCodes unit (codeId), set once the charge succeeds. */
-  voucherCodeId: string | null;
+  /** The claimed voucherCodes units (codeIds), set once the charge succeeds. */
+  voucherCodeIds: string[];
   receipt: WalletPurchaseReceipt | null;
   createdAt: Date;
   paidAt: Date | null;
@@ -77,11 +78,6 @@ export async function ensureWalletPaymentIndexes(db: Db): Promise<void> {
   await db.collection(WALLET_PAYMENT_CARDS_COLLECTION).createIndex({ identityId: 1 }, { name: 'identity_lookup' });
 
   const purchases = db.collection(WALLET_PURCHASES_COLLECTION);
-  // THE 1-per-variant business rule, DB-enforced.
-  await purchases.createIndex(
-    { identityId: 1, offerId: 1, variantId: 1 },
-    { unique: true, partialFilterExpression: { active: true }, name: 'uniq_active_purchase_per_variant' },
-  );
   await purchases.createIndex({ identityId: 1, status: 1, createdAt: -1 }, { name: 'identity_status_lookup' });
   await purchases.createIndex({ paymeSaleId: 1 }, { name: 'payme_sale_lookup' });
 }

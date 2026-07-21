@@ -43,8 +43,8 @@ const PURCHASE = {
   paymeSaleId: 'SALE-1',
   paymeTransactionId: 'TRAN-1',
   status: 'completed',
-  active: true,
-  voucherCodeId: 'unit1',
+  quantity: 1,
+  voucherCodeIds: ['unit1'],
   receipt: null,
   createdAt: new Date(),
   paidAt: new Date(),
@@ -97,7 +97,7 @@ describe('issueReceiptForPurchase', () => {
     delete process.env.SUMIT_COMPANY_ID;
     delete process.env.SUMIT_API_KEY;
     await issueReceiptForPurchase({
-      purchaseId: 'p1', buyerName: 'X', buyerEmail: 'x@y.z', itemName: 'i', cardMask: '4111********1111', language: 'en',
+      purchaseId: 'p1', buyerName: 'X', buyerEmail: 'x@y.z', itemName: 'i', quantity: 1, cardMask: '4111********1111', language: 'en',
     });
     expect(createMock).not.toHaveBeenCalled();
     const doc = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
@@ -107,7 +107,7 @@ describe('issueReceiptForPurchase', () => {
   it('records failed and never throws when SUMIT errors', async () => {
     createMock.mockRejectedValue(new Error('sumit_error'));
     await expect(issueReceiptForPurchase({
-      purchaseId: 'p1', buyerName: 'X', buyerEmail: 'x@y.z', itemName: 'i', cardMask: '4111********1111', language: 'en',
+      purchaseId: 'p1', buyerName: 'X', buyerEmail: 'x@y.z', itemName: 'i', quantity: 1, cardMask: '4111********1111', language: 'en',
     })).resolves.toBeUndefined();
     const doc = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
     expect(doc!.receipt).toEqual({ documentId: null, documentNumber: null, status: 'failed' });

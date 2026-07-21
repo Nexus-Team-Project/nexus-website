@@ -23,6 +23,7 @@ const BASE_PURCHASE = {
   tenantId: null,
   offerId: 'o1',
   variantId: 'v1',
+  quantity: 1,
   priceAgorot: 9000,
   currency: 'ILS',
   installments: 1,
@@ -30,8 +31,7 @@ const BASE_PURCHASE = {
   paymeSaleId: 'SALE-1',
   paymeTransactionId: null,
   status: 'pending',
-  active: true,
-  voucherCodeId: null,
+  voucherCodeIds: [],
   receipt: null,
   createdAt: new Date(),
   paidAt: null,
@@ -75,7 +75,7 @@ describe('handlePaymeCallback', () => {
     const doc = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
     expect(doc!.status).toBe('completed');
     expect(doc!.paymeTransactionId).toBe('TRAN-1');
-    expect(doc!.voucherCodeId).toBe('unit1');
+    expect(doc!.voucherCodeIds).toEqual(['unit1']);
     expect(doc!.paidAt).toBeTruthy();
     // second delivery changes nothing
     await handlePaymeCallback(callbackBody());
@@ -91,20 +91,18 @@ describe('handlePaymeCallback', () => {
     expect(doc!.status).toBe('pending');
   });
 
-  it('sale-failure: pending fails, unit released, slot freed', async () => {
+  it('sale-failure: pending fails, claimed unit released', async () => {
     await handlePaymeCallback(callbackBody({ notify_type: 'sale-failure', sale_status: 'failed' }));
     const doc = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
     expect(doc!.status).toBe('failed');
-    expect(doc!.active).toBeUndefined();
     const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit1' });
     expect(unit!.status).toBe('available');
   });
 
-  it('refund: completed becomes refunded and KEEPS the slot occupied', async () => {
+  it('refund: completed becomes refunded', async () => {
     await handlePaymeCallback(callbackBody());
     await handlePaymeCallback(callbackBody({ notify_type: 'refund', sale_status: 'refunded' }));
     const doc = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
     expect(doc!.status).toBe('refunded');
-    expect(doc!.active).toBe(true);
   });
 });
