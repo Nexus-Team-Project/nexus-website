@@ -155,6 +155,18 @@ export async function ensureDomainIndexes(db: Db): Promise<void> {
       { status: 1, validUntil: 1 },
       { name: 'status_validUntil' },
     ),
+    // Back the catalog cashback sorts (cashback_desc / cashback_asc) on the
+    // stored BASE cashback range. Two indexes because each direction anchors on
+    // a different bound (desc -> max, asc -> min); nulls (no cashback) are
+    // pushed last at query time.
+    supply.nexusOffers.createIndex(
+      { status: 1, visibility: 1, cashbackMaxPct: -1 },
+      { name: 'status_visibility_cashbackMax' },
+    ),
+    supply.nexusOffers.createIndex(
+      { status: 1, visibility: 1, cashbackMinPct: 1 },
+      { name: 'status_visibility_cashbackMin' },
+    ),
     // Backs tags ANY-of filter ($in). Multikey index.
     supply.nexusOffers.createIndex(
       { tags: 1 },

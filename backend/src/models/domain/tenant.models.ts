@@ -116,6 +116,13 @@ export type TenantOwnerAssignment = z.infer<typeof tenantOwnerAssignmentSchema>;
 export const domainTenantSchema = z.object({
   tenantId: z.string().min(1),
   organizationName: z.string().min(1).max(255),
+  // MIRROR of tenantProfiles.businessDescription, kept in sync by the single
+  // profile write funnel (syncDomainTenantCoreDocs) so the catalog-search
+  // tenants_search Atlas index can cover name + description on ONE collection
+  // (M0 allows only 3 search indexes). Read tenantProfiles for the source of
+  // truth; this copy exists for search only. Backfilled by
+  // scripts/backfill-search-fields.ts.
+  businessDescription: z.string().max(2000).optional(),
   // Cloudinary URL of the organization logo (the PRISTINE original). Absent -> the
   // UI shows the tenant-name initials (only the Nexus ecosystem catalog uses Nexus logo).
   logoUrl: z.string().url().optional(),

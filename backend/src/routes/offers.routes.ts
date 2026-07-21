@@ -289,7 +289,18 @@ export const catalogListQuerySchema = z.object({
     (val) => val === 'true' || val === true ? true : val === 'false' || val === false ? false : val,
     z.boolean().optional(),
   ),
-  sort: z.enum(['newest', 'price_asc', 'price_desc', 'expiry_soon', 'expiry_far']).optional(),
+  /**
+   * Voucher stacking filter (wallet store): 'with' = at least one variant with
+   * voucherStackable true (offer-level fallback when no variants), 'without' =
+   * at least one false. Offers with no stackable signal match neither value.
+   */
+  stackable: z.enum(['with', 'without']).optional(),
+  sort: z.enum([
+    'newest', 'price_asc', 'price_desc', 'expiry_soon', 'expiry_far',
+    // Wallet store sorts: stored BASE cashback range (per-tenant effective values
+    // applied by the catalog-search module) and Hebrew-aware title order.
+    'cashback_desc', 'cashback_asc', 'title_asc',
+  ]).optional(),
 });
 
 /**

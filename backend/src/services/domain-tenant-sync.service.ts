@@ -87,6 +87,11 @@ export async function syncDomainTenantCoreDocs(input: DomainTenantCoreSyncInput)
         },
         $set: {
           organizationName: input.tenant.organizationName,
+          // Search mirror of tenantProfiles.businessDescription (see the model
+          // comment) - this funnel is the ONLY businessDescription write site,
+          // so mirroring here keeps the copy exact.
+          ...(input.tenant.businessDescription !== undefined
+            && { businessDescription: input.tenant.businessDescription }),
           status: mapLegacyTenantStatus(input.tenant.status),
           updatedAt: now,
         },
