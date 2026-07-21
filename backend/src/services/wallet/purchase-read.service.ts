@@ -11,7 +11,33 @@ import {
   WALLET_PURCHASES_COLLECTION,
   type WalletPurchase,
 } from '../../models/payments/wallet-payments.models';
+import { NOT_DELETED } from '../../models/domain/supply.models';
 import { toPurchaseView, type PurchaseView, type VoucherUnitDoc } from './purchase-view.helper';
+
+/**
+ * Available (unclaimed) voucher-unit counts per variant for one offer, for the
+ * wallet's quantity stepper cap. Non-sensitive (numbers only, never codes);
+ * returns {} for a missing/deleted/non-voucher offer. Gated by the caller
+ * route to an authenticated member.
+ */
+export async function getAvailableVariantStock(offerId: string): Promise<Record<string, number>> {
+  const db = await getMongoDb();
+  const offer = await db
+    .collection<{ executionType?: string }>(DOMAIN_COLLECTIONS.nexusOffers)
+    .findOne({ offerId, ...NOT_DELETED }, { projection: { executionType: 1 } });
+  if (!offer || (offer.executionType ?? 'voucher') !== 'voucher') return {};
+
+  const rows = await db
+    .collection(DOMAIN_COLLECTIONS.voucherCodes)
+    .aggregate<{ _id: string; n: number }>([
+      { $match: { offerId, status: 'available' } },
+      { $group: { _id: '$variantId', n: { $sum: 1 } } },
+    ])
+    .toArray();
+  const stock: Record<string, number> = {};
+  for (const row of rows) stock[row._id] = row.n;
+  return stock;
+}
 
 /**
  * Lists the caller's purchases (newest first): completed + refunded only

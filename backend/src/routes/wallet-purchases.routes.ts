@@ -19,7 +19,7 @@ import { getMongoDb } from '../config/mongo';
 import { getIdentityDomainCollections } from '../models/domain';
 import { PURCHASE_MAX_QUANTITY } from '../models/payments/wallet-payments.models';
 import { createPurchase } from '../services/wallet/purchase.service';
-import { listMyPurchases } from '../services/wallet/purchase-read.service';
+import { listMyPurchases, getAvailableVariantStock } from '../services/wallet/purchase-read.service';
 import { getReceiptPdf } from '../services/wallet/purchase-receipt.service';
 
 const router = Router();
@@ -100,6 +100,20 @@ router.post('/purchases', authenticate, async (req: Request, res: Response) => {
       return;
     }
     console.error('[wallet-purchases] create failed:', e);
+    res.status(500).json({ error: 'internal_error' });
+  }
+});
+
+router.get('/offers/:offerId/variant-stock', authenticate, async (req: Request, res: Response) => {
+  const offerId = req.params.offerId;
+  if (typeof offerId !== 'string' || offerId.length === 0 || offerId.length > 128) {
+    res.status(400).json({ error: 'invalid_offer_id' });
+    return;
+  }
+  try {
+    res.json({ stock: await getAvailableVariantStock(offerId) });
+  } catch (e) {
+    console.error('[wallet-purchases] variant-stock failed:', e);
     res.status(500).json({ error: 'internal_error' });
   }
 });
