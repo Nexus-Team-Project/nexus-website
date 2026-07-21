@@ -18,7 +18,8 @@ vi.mock('../../src/services/payme/payme.client', async (importOriginal) => {
   };
 });
 
-import { createPurchase, listMyPurchases } from '../../src/services/wallet/purchase.service';
+import { createPurchase } from '../../src/services/wallet/purchase.service';
+import { listMyPurchases } from '../../src/services/wallet/purchase-read.service';
 import { paymeChargeToken, PaymeError } from '../../src/services/payme/payme.client';
 import {
   ensureWalletPaymentIndexes,

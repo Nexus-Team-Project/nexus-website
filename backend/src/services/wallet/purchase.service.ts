@@ -33,43 +33,10 @@ import { paymeChargeToken, isPaymeConfigured, PaymeError } from '../payme/payme.
 import { getCardForCharge } from './payment-cards.service';
 import { resolvePurchaseOffer } from './purchase-pricing.helper';
 import { issueReceiptForPurchase } from './purchase-receipt.service';
+import { toPurchaseView, type PurchaseView, type VoucherUnitDoc } from './purchase-view.helper';
 
 /** Single seam for the future multi-installment support (spec: 1 for now). */
 export const PURCHASE_INSTALLMENTS = 1;
-
-export interface PurchaseVoucherView {
-  kind: 'barcode' | 'link';
-  value: string;
-  code: string | null;
-}
-
-export interface PurchaseView {
-  purchaseId: string;
-  offerId: string;
-  variantId: string;
-  tenantId: string | null;
-  offerTitle: string;
-  variantTitle: string;
-  priceAgorot: number;
-  currency: 'ILS';
-  status: WalletPurchaseStatus;
-  paidAt: string | null;
-  createdAt: string;
-  /** Present when completed - what the buyer redeems. */
-  voucher: PurchaseVoucherView | null;
-  hasReceipt: boolean;
-}
-
-interface VoucherUnitDoc {
-  codeId: string;
-  offerId: string;
-  variantId: string;
-  kind: 'barcode' | 'link';
-  value: string;
-  code?: string;
-  status: string;
-  assignedPurchaseId?: string;
-}
 
 /** Public URL PayMe posts the IPN to (env seam; tunnel in dev). */
 export function paymeCallbackUrl(): string {
@@ -100,28 +67,6 @@ async function releaseUnit(db: Db, codeId: string): Promise<void> {
     { codeId },
     { $set: { status: 'available', updatedAt: new Date() }, $unset: { assignedPurchaseId: '' } },
   );
-}
-
-function toView(doc: WalletPurchase, extras: {
-  offerTitle: string;
-  variantTitle: string;
-  voucher: PurchaseVoucherView | null;
-}): PurchaseView {
-  return {
-    purchaseId: doc.purchaseId,
-    offerId: doc.offerId,
-    variantId: doc.variantId,
-    tenantId: doc.tenantId,
-    offerTitle: extras.offerTitle,
-    variantTitle: extras.variantTitle,
-    priceAgorot: doc.priceAgorot,
-    currency: doc.currency,
-    status: doc.status,
-    paidAt: doc.paidAt ? doc.paidAt.toISOString() : null,
-    createdAt: doc.createdAt.toISOString(),
-    voucher: extras.voucher,
-    hasReceipt: doc.receipt?.status === 'sent',
-  };
 }
 
 /**
@@ -230,11 +175,13 @@ export async function createPurchase(args: {
       });
     }
 
-    return toView(
+    return toPurchaseView(
       { ...doc, status: 'completed', paymeSaleId: sale.paymeSaleId, paymeTransactionId: sale.paymeTransactionId, voucherCodeId: unit.codeId, paidAt },
       {
         offerTitle: offer.offerTitle,
         variantTitle: offer.variantTitle,
+        faceValueAgorot: offer.faceValueAgorot,
+        cardMask: card.cardMask,
         voucher: { kind: unit.kind, value: unit.value, code: unit.code ?? null },
       },
     );
@@ -308,42 +255,4 @@ export async function handlePaymeCallback(body: Record<string, string>): Promise
   } catch (e) {
     console.error('[payme-callback] handler error (ignored, 200 returned):', e);
   }
-}
-
-/**
- * Lists the caller's purchases (newest first) with display data + voucher
- * payloads for completed ones. Powers the wallet home flip-cards.
- */
-export async function listMyPurchases(identityId: string): Promise<PurchaseView[]> {
-  const db = await getMongoDb();
-  const docs = await purchases(db)
-    .find({ identityId, status: { $in: ['completed', 'refunded'] } })
-    .sort({ createdAt: -1 })
-    .toArray();
-  if (docs.length === 0) return [];
-
-  const offerIds = [...new Set(docs.map((d) => d.offerId))];
-  const codeIds = docs.map((d) => d.voucherCodeId).filter((id): id is string => Boolean(id));
-  const [offers, units] = await Promise.all([
-    db.collection(DOMAIN_COLLECTIONS.nexusOffers)
-      .find({ offerId: { $in: offerIds } })
-      .project<{ offerId: string; title: string; variants?: Array<{ variantId: string; face_value?: number }> }>({ offerId: 1, title: 1, 'variants.variantId': 1, 'variants.face_value': 1 })
-      .toArray(),
-    codeIds.length
-      ? voucherUnits(db).find({ codeId: { $in: codeIds } }).toArray()
-      : Promise.resolve([] as VoucherUnitDoc[]),
-  ]);
-  const offerMap = new Map(offers.map((o) => [o.offerId, o]));
-  const unitMap = new Map(units.map((u) => [u.codeId, u]));
-
-  return docs.map((d) => {
-    const offer = offerMap.get(d.offerId);
-    const variant = offer?.variants?.find((v) => v.variantId === d.variantId);
-    const unit = d.voucherCodeId ? unitMap.get(d.voucherCodeId) : undefined;
-    return toView(d, {
-      offerTitle: offer?.title ?? d.offerId,
-      variantTitle: variant?.face_value !== undefined ? `₪${variant.face_value}` : d.variantId,
-      voucher: unit ? { kind: unit.kind, value: unit.value, code: unit.code ?? null } : null,
-    });
-  });
 }

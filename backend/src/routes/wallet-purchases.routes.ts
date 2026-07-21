@@ -17,7 +17,8 @@ import { authenticate } from '../middleware/authenticate';
 import { apiLimiter } from '../middleware/rateLimiter';
 import { getMongoDb } from '../config/mongo';
 import { getIdentityDomainCollections } from '../models/domain';
-import { createPurchase, listMyPurchases } from '../services/wallet/purchase.service';
+import { createPurchase } from '../services/wallet/purchase.service';
+import { listMyPurchases } from '../services/wallet/purchase-read.service';
 import { getReceiptPdf } from '../services/wallet/purchase-receipt.service';
 
 const router = Router();

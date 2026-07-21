@@ -31,6 +31,8 @@ export interface ResolvedPurchaseOffer {
   offerTitle: string;
   variantTitle: string;
   priceAgorot: number;
+  /** The variant's face value in agorot (drives the receipt cashback row). */
+  faceValueAgorot: number | null;
   currency: 'ILS';
   createdByTenantId: string;
 }
@@ -109,6 +111,7 @@ export async function resolvePurchaseOffer(
     offerTitle: offer.title,
     variantTitle: variant.face_value !== undefined ? `₪${variant.face_value}` : args.variantId,
     priceAgorot: toAgorot(priceShekels),
+    faceValueAgorot: variant.face_value !== undefined ? toAgorot(variant.face_value) : null,
     currency: 'ILS',
     createdByTenantId: offer.createdByTenantId,
   };
