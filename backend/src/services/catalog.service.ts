@@ -186,6 +186,10 @@ export interface CatalogItem {
   implementationInstructions?: string;
   /** Optional https URL to a page listing participating branches. Voucher-only; null otherwise. */
   branchListUrl?: string | null;
+  /** Optional https URL to the voucher's regulations page (תקנון). Voucher-only; null otherwise. */
+  regulationsUrl?: string | null;
+  /** Optional https URL to the voucher's return policy page (מדיניות החזרות). Voucher-only; null otherwise. */
+  returnPolicyUrl?: string | null;
   /** Date the offer goes live. null = live immediately on approval. */
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Always null for vouchers. */
@@ -327,6 +331,8 @@ export function toItem(
     implementationLink: offer.implementationLink ?? null,
     implementationInstructions: offer.implementationInstructions ?? '',
     branchListUrl: offer.branchListUrl ?? null,
+    regulationsUrl: offer.regulationsUrl ?? null,
+    returnPolicyUrl: offer.returnPolicyUrl ?? null,
     validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
     defaultValidityType: offer.defaultValidityType ?? null,

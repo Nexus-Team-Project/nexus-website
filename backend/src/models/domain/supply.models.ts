@@ -390,6 +390,17 @@ export const nexusOfferSchema = z.object({
    */
   branchListUrl: z.string().url().nullable().optional(),
   /**
+   * Optional https:// URL to the voucher's regulations page (תקנון).
+   * Voucher-only; null for other offer types. Same validation contract as
+   * branchListUrl: https-only enforced at the route schema, well-formed URL here.
+   */
+  regulationsUrl: z.string().url().nullable().optional(),
+  /**
+   * Optional https:// URL to the voucher's return policy page (מדיניות החזרות).
+   * Voucher-only; null for other offer types. Same contract as branchListUrl.
+   */
+  returnPolicyUrl: z.string().url().nullable().optional(),
+  /**
    * Spec OfferVersion.valid_from - the offer is hidden from member catalogs
    * until this date. null means the offer is live as soon as it is approved.
    */

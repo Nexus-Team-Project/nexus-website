@@ -325,6 +325,10 @@ const createOfferSchema = z.object({
   // Voucher-only: optional https:// link to a page listing participating
   // branches/locations. Forced null server-side for non-voucher offers.
   branchListUrl: httpsUrlSchema.nullable().optional(),
+  // Voucher-only optional https:// links: regulations page (תקנון) and return
+  // policy page (מדיניות החזרות). Same contract as branchListUrl.
+  regulationsUrl: httpsUrlSchema.nullable().optional(),
+  returnPolicyUrl: httpsUrlSchema.nullable().optional(),
   // ISO string from multipart form; convert to Date in handler.
   // validFrom is optional - null/undefined means the offer goes live as soon as approved.
   // No future-date refinement on validFrom: setting it to today (or the past) is valid
@@ -412,6 +416,8 @@ const updateOfferSchema = z.object({
   implementationInstructions: z.string().max(4000).optional(),
   // Empty string from the edit form means "clear it" -> null.
   branchListUrl: z.preprocess((v) => (v === '' ? null : v), httpsUrlSchema.nullable().optional()),
+  regulationsUrl: z.preprocess((v) => (v === '' ? null : v), httpsUrlSchema.nullable().optional()),
+  returnPolicyUrl: z.preprocess((v) => (v === '' ? null : v), httpsUrlSchema.nullable().optional()),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
   // Voucher combine-with-promotions + background color (voucher-only).
