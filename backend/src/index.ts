@@ -22,6 +22,7 @@ import { ensureDomainIndexes } from './models/domain';
 import { ensureSearchIndexes, catalogSearchEngineName } from './services/catalog-search';
 import { ensureOnboardingIndexes } from './models/onboarding.models';
 import { ensureWalletMagicLinkIndexes } from './models/auth/wallet-magic-link.models';
+import { ensureWalletPaymentIndexes } from './models/payments/wallet-payments.models';
 import { ensureDefaultRolePermissions } from './services/domain-permissions.service';
 import { getSupplyDomainCollections } from './models/domain/supply.models';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
@@ -193,6 +194,7 @@ async function bootstrap() {
     await ensureOnboardingIndexes(mongoDb);
     await ensureDomainIndexes(mongoDb);
     await ensureWalletMagicLinkIndexes(mongoDb);
+    await ensureWalletPaymentIndexes(mongoDb);
     await ensureDefaultRolePermissions();
     // Catalog search: Atlas Search indexes exist only when the Atlas engine is
     // enabled (the commands are Atlas-only); either way, log the active engine

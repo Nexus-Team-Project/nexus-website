@@ -95,6 +95,24 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
 
+  // PayMe - the payment provider for all NEW payment work (wallet voucher
+  // purchases). Sandbox by default; production switch = change these values
+  // only (no code change). Spec: docs/superpowers/specs/2026-07-21-payme-sandbox-integration-design.md
+  PAYME_BASE_URL: z.string().trim().url().default('https://sandbox.payme.io/api'),
+  PAYME_CLIENT_KEY: z.string().min(1).optional(),
+  PAYME_CLIENT_SECRET: z.string().min(1).optional(),
+  PAYME_SELLER_ID: z.string().min(1).optional(),
+  // Public base URL PayMe posts IPN callbacks to (dev: a cloudflared/ngrok
+  // tunnel URL - PayMe rejects localhost). Falls back to BACKEND_URL.
+  PAYME_CALLBACK_BASE_URL: z.string().trim().url().optional(),
+
+  // SUMIT (OfficeGuy) - receipts for wallet purchases. Documents are created
+  // as DRAFTS outside production (safe testing against the real company).
+  SUMIT_COMPANY_ID: z.coerce.number().int().positive().optional(),
+  SUMIT_API_KEY: z.string().min(1).optional(),
+  // 1 = InvoiceAndReceipt (חשבונית מס קבלה), 2 = Receipt (קבלה).
+  SUMIT_DOCUMENT_TYPE: z.coerce.number().int().default(1),
+
   // Cloudinary — backend-only media storage (offer images). Never expose to frontend.
   // Format: cloudinary://api_key:api_secret@cloud_name
   CLOUDINARY_URL: z.string().min(1).optional(),
@@ -151,6 +169,8 @@ const optional = {
   'Web Push Notifications': env.VAPID_PUBLIC_KEY,
   'Cloudinary (offer image uploads)': env.CLOUDINARY_URL,
   'InforU SMS (wallet phone OTP)': env.INFORU_USER,
+  'PayMe payments (wallet purchases)': env.PAYME_CLIENT_KEY,
+  'SUMIT receipts (wallet purchases)': env.SUMIT_API_KEY,
 };
 for (const [feature, key] of Object.entries(optional)) {
   if (!key) console.warn(`⚠️  ${feature} disabled — env var not set`);

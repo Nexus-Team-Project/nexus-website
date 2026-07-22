@@ -31,7 +31,7 @@ import {
   type TenantOfferConfig,
   type ImageCropEntry,
 } from '../models/domain/supply.models';
-import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap } from './catalog-query.helper';
+import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap, markVoucherSoldOut } from './catalog-query.helper';
 import { searchCatalog, type TenantPriceOverride } from './catalog-search';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
@@ -669,6 +669,9 @@ export async function getMemberCatalogView(
     });
   });
 
+  // Real voucher stock overrides the offer-level isSoldOut so store tiles can
+  // show a sold-out badge (a voucher is sold out at 0 available units).
+  await markVoucherSoldOut(db, items);
   return { items, total };
 }
 
