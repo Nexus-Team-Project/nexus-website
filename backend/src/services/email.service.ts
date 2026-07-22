@@ -129,6 +129,16 @@ export function buildTenantEmailBannerHtml(tenantLogoUrl?: string | null): strin
 
 // ─── Unified send interface ──────────────────────────────────
 
+/** One file attached to an outgoing email. */
+export interface EmailAttachment {
+  /** File name shown to the recipient, e.g. 'receipt.pdf'. */
+  filename: string;
+  /** Raw file bytes. */
+  content: Buffer;
+  /** MIME type, e.g. 'application/pdf'. Defaults to octet-stream when omitted. */
+  contentType?: string;
+}
+
 export interface SendMailOptions {
   to: string;
   toName?: string;
@@ -138,6 +148,7 @@ export interface SendMailOptions {
   text?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  attachments?: EmailAttachment[];
   /** Label for logging (e.g. 'CUSTOMER', 'AI') */
   _label?: string;
 }
@@ -184,6 +195,13 @@ export async function sendMail(options: SendMailOptions): Promise<string | null>
         ...(references && { references }),
         ...(options.replyTo && { replyTo: options.replyTo }),
         ...(Object.keys(extraHeaders).length > 0 && { headers: extraHeaders }),
+        ...(options.attachments?.length && {
+          attachments: options.attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            contentType: a.contentType,
+          })),
+        }),
       });
 
       console.log(`✅  [${label}] SMTP sent — messageId: ${info.messageId ?? 'none'}`);
@@ -214,6 +232,14 @@ export async function sendMail(options: SendMailOptions): Promise<string | null>
       to: [{ name: options.toName ?? options.to, email: options.to }],
     };
     if (options.replyTo) emailPayload.reply_to = options.replyTo;
+    // SendPulse's documented attachment shape: an object mapping filename ->
+    // base64 content (not yet exercised against a live SendPulse account -
+    // verify the first real send with an attachment lands correctly).
+    if (options.attachments?.length) {
+      emailPayload.attachments = Object.fromEntries(
+        options.attachments.map((a) => [a.filename, a.content.toString('base64')]),
+      );
+    }
 
     const body = JSON.stringify({ email: emailPayload });
     const res = await fetch('https://api.sendpulse.com/smtp/emails', {
