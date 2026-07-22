@@ -1,8 +1,10 @@
 /**
  * Server-side price + eligibility resolution for a wallet voucher purchase.
  *
- * THE INVARIANT: the charged price must equal the price the wallet DISPLAYED.
- * The wallet has two feeds and this helper mirrors their pricing exactly:
+ * THE INVARIANT: the buyer is CHARGED the variant's FULL FACE VALUE (a ~500
+ * voucher costs ~500), and the gap down to the DISPLAYED sale price comes
+ * back as CASHBACK credited to their Nexus balance on completion. The sale
+ * price resolution mirrors the wallet's two feeds exactly:
  * - Tenant context (member catalog): offer must be ADOPTED by the tenant
  *   (active TenantOfferConfig); an adopter's per-variant override
  *   (variantPrices[variantId]) wins over the variant's base member_price -
@@ -10,6 +12,8 @@
  *   (mirrors catalog.service.getTenantCatalogView / toItem).
  * - Null tenant (Nexus/ecosystem catalog): ecosystem-active offers at base
  *   member_price, no overrides (mirrors getEcosystemCatalogView).
+ * A variant with no (positive) face value falls back to charging the sale
+ * price with zero cashback.
  *
  * Access gate reuses resolveMemberCatalogAccess (membership + active catalog)
  * for the tenant path; the ecosystem path only requires authentication.
@@ -31,7 +35,10 @@ export interface ResolvedPurchaseOffer {
   offerTitle: string;
   variantTitle: string;
   imageUrl: string | null;
+  /** Per-unit CHARGED price: the full face value (sale price when no face value). */
   priceAgorot: number;
+  /** Per-unit cashback (face value minus the displayed sale price), credited to the balance. */
+  cashbackAgorot: number;
   /** The variant's face value in agorot (drives the receipt cashback row). */
   faceValueAgorot: number | null;
   currency: 'ILS';
@@ -108,13 +115,20 @@ export async function resolvePurchaseOffer(
 
   if (priceShekels === undefined || priceShekels <= 0) throw new Error('not_purchasable');
 
+  // The buyer pays the FULL face value; the gap down to the displayed sale
+  // price is the cashback credited to their Nexus balance on completion.
+  const saleAgorot = toAgorot(priceShekels);
+  const faceValueAgorot = variant.face_value !== undefined ? toAgorot(variant.face_value) : null;
+  const chargeAgorot = faceValueAgorot !== null && faceValueAgorot > 0 ? faceValueAgorot : saleAgorot;
+
   return {
     tenantId: args.tenantId,
     offerTitle: offer.title,
     variantTitle: variant.face_value !== undefined ? `₪${variant.face_value}` : args.variantId,
     imageUrl: offer.imageUrl ?? null,
-    priceAgorot: toAgorot(priceShekels),
-    faceValueAgorot: variant.face_value !== undefined ? toAgorot(variant.face_value) : null,
+    priceAgorot: chargeAgorot,
+    cashbackAgorot: Math.max(0, chargeAgorot - saleAgorot),
+    faceValueAgorot,
     currency: 'ILS',
     createdByTenantId: offer.createdByTenantId,
   };

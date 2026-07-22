@@ -26,8 +26,10 @@ export interface PurchaseView {
   imageUrl: string | null;
   /** Units bought in this purchase. */
   quantity: number;
-  /** Per-unit price in agorot; the total charged is priceAgorot * quantity. */
+  /** Per-unit CHARGED price in agorot (the full face value); the total charged is priceAgorot * quantity. */
   priceAgorot: number;
+  /** Per-unit cashback in agorot credited to the Nexus balance on completion (0 on pre-cashback purchases). */
+  cashbackAgorot: number;
   /** Variant face value in agorot (receipt cashback row), when known. */
   faceValueAgorot: number | null;
   currency: 'ILS';
@@ -75,6 +77,7 @@ export function toPurchaseView(doc: WalletPurchase, extras: PurchaseViewExtras):
     imageUrl: extras.imageUrl,
     quantity: doc.quantity,
     priceAgorot: doc.priceAgorot,
+    cashbackAgorot: doc.cashbackAgorot ?? 0,
     faceValueAgorot: extras.faceValueAgorot,
     currency: doc.currency,
     status: doc.status,

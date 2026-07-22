@@ -1,8 +1,9 @@
 /**
- * Tests for the wallet purchase pricing helper: the server-resolved price the
- * buyer is charged must equal the price the wallet DISPLAYS - per-tenant
- * override for adopters, base member_price on the Nexus (ecosystem) catalog -
- * and access/purchasability gates must hold.
+ * Tests for the wallet purchase pricing helper: the buyer is CHARGED the
+ * variant's full FACE VALUE, and the gap down to the DISPLAYED sale price
+ * (per-tenant override for adopters, base member_price on the Nexus
+ * ecosystem catalog) is returned as cashbackAgorot - and the
+ * access/purchasability gates must hold.
  * Spec: docs/superpowers/specs/2026-07-21-payme-sandbox-integration-design.md s.3
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -71,28 +72,44 @@ beforeEach(async () => {
 });
 
 describe('resolvePurchaseOffer', () => {
-  it('tenant context: adopter override price wins, converted to agorot', async () => {
+  it('tenant context: charges face value; cashback = face minus adopter override', async () => {
     const res = await resolvePurchaseOffer(db, {
       identityId: IDENTITY, offerId: OFFER, variantId: 'v1', tenantId: TENANT,
     });
-    expect(res.priceAgorot).toBe(9500); // override 95 shekels
+    expect(res.priceAgorot).toBe(10000); // face value 100 shekels charged
+    expect(res.cashbackAgorot).toBe(500); // 100 - override 95
     expect(res.tenantId).toBe(TENANT);
     expect(res.offerTitle).toBe('Coffee voucher');
   });
 
-  it('tenant context: variant without override falls back to base member_price', async () => {
+  it('tenant context: variant without override - cashback from base member_price', async () => {
     const res = await resolvePurchaseOffer(db, {
       identityId: IDENTITY, offerId: OFFER, variantId: 'v2', tenantId: TENANT,
     });
-    expect(res.priceAgorot).toBe(18000);
+    expect(res.priceAgorot).toBe(20000); // face value 200 charged
+    expect(res.cashbackAgorot).toBe(2000); // 200 - base 180
   });
 
-  it('null tenant (Nexus catalog): base price, no overrides', async () => {
+  it('null tenant (Nexus catalog): face value charged, cashback from base price', async () => {
     const res = await resolvePurchaseOffer(db, {
       identityId: IDENTITY, offerId: OFFER, variantId: 'v1', tenantId: null,
     });
-    expect(res.priceAgorot).toBe(9000); // base 90 shekels, override ignored
+    expect(res.priceAgorot).toBe(10000); // face value charged
+    expect(res.cashbackAgorot).toBe(1000); // 100 - base 90, override ignored
     expect(res.tenantId).toBeNull();
+  });
+
+  it('variant without a face value falls back to the sale price with zero cashback', async () => {
+    await db.collection(DOMAIN_COLLECTIONS.nexusOffers).updateOne(
+      { offerId: OFFER },
+      { $set: { variants: [{ variantId: 'v1', member_price: 90 }] } },
+    );
+    const res = await resolvePurchaseOffer(db, {
+      identityId: IDENTITY, offerId: OFFER, variantId: 'v1', tenantId: null,
+    });
+    expect(res.priceAgorot).toBe(9000);
+    expect(res.cashbackAgorot).toBe(0);
+    expect(res.faceValueAgorot).toBeNull();
   });
 
   it('rejects a non-member of the tenant with no_catalog_access', async () => {

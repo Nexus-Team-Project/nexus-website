@@ -20,6 +20,7 @@ import { listMyPurchases } from '../../src/services/wallet/purchase-read.service
 import { paymeChargeToken, PaymeError } from '../../src/services/payme/payme.client';
 import {
   ensureWalletPaymentIndexes,
+  WALLET_BALANCES_COLLECTION,
   WALLET_PAYMENT_CARDS_COLLECTION,
   WALLET_PURCHASES_COLLECTION,
 } from '../../src/models/payments/wallet-payments.models';
@@ -62,6 +63,7 @@ beforeEach(async () => {
     DOMAIN_COLLECTIONS.voucherCodes,
     WALLET_PAYMENT_CARDS_COLLECTION,
     WALLET_PURCHASES_COLLECTION,
+    WALLET_BALANCES_COLLECTION,
   ]) {
     await db.collection(c).deleteMany({});
   }
@@ -96,8 +98,14 @@ function chargeOk(): void {
   chargeMock.mockResolvedValue({ paymeSaleId: 'SALE-1', paymeSaleCode: 1, paymeTransactionId: 'TRAN-1', saleStatus: 'completed' });
 }
 
+/** The buyer's current balance in agorot (0 when no doc yet). */
+async function balanceOf(identityId: string): Promise<number> {
+  const doc = await db.collection(WALLET_BALANCES_COLLECTION).findOne({ identityId });
+  return (doc?.balanceAgorot as number | undefined) ?? 0;
+}
+
 describe('createPurchase - single unit', () => {
-  it('claims a unit, charges the unit price, completes and returns one voucher', async () => {
+  it('claims a unit, charges the FULL face value, credits the cashback, completes', async () => {
     await seedUnits(1);
     chargeOk();
     const view = await createPurchase(PURCHASE_ARGS);
@@ -105,24 +113,28 @@ describe('createPurchase - single unit', () => {
     expect(view.status).toBe('completed');
     expect(view.quantity).toBe(1);
     expect(view.vouchers).toEqual([{ kind: 'barcode', value: 'BAR-v1-0', code: null }]);
-    expect(view.priceAgorot).toBe(9000);
-    expect(chargeMock.mock.calls[0][0].priceAgorot).toBe(9000);
+    expect(view.priceAgorot).toBe(10000); // face value 100 charged, not the 90 sale price
+    expect(view.cashbackAgorot).toBe(1000); // 100 - 90 credited back
+    expect(chargeMock.mock.calls[0][0].priceAgorot).toBe(10000);
+    expect(await balanceOf(IDENTITY)).toBe(1000);
 
     const mine = await listMyPurchases(IDENTITY);
     expect(mine).toHaveLength(1);
     expect(mine[0].vouchers).toHaveLength(1);
+    expect(mine[0].cashbackAgorot).toBe(1000);
   });
 });
 
 describe('createPurchase - multiple quantity', () => {
-  it('claims N units and charges unit price x quantity', async () => {
+  it('claims N units, charges face value x quantity and credits cashback x quantity', async () => {
     await seedUnits(3);
     chargeOk();
     const view = await createPurchase({ ...PURCHASE_ARGS, quantity: 3 });
 
     expect(view.quantity).toBe(3);
     expect(view.vouchers).toHaveLength(3);
-    expect(chargeMock.mock.calls[0][0].priceAgorot).toBe(27000); // 9000 x 3
+    expect(chargeMock.mock.calls[0][0].priceAgorot).toBe(30000); // face 10000 x 3
+    expect(await balanceOf(IDENTITY)).toBe(3000); // cashback 1000 x 3
     const assigned = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).countDocuments({ status: 'assigned' });
     expect(assigned).toBe(3);
   });
