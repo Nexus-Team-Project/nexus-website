@@ -30,6 +30,7 @@ export interface ResolvedPurchaseOffer {
   tenantId: string | null;
   offerTitle: string;
   variantTitle: string;
+  imageUrl: string | null;
   priceAgorot: number;
   /** The variant's face value in agorot (drives the receipt cashback row). */
   faceValueAgorot: number | null;
@@ -47,6 +48,7 @@ interface OfferDoc {
   validFrom?: Date | null;
   validUntil?: Date | null;
   variants?: Array<{ variantId: string; face_value?: number; member_price?: number }>;
+  imageUrl?: string;
 }
 
 /** Converts a shekel amount to integer agorot (90.5 -> 9050). */
@@ -110,6 +112,7 @@ export async function resolvePurchaseOffer(
     tenantId: args.tenantId,
     offerTitle: offer.title,
     variantTitle: variant.face_value !== undefined ? `₪${variant.face_value}` : args.variantId,
+    imageUrl: offer.imageUrl ?? null,
     priceAgorot: toAgorot(priceShekels),
     faceValueAgorot: variant.face_value !== undefined ? toAgorot(variant.face_value) : null,
     currency: 'ILS',

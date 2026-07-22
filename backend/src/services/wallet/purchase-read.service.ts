@@ -58,7 +58,7 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   const [offers, units, cards] = await Promise.all([
     db.collection(DOMAIN_COLLECTIONS.nexusOffers)
       .find({ offerId: { $in: offerIds } })
-      .project<{ offerId: string; title: string; variants?: Array<{ variantId: string; face_value?: number }> }>({ offerId: 1, title: 1, 'variants.variantId': 1, 'variants.face_value': 1 })
+      .project<{ offerId: string; title: string; imageUrl?: string; variants?: Array<{ variantId: string; face_value?: number }> }>({ offerId: 1, title: 1, imageUrl: 1, 'variants.variantId': 1, 'variants.face_value': 1 })
       .toArray(),
     codeIds.length
       ? db.collection<VoucherUnitDoc>(DOMAIN_COLLECTIONS.voucherCodes).find({ codeId: { $in: codeIds } }).toArray()
@@ -82,6 +82,7 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
     return toPurchaseView(d, {
       offerTitle: offer?.title ?? d.offerId,
       variantTitle: variant?.face_value !== undefined ? `₪${variant.face_value}` : d.variantId,
+      imageUrl: offer?.imageUrl ?? null,
       faceValueAgorot: variant?.face_value !== undefined ? Math.round(variant.face_value * 100) : null,
       cardMask: cardMaskMap.get(d.cardId) ?? null,
       vouchers,

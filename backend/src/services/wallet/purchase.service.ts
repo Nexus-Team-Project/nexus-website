@@ -185,6 +185,7 @@ export async function createPurchase(args: {
       {
         offerTitle: offer.offerTitle,
         variantTitle: offer.variantTitle,
+        imageUrl: offer.imageUrl,
         faceValueAgorot: offer.faceValueAgorot,
         cardMask: card.cardMask,
         vouchers: units.map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null })),

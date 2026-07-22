@@ -22,6 +22,8 @@ export interface PurchaseView {
   tenantId: string | null;
   offerTitle: string;
   variantTitle: string;
+  /** The offer's cover image (imageUrls[0] mirror); null when the offer has none. */
+  imageUrl: string | null;
   /** Units bought in this purchase. */
   quantity: number;
   /** Per-unit price in agorot; the total charged is priceAgorot * quantity. */
@@ -55,6 +57,7 @@ export interface VoucherUnitDoc {
 export interface PurchaseViewExtras {
   offerTitle: string;
   variantTitle: string;
+  imageUrl: string | null;
   faceValueAgorot: number | null;
   cardMask: string | null;
   vouchers: PurchaseVoucherView[];
@@ -69,6 +72,7 @@ export function toPurchaseView(doc: WalletPurchase, extras: PurchaseViewExtras):
     tenantId: doc.tenantId,
     offerTitle: extras.offerTitle,
     variantTitle: extras.variantTitle,
+    imageUrl: extras.imageUrl,
     quantity: doc.quantity,
     priceAgorot: doc.priceAgorot,
     faceValueAgorot: extras.faceValueAgorot,
