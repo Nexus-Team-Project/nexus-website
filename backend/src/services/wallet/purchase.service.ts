@@ -5,28 +5,28 @@
  *   1. Verify the card belongs to the caller (buyerKey stays server-side).
  *   2. Resolve price + eligibility server-side (purchase-pricing.helper -
  *      the charged price always equals the displayed price).
- *   3. Insert the `pending` purchase doc - the unique partial index
- *      `uniq_active_purchase_per_variant` enforces the 1-per-variant rule
- *      (duplicate -> already_purchased).
- *   4. Atomically claim ONE available voucherCodes unit (available->assigned).
- *      None -> purchase failed + out_of_stock (slot freed via $unset active).
+ *   3. Insert the `pending` purchase doc, then enforce the PER-CUSTOMER cap:
+ *      a customer may hold at most PURCHASE_MAX_QUANTITY units of one variant
+ *      across all their pending+completed purchases (refunded/failed free the
+ *      allowance). The recount runs AFTER the insert so two concurrent
+ *      purchases see each other's pending docs - over the cap -> the new
+ *      purchase is marked failed (quantity_limit) before anything is charged.
+ *   4. Atomically claim `quantity` available voucherCodes units
+ *      (available->assigned). Not enough -> purchase failed + out_of_stock.
  *   5. Charge the saved token via the PayMe client. Failure -> release the
- *      unit + mark failed (card_declined). Success -> completed + paidAt.
+ *      units + mark failed (card_declined). Success -> completed + paidAt.
  *   6. Receipt issuing (SUMIT) is fire-and-forget - a receipt failure never
  *      fails a purchase (purchase-receipt.service).
  *
  * Throws stable-coded Errors: card_not_found | offer_not_found |
- * variant_not_found | not_purchasable | no_catalog_access |
- * already_purchased | out_of_stock | card_declined | payment_unavailable.
+ * variant_not_found | not_purchasable | no_catalog_access | invalid_quantity |
+ * quantity_limit | out_of_stock | card_declined | payment_unavailable.
  */
 import { randomUUID } from 'crypto';
-import type { Db } from 'mongodb';
 import { getMongoDb } from '../../config/mongo';
 import { env } from '../../config/env';
-import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import {
   PURCHASE_MAX_QUANTITY,
-  WALLET_PURCHASES_COLLECTION,
   type WalletPurchase,
   type WalletPurchaseStatus,
 } from '../../models/payments/wallet-payments.models';
@@ -37,9 +37,11 @@ import {
   type VerifiedNotifyType,
 } from './payme-ipn-verify.helper';
 import { getCardForCharge } from './payment-cards.service';
+import { claimUnits, markFailed, purchases, releaseUnitsForPurchase, voucherUnits } from './purchase-inventory.helper';
+import { assertCustomerVariantCap } from './purchase-quantity.helper';
 import { resolvePurchaseOffer } from './purchase-pricing.helper';
 import { issueReceiptForPurchase } from './purchase-receipt.service';
-import { toPurchaseView, type PurchaseView, type VoucherUnitDoc } from './purchase-view.helper';
+import { toPurchaseView, type PurchaseView } from './purchase-view.helper';
 
 /** Single seam for the future multi-installment support (spec: 1 for now). */
 export const PURCHASE_INSTALLMENTS = 1;
@@ -52,50 +54,6 @@ export function paymeCallbackUrl(): string {
     ?? env.BACKEND_URL
     ?? 'http://localhost:3001';
   return `${base.replace(/\/$/, '')}/api/v1/payments/payme/callback`;
-}
-
-function purchases(db: Db) {
-  return db.collection<WalletPurchase>(WALLET_PURCHASES_COLLECTION);
-}
-function voucherUnits(db: Db) {
-  return db.collection<VoucherUnitDoc>(DOMAIN_COLLECTIONS.voucherCodes);
-}
-
-async function markFailed(db: Db, purchaseId: string): Promise<void> {
-  await purchases(db).updateOne({ purchaseId }, { $set: { status: 'failed' } });
-}
-
-/** Return every unit claimed by a purchase back to the available pool. */
-async function releaseUnitsForPurchase(db: Db, purchaseId: string): Promise<void> {
-  await voucherUnits(db).updateMany(
-    { assignedPurchaseId: purchaseId },
-    { $set: { status: 'available', updatedAt: new Date() }, $unset: { assignedPurchaseId: '' } },
-  );
-}
-
-/**
- * Atomically claim `quantity` available units of a variant for a purchase.
- * Returns the claimed unit docs, or null when fewer than `quantity` are
- * available (any partially-claimed units are released before returning).
- */
-async function claimUnits(
-  db: Db,
-  args: { offerId: string; variantId: string; purchaseId: string; quantity: number },
-): Promise<VoucherUnitDoc[] | null> {
-  const claimed: VoucherUnitDoc[] = [];
-  for (let i = 0; i < args.quantity; i += 1) {
-    const unit = await voucherUnits(db).findOneAndUpdate(
-      { offerId: args.offerId, variantId: args.variantId, status: 'available' },
-      { $set: { status: 'assigned', assignedPurchaseId: args.purchaseId, updatedAt: new Date() } },
-      { returnDocument: 'after' },
-    );
-    if (!unit) {
-      await releaseUnitsForPurchase(db, args.purchaseId);
-      return null;
-    }
-    claimed.push(unit);
-  }
-  return claimed;
 }
 
 /**
@@ -156,6 +114,17 @@ export async function createPurchase(args: {
   console.info(
     `[wallet-purchase] ${purchaseId} START identity=${args.identityId} offer=${args.offerId} variant=${args.variantId} qty=${quantity} unitPrice=${offer.priceAgorot} total=${totalAgorot} card=${card.cardId} tenant=${offer.tenantId ?? 'ecosystem'}`,
   );
+
+  // Per-customer cap (max PURCHASE_MAX_QUANTITY units of this variant across
+  // pending+completed purchases) - see purchase-quantity.helper for the
+  // insert-then-recount race reasoning. Throws quantity_limit.
+  await assertCustomerVariantCap(db, {
+    identityId: args.identityId,
+    offerId: args.offerId,
+    variantId: args.variantId,
+    purchaseId,
+    quantity,
+  });
 
   // 4. Claim `quantity` units BEFORE charging - never charge without stock.
   const units = await claimUnits(db, { offerId: args.offerId, variantId: args.variantId, purchaseId, quantity });

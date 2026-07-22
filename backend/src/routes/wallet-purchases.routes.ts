@@ -1,14 +1,15 @@
 /**
  * Wallet voucher purchase routes (mounted under /api/v1/wallet):
  *
- * POST /purchases                       - buy ONE unit of one variant with a saved card
+ * POST /purchases                       - buy `quantity` units of one variant with a saved card
  * GET  /purchases/mine                  - the caller's purchases (home flip-cards)
  * GET  /purchases/:purchaseId/receipt   - the caller's own receipt PDF (SUMIT proxy)
  *
  * Strictly caller-scoped: identity from the authenticated email, price
- * resolved server-side (client price is never trusted), the 1-per-variant
- * rule enforced by a unique DB index. Stable error codes map to HTTP:
- * already_purchased/out_of_stock -> 409, card_declined -> 402,
+ * resolved server-side (client price is never trusted), and the per-customer
+ * cap (max PURCHASE_MAX_QUANTITY units of one variant across pending+completed
+ * purchases) enforced in purchase.service. Stable error codes map to HTTP:
+ * not_purchasable/out_of_stock/quantity_limit -> 409, card_declined -> 402,
  * payment_unavailable -> 503, *_not_found -> 404, access -> 403.
  */
 import { Router, Request, Response } from 'express';
@@ -47,6 +48,7 @@ const PURCHASE_ERROR_STATUS: Record<string, number> = {
   not_purchasable: 409,
   no_catalog_access: 403,
   invalid_quantity: 400,
+  quantity_limit: 409,
   out_of_stock: 409,
   card_declined: 402,
   payment_unavailable: 503,

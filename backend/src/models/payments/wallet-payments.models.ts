@@ -6,12 +6,14 @@
  *   brand, expiry). SECURITY: `buyerKey` must never be serialized into any
  *   API response; routes return the PaymentCardView projection only.
  *
- * - `walletPurchases`: one doc per purchase ATTEMPT of a voucher variant.
- *   The business rule "a user may buy at most ONE unit of each variant" is
- *   enforced HERE, not just in UI/service code: a unique partial index on
- *   (identityId, offerId, variantId) filtered to docs carrying `active: true`.
- *   `active` is set on insert (pending) and kept while completed/refunded;
- *   it is $unset when a purchase fails, which frees the slot for a retry.
+ * - `walletPurchases`: one doc per purchase ATTEMPT of a voucher variant,
+ *   carrying `quantity` units (1..PURCHASE_MAX_QUANTITY). The business rule
+ *   "a customer may hold at most PURCHASE_MAX_QUANTITY units of one variant"
+ *   is cumulative across their pending+completed purchases and enforced
+ *   server-side in purchase.service (insert-then-recount; refunded/failed
+ *   purchases free the allowance). The old 1-per-variant unique partial
+ *   index (`uniq_active_purchase_per_variant` + `active` flag) was removed
+ *   with the multi-quantity change.
  *
  * Both collections are covered by services/account-deletion (counts+delete).
  * Spec: docs/superpowers/specs/2026-07-21-payme-sandbox-integration-design.md
@@ -59,7 +61,11 @@ export interface WalletPurchaseReceipt {
   status: 'sent' | 'failed' | 'skipped';
 }
 
-/** Max units a single purchase may buy of one variant (stock still caps it). */
+/**
+ * Max units of one variant PER CUSTOMER - both the cap of a single purchase
+ * AND the cumulative cap across a customer's pending+completed purchases of
+ * that variant (enforced in purchase.service; stock still caps below it).
+ */
 export const PURCHASE_MAX_QUANTITY = 5;
 
 /** One purchase of one voucher variant (quantity units) by one wallet user. */

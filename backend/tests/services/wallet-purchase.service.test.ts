@@ -141,6 +141,48 @@ describe('createPurchase - multiple quantity', () => {
   });
 });
 
+describe('createPurchase - per-customer cumulative cap', () => {
+  it('blocks a purchase that would push the customer past 5 units of one variant', async () => {
+    await seedUnits(6);
+    chargeOk();
+    await createPurchase({ ...PURCHASE_ARGS, quantity: 3 });
+    await expect(createPurchase({ ...PURCHASE_ARGS, quantity: 3 })).rejects.toThrow('quantity_limit');
+    // only the first purchase charged; the blocked one is failed with nothing claimed
+    expect(chargeMock).toHaveBeenCalledTimes(1);
+    expect(await db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({ status: 'failed' })).toBe(1);
+    expect(await db.collection(DOMAIN_COLLECTIONS.voucherCodes).countDocuments({ status: 'assigned' })).toBe(3);
+  });
+
+  it('allows reaching exactly 5 units across purchases', async () => {
+    await seedUnits(5);
+    chargeOk();
+    await createPurchase({ ...PURCHASE_ARGS, quantity: 3 });
+    const second = await createPurchase({ ...PURCHASE_ARGS, quantity: 2 });
+    expect(second.status).toBe('completed');
+  });
+
+  it('a refunded purchase frees the allowance', async () => {
+    await seedUnits(6);
+    chargeOk();
+    await createPurchase({ ...PURCHASE_ARGS, quantity: 5 });
+    await db.collection(WALLET_PURCHASES_COLLECTION).updateOne(
+      { identityId: IDENTITY, status: 'completed' },
+      { $set: { status: 'refunded' } },
+    );
+    const next = await createPurchase(PURCHASE_ARGS);
+    expect(next.status).toBe('completed');
+  });
+
+  it('the cap is per variant - a different variant is unaffected', async () => {
+    await seedUnits(5, 'v1');
+    await seedUnits(1, 'v2');
+    chargeOk();
+    await createPurchase({ ...PURCHASE_ARGS, quantity: 5 });
+    const other = await createPurchase({ ...PURCHASE_ARGS, variantId: 'v2' });
+    expect(other.status).toBe('completed');
+  });
+});
+
 describe('createPurchase - failure paths', () => {
   it('not enough stock: purchase failed, no charge, all units released', async () => {
     await seedUnits(2);
