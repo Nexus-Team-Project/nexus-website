@@ -14,7 +14,10 @@ let db: Db;
 vi.mock('../../src/config/mongo', () => ({ getMongoDb: vi.fn(async () => db) }));
 
 import { handlePaymeCallback } from '../../src/services/wallet/purchase.service';
-import { WALLET_PURCHASES_COLLECTION } from '../../src/models/payments/wallet-payments.models';
+import {
+  WALLET_BALANCES_COLLECTION,
+  WALLET_PURCHASES_COLLECTION,
+} from '../../src/models/payments/wallet-payments.models';
 import { DOMAIN_COLLECTIONS } from '../../src/models/domain/collections';
 
 const BASE_PURCHASE = {
@@ -25,6 +28,7 @@ const BASE_PURCHASE = {
   variantId: 'v1',
   quantity: 1,
   priceAgorot: 9000,
+  cashbackAgorot: 1000,
   currency: 'ILS',
   installments: 1,
   cardId: 'card1',
@@ -62,6 +66,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.collection(WALLET_PURCHASES_COLLECTION).deleteMany({});
   await db.collection(DOMAIN_COLLECTIONS.voucherCodes).deleteMany({});
+  await db.collection(WALLET_BALANCES_COLLECTION).deleteMany({});
   await db.collection(WALLET_PURCHASES_COLLECTION).insertOne({ ...BASE_PURCHASE });
   await db.collection(DOMAIN_COLLECTIONS.voucherCodes).insertOne({
     codeId: 'unit1', offerId: 'o1', variantId: 'v1', kind: 'barcode', value: 'BAR-1',
@@ -70,17 +75,22 @@ beforeEach(async () => {
 });
 
 describe('handlePaymeCallback', () => {
-  it('sale-complete: pending becomes completed with ids + claimed unit, idempotent', async () => {
+  it('sale-complete: pending becomes completed with ids + claimed unit, cashback credited once, idempotent', async () => {
     await handlePaymeCallback(callbackBody());
     const doc = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
     expect(doc!.status).toBe('completed');
     expect(doc!.paymeTransactionId).toBe('TRAN-1');
     expect(doc!.voucherCodeIds).toEqual(['unit1']);
     expect(doc!.paidAt).toBeTruthy();
-    // second delivery changes nothing
+    // the IPN completion credited the cashback to the buyer's balance
+    const balance = await db.collection(WALLET_BALANCES_COLLECTION).findOne({ identityId: 'id_buyer' });
+    expect(balance!.balanceAgorot).toBe(1000);
+    // second delivery changes nothing - and never double-credits
     await handlePaymeCallback(callbackBody());
     const again = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
     expect(again!.status).toBe('completed');
+    const balanceAgain = await db.collection(WALLET_BALANCES_COLLECTION).findOne({ identityId: 'id_buyer' });
+    expect(balanceAgain!.balanceAgorot).toBe(1000);
   });
 
   it('ignores unknown purchase ids and price mismatches', async () => {

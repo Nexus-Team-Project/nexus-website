@@ -5,7 +5,9 @@
  * balance, which reads as 0. `getBalance` therefore returns 0 for a brand-new
  * member without writing anything. `adjustBalance` is the ledger-ready mutator
  * (top-ups, gift credits, spend) - it upserts the doc and never lets the
- * balance go negative. Amounts are agorot end-to-end; the wallet renders ILS.
+ * balance go negative. `creditPurchaseCashback` is the purchase-completion
+ * credit (buyer paid full face value, the gap comes back here) - best-effort,
+ * never throws. Amounts are agorot end-to-end; the wallet renders ILS.
  */
 import type { Db } from 'mongodb';
 import { getMongoDb } from '../../config/mongo';
@@ -56,4 +58,29 @@ export async function adjustBalance(identityId: string, deltaAgorot: number): Pr
     { upsert: true },
   );
   return { balanceAgorot: next, currency: 'ILS' };
+}
+
+/**
+ * Credits a completed purchase's cashback (total agorot for the whole
+ * purchase) to the buyer's balance. Best-effort and NEVER throws: the charge
+ * already succeeded, so a failed credit is logged loudly for manual
+ * reconciliation instead of failing the purchase. No-op for amounts <= 0.
+ */
+export async function creditPurchaseCashback(args: {
+  identityId: string;
+  purchaseId: string;
+  cashbackAgorot: number;
+}): Promise<void> {
+  if (args.cashbackAgorot <= 0) return;
+  try {
+    const result = await adjustBalance(args.identityId, args.cashbackAgorot);
+    console.info(
+      `[wallet-balance] ${args.purchaseId} cashback CREDITED ${args.cashbackAgorot} agorot -> balance ${result.balanceAgorot}`,
+    );
+  } catch (e) {
+    console.error(
+      `[wallet-balance] ${args.purchaseId} cashback credit FAILED (${args.cashbackAgorot} agorot for ${args.identityId}) - reconcile manually:`,
+      e,
+    );
+  }
 }

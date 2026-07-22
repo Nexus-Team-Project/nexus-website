@@ -5,7 +5,9 @@
  * NEVER throws - any outcome is recorded on the purchase doc's `receipt`
  * field (`sent` | `failed` | `skipped`) so a purchase always succeeds or
  * fails on the payment alone, and failed receipts can be retried later.
- * SUMIT emails the receipt to the buyer itself (SendByEmail in the client).
+ * SUMIT's own SendByEmail flag is unverified end-to-end, so this ALSO sends
+ * our own purchase-confirmation email regardless of the SUMIT outcome above
+ * (sent/failed/skipped), attaching the SUMIT PDF only when it was issued.
  *
  * getReceiptPdf is the owner-scoped read behind
  * GET /api/v1/wallet/purchases/:purchaseId/receipt - SUMIT credentials never
@@ -21,6 +23,7 @@ import {
   type WalletPurchaseReceipt,
 } from '../../models/payments/wallet-payments.models';
 import { sumitCreateReceipt, sumitGetDocumentPdf, isSumitConfigured } from '../sumit/sumit.client';
+import { sendPurchaseConfirmationMessage } from '../email/wallet-purchase-confirmation-email.service';
 
 function purchases(db: Db) {
   return db.collection<WalletPurchase>(WALLET_PURCHASES_COLLECTION);
@@ -41,44 +44,58 @@ export async function issueReceiptForPurchase(args: {
   buyerName: string;
   buyerEmail: string;
   itemName: string;
+  offerTitle: string;
+  variantTitle: string;
   quantity: number;
+  totalShekels: number;
+  paidAt: Date;
   cardMask: string;
   language: 'he' | 'en';
 }): Promise<void> {
   const db = await getMongoDb();
+  // Bytes of the SUMIT PDF, when issuing succeeded - attached to our own
+  // confirmation email below.
+  let receiptPdf: Buffer | undefined;
+
   try {
     if (!isSumitConfigured()) {
       console.warn(`[wallet-receipt] ${args.purchaseId} SUMIT not configured - receipt skipped`);
       await storeReceipt(db, args.purchaseId, { documentId: null, documentNumber: null, status: 'skipped' });
-      return;
-    }
-    const purchase = await purchases(db).findOne({ purchaseId: args.purchaseId });
-    if (!purchase || purchase.status !== 'completed') {
-      console.warn(
-        `[wallet-receipt] ${args.purchaseId} not eligible (status=${purchase?.status ?? 'missing'}) - receipt skipped`,
-      );
-      return;
-    }
+    } else {
+      const purchase = await purchases(db).findOne({ purchaseId: args.purchaseId });
+      if (!purchase || purchase.status !== 'completed') {
+        console.warn(
+          `[wallet-receipt] ${args.purchaseId} not eligible (status=${purchase?.status ?? 'missing'}) - receipt skipped`,
+        );
+        // Anomaly, not a real completed purchase - no confirmation email either.
+        return;
+      }
 
-    const doc = await sumitCreateReceipt({
-      customerName: args.buyerName,
-      customerEmail: args.buyerEmail,
-      itemName: args.itemName,
-      // Purchases store integer agorot; SUMIT wants decimal shekels (per unit).
-      priceShekels: purchase.priceAgorot / 100,
-      quantity: args.quantity,
-      cardLast4: args.cardMask.slice(-4),
-      language: args.language,
-      externalReference: args.purchaseId,
-    });
-    await storeReceipt(db, args.purchaseId, {
-      documentId: doc.documentId,
-      documentNumber: doc.documentNumber,
-      status: 'sent',
-    });
-    console.info(
-      `[wallet-receipt] ${args.purchaseId} receipt SENT document=${doc.documentId ?? 'n/a'} number=${doc.documentNumber ?? 'n/a'}`,
-    );
+      const doc = await sumitCreateReceipt({
+        customerName: args.buyerName,
+        customerEmail: args.buyerEmail,
+        itemName: args.itemName,
+        // Purchases store integer agorot; SUMIT wants decimal shekels (per unit).
+        priceShekels: purchase.priceAgorot / 100,
+        quantity: args.quantity,
+        cardLast4: args.cardMask.slice(-4),
+        language: args.language,
+        externalReference: args.purchaseId,
+      });
+      await storeReceipt(db, args.purchaseId, {
+        documentId: doc.documentId,
+        documentNumber: doc.documentNumber,
+        status: 'sent',
+      });
+      console.info(
+        `[wallet-receipt] ${args.purchaseId} receipt SENT document=${doc.documentId ?? 'n/a'} number=${doc.documentNumber ?? 'n/a'}`,
+      );
+      try {
+        receiptPdf = await sumitGetDocumentPdf(doc.documentId);
+      } catch (pdfErr) {
+        console.error(`[wallet-receipt] ${args.purchaseId} could not fetch PDF for confirmation email:`, pdfErr);
+      }
+    }
   } catch (e) {
     console.error(
       `[wallet-receipt] issuing failed for ${args.purchaseId}: ${e instanceof Error ? e.message : String(e)}`,
@@ -88,6 +105,23 @@ export async function issueReceiptForPurchase(args: {
     } catch (storeErr) {
       console.error(`[wallet-receipt] could not record failure for ${args.purchaseId}:`, storeErr);
     }
+  }
+
+  try {
+    await sendPurchaseConfirmationMessage({
+      to: args.buyerEmail,
+      buyerName: args.buyerName,
+      offerTitle: args.offerTitle,
+      variantTitle: args.variantTitle,
+      quantity: args.quantity,
+      totalShekels: args.totalShekels,
+      cardLast4: args.cardMask.slice(-4),
+      paidAt: args.paidAt,
+      lang: args.language,
+      ...(receiptPdf && { receiptPdf }),
+    });
+  } catch (emailErr) {
+    console.error(`[wallet-receipt] ${args.purchaseId} confirmation email failed:`, emailErr);
   }
 }
 

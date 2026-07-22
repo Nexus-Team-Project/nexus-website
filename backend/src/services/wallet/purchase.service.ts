@@ -4,7 +4,8 @@
  * Flow (claim-inventory-THEN-charge, so we never charge without stock):
  *   1. Verify the card belongs to the caller (buyerKey stays server-side).
  *   2. Resolve price + eligibility server-side (purchase-pricing.helper -
- *      the charged price always equals the displayed price).
+ *      the charge is the variant's full face value; the displayed sale price
+ *      only determines the cashback).
  *   3. Insert the `pending` purchase doc, then enforce the PER-CUSTOMER cap:
  *      a customer may hold at most PURCHASE_MAX_QUANTITY units of one variant
  *      across all their pending+completed purchases (refunded/failed free the
@@ -13,9 +14,15 @@
  *      purchase is marked failed (quantity_limit) before anything is charged.
  *   4. Atomically claim `quantity` available voucherCodes units
  *      (available->assigned). Not enough -> purchase failed + out_of_stock.
- *   5. Charge the saved token via the PayMe client. Failure -> release the
- *      units + mark failed (card_declined). Success -> completed + paidAt.
- *   6. Receipt issuing (SUMIT) is fire-and-forget - a receipt failure never
+ *   5. Charge the saved token via the PayMe client for the FULL FACE VALUE
+ *      (see purchase-pricing.helper). Failure -> release the units + mark
+ *      failed (card_declined). Success -> completed + paidAt.
+ *   6. CASHBACK: the gap between the face value paid and the displayed sale
+ *      price is credited to the buyer's Nexus balance. Guarded by the
+ *      pending->completed transition so the sync path and the IPN fallback
+ *      never double-credit; a failed credit never fails the purchase
+ *      (creditPurchaseCashback logs it for reconciliation).
+ *   7. Receipt issuing (SUMIT) is fire-and-forget - a receipt failure never
  *      fails a purchase (purchase-receipt.service).
  *
  * Throws stable-coded Errors: card_not_found | offer_not_found |
@@ -36,6 +43,7 @@ import {
   verifyIpnAgainstPayme,
   type VerifiedNotifyType,
 } from './payme-ipn-verify.helper';
+import { creditPurchaseCashback } from './balance.service';
 import { getCardForCharge } from './payment-cards.service';
 import { claimUnits, markFailed, purchases, releaseUnitsForPurchase, voucherUnits } from './purchase-inventory.helper';
 import { assertCustomerVariantCap } from './purchase-quantity.helper';
@@ -99,6 +107,7 @@ export async function createPurchase(args: {
     variantId: args.variantId,
     quantity,
     priceAgorot: offer.priceAgorot,
+    cashbackAgorot: offer.cashbackAgorot,
     currency: 'ILS',
     installments: PURCHASE_INSTALLMENTS,
     cardId: card.cardId,
@@ -112,7 +121,7 @@ export async function createPurchase(args: {
   };
   await purchases(db).insertOne(doc);
   console.info(
-    `[wallet-purchase] ${purchaseId} START identity=${args.identityId} offer=${args.offerId} variant=${args.variantId} qty=${quantity} unitPrice=${offer.priceAgorot} total=${totalAgorot} card=${card.cardId} tenant=${offer.tenantId ?? 'ecosystem'}`,
+    `[wallet-purchase] ${purchaseId} START identity=${args.identityId} offer=${args.offerId} variant=${args.variantId} qty=${quantity} unitPrice=${offer.priceAgorot} total=${totalAgorot} unitCashback=${offer.cashbackAgorot} card=${card.cardId} tenant=${offer.tenantId ?? 'ecosystem'}`,
   );
 
   // Per-customer cap (max PURCHASE_MAX_QUANTITY units of this variant across
@@ -152,8 +161,10 @@ export async function createPurchase(args: {
       ...(args.email ? { buyerEmail: args.email } : {}),
     });
     const paidAt = new Date();
-    await purchases(db).updateOne(
-      { purchaseId },
+    // Guard on `pending` so a racing IPN completion wins exactly once - the
+    // cashback credit below runs only for the path that made the transition.
+    const completion = await purchases(db).updateOne(
+      { purchaseId, status: 'pending' },
       {
         $set: {
           status: 'completed' satisfies WalletPurchaseStatus,
@@ -167,14 +178,28 @@ export async function createPurchase(args: {
     console.info(
       `[wallet-purchase] ${purchaseId} COMPLETED sale=${sale.paymeSaleId} status=${sale.saleStatus} charged=${totalAgorot} agorot`,
     );
-    // 6. Receipt: fire-and-forget - a receipt failure never fails a purchase.
+    // 6. Cashback: the buyer paid the full face value - credit the gap to
+    // their Nexus balance (best-effort; never fails the purchase).
+    if (completion.modifiedCount === 1) {
+      await creditPurchaseCashback({
+        identityId: args.identityId,
+        purchaseId,
+        cashbackAgorot: offer.cashbackAgorot * quantity,
+      });
+    }
+    // 7. Receipt + confirmation email: fire-and-forget - neither failure
+    // fails a purchase.
     if (args.email) {
       void issueReceiptForPurchase({
         purchaseId,
         buyerName: args.name ?? args.email,
         buyerEmail: args.email,
         itemName: `${offer.offerTitle} ${offer.variantTitle}`,
+        offerTitle: offer.offerTitle,
+        variantTitle: offer.variantTitle,
         quantity,
+        totalShekels: totalAgorot / 100,
+        paidAt,
         cardMask: card.cardMask,
         language: args.language,
       });
@@ -186,6 +211,8 @@ export async function createPurchase(args: {
         offerTitle: offer.offerTitle,
         variantTitle: offer.variantTitle,
         imageUrl: offer.imageUrl,
+        createdByTenantName: offer.createdByTenantName,
+        createdByTenantLogoUrl: offer.createdByTenantLogoUrl,
         faceValueAgorot: offer.faceValueAgorot,
         cardMask: card.cardMask,
         vouchers: units.map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null })),
@@ -297,6 +324,15 @@ export async function handlePaymeCallback(body: Record<string, string>): Promise
           ? `[payme-callback] ${purchaseId} COMPLETED via IPN sale=${saleId} units=${units.length}`
           : `[payme-callback] ${purchaseId} sale-complete no-op (lost race, status already advanced)`,
       );
+      // The IPN path made the pending->completed transition, so it owns the
+      // cashback credit (the sync path's guarded update no-oped).
+      if (result.modifiedCount === 1) {
+        await creditPurchaseCashback({
+          identityId: purchase.identityId,
+          purchaseId,
+          cashbackAgorot: (purchase.cashbackAgorot ?? 0) * purchase.quantity,
+        });
+      }
     } else if (notifyType === 'sale-failure' && purchase.status === 'pending') {
       await releaseUnitsForPurchase(db, purchaseId);
       await markFailed(db, purchaseId);

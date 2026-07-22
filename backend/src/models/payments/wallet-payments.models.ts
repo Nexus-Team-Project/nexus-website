@@ -78,8 +78,14 @@ export interface WalletPurchase {
   variantId: string;
   /** Number of voucher units bought in this purchase (1..PURCHASE_MAX_QUANTITY). */
   quantity: number;
-  /** Per-unit price in agorot; the charge total is priceAgorot * quantity. */
+  /** Per-unit CHARGED price in agorot (the variant's full face value); the charge total is priceAgorot * quantity. */
   priceAgorot: number;
+  /**
+   * Per-unit cashback in agorot (face value minus the displayed sale price),
+   * credited to the buyer's Nexus balance when the purchase completes.
+   * Absent on pre-cashback purchases (reads as 0).
+   */
+  cashbackAgorot?: number;
   currency: 'ILS';
   installments: number;
   cardId: string;

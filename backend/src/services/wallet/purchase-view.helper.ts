@@ -24,10 +24,16 @@ export interface PurchaseView {
   variantTitle: string;
   /** The offer's cover image (imageUrls[0] mirror); null when the offer has none. */
   imageUrl: string | null;
+  /** The CREATOR tenant's display name ("NEXUS" for platform offers / missing tenants). */
+  createdByTenantName: string;
+  /** The creator tenant's logo; null when unset (render initials fallback). */
+  createdByTenantLogoUrl: string | null;
   /** Units bought in this purchase. */
   quantity: number;
-  /** Per-unit price in agorot; the total charged is priceAgorot * quantity. */
+  /** Per-unit CHARGED price in agorot (the full face value); the total charged is priceAgorot * quantity. */
   priceAgorot: number;
+  /** Per-unit cashback in agorot credited to the Nexus balance on completion (0 on pre-cashback purchases). */
+  cashbackAgorot: number;
   /** Variant face value in agorot (receipt cashback row), when known. */
   faceValueAgorot: number | null;
   currency: 'ILS';
@@ -58,6 +64,8 @@ export interface PurchaseViewExtras {
   offerTitle: string;
   variantTitle: string;
   imageUrl: string | null;
+  createdByTenantName: string;
+  createdByTenantLogoUrl: string | null;
   faceValueAgorot: number | null;
   cardMask: string | null;
   vouchers: PurchaseVoucherView[];
@@ -73,8 +81,11 @@ export function toPurchaseView(doc: WalletPurchase, extras: PurchaseViewExtras):
     offerTitle: extras.offerTitle,
     variantTitle: extras.variantTitle,
     imageUrl: extras.imageUrl,
+    createdByTenantName: extras.createdByTenantName,
+    createdByTenantLogoUrl: extras.createdByTenantLogoUrl,
     quantity: doc.quantity,
     priceAgorot: doc.priceAgorot,
+    cashbackAgorot: doc.cashbackAgorot ?? 0,
     faceValueAgorot: extras.faceValueAgorot,
     currency: doc.currency,
     status: doc.status,

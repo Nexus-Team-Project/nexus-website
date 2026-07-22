@@ -1657,14 +1657,14 @@ router.get(
         res.status(404).json({ error: 'Offer not found' });
         return;
       }
-      // Counts + per-variant validity batches ride one response: both are
-      // numbers/dates only (never code values), sharing the same exposure
-      // envelope, and the variant table consumes them together.
-      const [counts, validity] = await Promise.all([
+      // Counts (total + bought breakdown) + per-variant validity batches ride
+      // one response: all are numbers/dates only (never code values), sharing
+      // the same exposure envelope, and the variant table consumes them together.
+      const [inventory, validity] = await Promise.all([
         getOfferVariantInventoryCounts(req.params.offerId),
         getOfferVariantValiditySummaries(req.params.offerId),
       ]);
-      res.json({ counts, validity });
+      res.json({ counts: inventory.counts, bought: inventory.bought, validity });
     } catch (err) {
       next(err);
     }

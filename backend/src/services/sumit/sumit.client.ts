@@ -91,7 +91,7 @@ export async function sumitCreateReceipt(
       // Drafts outside production - never real numbered documents in dev.
       IsDraft: process.env.NODE_ENV !== 'production',
       Type: documentType,
-      Language: input.language,
+      Language: input.language === 'he' ? 'Hebrew' : 'English',
       Currency: 'ILS',
       ExternalReference: input.externalReference,
       Customer: {
