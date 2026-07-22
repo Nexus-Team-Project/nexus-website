@@ -58,7 +58,7 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   const [offers, units, cards] = await Promise.all([
     db.collection(DOMAIN_COLLECTIONS.nexusOffers)
       .find({ offerId: { $in: offerIds } })
-      .project<{ offerId: string; title: string; imageUrl?: string; variants?: Array<{ variantId: string; face_value?: number }> }>({ offerId: 1, title: 1, imageUrl: 1, 'variants.variantId': 1, 'variants.face_value': 1 })
+      .project<{ offerId: string; title: string; imageUrl?: string; createdByTenantId?: string; variants?: Array<{ variantId: string; face_value?: number }> }>({ offerId: 1, title: 1, imageUrl: 1, createdByTenantId: 1, 'variants.variantId': 1, 'variants.face_value': 1 })
       .toArray(),
     codeIds.length
       ? db.collection<VoucherUnitDoc>(DOMAIN_COLLECTIONS.voucherCodes).find({ codeId: { $in: codeIds } }).toArray()
@@ -72,9 +72,22 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   const unitMap = new Map(units.map((u) => [u.codeId, u]));
   const cardMaskMap = new Map(cards.map((c) => [c.cardId, c.cardMask]));
 
+  // Batch-join the CREATOR tenants (logo + name for the receipt/flip-card
+  // tile) in one query; a missing doc (NEXUS platform sentinel) reads NEXUS.
+  const creatorIds = [...new Set(offers.map((o) => o.createdByTenantId).filter((id): id is string => Boolean(id)))];
+  const creators = creatorIds.length
+    ? await db
+        .collection<{ tenantId: string; organizationName?: string; logoUrl?: string }>(DOMAIN_COLLECTIONS.domainTenants)
+        .find({ tenantId: { $in: creatorIds } })
+        .project<{ tenantId: string; organizationName?: string; logoUrl?: string }>({ tenantId: 1, organizationName: 1, logoUrl: 1 })
+        .toArray()
+    : [];
+  const creatorMap = new Map(creators.map((c) => [c.tenantId, c]));
+
   return docs.map((d) => {
     const offer = offerMap.get(d.offerId);
     const variant = offer?.variants?.find((v) => v.variantId === d.variantId);
+    const creator = offer?.createdByTenantId ? creatorMap.get(offer.createdByTenantId) : undefined;
     const vouchers = (d.voucherCodeIds ?? [])
       .map((id) => unitMap.get(id))
       .filter((u): u is VoucherUnitDoc => Boolean(u))
@@ -83,6 +96,8 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
       offerTitle: offer?.title ?? d.offerId,
       variantTitle: variant?.face_value !== undefined ? `₪${variant.face_value}` : d.variantId,
       imageUrl: offer?.imageUrl ?? null,
+      createdByTenantName: creator?.organizationName ?? 'NEXUS',
+      createdByTenantLogoUrl: creator?.logoUrl ?? null,
       faceValueAgorot: variant?.face_value !== undefined ? Math.round(variant.face_value * 100) : null,
       cardMask: cardMaskMap.get(d.cardId) ?? null,
       vouchers,

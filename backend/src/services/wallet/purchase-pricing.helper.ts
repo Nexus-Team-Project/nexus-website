@@ -43,6 +43,9 @@ export interface ResolvedPurchaseOffer {
   faceValueAgorot: number | null;
   currency: 'ILS';
   createdByTenantId: string;
+  /** Creator tenant display fields for purchase views ("NEXUS" when no tenant doc). */
+  createdByTenantName: string;
+  createdByTenantLogoUrl: string | null;
 }
 
 interface OfferDoc {
@@ -121,6 +124,12 @@ export async function resolvePurchaseOffer(
   const faceValueAgorot = variant.face_value !== undefined ? toAgorot(variant.face_value) : null;
   const chargeAgorot = faceValueAgorot !== null && faceValueAgorot > 0 ? faceValueAgorot : saleAgorot;
 
+  // Creator tenant display fields (purchase views render its logo/name). A
+  // missing doc (NEXUS platform sentinel) falls back to the "NEXUS" name.
+  const creator = await db
+    .collection<{ organizationName?: string; logoUrl?: string }>(DOMAIN_COLLECTIONS.domainTenants)
+    .findOne({ tenantId: offer.createdByTenantId }, { projection: { organizationName: 1, logoUrl: 1 } });
+
   return {
     tenantId: args.tenantId,
     offerTitle: offer.title,
@@ -131,5 +140,7 @@ export async function resolvePurchaseOffer(
     faceValueAgorot,
     currency: 'ILS',
     createdByTenantId: offer.createdByTenantId,
+    createdByTenantName: creator?.organizationName ?? 'NEXUS',
+    createdByTenantLogoUrl: creator?.logoUrl ?? null,
   };
 }
