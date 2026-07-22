@@ -48,11 +48,17 @@ export async function issueReceiptForPurchase(args: {
   const db = await getMongoDb();
   try {
     if (!isSumitConfigured()) {
+      console.warn(`[wallet-receipt] ${args.purchaseId} SUMIT not configured - receipt skipped`);
       await storeReceipt(db, args.purchaseId, { documentId: null, documentNumber: null, status: 'skipped' });
       return;
     }
     const purchase = await purchases(db).findOne({ purchaseId: args.purchaseId });
-    if (!purchase || purchase.status !== 'completed') return;
+    if (!purchase || purchase.status !== 'completed') {
+      console.warn(
+        `[wallet-receipt] ${args.purchaseId} not eligible (status=${purchase?.status ?? 'missing'}) - receipt skipped`,
+      );
+      return;
+    }
 
     const doc = await sumitCreateReceipt({
       customerName: args.buyerName,
@@ -70,6 +76,9 @@ export async function issueReceiptForPurchase(args: {
       documentNumber: doc.documentNumber,
       status: 'sent',
     });
+    console.info(
+      `[wallet-receipt] ${args.purchaseId} receipt SENT document=${doc.documentId ?? 'n/a'} number=${doc.documentNumber ?? 'n/a'}`,
+    );
   } catch (e) {
     console.error(
       `[wallet-receipt] issuing failed for ${args.purchaseId}: ${e instanceof Error ? e.message : String(e)}`,

@@ -78,6 +78,8 @@ router.post('/payment-cards', authenticate, async (req: Request, res: Response) 
     }
     const db = await getMongoDb();
     const card = await addCard(db, identityId, parsed.data);
+    // Never log the buyer_key token - card id + brand are enough.
+    console.info(`[wallet-payment-cards] saved card=${card.cardId} identity=${identityId} brand=${card.cardBrand}`);
     res.status(201).json({ card });
   } catch (e) {
     console.error('[wallet-payment-cards] add failed:', e);
@@ -99,6 +101,7 @@ router.delete('/payment-cards/:cardId', authenticate, async (req: Request, res: 
     }
     const db = await getMongoDb();
     await deleteCard(db, identityId, parsed.data);
+    console.info(`[wallet-payment-cards] deleted card=${parsed.data} identity=${identityId}`);
     res.json({ ok: true });
   } catch (e) {
     if (e instanceof Error && e.message === 'card_not_found') {

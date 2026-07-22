@@ -91,10 +91,12 @@ const paymeResponseSchema = z.object({
 type PaymeResponse = z.infer<typeof paymeResponseSchema>;
 
 /**
- * POST one PayMe API call and return the Zod-validated response.
- * @throws PaymeError payme_not_configured | payme_network_error | payme_http_<n> | payme_bad_response
+ * POST one PayMe API call and return the raw parsed JSON body.
+ * PayMe returns errors as HTTP 500 with a JSON body carrying status_code 1,
+ * so the body is parsed regardless of res.ok and the caller branches on it.
+ * @throws PaymeError payme_not_configured | payme_network_error
  */
-async function paymePost(path: string, body: Record<string, unknown>): Promise<PaymeResponse> {
+async function paymePostJson(path: string, body: Record<string, unknown>): Promise<unknown> {
   if (!isPaymeConfigured()) throw new PaymeError('payme_not_configured', 'PayMe env vars missing');
   const { base } = readCreds();
   const started = Date.now();
@@ -112,13 +114,19 @@ async function paymePost(path: string, body: Record<string, unknown>): Promise<P
     );
     throw new PaymeError('payme_network_error', 'PayMe request failed to send');
   }
+  return res.json().catch(() => null);
+}
 
-  // PayMe returns errors as HTTP 500 with a JSON body carrying status_code 1,
-  // so parse the body regardless of res.ok and let the caller branch on it.
-  const raw: unknown = await res.json().catch(() => null);
+/**
+ * POST one PayMe sale/refund API call and return the Zod-validated response.
+ * @throws PaymeError payme_not_configured | payme_network_error | payme_bad_response
+ */
+async function paymePost(path: string, body: Record<string, unknown>): Promise<PaymeResponse> {
+  const started = Date.now();
+  const raw = await paymePostJson(path, body);
   const parsed = paymeResponseSchema.safeParse(raw);
   if (!parsed.success) {
-    console.error(`[payme] ${path} HTTP ${res.status} unparseable body (${Date.now() - started}ms)`);
+    console.error(`[payme] ${path} unparseable body (${Date.now() - started}ms)`);
     throw new PaymeError('payme_bad_response', 'Unparseable PayMe response');
   }
   if (parsed.data.status_code !== 0) {
@@ -141,6 +149,10 @@ async function paymePost(path: string, body: Record<string, unknown>): Promise<P
  */
 export async function paymeChargeToken(input: PaymeChargeTokenInput): Promise<PaymeSaleResult> {
   const { sellerId } = readCreds();
+  // Never log buyer_key/buyer details - amount + our purchase id are enough.
+  console.info(
+    `[payme] charge start purchase=${input.transactionId} amount=${input.priceAgorot} agorot installments=${input.installments}`,
+  );
   const data = await paymePost('/generate-sale', {
     seller_payme_id: sellerId,
     sale_price: input.priceAgorot,
@@ -169,12 +181,71 @@ export async function paymeChargeToken(input: PaymeChargeTokenInput): Promise<Pa
   };
 }
 
+/** Normalized sale lookup used to verify IPN callbacks server-to-server. */
+export interface PaymeSaleLookup {
+  saleStatus: string;
+  priceAgorot: number;
+  currency: string;
+}
+
+/** Response shape of POST /get-sales (only the fields we consume). */
+const getSalesResponseSchema = z.object({
+  status_code: z.number(),
+  status_error_details: z.string().nullish(),
+  items: z
+    .array(
+      z.object({
+        sale_payme_id: z.string(),
+        sale_status: z.string(),
+        sale_price: z.number(),
+        sale_currency: z.string(),
+      }),
+    )
+    .nullish(),
+});
+
+/**
+ * Look up one sale by its PayMe sale id via POST /get-sales.
+ * Used to verify IPN callbacks: the callback payload is untrusted network
+ * input, while this call is authenticated by our client key - PayMe's answer
+ * is the source of truth for the sale's status and amount.
+ * Input: the payme_sale_id from the callback.
+ * Output: the normalized sale, or null when PayMe reports no such sale.
+ * @throws PaymeError payme_get_sales_failed | transport codes from paymePostJson.
+ */
+export async function paymeGetSale(paymeSaleId: string): Promise<PaymeSaleLookup | null> {
+  const { clientKey, sellerId } = readCreds();
+  const raw = await paymePostJson('/get-sales', {
+    payme_client_key: clientKey,
+    seller_payme_id: sellerId,
+    sale_payme_id: paymeSaleId,
+  });
+  const parsed = getSalesResponseSchema.safeParse(raw);
+  if (!parsed.success) {
+    console.error('[payme] /get-sales unparseable body');
+    throw new PaymeError('payme_bad_response', 'Unparseable PayMe get-sales response');
+  }
+  if (parsed.data.status_code !== 0) {
+    console.error(`[payme] /get-sales FAILED details="${parsed.data.status_error_details ?? ''}"`);
+    throw new PaymeError('payme_get_sales_failed', parsed.data.status_error_details ?? 'PayMe get-sales failed');
+  }
+  const item = (parsed.data.items ?? []).find((i) => i.sale_payme_id === paymeSaleId);
+  console.info(
+    `[payme] /get-sales OK sale=${paymeSaleId} found=${Boolean(item)} status=${item?.sale_status ?? 'n/a'} price=${item?.sale_price ?? 'n/a'}`,
+  );
+  if (!item) return null;
+  return { saleStatus: item.sale_status, priceAgorot: item.sale_price, currency: item.sale_currency };
+}
+
 /**
  * Refund a sale, fully (no amount) or partially (integer agorot).
  * @throws PaymeError refund_failed | transport codes.
  */
 export async function paymeRefundSale(input: PaymeRefundInput): Promise<{ saleStatus: string }> {
   const { clientKey, sellerId } = readCreds();
+  console.info(
+    `[payme] refund start sale=${input.paymeSaleId} amount=${input.refundAmountAgorot ?? 'FULL'}`,
+  );
   const data = await paymePost('/refund-sale', {
     payme_client_key: clientKey,
     seller_payme_id: sellerId,
