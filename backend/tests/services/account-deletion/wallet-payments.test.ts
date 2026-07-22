@@ -1,7 +1,9 @@
 /**
  * Tests that account deletion covers the wallet payments collections:
- * dry-run counts include the user's saved cards + purchases, and
- * deleteMongoUser removes them while other users' rows survive.
+ * dry-run counts include the user's saved cards + purchases, deleteMongoUser
+ * removes the cards, and purchases are RETAINED as audit records (buyer
+ * name/email snapshot backfilled + buyerDeletedAt stamped) while other
+ * users' rows are untouched.
  * Spec: docs/superpowers/specs/2026-07-21-payme-sandbox-integration-design.md s.2
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -57,14 +59,33 @@ describe('account deletion covers wallet payments', () => {
   it('counts the user cards + purchases in dry run', async () => {
     const counts = await collectMongoCounts(EMAIL, null);
     expect(counts.walletPaymentCards).toBe(1);
-    expect(counts.walletPurchases).toBe(1);
+    expect(counts.walletPurchasesRetained).toBe(1);
   });
 
-  it('deletes only the user rows', async () => {
-    await deleteMongoUser(EMAIL, null);
+  it('deletes the user cards but retains purchases as audit records', async () => {
+    await deleteMongoUser(EMAIL, { id: 'u1', email: EMAIL, fullName: 'Buyer Person' });
     expect(await db.collection(WALLET_PAYMENT_CARDS_COLLECTION).countDocuments({})).toBe(1);
-    expect(await db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({})).toBe(1);
     expect(await db.collection(WALLET_PAYMENT_CARDS_COLLECTION).countDocuments({ identityId: 'id_buyer' })).toBe(0);
-    expect(await db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({ identityId: 'id_buyer' })).toBe(0);
+    // Purchases survive, with the buyer snapshot backfilled + deletion stamped.
+    expect(await db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({})).toBe(2);
+    const retained = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
+    expect(retained?.buyerName).toBe('Buyer Person');
+    expect(retained?.buyerEmail).toBe(EMAIL);
+    expect(retained?.buyerDeletedAt).toBeInstanceOf(Date);
+  });
+
+  it('does not overwrite an existing purchase-time buyer snapshot', async () => {
+    await db.collection(WALLET_PURCHASES_COLLECTION).updateOne(
+      { purchaseId: 'p1' },
+      { $set: { buyerName: 'Original Name', buyerEmail: 'original@example.com' } },
+    );
+    await deleteMongoUser(EMAIL, { id: 'u1', email: EMAIL, fullName: 'Buyer Person' });
+    const retained = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p1' });
+    expect(retained?.buyerName).toBe('Original Name');
+    expect(retained?.buyerEmail).toBe('original@example.com');
+    expect(retained?.buyerDeletedAt).toBeInstanceOf(Date);
+    // The other user's purchase is untouched.
+    const other = await db.collection(WALLET_PURCHASES_COLLECTION).findOne({ purchaseId: 'p2' });
+    expect(other?.buyerDeletedAt).toBeUndefined();
   });
 });

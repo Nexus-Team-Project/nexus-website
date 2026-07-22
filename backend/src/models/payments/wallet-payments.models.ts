@@ -15,7 +15,10 @@
  *   index (`uniq_active_purchase_per_variant` + `active` flag) was removed
  *   with the multi-quantity change.
  *
- * Both collections are covered by services/account-deletion (counts+delete).
+ * Account deletion: `walletPaymentCards` + `walletBalances` are hard-deleted;
+ * `walletPurchases` are RETAINED as tenant/tax audit records (buyer name and
+ * email are snapshotted on the doc, `buyerDeletedAt` marks the account as
+ * gone) - see services/account-deletion/mongo.ts.
  * Spec: docs/superpowers/specs/2026-07-21-payme-sandbox-integration-design.md
  */
 import type { Db } from 'mongodb';
@@ -72,6 +75,15 @@ export const PURCHASE_MAX_QUANTITY = 5;
 export interface WalletPurchase {
   purchaseId: string;
   identityId: string;
+  /**
+   * Buyer snapshot for tenant/tax audit - stamped at purchase time so the
+   * record stays meaningful after the account (identity) is deleted.
+   * Absent on pre-snapshot purchases; account deletion backfills it.
+   */
+  buyerName?: string | null;
+  buyerEmail?: string | null;
+  /** Set by account deletion: the buyer's account no longer exists. */
+  buyerDeletedAt?: Date;
   /** Tenant context used for pricing; null = ecosystem/default pricing. */
   tenantId: string | null;
   offerId: string;
