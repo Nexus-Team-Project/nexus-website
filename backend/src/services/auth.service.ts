@@ -389,6 +389,49 @@ export async function googleAuthFromAccessToken(
 }
 
 /**
+ * Compare-and-swap token rotation: atomically revokes the given token row
+ * (only if it is still unrevoked) and inserts its replacement.
+ * Input: the token row id to rotate, the owning user, and request metadata.
+ * Output: fresh tokens, or null when a concurrent refresh won the race
+ * (the caller then follows the replacement chain).
+ *
+ * Deliberately NOT wrapped in a transaction: the conditional updateMany IS the
+ * concurrency guard, and dropping the interactive transaction removes the
+ * BEGIN/COMMIT + extra statement roundtrips that dominated /refresh latency on
+ * a remote Postgres. Tradeoff: if the insert below fails after the revoke
+ * committed, the replacement chain points at a row that never appears and the
+ * next refresh bulk-revokes (forced re-login) - acceptable for an
+ * insert-failure case that means the DB is erroring anyway.
+ */
+async function rotateRefreshToken(
+  tokenId: string,
+  user: { id: string; email: string; role: string },
+  meta: { userAgent?: string; ipAddress?: string },
+) {
+  const newRawToken = generateToken(64);
+  const newTokenHash = hashToken(newRawToken);
+
+  const claimed = await prisma.refreshToken.updateMany({
+    where: { id: tokenId, revokedAt: null },
+    data: { revokedAt: new Date(), replacedByTokenHash: newTokenHash },
+  });
+  if (claimed.count === 0) return null;
+
+  const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
+  await prisma.refreshToken.create({
+    data: {
+      tokenHash: newTokenHash,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      userAgent: meta.userAgent,
+      ipAddress: meta.ipAddress,
+    },
+  });
+
+  return { accessToken, rawRefreshToken: newRawToken, userId: user.id };
+}
+
+/**
  * Rotates a refresh token and returns new tokens.
  * Handles benign concurrent-refresh races via a replacement chain + grace window:
  * if two tabs call /refresh at the same time, the second call finds the first
@@ -398,6 +441,9 @@ export async function googleAuthFromAccessToken(
  * bulk-revokes all user tokens as a security response.
  * Input: raw token from the httpOnly refresh cookie and request metadata.
  * Output: fresh access token, new raw refresh token, and the user ID.
+ *
+ * Happy path is 3 sequential Postgres statements (find token+user, CAS revoke,
+ * insert replacement) with no transaction wrapper - see rotateRefreshToken.
  */
 export async function refreshTokens(
   rawToken: string,
@@ -405,87 +451,60 @@ export async function refreshTokens(
 ) {
   const tokenHash = hashToken(rawToken);
 
-  return prisma.$transaction(async (tx) => {
-    const stored = await tx.refreshToken.findUnique({ where: { tokenHash } });
-
-    // Token not found or expired — straightforward rejection, no cascade.
-    if (!stored) throw createError('Invalid refresh token', 401);
-    if (stored.expiresAt < new Date()) throw createError('Refresh token expired', 401);
-
-    if (!stored.revokedAt) {
-      // Happy path: token is valid. Rotate it — mark revoked, point to new token.
-      const newRawToken = generateToken(64);
-      const newTokenHash = hashToken(newRawToken);
-
-      await tx.refreshToken.update({
-        where: { id: stored.id },
-        data: { revokedAt: new Date(), replacedByTokenHash: newTokenHash },
-      });
-
-      const user = await tx.user.findUnique({ where: { id: stored.userId } });
-      if (!user) throw createError('User not found', 401);
-
-      const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
-      await tx.refreshToken.create({
-        data: {
-          tokenHash: newTokenHash,
-          userId: user.id,
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-          userAgent: meta.userAgent,
-          ipAddress: meta.ipAddress,
-        },
-      });
-
-      return { accessToken, rawRefreshToken: newRawToken, userId: user.id };
-    }
-
-    // Token is revoked. Check if this is a benign race via the replacement chain.
-    if (stored.replacedByTokenHash) {
-      const replacement = await tx.refreshToken.findUnique({
-        where: { tokenHash: stored.replacedByTokenHash },
-      });
-
-      const withinGrace =
-        replacement &&
-        !replacement.revokedAt &&
-        replacement.createdAt.getTime() > Date.now() - REPLACEMENT_GRACE_MS;
-
-      if (withinGrace && replacement) {
-        // Benign race: rotate the replacement and return fresh tokens.
-        const newRawToken = generateToken(64);
-        const newTokenHash = hashToken(newRawToken);
-
-        await tx.refreshToken.update({
-          where: { id: replacement.id },
-          data: { revokedAt: new Date(), replacedByTokenHash: newTokenHash },
-        });
-
-        const user = await tx.user.findUnique({ where: { id: stored.userId } });
-        if (!user) throw createError('User not found', 401);
-
-        const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
-        await tx.refreshToken.create({
-          data: {
-            tokenHash: newTokenHash,
-            userId: user.id,
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            userAgent: meta.userAgent,
-            ipAddress: meta.ipAddress,
-          },
-        });
-
-        return { accessToken, rawRefreshToken: newRawToken, userId: user.id };
-      }
-    }
-
-    // Revoked token outside the grace window — treat as token theft.
-    // Bulk-revoke all tokens for this user to force re-login everywhere.
-    await tx.refreshToken.updateMany({
-      where: { userId: stored.userId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-    throw createError('Invalid refresh token', 401);
+  // One roundtrip fetches the token AND its owner (required relation, cascade
+  // delete - the user always exists when the token does).
+  const stored = await prisma.refreshToken.findUnique({
+    where: { tokenHash },
+    include: { user: { select: { id: true, email: true, role: true } } },
   });
+
+  // Token not found or expired — straightforward rejection, no cascade.
+  if (!stored) throw createError('Invalid refresh token', 401);
+  if (stored.expiresAt < new Date()) throw createError('Refresh token expired', 401);
+
+  let revokedState: { revokedAt: Date | null; replacedByTokenHash: string | null } = stored;
+
+  if (!stored.revokedAt) {
+    // Happy path: token is valid. CAS-rotate it.
+    const rotated = await rotateRefreshToken(stored.id, stored.user, meta);
+    if (rotated) return rotated;
+    // Lost a concurrent-rotation race: re-read the now-revoked row and fall
+    // through to the replacement-chain handling below.
+    const reread = await prisma.refreshToken.findUnique({
+      where: { tokenHash },
+      select: { revokedAt: true, replacedByTokenHash: true },
+    });
+    if (!reread) throw createError('Invalid refresh token', 401);
+    revokedState = reread;
+  }
+
+  // Token is revoked. Check if this is a benign race via the replacement chain.
+  if (revokedState.replacedByTokenHash) {
+    const replacement = await prisma.refreshToken.findUnique({
+      where: { tokenHash: revokedState.replacedByTokenHash },
+    });
+
+    const withinGrace =
+      replacement &&
+      !replacement.revokedAt &&
+      replacement.createdAt.getTime() > Date.now() - REPLACEMENT_GRACE_MS;
+
+    if (withinGrace && replacement) {
+      // Benign race: rotate the replacement and return fresh tokens. A CAS
+      // loss here means yet another racer rotated it first - fall through to
+      // the theft response like any other revoked-without-chain state.
+      const rotated = await rotateRefreshToken(replacement.id, stored.user, meta);
+      if (rotated) return rotated;
+    }
+  }
+
+  // Revoked token outside the grace window — treat as token theft.
+  // Bulk-revoke all tokens for this user to force re-login everywhere.
+  await prisma.refreshToken.updateMany({
+    where: { userId: stored.userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  throw createError('Invalid refresh token', 401);
 }
 
 export async function logout(rawToken: string) {

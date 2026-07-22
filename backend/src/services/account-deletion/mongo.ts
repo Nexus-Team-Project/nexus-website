@@ -25,6 +25,11 @@ import { TENANT_JOIN_REQUEST_COLLECTION } from '../../models/auth/tenant-join-re
 import { TENANT_RATING_COLLECTION } from '../../models/domain/tenant-rating.models';
 import { SHORT_LINK_COLLECTION } from '../../models/domain/short-links.models';
 import {
+  WALLET_PAYMENT_CARDS_COLLECTION,
+  WALLET_PURCHASES_COLLECTION,
+  WALLET_BALANCES_COLLECTION,
+} from '../../models/payments/wallet-payments.models';
+import {
   resolveMongoDeletionTargets,
   resolveOrchestrationDeletionTargets,
 } from './targets';
@@ -121,6 +126,9 @@ export async function collectMongoCounts(
     tenantJoinRequestsForOwnedTenants,
     tenantRatingsByUser,
     tenantRatingsForOwnedTenants,
+    walletPaymentCards,
+    walletPurchases,
+    walletBalances,
     ownerAssignmentsCleared,
   ] = await Promise.all([
     identity.nexusIdentities.countDocuments({
@@ -279,6 +287,18 @@ export async function collectMongoCounts(
     db.collection(TENANT_RATING_COLLECTION).countDocuments({
       tenantId: { $in: targets.domainOwnedTenantIds },
     }),
+    // Saved wallet payment cards (PayMe buyer_key tokens) for this user.
+    db.collection(WALLET_PAYMENT_CARDS_COLLECTION).countDocuments({
+      identityId: { $in: targets.nexusIdentityIds },
+    }),
+    // Wallet voucher purchases made by this user.
+    db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({
+      identityId: { $in: targets.nexusIdentityIds },
+    }),
+    // Wallet balance doc for this user.
+    db.collection(WALLET_BALANCES_COLLECTION).countDocuments({
+      identityId: { $in: targets.nexusIdentityIds },
+    }),
     // Admin-created orgs where this user is the ASSIGNED owner: the tenant is
     // kept but its ownerAssignment is cleared (reverts to "no owner").
     tenants.domainTenants.countDocuments({
@@ -332,6 +352,9 @@ export async function collectMongoCounts(
     tenantJoinRequestsForOwnedTenants,
     tenantRatingsByUser,
     tenantRatingsForOwnedTenants,
+    walletPaymentCards,
+    walletPurchases,
+    walletBalances,
     ownerAssignmentsCleared,
   };
 }
@@ -412,6 +435,19 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
         : []),
     ],
   });
+
+  // Saved payment cards (PayMe tokens) + wallet purchases for this user.
+  if (targets.nexusIdentityIds.length > 0) {
+    await db.collection(WALLET_PAYMENT_CARDS_COLLECTION).deleteMany({
+      identityId: { $in: targets.nexusIdentityIds },
+    });
+    await db.collection(WALLET_PURCHASES_COLLECTION).deleteMany({
+      identityId: { $in: targets.nexusIdentityIds },
+    });
+    await db.collection(WALLET_BALANCES_COLLECTION).deleteMany({
+      identityId: { $in: targets.nexusIdentityIds },
+    });
+  }
 
   await orchestration.consumedEvents.deleteMany({ platformEventId: { $in: orchestrationTargets.platformEventIds } });
   await orchestration.platformEvents.deleteMany({ platformEventId: { $in: orchestrationTargets.platformEventIds } });

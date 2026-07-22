@@ -81,6 +81,10 @@ export interface CreateOfferInput {
   implementationInstructions?: string;
   /** Optional https:// link to a page listing participating branches. Voucher-only. */
   branchListUrl?: string | null;
+  /** Optional https:// link to the voucher's regulations page (תקנון). Voucher-only. */
+  regulationsUrl?: string | null;
+  /** Optional https:// link to the voucher's return policy page (מדיניות החזרות). Voucher-only. */
+  returnPolicyUrl?: string | null;
   /** Offer goes live on this date. null means immediately available after approval. */
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Ignored for vouchers (forced null). */
@@ -200,6 +204,10 @@ export interface UpdateOfferInput {
   implementationInstructions?: string;
   /** Updated branch-list link. null clears it. Voucher-only. */
   branchListUrl?: string | null;
+  /** Updated regulations link (תקנון). null clears it. Voucher-only. */
+  regulationsUrl?: string | null;
+  /** Updated return-policy link (מדיניות החזרות). null clears it. Voucher-only. */
+  returnPolicyUrl?: string | null;
   /** Updated offer go-live date. null clears the gate (immediately live). */
   validFrom?: Date | null;
   /** Updated offer expiry date. null clears the expiry. Ignored for vouchers (forced null). */
@@ -446,6 +454,9 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     implementationInstructions: input.implementationInstructions ?? '',
     // Branch list is the opposite of implementationLink: voucher-only.
     branchListUrl: isVoucher ? (input.branchListUrl ?? null) : null,
+    // Regulations + return-policy links follow the same voucher-only gate.
+    regulationsUrl: isVoucher ? (input.regulationsUrl ?? null) : null,
+    returnPolicyUrl: isVoucher ? (input.returnPolicyUrl ?? null) : null,
     validFrom: resolvedValidFrom,
     validUntil: resolvedValidUntil,
     // Legacy parent validity mirror is no longer populated (per-unit now).
@@ -722,8 +733,10 @@ export async function updateOffer(
     ...(isVoucherUpdate && { implementationLink: null }),
     ...(input.implementationInstructions !== undefined && { implementationInstructions: input.implementationInstructions }),
     ...(input.branchListUrl !== undefined && { branchListUrl: input.branchListUrl }),
-    // Branch list is voucher-only - force null when the merged type is not a voucher.
-    ...(!isVoucherUpdate && { branchListUrl: null }),
+    ...(input.regulationsUrl !== undefined && { regulationsUrl: input.regulationsUrl }),
+    ...(input.returnPolicyUrl !== undefined && { returnPolicyUrl: input.returnPolicyUrl }),
+    // These links are voucher-only - force null when the merged type is not a voucher.
+    ...(!isVoucherUpdate && { branchListUrl: null, regulationsUrl: null, returnPolicyUrl: null }),
     // Voucher/non-voucher expiry + validity normalization (computed above).
     ...validityUpdate,
     ...(input.terms !== undefined && { terms: input.terms }),

@@ -20,6 +20,7 @@
  */
 import { getMongoDb } from '../../config/mongo';
 import { getTenantDomainCollections } from '../../models/domain';
+import { markVoucherSoldOut } from '../catalog-query.helper';
 import { searchCatalog } from '../catalog-search';
 import { toItem, type CatalogQuery, type CatalogPage } from '../catalog.service';
 
@@ -66,5 +67,7 @@ export async function getEcosystemCatalogView(query: CatalogQuery): Promise<Cata
     }),
   );
 
+  // Real voucher stock overrides offer-level isSoldOut for store-tile badges.
+  await markVoucherSoldOut(db, items);
   return { items, total };
 }

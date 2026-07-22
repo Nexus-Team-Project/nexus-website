@@ -31,7 +31,7 @@ import {
   type TenantOfferConfig,
   type ImageCropEntry,
 } from '../models/domain/supply.models';
-import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap } from './catalog-query.helper';
+import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap, markVoucherSoldOut } from './catalog-query.helper';
 import { searchCatalog, type TenantPriceOverride } from './catalog-search';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
@@ -186,6 +186,10 @@ export interface CatalogItem {
   implementationInstructions?: string;
   /** Optional https URL to a page listing participating branches. Voucher-only; null otherwise. */
   branchListUrl?: string | null;
+  /** Optional https URL to the voucher's regulations page (תקנון). Voucher-only; null otherwise. */
+  regulationsUrl?: string | null;
+  /** Optional https URL to the voucher's return policy page (מדיניות החזרות). Voucher-only; null otherwise. */
+  returnPolicyUrl?: string | null;
   /** Date the offer goes live. null = live immediately on approval. */
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Always null for vouchers. */
@@ -327,6 +331,8 @@ export function toItem(
     implementationLink: offer.implementationLink ?? null,
     implementationInstructions: offer.implementationInstructions ?? '',
     branchListUrl: offer.branchListUrl ?? null,
+    regulationsUrl: offer.regulationsUrl ?? null,
+    returnPolicyUrl: offer.returnPolicyUrl ?? null,
     validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
     defaultValidityType: offer.defaultValidityType ?? null,
@@ -669,6 +675,9 @@ export async function getMemberCatalogView(
     });
   });
 
+  // Real voucher stock overrides the offer-level isSoldOut so store tiles can
+  // show a sold-out badge (a voucher is sold out at 0 available units).
+  await markVoucherSoldOut(db, items);
   return { items, total };
 }
 
