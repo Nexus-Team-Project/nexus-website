@@ -75,7 +75,7 @@ describe('sumitCreateReceipt', () => {
     expect(body.Credentials).toEqual({ CompanyID: 522700000, APIKey: 'test_sumit_key' });
     expect(body.Details.Type).toBe(1);
     expect(body.Details.IsDraft).toBe(true); // NODE_ENV !== production in tests
-    expect(body.Details.Language).toBe('he');
+    expect(body.Details.Language).toBe('Hebrew');
     expect(body.Details.ExternalReference).toBe('purchase-1');
     expect(body.Details.Customer).toMatchObject({ Name: 'Test Buyer', EmailAddress: 'buyer@example.com', SearchMode: 0 });
     expect(body.Details.SendByEmail).toMatchObject({ EmailAddress: 'buyer@example.com', Original: true });
