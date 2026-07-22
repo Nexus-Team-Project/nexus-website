@@ -15,10 +15,12 @@ import adminUsersRoutes from './admin.users.routes';
 import agentApprovalsRoutes from './agent-approvals.routes';
 import analyticsRoutes from './analytics.routes';
 import authRoutes from './auth.routes';
+import authRefreshRoutes from './auth-refresh.routes';
 import phoneOtpRoutes from './phone-otp.routes';
 import emailOtpRoutes from './email-otp.routes';
 import walletMagicLinkRoutes from './wallet-magic-link.routes';
 import googleWalletRoutes from './google-wallet.routes';
+import walletMeRoutes from './wallet-me.routes';
 import walletProfileRoutes from './wallet-profile.routes';
 import walletTenantsRoutes, { tenantJoinAdminRouter } from './wallet-tenants.routes';
 import walletTenantRatingRoutes from './wallet-tenant-rating.routes';
@@ -53,11 +55,16 @@ import userRoutes from './user.routes';
 
 const router = Router();
 
+// Slim v1 refresh (access token only) - MUST stay before authRoutes so it
+// wins the POST /auth/refresh match; the legacy fat handler keeps serving
+// /api/auth/refresh for the website + dashboard.
+router.use('/auth', authRefreshRoutes);
 router.use('/auth', authRoutes);
 router.use('/auth/phone', phoneOtpRoutes);
 router.use('/auth/email-otp', emailOtpRoutes);
 router.use('/auth/magic-link', walletMagicLinkRoutes);
 router.use('/auth/google/wallet', googleWalletRoutes);
+router.use('/wallet', walletMeRoutes);
 router.use('/wallet', walletProfileRoutes);
 router.use('/wallet', walletTenantsRoutes);
 router.use('/wallet', walletTenantRatingRoutes);

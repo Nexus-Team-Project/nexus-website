@@ -429,39 +429,63 @@ export async function getMe(userId: string): Promise<MeResponse> {
     syncOnboardingMemberEmail(user.id, user.email),
     syncLegacyTenantContextForDomain(user.id, domainIdentity.nexusIdentityId, status.context),
   ]);
-  const domainAuthorization = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, status.context.tenantId);
-  const context = applyDomainRoleToContext(status.context, getPrimaryTenantRole(domainAuthorization.roles));
-
-  // Fetch plan + seat summary for tenant users so the dashboard can enforce
-  // and display the plan tier and remaining non-member seats.
-  let planSummary: TenantPlanSummary | undefined;
-  if (context.isTenant && context.tenantId) {
-    planSummary = await getTenantPlanSummary(context.tenantId).catch(() => undefined);
-  }
-
-  // Resolve catalog mode and member-purchase eligibility.
-  // These require async DB lookups so they are computed here and merged into
-  // the authorization object rather than inside the sync getDashboardAuthorization helper.
+  // Everything below only depends on (user, identity, status.context), so it
+  // resolves in ONE parallel wave. These lookups used to run sequentially -
+  // each awaiting a full DB roundtrip - which dominated /api/me latency.
+  // Note: the domain role only changes context.role, never context.tenantId,
+  // so status.context.tenantId is safe to use inside the wave.
   const db = await getMongoDb();
   const tenantCollections = getTenantDomainCollections(db);
   const identityCollections = getIdentityDomainCollections(db);
+  const tenantId = status.context.tenantId;
+  const { computeWalletMeRouter } = await import('./auth/wallet-me-router.service');
+  const { getWalletProfile } = await import('./wallet/wallet-profile.service');
 
-  // Run all four tenant-scoped lookups in parallel to avoid serial latency on
-  // every /api/me call. domainTenantStatus feeds resolveCatalogMode, which is
-  // called after Promise.all resolves.
-  const [domainTenantDoc, userRoles, domainMemberDoc, legacyOnboardingState] = await Promise.all([
-    // Look up the domain tenant's live status (separate from the legacy onboarding tenant).
-    context.tenantId
+  const [
+    domainAuthorization,
+    planSummary,
+    domainTenantDoc,
+    userRoles,
+    domainMemberDoc,
+    legacyOnboardingState,
+    walletRouter,
+    walletProfile,
+    phoneDoc,
+  ] = await Promise.all([
+    getDomainAuthorizationContext(domainIdentity.nexusIdentityId, tenantId),
+    // Plan + seat summary for tenant users so the dashboard can enforce
+    // and display the plan tier and remaining non-member seats.
+    status.context.isTenant && tenantId
+      ? getTenantPlanSummary(tenantId).catch((): TenantPlanSummary | undefined => undefined)
+      : Promise.resolve(undefined),
+    // The domain tenant's live status (feeds resolveCatalogMode) PLUS the
+    // branding/approval fields for the response - one findOne serves both
+    // (this doc was previously fetched twice per request).
+    tenantId
       ? tenantCollections.domainTenants.findOne(
-          { tenantId: context.tenantId },
-          { projection: { status: 1 } },
+          { tenantId },
+          {
+            projection: {
+              status: 1,
+              logoUrl: 1,
+              brandColor: 1,
+              logoCrop: 1,
+              coverImages: 1,
+              businessSetupApproval: 1,
+              autoApproveOffers: 1,
+              autoAdoptAdminOffers: 1,
+              instagramHandle: 1,
+              facebookHandle: 1,
+              twitterHandle: 1,
+            },
+          },
         )
       : Promise.resolve(null),
     // Check if this user holds the 'member' role in the tenant's role assignments.
     // Only members are allowed to purchase from the catalog.
-    context.tenantId
+    tenantId
       ? identityCollections.tenantUserRoles
-          .find({ nexusIdentityId: domainIdentity.nexusIdentityId, tenantId: context.tenantId })
+          .find({ nexusIdentityId: domainIdentity.nexusIdentityId, tenantId })
           .toArray()
       : Promise.resolve([]),
     // Fetch the domain TenantMember document to read the services field.
@@ -469,9 +493,9 @@ export async function getMe(userId: string): Promise<MeResponse> {
     // granted at invite time (e.g. ['benefits_catalog']). Defaults to
     // DEFAULT_MEMBER_SERVICES when the member doc has no services field (pre-Task-08
     // records) and to [] when the user has no domain tenant membership at all.
-    context.tenantId && domainIdentity.nexusIdentityId
+    tenantId && domainIdentity.nexusIdentityId
       ? tenantCollections.tenantMembers.findOne(
-          { nexusIdentityId: domainIdentity.nexusIdentityId, tenantId: context.tenantId },
+          { nexusIdentityId: domainIdentity.nexusIdentityId, tenantId },
           { projection: { services: 1 } },
         )
       : Promise.resolve(null),
@@ -481,7 +505,22 @@ export async function getMe(userId: string): Promise<MeResponse> {
       { userId },
       { projection: { welcomePending: 1 } },
     ),
+    // Wallet RouterScreen payload - cards the user sees right after login.
+    computeWalletMeRouter(db, {
+      nexusIdentityId: domainIdentity.nexusIdentityId,
+      email: user.email,
+    }),
+    // Wallet profile sub-doc so the LoginSheet can gate the slide chain on completedAt.
+    getWalletProfile(db, { prismaUserId: user.id, email: user.email }),
+    // The identity's phone (the canonical SMS-login store). phoneVerifiedAt is
+    // null for a test-attached number that never went through a real OTP.
+    identityCollections.nexusIdentities.findOne(
+      { nexusIdentityId: domainIdentity.nexusIdentityId },
+      { projection: { phone: 1, phoneVerifiedAt: 1, marketingConsent: 1 } },
+    ),
   ]);
+
+  const context = applyDomainRoleToContext(status.context, getPrimaryTenantRole(domainAuthorization.roles));
 
   const domainTenantStatus: string | null = domainTenantDoc?.status ?? null;
   const hasMemberRole = userRoles.some((r) => r.role === 'member');
@@ -516,67 +555,20 @@ export async function getMe(userId: string): Promise<MeResponse> {
     ? { required: false, step: null }
     : { ...status.onboarding, welcomePending };
 
-  // Wallet RouterScreen payload - cards the user sees right after login.
-  // Lives in its own helper so getMe does not grow further (file is already
-  // at the size cap; new auth logic goes in services/auth/).
-  const { computeWalletMeRouter } = await import('./auth/wallet-me-router.service');
-  const walletRouter = await computeWalletMeRouter(db, {
-    nexusIdentityId: domainIdentity.nexusIdentityId,
-    email: user.email,
-  });
-
-  // Plan #3: wallet profile sub-doc so the LoginSheet can gate the
-  // slide chain on completedAt.
-  const { getWalletProfile } = await import('./wallet/wallet-profile.service');
-  const walletProfile = await getWalletProfile(db, {
-    prismaUserId: user.id,
-    email: user.email,
-  });
-
-  // Surface the identity's phone (the canonical SMS-login store) so the wallet
-  // can display it and let the user edit it. phoneVerifiedAt is null for a
-  // test-attached number that never went through a real OTP.
-  const phoneDoc = await identityCollections.nexusIdentities.findOne(
-    { nexusIdentityId: domainIdentity.nexusIdentityId },
-    { projection: { phone: 1, phoneVerifiedAt: 1, marketingConsent: 1 } },
-  );
-
-  // The tenant's logo + brand color for the dashboard header / branding UI
-  // (logo null -> initials; color null -> wallet derives one from the id).
-  const tenantBrandingDoc = context.tenantId
-    ? await getTenantDomainCollections(db).domainTenants.findOne(
-        { tenantId: context.tenantId },
-        {
-          projection: {
-            logoUrl: 1,
-            brandColor: 1,
-            logoCrop: 1,
-            coverImages: 1,
-            businessSetupApproval: 1,
-            autoApproveOffers: 1,
-            autoAdoptAdminOffers: 1,
-            instagramHandle: 1,
-            facebookHandle: 1,
-            twitterHandle: 1,
-          },
-        },
-      )
-    : null;
-
   return {
     user: { id: user.id, email: user.email, name: user.fullName, avatarUrl: user.avatarUrl ?? null },
     context: {
       ...context,
       mode: resolvedMode,
-      tenantLogoUrl: tenantBrandingDoc?.logoUrl ?? null,
-      tenantLogoCrop: tenantBrandingDoc?.logoCrop ?? null,
-      tenantCoverImages: (tenantBrandingDoc?.coverImages ?? []) as TenantCoverImage[],
-      tenantBrandColor: tenantBrandingDoc?.brandColor ?? null,
-      tenantInstagramHandle: tenantBrandingDoc?.instagramHandle ?? null,
-      tenantFacebookHandle: tenantBrandingDoc?.facebookHandle ?? null,
-      tenantTwitterHandle: tenantBrandingDoc?.twitterHandle ?? null,
+      tenantLogoUrl: domainTenantDoc?.logoUrl ?? null,
+      tenantLogoCrop: domainTenantDoc?.logoCrop ?? null,
+      tenantCoverImages: (domainTenantDoc?.coverImages ?? []) as TenantCoverImage[],
+      tenantBrandColor: domainTenantDoc?.brandColor ?? null,
+      tenantInstagramHandle: domainTenantDoc?.instagramHandle ?? null,
+      tenantFacebookHandle: domainTenantDoc?.facebookHandle ?? null,
+      tenantTwitterHandle: domainTenantDoc?.twitterHandle ?? null,
       // Settings toggle: auto-adopt NEXUS-admin offers (absent field = true).
-      autoAdoptAdminOffers: tenantBrandingDoc ? tenantBrandingDoc.autoAdoptAdminOffers !== false : true,
+      autoAdoptAdminOffers: domainTenantDoc ? domainTenantDoc.autoAdoptAdminOffers !== false : true,
       ...(planSummary && {
         plan: planSummary.plan,
         seats: {
@@ -595,9 +587,9 @@ export async function getMe(userId: string): Promise<MeResponse> {
       memberServices,
       businessSetupComplete,
       // M8: NEXUS-admin approval state of this tenant's business setup.
-      ...approvalAuthFields(tenantBrandingDoc?.businessSetupApproval ?? null),
+      ...approvalAuthFields(domainTenantDoc?.businessSetupApproval ?? null),
       // Trusted/auto-approve tenant: its ecosystem offers publish immediately.
-      offersAutoApproved: tenantBrandingDoc?.autoApproveOffers === true,
+      offersAutoApproved: domainTenantDoc?.autoApproveOffers === true,
     },
     onboarding: resolvedOnboarding,
     memberships: walletRouter.memberships,

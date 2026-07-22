@@ -61,6 +61,36 @@ export async function syncDomainIdentityForLoginUser(user: LoginUserIdentityInpu
   const db = await getMongoDb();
   const collections = getIdentityDomainCollections(db);
   const normalizedEmail = normalizeEmail(user.email);
+
+  // Fast path: this sync runs on every /api/me and /api/v1/wallet/me request.
+  // When the identity and contact profile already reflect this login user,
+  // the three sequential upserts below are pure no-op writes - skip them for
+  // two parallel reads instead. Any mismatch (new user, provider change,
+  // relinked prisma id, email casing change) falls through to the full sync.
+  const [existingIdentity, existingProfile] = await Promise.all([
+    collections.nexusIdentities.findOne(
+      { normalizedEmail },
+      { projection: { nexusIdentityId: 1, normalizedEmail: 1, authProvider: 1, status: 1, prismaUserId: 1 } },
+    ),
+    collections.contactProfiles.findOne(
+      { channel: 'email', normalizedIdentifier: normalizedEmail },
+      { projection: { nexusIdentityId: 1, identifier: 1 } },
+    ),
+  ]);
+  if (
+    existingIdentity &&
+    existingIdentity.status === 'active' &&
+    existingIdentity.prismaUserId === user.id &&
+    existingIdentity.authProvider === mapAuthProvider(user.provider) &&
+    existingProfile?.nexusIdentityId === existingIdentity.nexusIdentityId &&
+    existingProfile.identifier === user.email
+  ) {
+    return {
+      nexusIdentityId: existingIdentity.nexusIdentityId,
+      normalizedEmail: existingIdentity.normalizedEmail,
+    };
+  }
+
   const now = new Date();
   const identityOnInsert = buildNexusIdentityDocument(user, normalizedEmail, now);
 
