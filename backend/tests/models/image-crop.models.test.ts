@@ -53,6 +53,38 @@ describe('imageCropSchema', () => {
       imageCropSchema.safeParse({ x: 0.5, y: 0, width: 0.5 + CROP_EPSILON * 2, height: 0.5 }).success,
     ).toBe(false);
   });
+
+  // Regression: dragging a crop handle flush to an image edge produces a
+  // fraction a hair over 1 purely from the editor dividing a sub-pixel drag
+  // position by the <img> element's rounded integer width/height (e.g.
+  // 1.00017) - not a genuine out-of-bounds selection. Each individual field
+  // bound must tolerate CROP_EPSILON too, not just the x+width/y+height sums.
+  it('tolerates a per-field width/height overshoot within CROP_EPSILON (edge-flush drag rounding)', () => {
+    expect(
+      imageCropSchema.safeParse({ x: 0, y: 0, width: 1 + CROP_EPSILON / 2, height: 0.5 }).success,
+    ).toBe(true);
+    expect(
+      imageCropSchema.safeParse({ x: 0, y: 0, width: 0.5, height: 1 + CROP_EPSILON / 2 }).success,
+    ).toBe(true);
+  });
+
+  it('still rejects a per-field width/height overshoot beyond CROP_EPSILON', () => {
+    expect(
+      imageCropSchema.safeParse({ x: 0, y: 0, width: 1 + CROP_EPSILON * 2, height: 0.5 }).success,
+    ).toBe(false);
+  });
+
+  it('tolerates a tiny per-field x/y negative overshoot within CROP_EPSILON', () => {
+    expect(
+      imageCropSchema.safeParse({ x: -CROP_EPSILON / 2, y: 0, width: 0.5, height: 0.5 }).success,
+    ).toBe(true);
+  });
+
+  it('still rejects a per-field x/y negative overshoot beyond CROP_EPSILON', () => {
+    expect(
+      imageCropSchema.safeParse({ x: -CROP_EPSILON * 2, y: 0, width: 0.5, height: 0.5 }).success,
+    ).toBe(false);
+  });
 });
 
 describe('imageCropEntrySchema', () => {
