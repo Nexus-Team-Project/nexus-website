@@ -220,6 +220,8 @@ export async function createPurchase(args: {
         faceValueAgorot: offer.faceValueAgorot,
         cardMask: card.cardMask,
         vouchers: units.map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null })),
+        terms: offer.terms,
+        implementationInstructions: offer.implementationInstructions,
       },
     );
   } catch (e) {

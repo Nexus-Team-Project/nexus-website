@@ -45,6 +45,10 @@ export interface PurchaseView {
   /** Present when completed - the redeemable units (one per quantity). */
   vouchers: PurchaseVoucherView[];
   hasReceipt: boolean;
+  /** Effective redemption terms (variant's own, else the offer's shared text). Rich HTML - sanitize before render. */
+  terms?: string;
+  /** Effective redemption method (variant's own, else shared). Rich HTML - sanitize before render. */
+  implementationInstructions?: string;
 }
 
 /** The voucherCodes unit fields the purchase flow touches. */
@@ -69,6 +73,8 @@ export interface PurchaseViewExtras {
   faceValueAgorot: number | null;
   cardMask: string | null;
   vouchers: PurchaseVoucherView[];
+  terms?: string;
+  implementationInstructions?: string;
 }
 
 /** Project a stored purchase + resolved extras into the client view. */
@@ -94,5 +100,7 @@ export function toPurchaseView(doc: WalletPurchase, extras: PurchaseViewExtras):
     cardMask: extras.cardMask,
     vouchers: extras.vouchers,
     hasReceipt: doc.receipt?.status === 'sent',
+    ...(extras.terms !== undefined && { terms: extras.terms }),
+    ...(extras.implementationInstructions !== undefined && { implementationInstructions: extras.implementationInstructions }),
   };
 }

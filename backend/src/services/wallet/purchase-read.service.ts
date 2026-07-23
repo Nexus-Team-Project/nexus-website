@@ -12,6 +12,7 @@ import {
   type WalletPurchase,
 } from '../../models/payments/wallet-payments.models';
 import { NOT_DELETED } from '../../models/domain/supply.models';
+import { resolveEffectiveVariantTerms } from '../supply-variants.helper';
 import { toPurchaseView, type PurchaseView, type VoucherUnitDoc } from './purchase-view.helper';
 
 /**
@@ -58,7 +59,26 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   const [offers, units, cards] = await Promise.all([
     db.collection(DOMAIN_COLLECTIONS.nexusOffers)
       .find({ offerId: { $in: offerIds } })
-      .project<{ offerId: string; title: string; imageUrl?: string; createdByTenantId?: string; variants?: Array<{ variantId: string; face_value?: number }> }>({ offerId: 1, title: 1, imageUrl: 1, createdByTenantId: 1, 'variants.variantId': 1, 'variants.face_value': 1 })
+      .project<{
+        offerId: string;
+        title: string;
+        imageUrl?: string;
+        createdByTenantId?: string;
+        terms?: string;
+        implementationInstructions?: string;
+        variants?: Array<{ variantId: string; face_value?: number; terms?: string; implementationInstructions?: string }>;
+      }>({
+        offerId: 1,
+        title: 1,
+        imageUrl: 1,
+        createdByTenantId: 1,
+        terms: 1,
+        implementationInstructions: 1,
+        'variants.variantId': 1,
+        'variants.face_value': 1,
+        'variants.terms': 1,
+        'variants.implementationInstructions': 1,
+      })
       .toArray(),
     codeIds.length
       ? db.collection<VoucherUnitDoc>(DOMAIN_COLLECTIONS.voucherCodes).find({ codeId: { $in: codeIds } }).toArray()
@@ -92,6 +112,9 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
       .map((id) => unitMap.get(id))
       .filter((u): u is VoucherUnitDoc => Boolean(u))
       .map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null }));
+    const { terms, implementationInstructions } = offer
+      ? resolveEffectiveVariantTerms(offer, variant)
+      : {};
     return toPurchaseView(d, {
       offerTitle: offer?.title ?? d.offerId,
       variantTitle: variant?.face_value !== undefined ? `₪${variant.face_value}` : d.variantId,
@@ -101,6 +124,8 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
       faceValueAgorot: variant?.face_value !== undefined ? Math.round(variant.face_value * 100) : null,
       cardMask: cardMaskMap.get(d.cardId) ?? null,
       vouchers,
+      terms,
+      implementationInstructions,
     });
   });
 }
