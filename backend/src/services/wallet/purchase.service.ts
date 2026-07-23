@@ -102,6 +102,10 @@ export async function createPurchase(args: {
   const doc: WalletPurchase = {
     purchaseId,
     identityId: args.identityId,
+    // Buyer audit snapshot - keeps "who bought what" readable after the
+    // account is deleted (purchases are retained by account deletion).
+    buyerName: args.name,
+    buyerEmail: args.email,
     tenantId: offer.tenantId,
     offerId: args.offerId,
     variantId: args.variantId,

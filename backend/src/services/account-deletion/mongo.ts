@@ -127,7 +127,7 @@ export async function collectMongoCounts(
     tenantRatingsByUser,
     tenantRatingsForOwnedTenants,
     walletPaymentCards,
-    walletPurchases,
+    walletPurchasesRetained,
     walletBalances,
     ownerAssignmentsCleared,
   ] = await Promise.all([
@@ -291,7 +291,8 @@ export async function collectMongoCounts(
     db.collection(WALLET_PAYMENT_CARDS_COLLECTION).countDocuments({
       identityId: { $in: targets.nexusIdentityIds },
     }),
-    // Wallet voucher purchases made by this user.
+    // Wallet voucher purchases made by this user - NOT deleted: retained as
+    // audit records (buyer snapshot + buyerDeletedAt stamped instead).
     db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({
       identityId: { $in: targets.nexusIdentityIds },
     }),
@@ -353,7 +354,7 @@ export async function collectMongoCounts(
     tenantRatingsByUser,
     tenantRatingsForOwnedTenants,
     walletPaymentCards,
-    walletPurchases,
+    walletPurchasesRetained,
     walletBalances,
     ownerAssignmentsCleared,
   };
@@ -436,14 +437,26 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
     ],
   });
 
-  // Saved payment cards (PayMe tokens) + wallet purchases for this user.
+  // Saved payment cards (PayMe tokens) are hard-deleted; wallet purchases
+  // are RETAINED as tenant/tax audit records ("who bought what and when").
+  // The buyer name/email snapshot is backfilled onto docs that predate the
+  // purchase-time snapshot, and buyerDeletedAt marks the account as gone.
   if (targets.nexusIdentityIds.length > 0) {
     await db.collection(WALLET_PAYMENT_CARDS_COLLECTION).deleteMany({
       identityId: { $in: targets.nexusIdentityIds },
     });
-    await db.collection(WALLET_PURCHASES_COLLECTION).deleteMany({
-      identityId: { $in: targets.nexusIdentityIds },
-    });
+    await db.collection(WALLET_PURCHASES_COLLECTION).updateMany(
+      { identityId: { $in: targets.nexusIdentityIds } },
+      [
+        {
+          $set: {
+            buyerName: { $ifNull: ['$buyerName', prismaUser?.fullName ?? null] },
+            buyerEmail: { $ifNull: ['$buyerEmail', email] },
+            buyerDeletedAt: '$$NOW',
+          },
+        },
+      ],
+    );
     await db.collection(WALLET_BALANCES_COLLECTION).deleteMany({
       identityId: { $in: targets.nexusIdentityIds },
     });
