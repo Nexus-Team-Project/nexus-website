@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { CONTACT_ROLES, USE_CASES } from '../models/onboarding.models';
 
 const domainPattern = /^(https?:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}(?::\d{2,5})?(?:\/.*)?$/i;
-const phonePattern = /^[+()\d\s.-]{7,20}$/;
+export const phonePattern = /^[+()\d\s.-]{7,20}$/;
 
 // HTML-injection characters that a real URL would percent-encode. Rejecting
 // them is defense in depth in case the website is later rendered as a link or
@@ -33,7 +33,7 @@ function hasOnlySafeUrlChars(value: string): boolean {
  * Input: raw website string.
  * Output: true for valid URL/domain values with no injection-prone characters.
  */
-function isValidWebsite(value: string): boolean {
+export function isValidWebsite(value: string): boolean {
   const trimmed = value.trim();
   if (!hasOnlySafeUrlChars(trimmed)) return false;
   if (!domainPattern.test(trimmed)) return false;
@@ -53,7 +53,7 @@ function isValidWebsite(value: string): boolean {
  * Input: raw free-text string (e.g. business description).
  * Output: true when the value has no disallowed control characters.
  */
-function hasNoControlChars(value: string): boolean {
+export function hasNoControlChars(value: string): boolean {
   for (const ch of value) {
     const code = ch.charCodeAt(0);
     if (code === 0x09 || code === 0x0a || code === 0x0d) continue; // tab, LF, CR
