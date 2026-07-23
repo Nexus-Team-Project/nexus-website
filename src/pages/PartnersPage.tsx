@@ -134,6 +134,13 @@ export default function PartnersPage() {
             <p className={`text-lg text-white/70 max-w-xl mb-8 ${direction === 'rtl' ? '' : 'mx-auto'}`}>
               {pT?.heroSubtitle ?? 'Leading brands with exclusive discounts for community members'}
             </p>
+            {!isLoggedIn && !authLoading && (
+              <p className={`text-sm text-white/50 max-w-xl -mt-4 mb-8 ${direction === 'rtl' ? '' : 'mx-auto'}`}>
+                {language === 'he'
+                  ? 'התחברו כדי לראות את אחוזי הקאשבק של כל שותף'
+                  : "Sign in to see each partner's cashback percentage"}
+              </p>
+            )}
           </div>
         </div>
       </section>

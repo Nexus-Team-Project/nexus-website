@@ -9,6 +9,8 @@ export interface Partner {
   thumbnailUrl: string;
   categories: string[];
   discount?: string | null;
+  /** Cashback percentage (login-gated server-side; absent for guests). */
+  cashbackPct?: number | null;
   description?: string | null;
   websiteUrl?: string | null;
   /** Bilingual search aliases (HE/EN alt names) - used by the partners page search filter. */
@@ -23,7 +25,7 @@ interface PartnerCardProps {
 export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
   const { language } = useLanguage();
   const loginTo = language === 'he' ? '/he/login' : '/login';
-  const lockLabel = language === 'he' ? 'התחבר לצפייה' : 'Sign in to view';
+  const lockLabel = language === 'he' ? 'התחבר לצפייה בקאשבק' : 'Sign in to view cashback';
 
   return (
     <BorderHighlightCard className="group bg-white rounded-xl border border-slate-100 shadow-sm hover:shadow-md hover:border-violet-200 transition-all duration-200 overflow-hidden flex flex-col">
@@ -62,19 +64,31 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
         {/* Discount area — pinned to bottom */}
         <div className="mt-auto pt-3 border-t border-slate-50">
           {isLoggedIn ? (
-            partner.discount ? (
-              /* Logged in + has discount */
-              <div className="flex items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
-                <span className="text-emerald-600 font-bold text-sm">{partner.discount}</span>
-              </div>
-            ) : (
-              /* Logged in + no discount configured */
-              <div className="flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-                <span className="text-slate-400 text-xs">
-                  {language === 'he' ? 'ממתין להטבה' : 'Benefit coming soon'}
-                </span>
-              </div>
-            )
+            <div className="flex flex-col gap-1.5">
+              {typeof partner.cashbackPct === 'number' && (
+                /* Logged in + cashback value */
+                <div className="flex items-center justify-center gap-1.5 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
+                  <span className="text-violet-700 font-bold text-sm">
+                    {language === 'he'
+                      ? `${partner.cashbackPct}% קאשבק`
+                      : `${partner.cashbackPct}% cashback`}
+                  </span>
+                </div>
+              )}
+              {partner.discount ? (
+                /* Logged in + has discount */
+                <div className="flex items-center justify-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                  <span className="text-emerald-600 font-bold text-sm">{partner.discount}</span>
+                </div>
+              ) : typeof partner.cashbackPct !== 'number' ? (
+                /* Logged in + nothing configured */
+                <div className="flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                  <span className="text-slate-400 text-xs">
+                    {language === 'he' ? 'ממתין להטבה' : 'Benefit coming soon'}
+                  </span>
+                </div>
+              ) : null}
+            </div>
           ) : (
             /* Guest — blurred lock */
             <div className="relative overflow-hidden rounded-xl">
