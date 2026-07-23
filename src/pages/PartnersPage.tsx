@@ -8,6 +8,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { useSEO } from '../hooks/useSEO';
+import { useGoogleOneTap } from '../hooks/useGoogleOneTap';
 
 const Footer = lazy(() => import('../components/Footer'));
 
@@ -26,6 +27,8 @@ type SortBy = 'default' | 'az' | 'za';
 export default function PartnersPage() {
   const { t, language, direction } = useLanguage();
   const { user, isLoading: authLoading } = useAuth();
+  // Google One Tap for logged-out visitors (silent session on tap).
+  useGoogleOneTap();
   const isLoggedIn = !!user;
   const he = language === 'he';
 
