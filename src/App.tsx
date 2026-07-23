@@ -30,7 +30,6 @@ const PaymentsPage       = lazy(() => import('./pages/PaymentsPage'));
 const BenefitsPage       = lazy(() => import('./pages/BenefitsPage'));
 const BenefitsPageV1     = lazy(() => import('./pages/BenefitsPageV1'));
 const AdminDashboard     = lazy(() => import('./pages/AdminDashboard'));
-const UserDashboard      = lazy(() => import('./pages/UserDashboard'));
 const BlogList           = lazy(() => import('./pages/BlogList'));
 const BlogListHe         = lazy(() => import('./pages/BlogListHe'));
 const ArticlePage        = lazy(() => import('./pages/Article'));
@@ -429,16 +428,12 @@ function App() {
           <Route path="/he/docs"     element={<LanguageProvider language="he"><ApiDocsPage /></LanguageProvider>} />
           <Route path="/changelog"   element={<LanguageGate><ChangelogPage /></LanguageGate>} />
           <Route path="/he/changelog" element={<ChangelogPageHe />} />
-          <Route path="/dashboard" element={
-            <ProtectedRoute redirectTo="/login">
-              <UserDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/he/dashboard" element={
-            <ProtectedRoute redirectTo="/he/login">
-              <UserDashboard />
-            </ProtectedRoute>
-          } />
+          {/* The legacy in-website user dashboard was deleted (2026-07-23);
+              old links land on home, whose session gate hands an
+              authenticated user off to the real nexus-dashboard. */}
+          <Route path="/dashboard"    element={<Navigate to="/" replace />} />
+          <Route path="/he/dashboard" element={<Navigate to="/he" replace />} />
+
           {/* Admin routes with sidebar layout */}
           <Route path="/admin" element={
             <ProtectedRoute roles={['ADMIN', 'AGENT']} redirectTo="/login">

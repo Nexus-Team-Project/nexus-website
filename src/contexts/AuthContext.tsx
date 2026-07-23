@@ -14,6 +14,7 @@ import {
 import { api, setAccessToken, refreshAccessToken } from '../lib/api';
 import { getVisitorId } from '../lib/visitorId';
 import { setOneTapSilentSession, clearOneTapSilentSession } from '../lib/oneTapSilent';
+import { consumeWebsiteReturnTo } from '../lib/websiteReturnTo';
 
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
@@ -72,6 +73,13 @@ interface GoogleAuthResponse {
 export const AuthContext = createContext<AuthContextType | null>(null);
 
 const googleCodeRequests = new Map<string, Promise<GoogleAuthResponse>>();
+
+// The OAuth code whose post-exchange handling (redirect decision) already ran.
+// StrictMode mounts the effect twice: exchangeGoogleCodeOnce dedups the POST,
+// but BOTH .then chains fire - the second one must not run the redirect logic
+// again (it raced the first: consumed nothing and replaced the location with
+// the dashboard, overriding a website returnTo navigation).
+let handledGoogleCode: string | null = null;
 
 /**
  * Infers the active website language without depending on React context.
@@ -209,12 +217,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logAuthHandoff('Google callback detected; exchanging code');
       exchangeGoogleCodeOnce(code)
         .then(async (data) => {
+          // Redirect decision must run ONCE per code (see handledGoogleCode).
+          if (handledGoogleCode === code) return;
+          handledGoogleCode = code;
           const dashboardRedirect = getSavedGoogleDashboardRedirect();
           sessionStorage.removeItem('google_oauth_redirect');
           logAuthHandoff('Google exchange succeeded', {
             hasDashboardUrl: Boolean(data.dashboardUrl),
             hasDashboardCode: Boolean(data.dashboardCode),
           });
+
+          // A website return path (login page opened with ?returnTo=...)
+          // takes precedence over the dashboard handoff: the refresh cookie
+          // is set, so the target page restores the session on load.
+          const websiteReturnTo = consumeWebsiteReturnTo();
+          if (websiteReturnTo) {
+            logAuthHandoff('Returning to website page after Google login', { websiteReturnTo });
+            window.location.replace(websiteReturnTo);
+            return;
+          }
 
           if (data.dashboardUrl) {
             logAuthHandoff('Redirecting to dashboard callback', { dashboardUrl: data.dashboardUrl });
