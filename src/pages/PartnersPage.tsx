@@ -64,8 +64,10 @@ export default function PartnersPage() {
 
   useEffect(() => {
     if (authLoading) return;
+    // isLoggedIn dep: refetch the moment a One Tap silent login (or logout)
+    // lands so the login-gated cashback/discount fields appear immediately.
     fetchPartners();
-  }, [authLoading, fetchPartners]);
+  }, [authLoading, isLoggedIn, fetchPartners]);
 
   // Reset to page 1 whenever filters or sort change
   useEffect(() => {

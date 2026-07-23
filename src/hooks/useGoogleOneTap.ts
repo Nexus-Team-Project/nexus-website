@@ -9,7 +9,11 @@
  */
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { isOneTapSilentSession } from '../lib/oneTapSilent';
+import {
+  isOneTapSilentSession,
+  setOneTapSilentSession,
+  clearOneTapSilentSession,
+} from '../lib/oneTapSilent';
 
 const GIS_SRC = 'https://accounts.google.com/gsi/client';
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
@@ -78,7 +82,12 @@ export function useGoogleOneTap(): void {
       idApi.initialize({
         client_id: CLIENT_ID,
         callback: (response) => {
+          // Flag set IMMEDIATELY so the UI (Continue button, hidden Google
+          // CTA) reacts the instant the account is picked - the network
+          // round-trips finish in the background. Cleared again on failure.
+          setOneTapSilentSession();
           void oneTapLogin(response.credential, window.location.pathname).catch((err) => {
+            clearOneTapSilentSession();
             console.error('[Nexus one-tap] silent login failed', err);
           });
         },

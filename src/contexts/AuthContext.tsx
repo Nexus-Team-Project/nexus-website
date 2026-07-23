@@ -56,6 +56,8 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<{ requiresVerification: true; email: string } | void>;
   googleLogin: (accessToken: string) => Promise<AuthUser>;
   oneTapLogin: (idToken: string, page: string) => Promise<void>;
+  /** Starts an immediate dashboard handoff for the current session (ends One Tap silence). */
+  continueToDashboard: () => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (partial: Partial<AuthUser>) => void;
 }
@@ -250,7 +252,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Normal session restore
     refreshAccessToken()
       .then((result) => {
-        if (result && result.user) setUser(result.user as AuthUser);
+        if (result && result.user) {
+          setUser(result.user as AuthUser);
+        } else {
+          // Session gone (cookie expired/cleared): a leftover One Tap silent
+          // flag would strand the Navbar in a pending Continue state.
+          clearOneTapSilentSession();
+        }
       })
       .finally(() => setIsLoading(false));
   }, []);
@@ -294,6 +302,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Immediate dashboard handoff for the signed-in user (used by the Navbar
+   * Continue button and the Login/Signup existing-session redirects).
+   * Clears One Tap silence, mints a fresh SSO code, and replaces the page.
+   * No-op when there is no user yet.
+   */
+  const continueToDashboard = useCallback(async (): Promise<void> => {
+    if (!user) return;
+    await redirectDashboardUser(user);
+  }, [user]);
+
   const logout = useCallback(async () => {
     await api.post('/api/auth/logout').catch(() => {});
     setAccessToken(null);
@@ -306,7 +325,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, verifyLoginOtp, resendLoginOtp, register, googleLogin, oneTapLogin, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, isLoading, login, verifyLoginOtp, resendLoginOtp, register, googleLogin, oneTapLogin, continueToDashboard, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

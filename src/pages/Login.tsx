@@ -190,6 +190,19 @@ export default function Login() {
     }
   };
 
+  // A restored session is being redirected to the dashboard (effect above) -
+  // show a loader instead of a login form nobody should fill.
+  if (!isAuthLoading && authenticatedUser) {
+    return (
+      <div className="h-screen bg-white flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-4 border-nx-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-500">
+          {isHe ? 'מעבירים אותך ללוח הבקרה...' : 'Taking you to your dashboard...'}
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="relative h-screen bg-white flex flex-col overflow-hidden">
       {/* Animated gradient diagonal stripe */}

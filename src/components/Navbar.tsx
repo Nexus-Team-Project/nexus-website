@@ -7,7 +7,8 @@ import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { TranslationKeys } from '../i18n/translations';
 import { useAuth } from '../contexts/AuthContext';
-import { isOneTapSilentSession, clearOneTapSilentSession } from '../lib/oneTapSilent';
+import { clearOneTapSilentSession } from '../lib/oneTapSilent';
+import { useOneTapSilentFlag } from '../hooks/useOneTapSilentFlag';
 import { createPortal } from 'react-dom';
 
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
@@ -184,13 +185,32 @@ function MegaMenuPanel({
 export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dark' }) {
   const { t, direction, language } = useLanguage();
   const { track } = useAnalytics();
-  const { user } = useAuth();
+  const { user, continueToDashboard, logout } = useAuth();
   const isHe = language === 'he';
-  // One Tap silent sessions keep the guest presentation; the sign-in link
-  // relabels to Continue and ends silence on click (login page then does
-  // the instant dashboard handoff).
-  const silentSession = Boolean(user) && isOneTapSilentSession();
-  const signInLabel = silentSession ? (isHe ? 'המשך' : 'Continue') : t.navbar.signIn;
+  // One Tap silent sessions keep the guest presentation but swap the CTA
+  // pair for Continue (instant dashboard handoff) + Log out. The flag is
+  // reactive - it flips the UI the moment the account is picked, before the
+  // silent login's network calls finish (Continue spins until the user is
+  // loaded).
+  const silentFlag = useOneTapSilentFlag();
+  const [isContinuing, setIsContinuing] = useState(false);
+
+  /** Instant dashboard handoff from the Continue button (silent sessions). */
+  const handleContinue = async () => {
+    if (!user || isContinuing) return;
+    setIsContinuing(true);
+    try {
+      await continueToDashboard();
+    } catch (error) {
+      console.error('[Nexus auth] Continue handoff failed', error);
+      setIsContinuing(false);
+    }
+  };
+
+  /** Ends a silent One Tap session entirely (back to a plain guest). */
+  const handleSilentLogout = () => {
+    void logout();
+  };
   const userOrgs = user?.orgMemberships ?? [];
 
   // Get nav items with current language
@@ -368,20 +388,44 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
           ))}
 
           <div className="mt-8 space-y-3">
-            <Link
-              to={language === 'he' ? '/he/signup' : '/signup'}
-              className="block bg-nx-primary text-white text-sm font-semibold px-5 py-3 rounded-lg text-center"
-              onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
-            >
-              {t.buttons.startNow}
-            </Link>
-            <Link
-              to={language === 'he' ? '/he/login' : '/login'}
-              className="block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
-              onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
-            >
-              {signInLabel}
-            </Link>
+            {silentFlag ? (
+              // ── One Tap silent session: Continue + Log out ──────
+              <>
+                <button
+                  onClick={handleContinue}
+                  disabled={!user || isContinuing}
+                  className="w-full flex items-center justify-center gap-2 bg-nx-primary text-white text-sm font-semibold px-5 py-3 rounded-lg text-center disabled:opacity-70"
+                >
+                  {(!user || isContinuing) && (
+                    <span className="w-3.5 h-3.5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {isHe ? 'המשך' : 'Continue'}
+                </button>
+                <button
+                  onClick={() => { handleSilentLogout(); setMobileOpen(false); }}
+                  className="w-full block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
+                >
+                  {isHe ? 'התנתק' : 'Log out'}
+                </button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to={language === 'he' ? '/he/signup' : '/signup'}
+                  className="block bg-nx-primary text-white text-sm font-semibold px-5 py-3 rounded-lg text-center"
+                  onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
+                >
+                  {t.buttons.startNow}
+                </Link>
+                <Link
+                  to={language === 'he' ? '/he/login' : '/login'}
+                  className="block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
+                  onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
+                >
+                  {t.navbar.signIn}
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -568,7 +612,27 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
 
         {/* Desktop CTA */}
         <div className="hidden lg:flex items-center gap-4">
-          {user && !silentSession ? (
+          {silentFlag ? (
+            // ── One Tap silent session: Continue + Log out ──────
+            <>
+              <button
+                onClick={handleSilentLogout}
+                className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}
+              >
+                {isHe ? 'התנתק' : 'Log out'}
+              </button>
+              <button
+                onClick={handleContinue}
+                disabled={!user || isContinuing}
+                className="flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-nx-primary/25 disabled:opacity-70"
+              >
+                {(!user || isContinuing) && (
+                  <span className="w-3.5 h-3.5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                )}
+                {isHe ? 'המשך' : 'Continue'}
+              </button>
+            </>
+          ) : user ? (
             // ── Authenticated user ──────────────────────────────
             userOrgs.length > 0 ? (
               // Has org(s) — show Dashboard button
@@ -606,7 +670,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
             // ── Unauthenticated ────────────────────────────────
             <>
               <Link to={language === 'he' ? '/he/login' : '/login'} onClick={() => clearOneTapSilentSession()} className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}>
-                {signInLabel}
+                {t.navbar.signIn}
               </Link>
               <Link
                 to={language === 'he' ? '/he/signup' : '/signup'}
