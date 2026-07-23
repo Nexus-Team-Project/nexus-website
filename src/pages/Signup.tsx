@@ -10,6 +10,7 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import InviteBanner from '../components/InviteBanner';
+import { clearOneTapSilentSession } from '../lib/oneTapSilent';
 
 interface SignupPageError {
   field?: string;
@@ -52,6 +53,13 @@ const FlagIcon = ({ code }: { code: string }) => {
 };
 
 export default function Signup() {
+  // Entering an explicit auth flow ends One Tap silence - the session (if
+  // any) must behave normally here (instant recognize + dashboard redirect).
+  useEffect(() => {
+    clearOneTapSilentSession();
+  }, []);
+
+  const hasRedirectedExistingSession = useRef(false);
   const [country, setCountry] = useState('IL');
   const [emailUpdates, setEmailUpdates] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -74,7 +82,7 @@ export default function Signup() {
   const countryDropdownRef = useRef<HTMLDivElement>(null);
 
   const { t, language, direction } = useLanguage();
-  const { register } = useAuth();
+  const { register, user: authenticatedUser, isLoading: isAuthLoading, continueToDashboard } = useAuth();
   const navigate = useNavigate();
   const { track } = useAnalytics();
   const isHe = language === 'he';
@@ -207,6 +215,24 @@ export default function Signup() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    /**
+     * Sends already-authenticated visitors away from the signup page
+     * (mirrors the Login page): fresh SSO code + dashboard redirect.
+     */
+    const redirectExistingSession = async () => {
+      if (isAuthLoading || !authenticatedUser || hasRedirectedExistingSession.current) return;
+      hasRedirectedExistingSession.current = true;
+      try {
+        await continueToDashboard();
+      } catch (error) {
+        console.error('[Nexus auth] Signup dashboard redirect failed', error);
+      }
+    };
+
+    void redirectExistingSession();
+  }, [authenticatedUser, isAuthLoading, continueToDashboard]);
+
   const validateForm = () => {
     const newErrors = {
       email: '',
@@ -284,6 +310,19 @@ export default function Signup() {
   }, [language, verificationEmail, resendCooldown]);
 
   const getCountryName = (c: typeof countries[0]) => isHe ? c.nameHe : c.name;
+
+  // A restored session is being redirected to the dashboard (effect above) -
+  // show a loader instead of a signup form nobody should fill.
+  if (!isAuthLoading && authenticatedUser) {
+    return (
+      <div className="h-screen bg-white flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-4 border-nx-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-500">
+          {isHe ? 'מעבירים אותך ללוח הבקרה...' : 'Taking you to your dashboard...'}
+        </p>
+      </div>
+    );
+  }
 
   // ── "Check your email" screen ─────────────────────────────────────────────
   if (step === 'verify') {

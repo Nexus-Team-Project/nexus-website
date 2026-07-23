@@ -5,9 +5,22 @@ import { apiLimiter } from '../middleware/rateLimiter';
 
 const router = Router();
 
+/**
+ * Removes login-gated fields (discount, cashbackPct) from a partner record
+ * for unauthenticated callers. Pure - exported for unit testing.
+ * Input: full partner record. Output: the record without gated fields.
+ */
+export function stripGuestPartnerFields<T extends { discount?: unknown; cashbackPct?: unknown }>(
+  partner: T,
+): Omit<T, 'discount' | 'cashbackPct'> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip gated fields
+  const { discount: _d, cashbackPct: _c, ...rest } = partner;
+  return rest;
+}
+
 // ─── GET /api/partners ─────────────────────────────────────
 // Public: returns id, title, thumbnailUrl, categories, isActive, order
-// Authenticated: also returns `discount` field
+// Authenticated: also returns `discount` + `cashbackPct` fields
 
 router.get(
   '/',
@@ -36,11 +49,8 @@ router.get(
         orderBy: { order: 'asc' },
       });
 
-      // Strip `discount` field for unauthenticated users
-      const result = isAuthenticated
-        ? partners
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars -- destructured only to strip `discount` from the public payload
-        : partners.map(({ discount: _d, ...rest }) => rest);
+      // Strip login-gated fields for unauthenticated users
+      const result = isAuthenticated ? partners : partners.map(stripGuestPartnerFields);
 
       res.json({ partners: result, total: result.length });
     } catch (err) {

@@ -13,6 +13,7 @@ import * as AuthService from '../services/auth.service';
 import * as EmailService from '../services/email.service';
 import { signEmailVerificationToken, verifyEmailVerificationToken } from '../utils/jwt';
 import * as LoginMfaService from '../services/auth/login-mfa.service';
+import { createOneTapLead } from '../services/monday-lead.service';
 import { REFRESH_COOKIE, refreshCookieOpts, TRUSTED_DEVICE_COOKIE } from '../utils/auth-cookies';
 import { passwordSchema } from '../utils/password-policy';
 
@@ -126,11 +127,29 @@ const googleSchema = z.object({
       redirectUri: z.string().url().optional(),
       language: z.enum(['he', 'en']).optional(),
       dashboardRedirect: z.string().min(1).max(500).optional(),
+      // Google One Tap silent-login metadata (2026-07-23 spec): 'one_tap'
+      // marks the request so a NEW user produces a Monday lead; page is the
+      // website path the prompt appeared on (context only, never trusted).
+      source: z.enum(['one_tap']).optional(),
+      page: z.string().max(200).optional(),
     })
     .refine((d) => d.idToken || d.code || d.accessToken, {
       message: 'idToken, code, or accessToken is required',
     }),
 });
+
+/**
+ * Decides whether a /api/auth/google request should produce a One Tap
+ * Monday lead: only explicit one_tap idToken logins that CREATED the user.
+ * Pure - exported for unit testing.
+ * Input: request body subset + isNew from googleAuth. Output: boolean.
+ */
+export function shouldFireOneTapLead(
+  body: { source?: string; idToken?: string },
+  isNew: boolean,
+): boolean {
+  return body.source === 'one_tap' && Boolean(body.idToken) && isNew;
+}
 
 router.post(
   '/google',
@@ -145,7 +164,16 @@ router.post(
       } else if (req.body.accessToken) {
         result = await AuthService.googleAuthFromAccessToken(req.body.accessToken, meta);
       } else {
-        result = await AuthService.googleAuth(req.body.idToken, meta);
+        const googleResult = await AuthService.googleAuth(req.body.idToken, meta);
+        if (shouldFireOneTapLead(req.body, googleResult.isNew)) {
+          // Fire-and-forget: a Monday outage must never affect the auth response.
+          void createOneTapLead({
+            email: googleResult.email,
+            fullName: googleResult.fullName,
+            page: req.body.page,
+          });
+        }
+        result = googleResult;
       }
       const dashboardCode = AuthService.createDashboardAuthCode(result.userId);
       const dashboardUrl = buildDashboardCallbackUrl(

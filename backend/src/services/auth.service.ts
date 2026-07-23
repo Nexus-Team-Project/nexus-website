@@ -323,7 +323,9 @@ export async function googleAuth(
   });
 
   const tokens = await issueTokens(user.id, user.email, user.role, meta);
-  return { ...tokens, isNew };
+  // email/fullName ride along so the route can build a One Tap Monday lead
+  // for newly created users without a second DB read.
+  return { ...tokens, isNew, email: user.email, fullName: user.fullName ?? null };
 }
 
 export async function googleAuthFromCode(

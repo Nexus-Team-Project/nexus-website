@@ -8,6 +8,8 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { useSEO } from '../hooks/useSEO';
+import { useGoogleOneTap } from '../hooks/useGoogleOneTap';
+import { useOneTapSilentFlag } from '../hooks/useOneTapSilentFlag';
 
 const Footer = lazy(() => import('../components/Footer'));
 
@@ -26,7 +28,12 @@ type SortBy = 'default' | 'az' | 'za';
 export default function PartnersPage() {
   const { t, language, direction } = useLanguage();
   const { user, isLoading: authLoading } = useAuth();
+  // Google One Tap for logged-out visitors (silent session on tap).
+  useGoogleOneTap();
   const isLoggedIn = !!user;
+  // Between the One Tap account pick and the authenticated refetch landing,
+  // keep the grid in its loading skeleton so cashback appears in one step.
+  const pendingOneTapLogin = useOneTapSilentFlag() && !isLoggedIn && !authLoading;
   const he = language === 'he';
 
   useSEO({
@@ -61,8 +68,10 @@ export default function PartnersPage() {
 
   useEffect(() => {
     if (authLoading) return;
+    // isLoggedIn dep: refetch the moment a One Tap silent login (or logout)
+    // lands so the login-gated cashback/discount fields appear immediately.
     fetchPartners();
-  }, [authLoading, fetchPartners]);
+  }, [authLoading, isLoggedIn, fetchPartners]);
 
   // Reset to page 1 whenever filters or sort change
   useEffect(() => {
@@ -104,6 +113,10 @@ export default function PartnersPage() {
   }, [sorted, currentPage]);
 
   const signupLink = language === 'he' ? '/he/signup' : '/signup';
+  // One loading signal for the grid: initial/refetch load OR the One Tap
+  // login round-trip (so tapping an account shows a skeleton, not stale
+  // guest cards, until cashback values arrive).
+  const isBusy = loading || pendingOneTapLogin;
 
   return (
     <div dir={direction} className="min-h-screen bg-slate-100">
@@ -131,6 +144,13 @@ export default function PartnersPage() {
             <p className={`text-lg text-white/70 max-w-xl mb-8 ${direction === 'rtl' ? '' : 'mx-auto'}`}>
               {pT?.heroSubtitle ?? 'Leading brands with exclusive discounts for community members'}
             </p>
+            {!isLoggedIn && !authLoading && (
+              <p className={`text-sm text-white/50 max-w-xl -mt-4 mb-8 ${direction === 'rtl' ? '' : 'mx-auto'}`}>
+                {language === 'he'
+                  ? 'התחברו כדי לראות את אחוזי הקאשבק של כל שותף'
+                  : "Sign in to see each partner's cashback percentage"}
+              </p>
+            )}
           </div>
         </div>
       </section>
@@ -217,7 +237,7 @@ export default function PartnersPage() {
         )}
 
         {/* Loading skeleton */}
-        {loading && (
+        {isBusy && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="bg-white rounded-xl border border-slate-100 overflow-hidden animate-pulse">
@@ -233,7 +253,7 @@ export default function PartnersPage() {
         )}
 
         {/* No results */}
-        {!loading && sorted.length === 0 && (
+        {!isBusy && sorted.length === 0 && (
           <div className="text-center py-24">
             <p className="text-slate-500 text-lg font-medium mb-2">
               {pT?.noResults ?? (language === 'he' ? 'לא נמצאו תוצאות' : 'No results found')}
@@ -251,7 +271,7 @@ export default function PartnersPage() {
         )}
 
         {/* Grid */}
-        {!loading && sorted.length > 0 && (
+        {!isBusy && sorted.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginated.map((partner) => (
               <PartnerCard key={partner.id} partner={partner} isLoggedIn={isLoggedIn} />
@@ -260,7 +280,7 @@ export default function PartnersPage() {
         )}
 
         {/* Pagination */}
-        {!loading && totalPages > 1 && (
+        {!isBusy && totalPages > 1 && (
           <div className={`flex gap-2 justify-center mt-8 flex-wrap ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <button
@@ -279,7 +299,7 @@ export default function PartnersPage() {
         )}
 
         {/* Guest CTA banner */}
-        {!isLoggedIn && !loading && sorted.length > 0 && (
+        {!isLoggedIn && !isBusy && sorted.length > 0 && (
           <div className="mt-12 bg-gradient-to-r from-nx-blue to-violet-900 rounded-2xl p-8 text-white text-center">
             <h2 className="text-xl font-bold mb-2">
               {language === 'he' ? 'הצטרפו לקהילת Nexus וגלו את כל ההטבות' : 'Join Nexus Community and unlock all benefits'}
