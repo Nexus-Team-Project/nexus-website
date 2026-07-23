@@ -264,12 +264,10 @@ export async function createContactSalesLead(input: ContactSalesLeadInput): Prom
 // ─── One Tap leads ───────────────────────────────────────────────────────────
 
 /**
- * TESTING-PHASE GATE for One Tap leads. While false, One Tap leads are
- * created in EVERY environment so the flow can be verified in dev. Flip to
- * true after the testing phase to make One Tap leads production-only like
- * the other two producers (documented follow-up of the 2026-07-23 spec).
+ * One Tap leads are PRODUCTION-only, like the other two producers. (Was
+ * false during the 2026-07-23 testing phase; flipped after verification.)
  */
-export const ONE_TAP_LEAD_PRODUCTION_ONLY = false;
+export const ONE_TAP_LEAD_PRODUCTION_ONLY = true;
 
 export interface OneTapLeadInput {
   /** Google account email - also the Email column value. */

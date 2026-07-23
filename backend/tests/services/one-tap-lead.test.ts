@@ -33,8 +33,7 @@ describe('one tap lead column values', () => {
 });
 
 describe('ONE_TAP_LEAD_PRODUCTION_ONLY', () => {
-  it('is false during the testing phase (leads fire in every env)', () => {
-    // Planned flip to true after testing - see the spec follow-ups section.
-    expect(ONE_TAP_LEAD_PRODUCTION_ONLY).toBe(false);
+  it('is true - one tap leads are production-only (testing phase over)', () => {
+    expect(ONE_TAP_LEAD_PRODUCTION_ONLY).toBe(true);
   });
 });
