@@ -127,6 +127,11 @@ export interface MeResponse {
     tenantInstagramHandle?: string | null;
     tenantFacebookHandle?: string | null;
     tenantTwitterHandle?: string | null;
+    /** Tenant identity fields editable post-onboarding on the Appearance
+     *  settings page (name lives on `tenantName` above). */
+    tenantBusinessDescription?: string | null;
+    tenantWebsite?: string | null;
+    tenantContactPhone?: string | null;
     /** Auto-adopt NEXUS-admin offers setting (absent tenant field = true). */
     autoAdoptAdminOffers?: boolean;
   };
@@ -477,6 +482,9 @@ export async function getMe(userId: string): Promise<MeResponse> {
               instagramHandle: 1,
               facebookHandle: 1,
               twitterHandle: 1,
+              businessDescription: 1,
+              website: 1,
+              contactPhone: 1,
             },
           },
         )
@@ -567,6 +575,11 @@ export async function getMe(userId: string): Promise<MeResponse> {
       tenantInstagramHandle: domainTenantDoc?.instagramHandle ?? null,
       tenantFacebookHandle: domainTenantDoc?.facebookHandle ?? null,
       tenantTwitterHandle: domainTenantDoc?.twitterHandle ?? null,
+      // Identity fields the Appearance settings page lets an owner/admin edit
+      // after onboarding (previously write-once, no read-back surface).
+      tenantBusinessDescription: domainTenantDoc?.businessDescription ?? null,
+      tenantWebsite: domainTenantDoc?.website ?? null,
+      tenantContactPhone: domainTenantDoc?.contactPhone ?? null,
       // Settings toggle: auto-adopt NEXUS-admin offers (absent field = true).
       autoAdoptAdminOffers: domainTenantDoc ? domainTenantDoc.autoAdoptAdminOffers !== false : true,
       ...(planSummary && {

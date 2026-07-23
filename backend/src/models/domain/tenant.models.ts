@@ -123,6 +123,15 @@ export const domainTenantSchema = z.object({
   // truth; this copy exists for search only. Backfilled by
   // scripts/backfill-search-fields.ts.
   businessDescription: z.string().max(2000).optional(),
+  // MIRROR of the legacy tenants.website (write-through funnel:
+  // updateTenantIdentity in tenant-identity.service.ts). tenantProfiles.website
+  // stays the historical source; this copy exists so every identity field is
+  // consistently available wherever domainTenants is read.
+  website: z.string().max(200).optional(),
+  // MIRROR of the legacy tenants.contactPhone (same write-through funnel).
+  // No prior domain-model home existed for this field before tenant-identity
+  // settings editing was added.
+  contactPhone: z.string().max(20).optional(),
   // Cloudinary URL of the organization logo (the PRISTINE original). Absent -> the
   // UI shows the tenant-name initials (only the Nexus ecosystem catalog uses Nexus logo).
   logoUrl: z.string().url().optional(),

@@ -92,6 +92,10 @@ export async function syncDomainTenantCoreDocs(input: DomainTenantCoreSyncInput)
           // so mirroring here keeps the copy exact.
           ...(input.tenant.businessDescription !== undefined
             && { businessDescription: input.tenant.businessDescription }),
+          // Mirrors of the legacy tenants doc so every identity field is
+          // consistently readable from domainTenants (tenant-identity-settings).
+          ...(input.tenant.website !== undefined && { website: input.tenant.website }),
+          ...(input.tenant.contactPhone !== undefined && { contactPhone: input.tenant.contactPhone }),
           status: mapLegacyTenantStatus(input.tenant.status),
           updatedAt: now,
         },
