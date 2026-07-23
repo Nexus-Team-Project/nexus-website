@@ -7,6 +7,7 @@ import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { TranslationKeys } from '../i18n/translations';
 import { useAuth } from '../contexts/AuthContext';
+import { isOneTapSilentSession, clearOneTapSilentSession } from '../lib/oneTapSilent';
 import { createPortal } from 'react-dom';
 
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
@@ -185,6 +186,11 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
   const { track } = useAnalytics();
   const { user } = useAuth();
   const isHe = language === 'he';
+  // One Tap silent sessions keep the guest presentation; the sign-in link
+  // relabels to Continue and ends silence on click (login page then does
+  // the instant dashboard handoff).
+  const silentSession = Boolean(user) && isOneTapSilentSession();
+  const signInLabel = silentSession ? (isHe ? 'המשך' : 'Continue') : t.navbar.signIn;
   const userOrgs = user?.orgMemberships ?? [];
 
   // Get nav items with current language
@@ -365,16 +371,16 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
             <Link
               to={language === 'he' ? '/he/signup' : '/signup'}
               className="block bg-nx-primary text-white text-sm font-semibold px-5 py-3 rounded-lg text-center"
-              onClick={() => setMobileOpen(false)}
+              onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
             >
               {t.buttons.startNow}
             </Link>
             <Link
               to={language === 'he' ? '/he/login' : '/login'}
               className="block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
-              onClick={() => setMobileOpen(false)}
+              onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
             >
-              {t.navbar.signIn}
+              {signInLabel}
             </Link>
           </div>
         </div>
@@ -562,7 +568,7 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
 
         {/* Desktop CTA */}
         <div className="hidden lg:flex items-center gap-4">
-          {user ? (
+          {user && !silentSession ? (
             // ── Authenticated user ──────────────────────────────
             userOrgs.length > 0 ? (
               // Has org(s) — show Dashboard button
@@ -599,13 +605,13 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
           ) : (
             // ── Unauthenticated ────────────────────────────────
             <>
-              <Link to={language === 'he' ? '/he/login' : '/login'} className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}>
-                {t.navbar.signIn}
+              <Link to={language === 'he' ? '/he/login' : '/login'} onClick={() => clearOneTapSilentSession()} className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}>
+                {signInLabel}
               </Link>
               <Link
                 to={language === 'he' ? '/he/signup' : '/signup'}
                 className="group flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-nx-primary/25"
-                onClick={() => track(MARKETING.NAVBAR_CTA_CLICKED, 'MARKETING', { button_text: t.navbar.getStarted, destination: 'signup' })}
+                onClick={() => { clearOneTapSilentSession(); track(MARKETING.NAVBAR_CTA_CLICKED, 'MARKETING', { button_text: t.navbar.getStarted, destination: 'signup' }); }}
               >
                 {t.navbar.getStarted}
                 <span className="inline-block w-0 overflow-hidden group-hover:w-4 transition-all duration-300 ease-out">
