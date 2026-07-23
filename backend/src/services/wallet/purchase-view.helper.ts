@@ -6,6 +6,7 @@
  * ids never appear here.
  */
 import type { WalletPurchase, WalletPurchaseStatus } from '../../models/payments/wallet-payments.models';
+import type { OfferVoucherValidityUnit } from '../../models/domain/supply.models';
 
 /** What the buyer redeems - a barcode value or a redemption link. */
 export interface PurchaseVoucherView {
@@ -63,8 +64,14 @@ export interface VoucherUnitDoc {
   code?: string;
   status: string;
   assignedPurchaseId?: string;
+  /** The "limit" recipe ("N units from purchase"), when the unit carries one. */
+  validityValue?: number | null;
+  validityUnit?: OfferVoucherValidityUnit | null;
   /** Unit-level redemption window (voucher-unit-level-dating); null/unset for an unfilled "limit"-type unit. */
+  validFrom?: Date | null;
   validUntil?: Date | null;
+  /** Set when the purchase flow computed the window from the limit recipe (vs an admin-authored window). */
+  validityFilledAt?: Date | null;
 }
 
 /** Display extras resolved by the caller (offer/card/unit joins). */
