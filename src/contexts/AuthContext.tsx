@@ -14,6 +14,7 @@ import {
 import { api, setAccessToken, refreshAccessToken } from '../lib/api';
 import { getVisitorId } from '../lib/visitorId';
 import { setOneTapSilentSession, clearOneTapSilentSession } from '../lib/oneTapSilent';
+import { consumeWebsiteReturnTo } from '../lib/websiteReturnTo';
 
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
 
@@ -215,6 +216,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             hasDashboardUrl: Boolean(data.dashboardUrl),
             hasDashboardCode: Boolean(data.dashboardCode),
           });
+
+          // A website return path (login page opened with ?returnTo=...)
+          // takes precedence over the dashboard handoff: the refresh cookie
+          // is set, so the target page restores the session on load.
+          const websiteReturnTo = consumeWebsiteReturnTo();
+          if (websiteReturnTo) {
+            logAuthHandoff('Returning to website page after Google login', { websiteReturnTo });
+            window.location.replace(websiteReturnTo);
+            return;
+          }
 
           if (data.dashboardUrl) {
             logAuthHandoff('Redirecting to dashboard callback', { dashboardUrl: data.dashboardUrl });

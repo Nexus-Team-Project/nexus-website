@@ -7,11 +7,12 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import AnimatedGradient from '../components/AnimatedGradient';
 import GoogleSignIn from '../components/GoogleSignIn';
 import NexusLogo from '../components/NexusLogo';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { clearOneTapSilentSession } from '../lib/oneTapSilent';
+import { sanitizeWebsiteReturnTo, saveWebsiteReturnTo, clearWebsiteReturnTo } from '../lib/websiteReturnTo';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import InviteBanner from '../components/InviteBanner';
 import LoginOtpStep from '../components/LoginOtpStep';
@@ -49,6 +50,7 @@ export default function Login() {
   const { t, language } = useLanguage();
   const { user: authenticatedUser, isLoading: isAuthLoading, login, verifyLoginOtp, resendLoginOtp } = useAuth();
   const { search } = useLocation();
+  const navigate = useNavigate();
   const { identify } = useAnalytics();
   const isHe = language === 'he';
   const homePath = isHe ? '/he' : '/';
@@ -56,12 +58,23 @@ export default function Login() {
 
   const searchParams = new URLSearchParams(search);
   const dashboardRedirect = searchParams.get('dashboardRedirect');
+  // ?returnTo=<website path>: after login, go BACK to that website page
+  // instead of the dashboard handoff (e.g. partners cashback while One Tap
+  // is in Google's dismissal cooldown).
+  const returnTo = sanitizeWebsiteReturnTo(searchParams.get('returnTo'));
 
   // Entering an explicit auth flow ends One Tap silence - the session (if
   // any) must behave normally here (instant recognize + dashboard redirect).
   useEffect(() => {
     clearOneTapSilentSession();
   }, []);
+
+  // Persist/clear the return path across the Google OAuth full-page
+  // round-trip (AuthContext consumes it after the code exchange).
+  useEffect(() => {
+    if (returnTo) saveWebsiteReturnTo(returnTo);
+    else clearWebsiteReturnTo();
+  }, [returnTo]);
 
   // When the visitor arrived from an invite email, look up the organization so
   // the banner can tell them who invited them before they sign in.
@@ -106,9 +119,16 @@ export default function Login() {
   const redirectToDashboard = useCallback(async (
     user: { orgMemberships?: { org: { slug: string } }[] },
   ) => {
+    // A website return path takes precedence over the dashboard handoff:
+    // the session cookie is already set, so the target page sees the login.
+    if (returnTo) {
+      clearWebsiteReturnTo();
+      navigate(returnTo, { replace: true });
+      return;
+    }
     const { code } = await api.post<{ code: string }>('/api/auth/create-code');
     window.location.replace(buildDashboardCallbackUrl(code, getDashboardRedirectPath(user)));
-  }, [buildDashboardCallbackUrl, getDashboardRedirectPath]);
+  }, [buildDashboardCallbackUrl, getDashboardRedirectPath, returnTo, navigate]);
 
   /**
    * Sends a regular authenticated user to the dashboard with a fresh SSO code.
@@ -197,7 +217,9 @@ export default function Login() {
       <div className="h-screen bg-white flex flex-col items-center justify-center gap-4">
         <div className="w-10 h-10 border-4 border-nx-primary border-t-transparent rounded-full animate-spin" />
         <p className="text-sm text-slate-500">
-          {isHe ? 'מעבירים אותך ללוח הבקרה...' : 'Taking you to your dashboard...'}
+          {returnTo
+            ? (isHe ? 'מחזירים אותך לעמוד...' : 'Taking you back...')
+            : (isHe ? 'מעבירים אותך ללוח הבקרה...' : 'Taking you to your dashboard...')}
         </p>
       </div>
     );
