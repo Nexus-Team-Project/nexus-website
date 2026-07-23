@@ -38,6 +38,7 @@ const PrivacyPolicyPage  = lazy(() => import('./pages/PrivacyPolicyPage'));
 const AccessibilityPage  = lazy(() => import('./pages/AccessibilityPage'));
 const TermsOfUsePage     = lazy(() => import('./pages/TermsOfUsePage'));
 const NexusLandingPage   = lazy(() => import('./pages/NexusLandingPage'));
+const NexusLandingPageLegacy = lazy(() => import('./pages/NexusLandingPageLegacy'));
 const ApiDocsPage        = lazy(() => import('./pages/ApiDocsPage'));
 const ChangelogPage      = lazy(() => import('./pages/Changelog'));
 const ChangelogPageHe    = lazy(() => import('./pages/ChangelogHe'));
@@ -417,6 +418,9 @@ function App() {
           <Route path="/he/terms"    element={<LanguageProvider language="he"><TermsOfUsePage /></LanguageProvider>} />
           <Route path="/welfare"     element={<LanguageGate><LanguageProvider language="en"><NexusLandingPage /></LanguageProvider></LanguageGate>} />
           <Route path="/he/welfare"  element={<LanguageProvider language="he"><NexusLandingPage /></LanguageProvider>} />
+          {/* Frozen snapshot of the previous welfare page — for side-by-side comparison while the new version is built. */}
+          <Route path="/welfare-legacy"    element={<LanguageGate><LanguageProvider language="en"><NexusLandingPageLegacy /></LanguageProvider></LanguageGate>} />
+          <Route path="/he/welfare-legacy" element={<LanguageProvider language="he"><NexusLandingPageLegacy /></LanguageProvider>} />
           <Route path="/docs"        element={<LanguageGate><LanguageProvider language="en"><ApiDocsPage /></LanguageProvider></LanguageGate>} />
           <Route path="/he/docs"     element={<LanguageProvider language="he"><ApiDocsPage /></LanguageProvider>} />
           <Route path="/changelog"   element={<LanguageGate><ChangelogPage /></LanguageGate>} />

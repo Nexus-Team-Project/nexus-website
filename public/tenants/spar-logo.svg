@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 110" role="img" aria-label="SPAR">
+  <rect x="2" y="18" width="248" height="74" rx="6" fill="#E2001A"/>
+  <text x="126" y="78" text-anchor="middle" font-family="Arial Black, Arial, Helvetica, sans-serif" font-weight="900" font-size="58" fill="#ffffff" letter-spacing="3">SPAR</text>
+  <g transform="translate(262,10)">
+    <circle cx="38" cy="45" r="45" fill="#009639"/>
+    <path d="M38 12 L57 52 L19 52 Z" fill="#ffffff"/>
+    <rect x="33" y="50" width="10" height="22" fill="#ffffff"/>
+  </g>
+</svg>
