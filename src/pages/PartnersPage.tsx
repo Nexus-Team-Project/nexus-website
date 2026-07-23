@@ -57,10 +57,14 @@ export default function PartnersPage() {
   /**
    * Guest clicked a card's lock label: re-open the One Tap prompt; when
    * Google suppresses it (dismiss cooldown / no browser session), fall back
-   * to the login page so the click always does something.
+   * to the login page with a returnTo so the login lands BACK here with
+   * cashback visible instead of the dashboard handoff.
    */
   const handleLockSignIn = useCallback(() => {
-    promptGoogleOneTap(() => navigate(he ? '/he/login' : '/login'));
+    promptGoogleOneTap(() => {
+      const returnTo = encodeURIComponent(window.location.pathname);
+      navigate(`${he ? '/he/login' : '/login'}?returnTo=${returnTo}`);
+    });
   }, [navigate, he]);
 
   // Fetch partners (waits for auth to resolve so the token is ready)
