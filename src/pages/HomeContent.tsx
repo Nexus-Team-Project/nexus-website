@@ -7,6 +7,7 @@ import Hero from '../components/Hero';
 import PartnerBubbles from '../components/PartnerBubbles';
 
 import { useSectionVisible } from '../hooks/useSectionVisible';
+import { useGoogleOneTap } from '../hooks/useGoogleOneTap';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { useSEO } from '../hooks/useSEO';
 import { MARKETING } from '../lib/analyticsEvents';
@@ -212,6 +213,8 @@ function FooterSkeleton() {
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function HomeContent() {
+  // Google One Tap for logged-out visitors (silent session on tap).
+  useGoogleOneTap();
   const { t, direction, language } = useLanguage();
   const { track } = useAnalytics();
   const [isChatOpen, setIsChatOpen] = useState(false);

@@ -540,6 +540,7 @@ model Partner {
   thumbnailUrl String
   categories   String[]
   discount     String?
+  cashbackPct  Float?
   description  String?
   websiteUrl   String?
   searchTerms  String[] @default([])

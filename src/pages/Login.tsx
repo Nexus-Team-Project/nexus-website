@@ -11,6 +11,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { clearOneTapSilentSession } from '../lib/oneTapSilent';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import InviteBanner from '../components/InviteBanner';
 import LoginOtpStep from '../components/LoginOtpStep';
@@ -55,6 +56,12 @@ export default function Login() {
 
   const searchParams = new URLSearchParams(search);
   const dashboardRedirect = searchParams.get('dashboardRedirect');
+
+  // Entering an explicit auth flow ends One Tap silence - the session (if
+  // any) must behave normally here (instant recognize + dashboard redirect).
+  useEffect(() => {
+    clearOneTapSilentSession();
+  }, []);
 
   // When the visitor arrived from an invite email, look up the organization so
   // the banner can tell them who invited them before they sign in.
@@ -182,6 +189,19 @@ export default function Login() {
       }
     }
   };
+
+  // A restored session is being redirected to the dashboard (effect above) -
+  // show a loader instead of a login form nobody should fill.
+  if (!isAuthLoading && authenticatedUser) {
+    return (
+      <div className="h-screen bg-white flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-4 border-nx-primary border-t-transparent rounded-full animate-spin" />
+        <p className="text-sm text-slate-500">
+          {isHe ? 'מעבירים אותך ללוח הבקרה...' : 'Taking you to your dashboard...'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-screen bg-white flex flex-col overflow-hidden">

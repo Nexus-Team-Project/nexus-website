@@ -5,10 +5,16 @@ import AnimatedGradient from './AnimatedGradient';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
 import GoogleSignIn from './GoogleSignIn';
+import { useAuth } from '../contexts/AuthContext';
+import { useOneTapSilentFlag } from '../hooks/useOneTapSilentFlag';
 
 export default function Hero() {
   const { t, direction, language } = useLanguage();
   const { track } = useAnalytics();
+  const { user } = useAuth();
+  // Hide the Google sign-in CTA the instant a One Tap silent session starts
+  // (or when any session exists) - signing in again makes no sense.
+  const hasSession = useOneTapSilentFlag() || Boolean(user);
 
   // Mobile mockup uses the same hero image asset as desktop so users
   // see the chart + phone preview the moment the page loads on a phone.
@@ -80,7 +86,7 @@ export default function Hero() {
                     <ArrowRight size={16} className={`inline ${direction === 'rtl' ? 'scale-x-[-1]' : ''}`} />
                   </span>
                 </Link>
-                <GoogleSignIn variant="hero" />
+                {!hasSession && <GoogleSignIn variant="hero" />}
               </div>
 
             </div>

@@ -426,16 +426,19 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
     ],
   });
   // Tenant ratings authored by this user + ratings on tenants the user owns.
-  await db.collection(TENANT_RATING_COLLECTION).deleteMany({
-    $or: [
-      ...(targets.nexusIdentityIds.length
-        ? [{ nexusIdentityId: { $in: targets.nexusIdentityIds } }]
-        : []),
-      ...(targets.domainOwnedTenantIds.length
-        ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }]
-        : []),
-    ],
-  });
+  // Both clauses are conditional, so guard against an empty $or (illegal in
+  // Mongo) - a fresh login-only user has no identity and owns no tenants.
+  const tenantRatingClauses = [
+    ...(targets.nexusIdentityIds.length
+      ? [{ nexusIdentityId: { $in: targets.nexusIdentityIds } }]
+      : []),
+    ...(targets.domainOwnedTenantIds.length
+      ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }]
+      : []),
+  ];
+  if (tenantRatingClauses.length > 0) {
+    await db.collection(TENANT_RATING_COLLECTION).deleteMany({ $or: tenantRatingClauses });
+  }
 
   // Saved payment cards (PayMe tokens) are hard-deleted; wallet purchases
   // are RETAINED as tenant/tax audit records ("who bought what and when").

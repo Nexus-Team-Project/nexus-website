@@ -247,19 +247,31 @@ export const CROP_EPSILON = 0.001;
  */
 export const imageCropSchema = z
   .object({
-    x: z.number().min(0).max(1),
-    y: z.number().min(0).max(1),
-    width: z.number().gt(0).max(1),
-    height: z.number().gt(0).max(1),
+    // Bounds carry +/-CROP_EPSILON tolerance on every side, not just the sum
+    // checks below: the editor computes these fractions by dividing a
+    // sub-pixel-precise drag position by the rendered <img> element's
+    // ROUNDED integer width/height, so a crop dragged flush to an edge can
+    // land a hair past 0 or 1 (e.g. 1.00017) purely from that rounding, with
+    // no actual out-of-bounds selection. A hard .max(1)/.min(0) here rejected
+    // that harmless overshoot with Zod's generic "Number must be less than or
+    // equal to 1" - unhelpful and technically wrong, since the crop is valid.
+    x: z.number().min(-CROP_EPSILON, { message: 'Crop left edge is outside the image' })
+      .max(1 + CROP_EPSILON, { message: 'Crop left edge is outside the image' }),
+    y: z.number().min(-CROP_EPSILON, { message: 'Crop top edge is outside the image' })
+      .max(1 + CROP_EPSILON, { message: 'Crop top edge is outside the image' }),
+    width: z.number().gt(0, { message: 'Crop width must be greater than zero' })
+      .max(1 + CROP_EPSILON, { message: 'Crop width exceeds the image bounds' }),
+    height: z.number().gt(0, { message: 'Crop height must be greater than zero' })
+      .max(1 + CROP_EPSILON, { message: 'Crop height exceeds the image bounds' }),
     aspect: z.number().positive().optional(),
     naturalWidth: z.number().int().positive().optional(),
     naturalHeight: z.number().int().positive().optional(),
   })
   .refine((c) => c.x + c.width <= 1 + CROP_EPSILON, {
-    message: 'crop x + width exceeds image bounds',
+    message: 'Crop area extends past the right edge of the image',
   })
   .refine((c) => c.y + c.height <= 1 + CROP_EPSILON, {
-    message: 'crop y + height exceeds image bounds',
+    message: 'Crop area extends past the bottom edge of the image',
   });
 
 export type ImageCrop = z.infer<typeof imageCropSchema>;

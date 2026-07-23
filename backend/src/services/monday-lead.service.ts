@@ -1,14 +1,18 @@
 /**
  * Monday.com lead service for the "Website Leads" group of the Leads board
- * (1767743351). Two producers:
+ * (1767743351). Three producers:
  *   - createOnboardingLead: fired when a user completes the dashboard
  *     onboarding wizard.
  *   - createContactSalesLead: fired when the public website contact-sales
  *     form ("צור קשר עם מכירות") is submitted; the message is posted as an
  *     item UPDATE so sales sees the full inquiry on the item.
- * Both are fire-and-forget: they log and never throw, so a Monday outage can
- * never fail onboarding or the contact form. Both are PRODUCTION-only -
- * outside NODE_ENV=production they log a skip line and do nothing.
+ *   - createOneTapLead: fired when a NEW user signs up via Google One Tap on
+ *     the public website (2026-07-23 spec). Has its own testing-phase gate
+ *     (ONE_TAP_LEAD_PRODUCTION_ONLY) instead of the hard production-only rule.
+ * All are fire-and-forget: they log and never throw, so a Monday outage can
+ * never fail onboarding, the contact form, or a One Tap login. The first two
+ * are PRODUCTION-only - outside NODE_ENV=production they log a skip line and
+ * do nothing.
  *
  * Legacy monday.service.ts (marketing-site leads, different board) is
  * intentionally untouched.
@@ -252,6 +256,73 @@ export async function createContactSalesLead(input: ContactSalesLeadInput): Prom
   } catch (err) {
     console.error(
       `[monday-lead] failed to create contact-sales lead - email ${input.email}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+// ─── One Tap leads ───────────────────────────────────────────────────────────
+
+/**
+ * One Tap leads are PRODUCTION-only, like the other two producers. (Was
+ * false during the 2026-07-23 testing phase; flipped after verification.)
+ */
+export const ONE_TAP_LEAD_PRODUCTION_ONLY = true;
+
+export interface OneTapLeadInput {
+  /** Google account email - also the Email column value. */
+  email: string;
+  /** Google full name; falls back to the email as the item name. */
+  fullName?: string | null;
+  /** Website path the One Tap happened on (e.g. /partners), for context. */
+  page?: string;
+}
+
+/**
+ * Builds the lead message shown in the Company column + item update.
+ * Pure - exported for unit testing.
+ * Input: optional page path. Output: the message string.
+ */
+export function buildOneTapLeadMessage(page?: string): string {
+  return page ? `Google One Tap signup (page: ${page})` : 'Google One Tap signup';
+}
+
+/**
+ * Create a Website Leads item for a NEW user who signed up via Google One
+ * Tap on the public website. Never throws; logs outcome either way.
+ * Gating: skipped outside production only once ONE_TAP_LEAD_PRODUCTION_ONLY
+ * is flipped to true (currently fires in every env for testing).
+ * Input: Google-derived lead fields. Output: resolves when the attempt finished.
+ */
+export async function createOneTapLead(input: OneTapLeadInput): Promise<void> {
+  if (ONE_TAP_LEAD_PRODUCTION_ONLY && env.NODE_ENV !== 'production') {
+    console.info(`[monday-lead] non-production env - skipping one-tap lead for ${input.email}`);
+    return;
+  }
+  if (!env.MONDAY_API_TOKEN) {
+    console.warn(`[monday-lead] MONDAY_API_TOKEN not set - skipping one-tap lead for ${input.email}`);
+    return;
+  }
+  const message = buildOneTapLeadMessage(input.page);
+  try {
+    const itemId = await createWebsiteLeadsItem(
+      input.fullName?.trim() || input.email,
+      buildContactSalesColumnValues({ email: input.email, name: input.fullName ?? undefined, message }),
+    );
+    // Post the context as an item update too, mirroring contact-sales. Best-effort.
+    await mondayGraphql(
+      'mutation ($itemId: ID!, $body: String!) { create_update(item_id: $itemId, body: $body) { id } }',
+      { itemId, body: message },
+    ).catch((e) => {
+      console.warn(`[monday-lead] one-tap update post failed for item ${itemId}:`, e instanceof Error ? e.message : e);
+    });
+    console.info(
+      `[monday-lead] created one-tap Website Leads item ${itemId} on board ${env.MONDAY_LEADS_BOARD_ID ?? DEFAULT_LEADS_BOARD_ID} - ` +
+      `lead "${input.fullName ?? ''}", email ${input.email}${input.page ? `, page ${input.page}` : ''}`,
+    );
+  } catch (err) {
+    console.error(
+      `[monday-lead] failed to create one-tap lead - email ${input.email}:`,
       err instanceof Error ? err.message : err,
     );
   }
