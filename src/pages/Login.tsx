@@ -11,6 +11,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
+import { clearOneTapSilentSession } from '../lib/oneTapSilent';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import InviteBanner from '../components/InviteBanner';
 import LoginOtpStep from '../components/LoginOtpStep';
@@ -55,6 +56,12 @@ export default function Login() {
 
   const searchParams = new URLSearchParams(search);
   const dashboardRedirect = searchParams.get('dashboardRedirect');
+
+  // Entering an explicit auth flow ends One Tap silence - the session (if
+  // any) must behave normally here (instant recognize + dashboard redirect).
+  useEffect(() => {
+    clearOneTapSilentSession();
+  }, []);
 
   // When the visitor arrived from an invite email, look up the organization so
   // the banner can tell them who invited them before they sign in.

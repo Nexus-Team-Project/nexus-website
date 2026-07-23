@@ -7,6 +7,7 @@ import AccessibilityWidget from './components/AccessibilityWidget';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAuth } from './contexts/AuthContext';
 import { api } from './lib/api';
+import { clearOneTapSilentSession } from './lib/oneTapSilent';
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
@@ -99,6 +100,8 @@ function getDashboardRedirectPath(user: DashboardRedirectProfile): string {
  * Output: browser leaves the website after receiving a one-time SSO code.
  */
 async function redirectWebsiteSessionToDashboard(user: DashboardRedirectProfile): Promise<void> {
+  // An explicit dashboard handoff ends One Tap silence.
+  clearOneTapSilentSession();
   const { code } = await api.post<{ code: string }>('/api/auth/create-code');
   window.location.replace(buildDashboardCallbackUrl(code, getDashboardRedirectPath(user)));
 }

@@ -10,6 +10,7 @@ import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
 import { useInvitePreview } from '../hooks/useInvitePreview';
 import InviteBanner from '../components/InviteBanner';
+import { clearOneTapSilentSession } from '../lib/oneTapSilent';
 
 interface SignupPageError {
   field?: string;
@@ -52,6 +53,12 @@ const FlagIcon = ({ code }: { code: string }) => {
 };
 
 export default function Signup() {
+  // Entering an explicit auth flow ends One Tap silence - the session (if
+  // any) must behave normally here (instant recognize + dashboard redirect).
+  useEffect(() => {
+    clearOneTapSilentSession();
+  }, []);
+
   const [country, setCountry] = useState('IL');
   const [emailUpdates, setEmailUpdates] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
