@@ -67,9 +67,14 @@ export function useGoogleOneTap(): void {
     if (!CLIENT_ID || isOneTapSilentSession()) return;
     promptedRef.current = true;
 
-    let cancelled = false;
+    // NOTE: no cleanup/cancellation here on purpose. React StrictMode (dev)
+    // runs effects twice: a cancel flag killed run A's pending init while the
+    // one-shot promptedRef blocked run B - so initialize() never executed.
+    // The ref alone already guarantees a single prompt per mount, and a
+    // late prompt after navigation is harmless (the hook is mounted on every
+    // One Tap surface and the global guards re-checked on tap).
     void loadGisScript().then((idApi) => {
-      if (!idApi || cancelled) return;
+      if (!idApi) return;
       idApi.initialize({
         client_id: CLIENT_ID,
         callback: (response) => {
@@ -82,6 +87,5 @@ export function useGoogleOneTap(): void {
       });
       idApi.prompt();
     });
-    return () => { cancelled = true; };
   }, [isLoading, user, oneTapLogin]);
 }
