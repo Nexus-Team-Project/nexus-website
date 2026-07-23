@@ -22,6 +22,12 @@ interface GoogleCredentialResponse {
   credential: string;
 }
 
+/** Subset of the GIS prompt moment notification we rely on. */
+interface GooglePromptMoment {
+  isNotDisplayed?: () => boolean;
+  isSkippedMoment?: () => boolean;
+}
+
 interface GoogleIdApi {
   initialize: (config: {
     client_id: string;
@@ -29,7 +35,30 @@ interface GoogleIdApi {
     auto_select?: boolean;
     cancel_on_tap_outside?: boolean;
   }) => void;
-  prompt: () => void;
+  prompt: (momentListener?: (notification: GooglePromptMoment) => void) => void;
+}
+
+// The initialized GIS api, kept module-level so any surface (e.g. the
+// partners-card lock label) can re-open the prompt after the auto-show.
+let initializedGisApi: GoogleIdApi | null = null;
+
+/**
+ * Re-opens the One Tap prompt on demand (e.g. from the partners lock label).
+ * Input: onSuppressed - called when the prompt cannot show (GIS not
+ * initialized, Google cooldown after a dismissal, no browser session) so the
+ * caller can fall back to the login page.
+ */
+export function promptGoogleOneTap(onSuppressed?: () => void): void {
+  const idApi = initializedGisApi;
+  if (!idApi) {
+    onSuppressed?.();
+    return;
+  }
+  idApi.prompt((notification) => {
+    if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+      onSuppressed?.();
+    }
+  });
 }
 
 declare global {
@@ -94,6 +123,7 @@ export function useGoogleOneTap(): void {
         auto_select: false,
         cancel_on_tap_outside: true,
       });
+      initializedGisApi = idApi;
       idApi.prompt();
     });
   }, [isLoading, user, oneTapLogin]);

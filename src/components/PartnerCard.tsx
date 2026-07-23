@@ -19,9 +19,11 @@ export interface Partner {
 interface PartnerCardProps {
   partner: Partner;
   isLoggedIn: boolean;
+  /** Called when a guest clicks the lock label - opens the One Tap prompt. */
+  onSignInClick?: () => void;
 }
 
-export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
+export default function PartnerCard({ partner, isLoggedIn, onSignInClick }: PartnerCardProps) {
   const { language } = useLanguage();
   const lockLabel = language === 'he' ? 'התחבר לצפייה בקאשבק' : 'Sign in to view cashback';
 
@@ -95,9 +97,13 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
               </div>
               <div className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-xl backdrop-blur-[0.5px] bg-white/60 select-none">
                 <Lock size={11} className="text-nx-primary shrink-0" />
-                <span className="text-[11px] font-semibold text-nx-primary whitespace-nowrap">
+                <button
+                  type="button"
+                  onClick={onSignInClick}
+                  className="text-[11px] font-semibold text-nx-primary hover:underline whitespace-nowrap"
+                >
                   {lockLabel}
-                </span>
+                </button>
               </div>
             </div>
           )}
