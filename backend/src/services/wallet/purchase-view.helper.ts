@@ -12,6 +12,8 @@ export interface PurchaseVoucherView {
   kind: 'barcode' | 'link';
   value: string;
   code: string | null;
+  /** This unit's redemption deadline (unit-level dating); null when unset (e.g. an unfilled "limit"-type unit). */
+  validUntil: string | null;
 }
 
 /** One purchase as the wallet client sees it. */
@@ -61,6 +63,8 @@ export interface VoucherUnitDoc {
   code?: string;
   status: string;
   assignedPurchaseId?: string;
+  /** Unit-level redemption window (voucher-unit-level-dating); null/unset for an unfilled "limit"-type unit. */
+  validUntil?: Date | null;
 }
 
 /** Display extras resolved by the caller (offer/card/unit joins). */

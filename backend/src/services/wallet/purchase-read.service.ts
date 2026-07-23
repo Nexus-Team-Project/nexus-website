@@ -111,7 +111,7 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
     const vouchers = (d.voucherCodeIds ?? [])
       .map((id) => unitMap.get(id))
       .filter((u): u is VoucherUnitDoc => Boolean(u))
-      .map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null }));
+      .map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null, validUntil: u.validUntil ? u.validUntil.toISOString() : null }));
     const { terms, implementationInstructions } = offer
       ? resolveEffectiveVariantTerms(offer, variant)
       : {};
