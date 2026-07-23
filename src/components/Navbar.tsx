@@ -658,13 +658,27 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                 </Link>
               )
             ) : (
-              // Has no org — link to personal dashboard
-              <Link
-                to={isHe ? '/he/dashboard' : '/dashboard'}
-                className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}
-              >
-                {isHe ? 'החשבון שלי' : 'My Account'}
-              </Link>
+              // Has no org - My Account starts the dashboard SSO handoff
+              // (code exchange, same as a regular login); Sign out ends the
+              // website session. The legacy in-website /dashboard page is gone.
+              <>
+                <button
+                  onClick={handleSilentLogout}
+                  className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}
+                >
+                  {isHe ? 'התנתק' : 'Sign out'}
+                </button>
+                <button
+                  onClick={handleContinue}
+                  disabled={isContinuing}
+                  className="flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-nx-primary/25 disabled:opacity-70"
+                >
+                  {isContinuing && (
+                    <span className="w-3.5 h-3.5 border-2 border-white/60 border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {isHe ? 'החשבון שלי' : 'My Account'}
+                </button>
+              </>
             )
           ) : (
             // ── Unauthenticated ────────────────────────────────
