@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useAnalytics } from '../hooks/useAnalytics';
 import { MARKETING } from '../lib/analyticsEvents';
 import { ChevronDown, Menu, X, ArrowRight, CreditCard, Link as LinkIcon, Receipt, TrendingUp, Building2, Globe, Wallet, Network, FileText, HelpCircle, Users, Store, Code, Newspaper, GraduationCap, MessageSquare, Youtube, Gift, Heart, Layers, Cpu, type LucideIcon } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import NexusLogo from './NexusLogo';
 import { useLanguage } from '../i18n/LanguageContext';
 import type { TranslationKeys } from '../i18n/translations';
 import { useAuth } from '../contexts/AuthContext';
 import { clearOneTapSilentSession } from '../lib/oneTapSilent';
 import { useOneTapSilentFlag } from '../hooks/useOneTapSilentFlag';
+import { promptGoogleOneTap } from '../hooks/useGoogleOneTap';
 import { createPortal } from 'react-dom';
 
 const DASHBOARD_URL = import.meta.env.VITE_DASHBOARD_URL ?? '';
@@ -194,6 +195,12 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
   // loaded).
   const silentFlag = useOneTapSilentFlag();
   const [isContinuing, setIsContinuing] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  // On the partners page the sign-in link behaves like the cards' lock
+  // label: One Tap first, login page with a returnTo as the fallback.
+  const onPartnersPage = location.pathname.endsWith('/partners');
 
   /** Instant dashboard handoff from the Continue button (silent sessions). */
   const handleContinue = async () => {
@@ -207,9 +214,26 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
     }
   };
 
-  /** Ends a silent One Tap session entirely (back to a plain guest). */
-  const handleSilentLogout = () => {
-    void logout();
+  /** Ends the session (silent or regular) - back to a plain guest. */
+  const handleSilentLogout = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    try {
+      await logout();
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  /**
+   * Partners-page sign-in click: try the One Tap prompt; when suppressed
+   * (cooldown / no Google session) go to the login page with a returnTo so
+   * the login lands back on the partners page.
+   */
+  const handlePartnersSignIn = () => {
+    promptGoogleOneTap(() => {
+      navigate(`${isHe ? '/he/login' : '/login'}?returnTo=${encodeURIComponent(location.pathname)}`);
+    });
   };
   const userOrgs = user?.orgMemberships ?? [];
 
@@ -402,9 +426,13 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                   {isHe ? 'המשך' : 'Continue'}
                 </button>
                 <button
-                  onClick={() => { handleSilentLogout(); setMobileOpen(false); }}
-                  className="w-full block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
+                  onClick={() => { void handleSilentLogout().then(() => setMobileOpen(false)); }}
+                  disabled={isSigningOut}
+                  className="w-full flex items-center justify-center gap-2 border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center disabled:opacity-70"
                 >
+                  {isSigningOut && (
+                    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  )}
                   {isHe ? 'התנתק' : 'Log out'}
                 </button>
               </>
@@ -417,13 +445,22 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
                 >
                   {t.buttons.startNow}
                 </Link>
-                <Link
-                  to={language === 'he' ? '/he/login' : '/login'}
-                  className="block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
-                  onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
-                >
-                  {t.navbar.signIn}
-                </Link>
+                {onPartnersPage ? (
+                  <button
+                    onClick={() => { setMobileOpen(false); handlePartnersSignIn(); }}
+                    className="w-full block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
+                  >
+                    {t.navbar.signIn}
+                  </button>
+                ) : (
+                  <Link
+                    to={language === 'he' ? '/he/login' : '/login'}
+                    className="block border border-slate-200 text-slate-700 text-sm font-semibold px-5 py-3 rounded-lg text-center"
+                    onClick={() => { clearOneTapSilentSession(); setMobileOpen(false); }}
+                  >
+                    {t.navbar.signIn}
+                  </Link>
+                )}
               </>
             )}
           </div>
@@ -617,8 +654,12 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
             <>
               <button
                 onClick={handleSilentLogout}
-                className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}
+                disabled={isSigningOut}
+                className={`flex items-center gap-2 text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all disabled:opacity-70`}
               >
+                {isSigningOut && (
+                  <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                )}
                 {isHe ? 'התנתק' : 'Log out'}
               </button>
               <button
@@ -664,8 +705,12 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
               <>
                 <button
                   onClick={handleSilentLogout}
-                  className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}
+                  disabled={isSigningOut}
+                  className={`flex items-center gap-2 text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all disabled:opacity-70`}
                 >
+                  {isSigningOut && (
+                    <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  )}
                   {isHe ? 'התנתק' : 'Sign out'}
                 </button>
                 <button
@@ -683,9 +728,18 @@ export default function Navbar({ variant = 'light' }: { variant?: 'light' | 'dar
           ) : (
             // ── Unauthenticated ────────────────────────────────
             <>
-              <Link to={language === 'he' ? '/he/login' : '/login'} onClick={() => clearOneTapSilentSession()} className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}>
-                {t.navbar.signIn}
-              </Link>
+              {onPartnersPage ? (
+                <button
+                  onClick={handlePartnersSignIn}
+                  className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}
+                >
+                  {t.navbar.signIn}
+                </button>
+              ) : (
+                <Link to={language === 'he' ? '/he/login' : '/login'} onClick={() => clearOneTapSilentSession()} className={`text-sm ${variant === 'dark' ? 'text-slate-800 hover:text-slate-900 hover:bg-slate-100' : 'text-white/80 hover:text-slate-900 hover:bg-white'} px-4 py-2 rounded-lg transition-all`}>
+                  {t.navbar.signIn}
+                </Link>
+              )}
               <Link
                 to={language === 'he' ? '/he/signup' : '/signup'}
                 className="group flex items-center gap-2 bg-nx-primary hover:bg-nx-primary/90 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-all hover:shadow-lg hover:shadow-nx-primary/25"
