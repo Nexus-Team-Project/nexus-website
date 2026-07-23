@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Search, X } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import PartnerCard, { type Partner } from '../components/PartnerCard';
@@ -8,7 +8,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { useSEO } from '../hooks/useSEO';
-import { useGoogleOneTap } from '../hooks/useGoogleOneTap';
+import { useGoogleOneTap, promptGoogleOneTap } from '../hooks/useGoogleOneTap';
 import { useOneTapSilentFlag } from '../hooks/useOneTapSilentFlag';
 
 const Footer = lazy(() => import('../components/Footer'));
@@ -52,6 +52,16 @@ export default function PartnersPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const pT = t.partnersPage as Record<string, string>;
+  const navigate = useNavigate();
+
+  /**
+   * Guest clicked a card's lock label: re-open the One Tap prompt; when
+   * Google suppresses it (dismiss cooldown / no browser session), fall back
+   * to the login page so the click always does something.
+   */
+  const handleLockSignIn = useCallback(() => {
+    promptGoogleOneTap(() => navigate(he ? '/he/login' : '/login'));
+  }, [navigate, he]);
 
   // Fetch partners (waits for auth to resolve so the token is ready)
   const fetchPartners = useCallback(async () => {
@@ -274,7 +284,7 @@ export default function PartnersPage() {
         {!isBusy && sorted.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginated.map((partner) => (
-              <PartnerCard key={partner.id} partner={partner} isLoggedIn={isLoggedIn} />
+              <PartnerCard key={partner.id} partner={partner} isLoggedIn={isLoggedIn} onSignInClick={handleLockSignIn} />
             ))}
           </div>
         )}
