@@ -84,7 +84,14 @@ export async function attachPhoneToIdentity(
     .updateMany({ nexusIdentityId: args.nexusIdentityId }, { $set: rowSet });
   await db
     .collection(DOMAIN_COLLECTIONS.tenantContacts)
-    .updateMany({ nexusIdentityId: args.nexusIdentityId }, { $set: rowSet });
+    .updateMany({ nexusIdentityId: args.nexusIdentityId }, { $set: rowSet })
+    .catch((error: unknown) => {
+      // ponytail: the new partial unique (tenantId, phone) index can reject
+      // this mirror write when the tenant separately imported a phone-only
+      // contact with the same number (two rows for one human). Attach must
+      // never fail on that; a contact-merge flow is the follow-up.
+      console.warn('tenantContacts phone mirror skipped (duplicate phone in tenant)', error);
+    });
 
   return { phone };
 }

@@ -1,13 +1,16 @@
 /**
  * Tenant (organization) logo lifecycle. Uploads the square-cropped logo to
- * Cloudinary, stores the secure URL on the Tenant, and best-effort cleans up the
- * previous Cloudinary asset. Removing clears the URL (the UI falls back to the
- * tenant-name initials).
+ * Cloudinary, runs background removal on it (the transparent PNG becomes the
+ * stored asset; the original is kept only when removal fails), stores the
+ * secure URL on the Tenant, and best-effort cleans up the previous Cloudinary
+ * asset. Removing clears the URL (the UI falls back to the tenant-name
+ * initials).
  */
 import { Db } from 'mongodb';
 import { getTenantDomainCollections } from '../models/domain';
 import type { LogoCrop } from '../models/domain/tenant.models';
 import { uploadTenantLogo, deleteOfferImage } from '../utils/cloudinary';
+import { removeLogoBackground } from '../utils/cloudinary-background';
 
 /**
  * Upload a new (pristine) logo and set it on the tenant, along with an optional
@@ -19,13 +22,37 @@ export async function setTenantLogo(
   db: Db,
   args: { tenantId: string; buffer: Buffer; filename: string; crop?: LogoCrop | null },
 ): Promise<{ logoUrl: string; logoCrop: LogoCrop | null }> {
+  const logoUrl = await uploadTenantLogo(args.buffer, args.filename);
+  return setTenantLogoHosted(db, { tenantId: args.tenantId, logoUrl, crop: args.crop });
+}
+
+/**
+ * Set an ALREADY-HOSTED Cloudinary URL as the tenant logo (the URL-source
+ * path: the route re-hosts the remote image first, then calls this). Same
+ * semantics as setTenantLogo minus the buffer upload: the provided crop is
+ * stored (or cleared when none) and the previous asset is best-effort deleted.
+ *
+ * Every stored logo goes through Cloudinary background removal first: the
+ * transparent version becomes the stored asset and the just-uploaded original
+ * is deleted. When removal fails (timeout, transform error, Cloudinary down)
+ * the original is stored as-is - a removal hiccup never fails the upload.
+ * @returns the new logo URL + the stored crop.
+ */
+export async function setTenantLogoHosted(
+  db: Db,
+  args: { tenantId: string; logoUrl: string; crop?: LogoCrop | null },
+): Promise<{ logoUrl: string; logoCrop: LogoCrop | null }> {
   const { domainTenants } = getTenantDomainCollections(db);
   const existing = await domainTenants.findOne(
     { tenantId: args.tenantId },
     { projection: { logoUrl: 1 } },
   );
 
-  const logoUrl = await uploadTenantLogo(args.buffer, args.filename);
+  const processed = await removeLogoBackground(args.logoUrl);
+  const logoUrl = processed ?? args.logoUrl;
+  // Removal succeeded: the intermediate original asset is no longer referenced.
+  if (processed) void deleteOfferImage(args.logoUrl);
+
   const crop = args.crop ?? null;
   await domainTenants.updateOne(
     { tenantId: args.tenantId },

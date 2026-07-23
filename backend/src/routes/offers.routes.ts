@@ -30,7 +30,9 @@ import {
   resolveTenantContextWithPermission,
 } from '../utils/resolve-tenant-context';
 import { createOffer, updateOffer, deleteOffer } from '../services/supply.service';
+import { resolveMemberCatalogAccess } from '../services/catalog-member-gate.service';
 import { setTenantVoucherPrice } from '../services/tenant-pricing.service';
+import { setNexusFeePct, setVariantBaseSalePrice } from '../services/nexus-fee.service';
 import { approveOffer, denyOffer } from '../services/supply-approval.service';
 import {
   getTenantCatalogView,
@@ -39,10 +41,13 @@ import {
   adoptOffer,
   excludeOffer,
 } from '../services/catalog.service';
-import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
+import { autoAdoptOfferForAllTenants } from '../services/admin-offer-auto-adopt.service';
+import { OFFER_CATEGORIES, OFFER_VISIBILITY, OFFER_EXECUTION_TYPES, OFFER_IMAGES_MAX, VOUCHER_VALIDITY_UNITS, VOUCHER_PAYMENTS_MIN, VOUCHER_PAYMENTS_MAX, SKU_MIN_LENGTH, SKU_MAX_LENGTH, SKU_REGEX, getSupplyDomainCollections, NOT_DELETED, imageCropSchema, imageCropEntrySchema, type OfferVariant } from '../models/domain/supply.models';
 import { OFFER_REDEMPTION_SCOPES, MAX_VARIANTS_PER_OFFER, VARIANT_ID_REGEX, VALIDITY_TYPES } from '../models/domain/supply-variants.models';
-import { assertVoucherValidity, assertVoucherStackable } from '../services/supply-voucher.helper';
+import { assertVoucherValidity, assertVoucherStackable, assertUniqueVariantValueStack } from '../services/supply-voucher.helper';
+import { isUploadableImageUrl, MAX_IMAGE_URL_LENGTH } from '../utils/cloudinary';
 import { addBarcodes, addLinks, getInventorySummary, getOfferVariantInventoryCounts, listVariantUnits, updateUnitValidity, updateUnitsValidity, deleteUnit, type InventoryResult, type BatchValidity } from '../services/voucher-inventory.service';
+import { getOfferVariantValiditySummaries } from '../services/voucher-validity-summary.service';
 import type { OfferVariantInput } from '../services/supply-variants.helper';
 import { createVouchersBulk, BULK_MAX_ROWS } from '../services/voucher-bulk.service';
 import { VOUCHER_CODE_KINDS, VOUCHER_INVENTORY_MAX, VOUCHER_CODE_REGEX } from '../models/domain/voucher-codes.models';
@@ -117,6 +122,40 @@ function parseVariantsField(v: unknown): unknown {
 }
 
 /**
+ * Multipart `remoteImages` field: JSON-encoded [{url, crop|null}] of
+ * URL-sourced gallery images. The UI exposes this for VOUCHER offers only
+ * (owner decision 2026-07-16); the server accepts it for any type because
+ * re-hosting yields the exact result of uploading the same file - the voucher
+ * gate is a UI rollout scope, not a security boundary.
+ *
+ * SECURITY: each URL is http(s)-only + length-capped (rejecting javascript:/
+ * data:/file: and free text) BEFORE any fetch; the fetch itself is performed
+ * by Cloudinary (never this server) and only the re-hosted Cloudinary URL is
+ * persisted - the user's URL string never reaches storage or an HTML sink.
+ */
+const remoteImagesField = z.preprocess(
+  parseImageCropsField,
+  z.array(z.object({
+    url: z.string().max(MAX_IMAGE_URL_LENGTH).refine(
+      (value) => isUploadableImageUrl(value),
+      'remote image URLs must be http(s)',
+    ),
+    crop: imageCropSchema.nullable(),
+  })).max(OFFER_IMAGES_MAX).optional(),
+);
+
+/**
+ * Strict https-only URL schema for the voucher branch-list link
+ * (`NexusOffer.branchListUrl`): well-formed URL AND scheme === 'https:' - a
+ * plain http(s)-agnostic `.url()` (used elsewhere, e.g. implementationLink)
+ * would accept http, which this field explicitly must not.
+ */
+const httpsUrlSchema = z.string().trim().url().refine(
+  (value) => new URL(value).protocol === 'https:',
+  { message: 'must be a valid https:// URL' },
+);
+
+/**
  * One voucher variant as received from a client. Numbers arrive as real numbers
  * (the array is JSON-encoded), so no coercion is needed. `variantId` is optional:
  * present preserves an existing variant on edit; absent = the service generates one.
@@ -180,6 +219,10 @@ function validateVoucherVariants(
     const s = assertVoucherStackable(v.voucherStackable);
     if (!s.ok) return { ok: false, error: s.error, errorHe: s.errorHe };
   }
+  // Uniqueness (owner decision 2026-07-16): at most ONE variant per
+  // (face_value, stackable) pair - see assertUniqueVariantValueStack.
+  const unique = assertUniqueVariantValueStack(variants);
+  if (!unique.ok) return { ok: false, error: unique.error, errorHe: unique.errorHe };
   return { ok: true };
 }
 
@@ -215,10 +258,12 @@ const voucherBackgroundStackableFields = {
  * Member view ignores approvalStatus/adoptionStatus (its read service
  * dis-regards them) but it is harmless to accept them in the same schema.
  */
-const catalogListQuerySchema = z.object({
+export const catalogListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),
+  /** Free-text filter on the creating tenant's organization name. */
+  orgSearch: z.string().trim().min(1).max(100).optional(),
   category: z.enum(OFFER_CATEGORIES).optional(),
   approvalStatus: z.enum(['active', 'pending_approval', 'denied', 'expired']).optional(),
   adoptionStatus: z.enum(['adopted', 'not_adopted']).optional(),
@@ -244,7 +289,18 @@ const catalogListQuerySchema = z.object({
     (val) => val === 'true' || val === true ? true : val === 'false' || val === false ? false : val,
     z.boolean().optional(),
   ),
-  sort: z.enum(['newest', 'price_asc', 'price_desc', 'expiry_soon', 'expiry_far']).optional(),
+  /**
+   * Voucher stacking filter (wallet store): 'with' = at least one variant with
+   * voucherStackable true (offer-level fallback when no variants), 'without' =
+   * at least one false. Offers with no stackable signal match neither value.
+   */
+  stackable: z.enum(['with', 'without']).optional(),
+  sort: z.enum([
+    'newest', 'price_asc', 'price_desc', 'expiry_soon', 'expiry_far',
+    // Wallet store sorts: stored BASE cashback range (per-tenant effective values
+    // applied by the catalog-search module) and Hebrew-aware title order.
+    'cashback_desc', 'cashback_asc', 'title_asc',
+  ]).optional(),
 });
 
 /**
@@ -266,6 +322,13 @@ const createOfferSchema = z.object({
   stockLimit: z.coerce.number().int().positive().nullable().optional().default(null),
   implementationLink: z.string().url().nullable().optional(),
   implementationInstructions: z.string().max(4000).optional(),
+  // Voucher-only: optional https:// link to a page listing participating
+  // branches/locations. Forced null server-side for non-voucher offers.
+  branchListUrl: httpsUrlSchema.nullable().optional(),
+  // Voucher-only optional https:// links: regulations page (תקנון) and return
+  // policy page (מדיניות החזרות). Same contract as branchListUrl.
+  regulationsUrl: httpsUrlSchema.nullable().optional(),
+  returnPolicyUrl: httpsUrlSchema.nullable().optional(),
   // ISO string from multipart form; convert to Date in handler.
   // validFrom is optional - null/undefined means the offer goes live as soon as approved.
   // No future-date refinement on validFrom: setting it to today (or the past) is valid
@@ -282,6 +345,12 @@ const createOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // optional for pre-variant clients). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
+  // Voucher-only: max credit-card payments for this voucher (offer-level, all
+  // variants). Empty string from multipart = not provided (service defaults to 1).
+  maxPayments: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : v),
+    z.coerce.number().int().min(VOUCHER_PAYMENTS_MIN).max(VOUCHER_PAYMENTS_MAX).optional(),
+  ),
   terms: z.string().max(6000).optional(),
   // JSON-encoded array string from multipart form.
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
@@ -314,6 +383,8 @@ const createOfferSchema = z.object({
     parseImageCropsField,
     z.array(imageCropEntrySchema).max(OFFER_IMAGES_MAX).optional(),
   ),
+  // URL-sourced images (re-hosted server-side; see remoteImagesField).
+  remoteImages: remoteImagesField,
 });
 
 /**
@@ -343,6 +414,10 @@ const updateOfferSchema = z.object({
   stockLimit: z.preprocess((v) => (v === '' ? null : v), z.coerce.number().int().positive().nullable().optional()),
   implementationLink: z.preprocess((v) => (v === '' ? null : v), z.string().url().nullable().optional()),
   implementationInstructions: z.string().max(4000).optional(),
+  // Empty string from the edit form means "clear it" -> null.
+  branchListUrl: z.preprocess((v) => (v === '' ? null : v), httpsUrlSchema.nullable().optional()),
+  regulationsUrl: z.preprocess((v) => (v === '' ? null : v), httpsUrlSchema.nullable().optional()),
+  returnPolicyUrl: z.preprocess((v) => (v === '' ? null : v), httpsUrlSchema.nullable().optional()),
   validFrom: z.string().optional().nullable(),
   validUntil: z.string().optional().nullable(),
   // Voucher combine-with-promotions + background color (voucher-only).
@@ -350,6 +425,12 @@ const updateOfferSchema = z.object({
   // Voucher variants + redemption scope + validity-type default (voucher-only;
   // replaces the array wholesale when sent). Validity VALUE is set at the inventory route.
   ...variantSchemaFields,
+  // Voucher-only: max credit-card payments for this voucher (offer-level, all
+  // variants). Empty string from multipart = not provided (leave unchanged).
+  maxPayments: z.preprocess(
+    (v) => (v === '' || v === null || v === undefined ? undefined : v),
+    z.coerce.number().int().min(VOUCHER_PAYMENTS_MIN).max(VOUCHER_PAYMENTS_MAX).optional(),
+  ),
   terms: z.string().max(6000).optional(),
   // Invalid JSON falls back to null so Zod fails array validation and returns 400.
   tags: z.preprocess(
@@ -382,6 +463,8 @@ const updateOfferSchema = z.object({
     parseImageCropsField,
     z.array(imageCropSchema.nullable()).max(OFFER_IMAGES_MAX).optional(),
   ),
+  // URL-sourced images (re-hosted server-side; see remoteImagesField).
+  remoteImages: remoteImagesField,
 });
 
 /**
@@ -402,6 +485,13 @@ const setTenantVoucherPriceSchema = z
   .refine((d) => d.memberPrice !== undefined || d.markupPct !== undefined, {
     message: 'memberPrice or markupPct required',
   });
+
+/** Body for PATCH /:offerId/nexus-fee - the platform fee % of the margin.
+ *  May be fractional. */
+const setNexusFeeSchema = z.object({ pct: z.number().min(0).max(100) });
+
+/** Body for PATCH /:offerId/variants/:variantId/sale-price - the raw sale price. */
+const setBaseSalePriceSchema = z.object({ salePrice: z.number().positive() });
 
 /**
  * Validates the voucher inventory body. `kind` selects barcode generation
@@ -643,14 +733,23 @@ router.post(
         }
       }
 
-      // Voucher single-image rule: a voucher carries exactly one card image.
-      // multer already caps total file count at OFFER_IMAGES_MAX; this narrows
-      // it to 1 for vouchers. Re-enforced server-side regardless of the UI.
+      // Voucher single-image rule: a voucher carries exactly one card image
+      // (uploaded file OR URL-sourced). multer already caps total file count
+      // at OFFER_IMAGES_MAX; this narrows the combined count to 1 for
+      // vouchers. Re-enforced server-side regardless of the UI.
       const uploadedFileCount = Array.isArray(req.files) ? req.files.length : 0;
-      if (d.executionType === 'voucher' && uploadedFileCount > 1) {
+      const remoteCount = d.remoteImages?.length ?? 0;
+      if (d.executionType === 'voucher' && uploadedFileCount + remoteCount > 1) {
         res.status(400).json({
           error: 'A voucher offer can have at most one image',
           errorHe: 'שובר יכול לכלול תמונה אחת בלבד',
+        });
+        return;
+      }
+      // Combined cap across sources (multer only caps the file field).
+      if (uploadedFileCount + remoteCount > OFFER_IMAGES_MAX) {
+        res.status(400).json({
+          error: `An offer can have at most ${OFFER_IMAGES_MAX} images.`,
         });
         return;
       }
@@ -697,6 +796,17 @@ router.post(
         } catch (err) {
           // Log but do not fail the response - offer was created successfully.
           console.error('[OFFERS] Auto-adopt failed for tenant_only offer:', err);
+        }
+      }
+
+      // Admin-offer auto-adopt: an on-behalf ECOSYSTEM offer (admin-uploaded,
+      // publishes active) is adopted into every eligible tenant's catalog.
+      // Best-effort: never fails the creation response.
+      if (onBehalfOfTenantId && offer.visibility === 'ecosystem' && offer.status === 'active') {
+        try {
+          await autoAdoptOfferForAllTenants(offer.offerId);
+        } catch (err) {
+          console.error('[OFFERS] Admin-offer auto-adopt fan-out failed:', err);
         }
       }
 
@@ -859,18 +969,20 @@ router.patch(
             mimetype: f.mimetype,
           }))
         : [];
-      // Belt+suspenders cap: kept + new uploaded must not exceed OFFER_IMAGES_MAX.
-      // multer already caps file count, but kept can be sent without files.
+      // Belt+suspenders cap: kept + new uploaded + URL-sourced must not exceed
+      // OFFER_IMAGES_MAX. multer only caps the file field.
       const keptCount = restParsed.keptImageUrls?.length ?? 0;
-      if (keptCount + imageFiles.length > OFFER_IMAGES_MAX) {
+      const remoteCount = restParsed.remoteImages?.length ?? 0;
+      if (keptCount + imageFiles.length + remoteCount > OFFER_IMAGES_MAX) {
         res.status(400).json({
           error: `An offer can have at most ${OFFER_IMAGES_MAX} images.`,
         });
         return;
       }
       // Voucher single-image rule. The frontend always sends executionType on
-      // save; when it indicates a voucher, kept + uploaded must be at most 1.
-      if (restParsed.executionType === 'voucher' && keptCount + imageFiles.length > 1) {
+      // save; when it indicates a voucher, kept + uploaded + URL-sourced must
+      // be at most 1.
+      if (restParsed.executionType === 'voucher' && keptCount + imageFiles.length + remoteCount > 1) {
         res.status(400).json({
           error: 'A voucher offer can have at most one image',
           errorHe: 'שובר יכול לכלול תמונה אחת בלבד',
@@ -1221,7 +1333,7 @@ router.patch(
         return;
       }
 
-      const { tenantId } = await resolveTenantContextWithPermission(
+      const { tenantId, isPlatformAdmin } = await resolveTenantContextWithPermission(
         req,
         'catalog.adopt_offer',
       );
@@ -1229,6 +1341,7 @@ router.patch(
       const result = await setTenantVoucherPrice({
         tenantId,
         offerId: req.params.offerId,
+        isPlatformAdmin: isPlatformAdmin ?? false,
         ...(parsed.data.memberPrice !== undefined && { memberPrice: parsed.data.memberPrice }),
         ...(parsed.data.markupPct !== undefined && { markupPct: parsed.data.markupPct }),
         ...(parsed.data.variantId !== undefined && { variantId: parsed.data.variantId }),
@@ -1246,6 +1359,100 @@ router.patch(
       }
 
       res.json({ config: result.config });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/offers/:offerId/nexus-fee
+ *
+ * Sets the offer's platform fee percentage (nexusFeePct) and re-bakes all
+ * derived pricing (variant member_price, mirror, displayPrice, adopter floors).
+ * The fee is never exposed to tenants; this route is PLATFORM ADMIN ONLY.
+ *
+ * Input body: { pct: int 0..100 }.
+ * Output: { success: true, nexusFeePct } on 200; error JSON otherwise.
+ *   403 - caller is not a platform admin
+ *   404 - offer_not_found
+ *   400 - invalid body or not_voucher
+ */
+router.patch(
+  '/:offerId/nexus-fee',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContext(req);
+      if (!ctx.isPlatformAdmin) {
+        res.status(403).json({ error: 'Only platform admins can set the nexus fee' });
+        return;
+      }
+
+      const parsed = setNexusFeeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'pct must be an integer between 0 and 100' });
+        return;
+      }
+
+      const result = await setNexusFeePct(req.params.offerId, parsed.data.pct);
+      if (!result.ok) {
+        res.status(result.reason === 'offer_not_found' ? 404 : 400).json({ error: result.reason });
+        return;
+      }
+
+      res.json({ success: true, nexusFeePct: parsed.data.pct });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH /api/v1/offers/:offerId/variants/:variantId/sale-price
+ *
+ * PLATFORM-ADMIN edit of one variant's sale price (nexus_cost) from the price
+ * popover's main slider. The fee % is untouched; member_price re-bakes from the
+ * stored fee, mirror + displayPrice recompute, adopter overrides re-sync.
+ *
+ * Input body: { salePrice: number > 0, <= variant face_value }.
+ * Output: { success: true } on 200; error JSON otherwise.
+ *   403 - caller is not a platform admin
+ *   404 - offer_not_found / variant_not_found
+ *   400 - invalid body, not_voucher, or out_of_bounds
+ */
+router.patch(
+  '/:offerId/variants/:variantId/sale-price',
+  authenticate,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const ctx = await resolveTenantContext(req);
+      if (!ctx.isPlatformAdmin) {
+        res.status(403).json({ error: 'Only platform admins can set the base sale price' });
+        return;
+      }
+
+      const parsed = setBaseSalePriceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'salePrice must be a positive number' });
+        return;
+      }
+
+      const result = await setVariantBaseSalePrice(
+        req.params.offerId,
+        req.params.variantId,
+        parsed.data.salePrice,
+      );
+      if (!result.ok) {
+        const code =
+          result.reason === 'offer_not_found' ? 404 :
+          result.reason === 'variant_not_found' ? 404 :
+          400;
+        res.status(code).json({ error: result.reason });
+        return;
+      }
+
+      res.json({ success: true });
     } catch (err) {
       next(err);
     }
@@ -1420,13 +1627,14 @@ router.get(
 
 /**
  * GET /api/v1/offers/:offerId/inventory/counts
- * Per-variant inventory unit COUNTS for an offer the caller can SEE in the
- * catalog: their own offers, or an ACTIVE ecosystem offer (platform admins see
- * any). Unlike the owner-only summaries above, this returns numbers only -
- * never code values - so the Benefits table can show another supplier's stock
- * without exposing redeemable codes. Anything else 404s without revealing
- * whether the offer exists. Rate-limited by the router-level apiLimiter like
- * every offers route; requires only catalog.view (read-only, non-sensitive).
+ * Per-variant inventory unit COUNTS + real VALIDITY batches for an offer the
+ * caller can SEE in the catalog: their own offers, or an ACTIVE ecosystem
+ * offer (platform admins see any). Unlike the owner-only summaries above, this
+ * returns numbers/dates only - never code values - so the Benefits table can
+ * show another supplier's stock and each variant's actual validity without
+ * exposing redeemable codes. Anything else 404s without revealing whether the
+ * offer exists. Rate-limited by the router-level apiLimiter like every offers
+ * route; requires only catalog.view (read-only, non-sensitive).
  */
 router.get(
   '/:offerId/inventory/counts',
@@ -1449,8 +1657,14 @@ router.get(
         res.status(404).json({ error: 'Offer not found' });
         return;
       }
-      const counts = await getOfferVariantInventoryCounts(req.params.offerId);
-      res.json({ counts });
+      // Counts (total + bought breakdown) + per-variant validity batches ride
+      // one response: all are numbers/dates only (never code values), sharing
+      // the same exposure envelope, and the variant table consumes them together.
+      const [inventory, validity] = await Promise.all([
+        getOfferVariantInventoryCounts(req.params.offerId),
+        getOfferVariantValiditySummaries(req.params.offerId),
+      ]);
+      res.json({ counts: inventory.counts, bought: inventory.bought, validity });
     } catch (err) {
       next(err);
     }
@@ -1685,8 +1899,10 @@ router.get(
  * Returns the member-facing benefits catalog for a given tenant.
  * Only shows offers that have been actively adopted by that tenant.
  *
- * Gate: the benefits_catalog service must be active for the requested tenant.
- * Returns 403 when the service has not been activated yet.
+ * Gate (decision 7, 2026-07-15): active membership + active tenant
+ * benefits_catalog. The member's services array is NOT consulted - join-path
+ * members carry services: [] and must pass. catalog.view holders bypass the
+ * membership check (they manage the catalog) but not the activation check.
  *
  * Input: tenantId as path param (used as the catalog scope, not auth context).
  * Output: array of adopted CatalogItem entries, sorted newest-first.
@@ -1698,25 +1914,6 @@ router.get(
     try {
       const { tenantId } = req.params;
 
-      // Guard: benefits_catalog service must be active for this tenant before
-      // exposing the member-facing catalog. This prevents tenants that have not
-      // activated the service from having their catalog accessed.
-      const db = await getMongoDb();
-      const tenantCollections = getTenantDomainCollections(db);
-      const serviceActive = await tenantCollections.tenantServiceActivations.findOne({
-        tenantId,
-        serviceKey: 'benefits_catalog',
-        status: 'active',
-      });
-      if (!serviceActive) {
-        res.status(403).json({ error: 'Benefits Catalog service is not activated' });
-        return;
-      }
-
-      // Guard: member-level access check.
-      // Admins with catalog.view permission bypass this check — they manage the catalog.
-      // Regular members must have been explicitly invited with benefits_catalog in their
-      // services array to browse and purchase offers.
       const loginUser = await prisma.user.findUnique({
         where: { id: req.user!.sub },
         select: { id: true, email: true, fullName: true, provider: true },
@@ -1727,21 +1924,20 @@ router.get(
       }
       const domainIdentity = await syncDomainIdentityForLoginUser(loginUser);
       const authCtx = await getDomainAuthorizationContext(domainIdentity.nexusIdentityId, tenantId);
-      const isAdminOrManager = hasDomainPermission(authCtx, 'catalog.view');
 
-      if (!isAdminOrManager) {
-        // Regular member: verify they were invited with catalog access.
-        const memberDoc = await tenantCollections.tenantMembers.findOne({
-          tenantId,
-          nexusIdentityId: domainIdentity.nexusIdentityId,
-        });
-        const memberHasCatalog =
-          Array.isArray(memberDoc?.services) &&
-          memberDoc.services.includes('benefits_catalog');
-        if (!memberHasCatalog) {
-          res.status(403).json({ error: 'You do not have access to the Benefits Catalog' });
-          return;
-        }
+      const db = await getMongoDb();
+      const access = await resolveMemberCatalogAccess(db, {
+        tenantId,
+        nexusIdentityId: domainIdentity.nexusIdentityId,
+        hasCatalogViewPermission: hasDomainPermission(authCtx, 'catalog.view'),
+      });
+      if (access === 'catalog_inactive') {
+        res.status(403).json({ error: 'Benefits Catalog service is not activated' });
+        return;
+      }
+      if (access === 'forbidden') {
+        res.status(403).json({ error: 'You do not have access to the Benefits Catalog' });
+        return;
       }
 
       const parsed = catalogListQuerySchema.safeParse(req.query);

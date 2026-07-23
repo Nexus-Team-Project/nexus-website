@@ -24,7 +24,6 @@ import {
   computeTenantDisplayPrice,
   markupToPrice,
   clampMarkupPct,
-  roundAgorot,
 } from './supply-price.helper';
 
 /** Input contract for setTenantVoucherPrice. */
@@ -51,6 +50,13 @@ export interface SetTenantVoucherPriceInput {
    * multi-variant vouchers; the base/ceiling come from the variant, not the offer.
    */
   variantId?: string;
+  /**
+   * True when the caller is a NEXUS platform admin. Platform admins bypass the
+   * owning-tenant price lock (the tenant that UPLOADED an offer may not set a
+   * per-tenant selling price on it - it sets the real sale price on the offer
+   * itself via Edit Offer). Defaults to false.
+   */
+  isPlatformAdmin?: boolean;
 }
 
 /**
@@ -187,6 +193,55 @@ export async function clampTenantVariantPricesToBounds(
 }
 
 /**
+ * Re-sync per-tenant price overrides after a NEXUS FEE change re-baked the
+ * offer's variant member_price (the per-tenant floor). Differs from
+ * clampTenantVariantPricesToBounds (deal-price edits, floor 0): here the floor
+ * is the NEW fee-inflated base - an override below it snaps UP (the fee must
+ * always be collectable), an override above it is preserved (adopter margins
+ * kept), and everything stays capped at face_value. %-backed prices recompute
+ * from the new base via recomputeConfigMarkup. Cached displayPrice recomputed.
+ *
+ * Input:  offerId + the freshly re-baked variant array (carrying the new bounds).
+ * Output: resolves when all affected configs are updated (no-op when none).
+ */
+export async function syncTenantPricesToFeeFloor(
+  offerId: string,
+  variants: OfferVariant[],
+): Promise<void> {
+  const bounds = boundsByVariant(variants);
+  if (bounds.size === 0) return;
+
+  const db = await getMongoDb();
+  const { tenantOfferConfigs } = getSupplyDomainCollections(db);
+  const configs = await tenantOfferConfigs
+    .find({ offerId, $or: [{ variantMarkupPct: { $exists: true } }, { variantPrices: { $exists: true } }] })
+    .toArray();
+
+  for (const cfg of configs) {
+    const rec = recomputeConfigMarkup(cfg.variantMarkupPct ?? {}, cfg.variantPrices ?? {}, bounds);
+    const nextMarkup = rec.markup;
+    const nextPrices = rec.prices;
+    let changed = rec.changed;
+
+    // Absolute overrides (no stored %): clamp into [new floor, face_value].
+    for (const [variantId, price] of Object.entries(nextPrices)) {
+      if (variantId in nextMarkup) continue;
+      const b = bounds.get(variantId);
+      if (!b) continue;
+      const clamped = Math.min(Math.max(price, b.base), b.face);
+      if (clamped !== price) { nextPrices[variantId] = clamped; changed = true; }
+    }
+
+    if (!changed) continue;
+    const displayPrice = lowestEffectiveVariantPrice(variants, nextPrices);
+    await tenantOfferConfigs.updateOne(
+      { configId: cfg.configId },
+      { $set: { variantMarkupPct: nextMarkup, variantPrices: nextPrices, ...(displayPrice !== undefined ? { displayPrice } : {}) } },
+    );
+  }
+}
+
+/**
  * Re-sync per-tenant price overrides after a tenant_only offer's OWNER edited its
  * OWN sale price (nexus_cost) in the Edit Offer modal. The displayed Sale Price must
  * SNAP to the new value, so for every TenantOfferConfig of the offer:
@@ -287,7 +342,7 @@ export async function setTenantVoucherPrice(
   | { ok: true; config: TenantOfferConfig }
   | { ok: false; reason: SetTenantVoucherPriceError }
 > {
-  const { tenantId, offerId, memberPrice, markupPct, variantId } = input;
+  const { tenantId, offerId, memberPrice, markupPct, variantId, isPlatformAdmin } = input;
 
   const db = await getMongoDb();
   const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
@@ -304,11 +359,13 @@ export async function setTenantVoucherPrice(
     return { ok: false, reason: 'not_voucher' };
   }
 
-  // 2b. A Nexus admin uploaded this offer on behalf of its owning tenant
-  //     (uploadedByIdentityId set). That tenant may NOT change its own selling
-  //     price - Nexus manages it. Adopting tenants (createdByTenantId !== caller)
-  //     are unaffected and keep their per-tenant price.
-  if (offer.uploadedByIdentityId && offer.createdByTenantId === tenantId) {
+  // 2b. The tenant that UPLOADED this offer (createdByTenantId === caller) may NOT
+  //     set a per-tenant selling price on it via the markup slider - it sets the
+  //     real sale price on the offer itself (Edit Offer). This holds whether or
+  //     not the owner adopted the offer, and whether or not a Nexus admin uploaded
+  //     it on their behalf. Platform admins are exempt. Adopting tenants
+  //     (createdByTenantId !== caller) are unaffected and keep their own price.
+  if (!isPlatformAdmin && offer.createdByTenantId === tenantId) {
     return { ok: false, reason: 'owner_locked' };
   }
 
@@ -353,17 +410,25 @@ export async function setTenantVoucherPrice(
   }
 
   // 6. Resolve the cached effective price. The dashboard sends an ABSOLUTE price
-  //    (memberPrice) clamped into [0, face_value] - 0 = free, and any value below
-  //    the base cost is a subsidy the tenant gives the member. The legacy path
-  //    (markupPct only) clamps a % into the headroom and applies it. variantPrices
-  //    / memberPrice is the cached projection so the catalog read/sort/filter path
-  //    is unchanged. When an absolute price is set, the stored markup % for the
-  //    target is cleared ($unset) so a later deal-price re-sync treats it as an
-  //    absolute override (preserved) rather than recomputing it from a stale %.
+  //    (memberPrice) clamped into [base, face_value] and rounded UP to a whole
+  //    shekel: the tenant may never price below the base sale price, and every
+  //    stored price is a round number (mirrors + enforces the popover UI so a
+  //    crafted request cannot bypass either rule). The legacy path (markupPct
+  //    only) clamps a % into the headroom and applies it - its floor is already
+  //    the base (0% = base). variantPrices / memberPrice is the cached projection
+  //    so the catalog read/sort/filter path is unchanged. When an absolute price
+  //    is set, the stored markup % for the target is cleared ($unset) so a later
+  //    deal-price re-sync treats it as an absolute override (preserved) rather
+  //    than recomputing it from a stale %.
+  // Both branches produce a WHOLE-shekel price rounded UP and capped at the
+  // face value. The absolute path floors at the base (no below-base pricing);
+  // the legacy markup path is already floored at the base (0% = base), so it
+  // only needs the same whole-shekel rounding applied to its projection.
   const useAbsolute = memberPrice !== undefined;
-  const price = useAbsolute
-    ? roundAgorot(Math.min(Math.max(memberPrice, 0), ceiling))
+  const rawPrice = useAbsolute
+    ? Math.max(memberPrice, base)
     : markupToPrice(base, ceiling, clampMarkupPct(markupPct ?? 0, base, ceiling));
+  const price = Math.min(Math.ceil(rawPrice), ceiling);
 
   let setOps: Record<string, unknown>;
   let unsetOps: Record<string, ''> | undefined;

@@ -9,7 +9,8 @@
  * login first, then into dashboard accept (those roles only exist in the dashboard).
  */
 import { env } from '../config/env';
-import { buildAuthEmailBannerHtml, sendMail } from './email.service';
+import { buildTenantEmailBannerHtml, sendMail } from './email.service';
+import { fetchTenantEmailLogoUrl } from './email/tenant-email-logo.helper';
 import type { TenantUserRoleName } from '../models/domain';
 
 /**
@@ -26,6 +27,8 @@ export interface TenantMemberInviteEmailInput {
   to: string;
   displayName?: string;
   tenantName: string;
+  /** When provided, the tenant's logo (if set) is shown beside the Nexus logo. */
+  tenantId?: string;
   roles: TenantUserRoleName[];
   /** Service keys granted to this member (e.g. benefits_catalog). */
   services?: string[];
@@ -152,7 +155,7 @@ export function buildMemberInviteLoginUrl(token: string, language: 'he' | 'en'):
   return url.toString();
 }
 
-/** The wallet's local dev port (matches nexusWallet's documented dev server). */
+/** The wallet's local dev port, used only as a fallback when WALLET_URL is unset. */
 const LOCAL_WALLET_URL = 'http://localhost:8080';
 
 /**
@@ -162,18 +165,15 @@ const LOCAL_WALLET_URL = 'http://localhost:8080';
  * landing) takes it from there. No token: the wallet auto-accepts a pending
  * invitation for the signed-in email on any login/signup.
  *
- * Outside production, this ALWAYS uses the local dev wallet port and ignores
- * `WALLET_URL` - that var is deliberately pointed at the real prod domain in
- * local `.env` for the SMS-autofill origin binding (`otp-sms.helper.ts`), so
- * following it here would send a local dev invite to production.
+ * Follows `WALLET_URL` (set per environment - localhost in local dev, the
+ * Railway dev host on dev, the prod domain in prod), falling back to the local
+ * dev wallet port only when it is unset.
  *
  * Input: the tenant id and target email language.
- * Output: absolute wallet URL (local dev port outside production; `WALLET_URL`,
- * falling back to the local dev port if unset, in production).
+ * Output: absolute wallet URL for the invite.
  */
 export function buildMemberInviteWalletUrl(tenantId: string, language: 'he' | 'en'): string {
-  const walletBase = env.NODE_ENV === 'production' ? (env.WALLET_URL ?? LOCAL_WALLET_URL) : LOCAL_WALLET_URL;
-  const url = new URL(`/${language}`, walletBase);
+  const url = new URL(`/${language}`, env.WALLET_URL ?? LOCAL_WALLET_URL);
   url.searchParams.set('tenant', tenantId);
   return url.toString();
 }
@@ -210,7 +210,7 @@ export async function sendTenantMemberInviteEmail(
   const servicesBadges = buildServicesBadgesHtml(input.services, input.language);
   const expiry = escapeHtml(formatExpiryDate(input.expiresAt, input.language));
   const escapedUrl = escapeHtml(input.inviteUrl);
-  const bannerHtml = buildAuthEmailBannerHtml();
+  const bannerHtml = buildTenantEmailBannerHtml(await fetchTenantEmailLogoUrl(input.tenantId));
 
   const subject = isHebrew
     ? `הוזמנת להצטרף ל-${tenantName} ב-Nexus`

@@ -10,6 +10,121 @@
   --color-nx-light: #f6f9fc;
   --color-nx-gray: #425466;
   --color-nx-dark: #0a2540;
+
+  /* Wallet design tokens - ported from nexus-wallet so the SPAR gift flow
+     components (HeroGiftFlow, VoucherCard, PayCodesPanel) keep bg-bg-dark /
+     text-text-primary / bg-surface / border-border etc. resolving 1:1. */
+  --color-primary: #635bff;
+  --color-bg-dark: #0a2540;
+  --color-surface: #f6f9fc;
+  --color-text-primary: #0a2540;
+  --color-text-secondary: #425466;
+  --color-text-muted: #6b7280;
+  --color-border: #e5e7eb;
+
+  /* Utility animations used by the ported gift flow. */
+  --animate-fade-in: gift-fade-in 0.3s ease-out;
+  --animate-slide-up: gift-slide-up 0.3s ease-out;
+}
+
+/* ── Ported wallet animations + helpers (nexus-wallet gift flow) ──────────── */
+@keyframes gift-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gift-slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+/* Gentle float - the gift-preview cover illustration. */
+@keyframes gift-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-10px); }
+}
+.animate-gift-float { animation: gift-float 4s ease-in-out infinite; }
+
+/* Gift redeem - the card rises up into the centre of the screen. */
+@keyframes gift-rise-center {
+  0%   { transform: translateY(46vh) scale(0.85); opacity: 0; }
+  22%  { opacity: 1; }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; }
+}
+.animate-gift-rise-center { animation: gift-rise-center 0.95s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+
+/* 3D flip card - used to "open" the gift cover into the letter, and the
+   voucher card front/back. */
+.flip-perspective { perspective: 1600px; }
+.flip-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.flip-inner.is-flipped { transform: rotateY(180deg); }
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.flip-face-back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+}
+
+/* Hide scrollbars inside the scrollable phone body. */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Premium-reveal celebration keyframes (ported from nexus-wallet
+   PremiumRevealPage) - animated gradient blobs + rising brand bubbles. */
+@keyframes blob1 {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-25%, 20%) scale(1.25); }
+  50% { transform: translate(15%, -20%) scale(0.85); }
+  75% { transform: translate(-20%, -10%) scale(1.15); }
+  100% { transform: translate(20%, 15%) scale(0.9); }
+}
+@keyframes blob2 {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(25%, -20%) scale(1.3); }
+  50% { transform: translate(-20%, 25%) scale(0.8); }
+  75% { transform: translate(15%, 15%) scale(1.2); }
+  100% { transform: translate(-25%, -15%) scale(1.1); }
+}
+@keyframes blob3 {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-20%, -25%) scale(1.2); }
+  50% { transform: translate(25%, 20%) scale(1.3); }
+  75% { transform: translate(20%, -15%) scale(0.85); }
+  100% { transform: translate(-15%, 25%) scale(1.15); }
+}
+@keyframes blob4 {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(20%, 20%) scale(0.85); }
+  50% { transform: translate(-25%, -15%) scale(1.25); }
+  75% { transform: translate(-10%, 25%) scale(1.1); }
+  100% { transform: translate(25%, -20%) scale(0.9); }
+}
+@keyframes blob5 {
+  0% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(25%, 10%) scale(1.2); }
+  50% { transform: translate(-15%, -25%) scale(1.15); }
+  75% { transform: translate(20%, 20%) scale(0.85); }
+  100% { transform: translate(-20%, 15%) scale(1.3); }
+}
+@keyframes riseBubble {
+  0% { transform: translateY(0) translateX(0) scale(0.7); opacity: 0; }
+  5% { opacity: 1; }
+  20% { transform: translateY(-25vh) translateX(calc(var(--drift) * 0.2)) scale(0.8); }
+  50% { transform: translateY(-55vh) translateX(calc(var(--drift) * 0.6)) scale(0.9); }
+  80% { transform: translateY(-95vh) translateX(calc(var(--drift) * 0.9)) scale(1); opacity: 1; }
+  100% { transform: translateY(-130vh) translateX(var(--drift)) scale(1); opacity: 0; }
 }
 
 html {

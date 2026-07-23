@@ -121,7 +121,9 @@ const PartnerBubbles = () => {
           }
         }
         .partner-bubble {
-          animation: risePartner linear forwards;
+          /* 'both' so a bubble stays hidden (0% keyframe) during its stagger delay
+             instead of sitting static/visible at the bottom before it rises. */
+          animation: risePartner linear both;
         }
       `}</style>
 

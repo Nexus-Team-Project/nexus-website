@@ -14,6 +14,8 @@
  * Exports:
  *   getTenantCatalogView  - paginated admin/supply-manager catalog
  *   getMemberCatalogView  - paginated member-facing catalog (adopted offers)
+ *   toItem                - NexusOffer -> CatalogItem mapper (reused by the
+ *                           wallet ecosystem/"Nexus catalog" view for base pricing)
  *   adoptOffer            - mark an offer as active for a tenant
  *   excludeOffer          - remove an offer from a tenant's catalog
  */
@@ -23,14 +25,17 @@ import { getMongoDb } from '../config/mongo';
 import {
   getSupplyDomainCollections,
   NOT_DELETED,
+  VOUCHER_PAYMENTS_DEFAULT,
+  NEXUS_FEE_DEFAULT_PCT,
   type NexusOffer,
   type TenantOfferConfig,
   type ImageCropEntry,
 } from '../models/domain/supply.models';
-import { buildSearchFilter, buildFilterClauses, buildSortMap } from './catalog-query.helper';
+import { buildSearchFilter, buildFilterClauses, buildInStockClause, buildSortMap, markVoucherSoldOut } from './catalog-query.helper';
+import { searchCatalog, type TenantPriceOverride } from './catalog-search';
 import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
-import type { LogoCrop } from '../models/domain/tenant.models';
+import type { LogoCrop, TenantCoverImage } from '../models/domain/tenant.models';
 import { uploaderFieldsFromTenant, type UploaderTenantDoc } from './catalog-uploader.helper';
 
 // ---------------------------------------------------------------------------
@@ -48,6 +53,12 @@ export interface CatalogQuery {
   page: number;
   limit: number;
   search?: string;
+  /**
+   * Free-text filter on the CREATING tenant's organization name (the
+   * "uploaded by" column). Resolved to tenantIds server-side against
+   * domainTenants, then matched on createdByTenantId.
+   */
+  orgSearch?: string;
   category?: string;
   approvalStatus?: 'active' | 'pending_approval' | 'denied' | 'expired';
   adoptionStatus?: 'adopted' | 'not_adopted';
@@ -72,8 +83,16 @@ export interface CatalogQuery {
   tags?: string[];
   /** Hide sold-out offers (stockUsed >= stockLimit). */
   inStockOnly?: boolean;
+  /**
+   * Voucher stacking filter: 'with' = at least one stackable variant
+   * (offer-level fallback when no variants), 'without' = at least one
+   * non-stackable. No stackable signal anywhere = matches neither.
+   */
+  stackable?: 'with' | 'without';
   /** Sort mode. Default 'newest' (createdAt desc). */
-  sort?: 'newest' | 'price_asc' | 'price_desc' | 'expiry_soon' | 'expiry_far';
+  sort?:
+    | 'newest' | 'price_asc' | 'price_desc' | 'expiry_soon' | 'expiry_far'
+    | 'cashback_desc' | 'cashback_asc' | 'title_asc';
 }
 
 /** Page result returned by both catalog views. Total drives UI page count. */
@@ -125,6 +144,8 @@ export interface CatalogItem {
    * Must never be returned to adopting tenants or members.
    */
   nexus_cost?: number;
+  /** Platform fee % of the margin. PLATFORM ADMINS ONLY - stripped for everyone else. */
+  nexusFeePct?: number;
   /** Current lifecycle status of the offer (e.g. active, pending_approval, denied, expired). */
   approval_status?: string;
   /** Denial reason from the platform admin. Only populated for the creating tenant. */
@@ -149,6 +170,8 @@ export interface CatalogItem {
   createdByTenantBrandColor?: string;
   /** Crop of the creating tenant's logo (normalized fractions), applied at display time. */
   createdByTenantLogoCrop?: LogoCrop | null;
+  /** Creating tenant's FIRST cover-gallery image (url + crop), for card backgrounds. */
+  createdByTenantCoverImage?: TenantCoverImage;
   /** How the offer is fulfilled/redeemed (voucher, coupon, gift_card, product, service). */
   executionType: string;
   /** Maximum total units available (null = unlimited). */
@@ -161,6 +184,12 @@ export interface CatalogItem {
   implementationLink?: string | null;
   /** Human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Optional https URL to a page listing participating branches. Voucher-only; null otherwise. */
+  branchListUrl?: string | null;
+  /** Optional https URL to the voucher's regulations page (תקנון). Voucher-only; null otherwise. */
+  regulationsUrl?: string | null;
+  /** Optional https URL to the voucher's return policy page (מדיניות החזרות). Voucher-only; null otherwise. */
+  returnPolicyUrl?: string | null;
   /** Date the offer goes live. null = live immediately on approval. */
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Always null for vouchers. */
@@ -170,6 +199,9 @@ export interface CatalogItem {
   defaultValidityType?: 'limit' | 'from_until' | null;
   /** Whether the voucher may be combined with other promotions. Voucher-only; null otherwise. */
   voucherStackable?: boolean | null;
+  /** Max credit-card payments for this voucher (offer-level, all variants).
+   *  Voucher-only; missing pre-backfill docs read as the default (1). Null otherwise. */
+  maxPayments?: number | null;
   /** Voucher card background color ("#rrggbb"). Voucher-only; null otherwise. */
   voucherBackgroundColor?: string | null;
   /** Voucher SKU / internal company code. Voucher-only; null otherwise. */
@@ -229,7 +261,7 @@ export interface CatalogVariant {
  * the underlying document, so the same offer can appear as 'active' to admins
  * paginating without an expiry filter and 'expired' once it crosses validUntil.
  */
-function toItem(
+export function toItem(
   offer: NexusOffer,
   config: TenantOfferConfig | undefined,
   context: {
@@ -278,6 +310,10 @@ function toItem(
       context.canSeeNexusCost &&
       offer.nexus_cost !== undefined && { nexus_cost: offer.nexus_cost }
     ),
+    // Fee % - platform admins only (tenants must never see it). Vouchers that
+    // predate the field read as the default so the admin slider has a value.
+    ...(context.isPlatformAdmin && (offer.executionType ?? 'voucher') === 'voucher'
+      && { nexusFeePct: offer.nexusFeePct ?? NEXUS_FEE_DEFAULT_PCT }),
     approval_status: effectiveStatus,
     ...(context.isOwnOffer && offer.denial_reason && { denial_reason: offer.denial_reason }),
     isAdopted: config?.adoptionStatus === 'active',
@@ -294,10 +330,16 @@ function toItem(
       && (offer.stockUsed ?? 0) >= offer.stockLimit,
     implementationLink: offer.implementationLink ?? null,
     implementationInstructions: offer.implementationInstructions ?? '',
+    branchListUrl: offer.branchListUrl ?? null,
+    regulationsUrl: offer.regulationsUrl ?? null,
+    returnPolicyUrl: offer.returnPolicyUrl ?? null,
     validFrom: offer.validFrom ?? null,
     validUntil: offer.validUntil ?? null,
     defaultValidityType: offer.defaultValidityType ?? null,
     voucherStackable: offer.voucherStackable ?? null,
+    maxPayments: (offer.executionType ?? 'voucher') === 'voucher'
+      ? (offer.maxPayments ?? VOUCHER_PAYMENTS_DEFAULT)
+      : null,
     voucherBackgroundColor: offer.voucherBackgroundColor ?? null,
     sku: offer.sku ?? null,
     terms: offer.terms ?? '',
@@ -387,6 +429,26 @@ export async function getTenantCatalogView(
   const searchFilter = buildSearchFilter(query.search);
   if (searchFilter) andClauses.push(searchFilter);
   andClauses.push(...buildFilterClauses(query));
+  // Voucher stock lives in voucherCodes units - async clause, see the helper.
+  if (query.inStockOnly) andClauses.push(await buildInStockClause(db));
+
+  // Org (uploader) filter: free-text, case-insensitive contains on the CREATING
+  // tenant's organization name. Names live on domainTenants, so resolve the
+  // matching tenantIds first (same pre-fetch pattern as the adoption filter;
+  // the tenant collection is small) and match offers on createdByTenantId.
+  // The $in is capped at 200 ids to bound the clause; regex specials escaped.
+  if (query.orgSearch?.trim()) {
+    const escaped = query.orgSearch.trim().slice(0, 100).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const orgs = await getTenantDomainCollections(db).domainTenants
+      .find(
+        { organizationName: { $regex: escaped, $options: 'i' } },
+        { projection: { tenantId: 1 } },
+      )
+      .limit(200)
+      .toArray();
+    if (orgs.length === 0) return { items: [], total: 0 };
+    andClauses.push({ createdByTenantId: { $in: orgs.map((t) => t.tenantId) } });
+  }
 
   // 'expired' is computed (validUntil<now, still status=active). Other approval
   // statuses are exact matches.
@@ -453,15 +515,20 @@ export async function getTenantCatalogView(
       isOwnOffer,
       isPlatformAdmin,
       canSeeNexusCost,
-      ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
-      ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+      // The tenant that UPLOADED an offer never has a per-tenant selling price on
+      // it (it sets the real sale price via Edit Offer, and is blocked from the
+      // per-variant slider). So a stale/leftover per-tenant override on its OWN
+      // offer must NOT drive display - show the base member_price. Adopting
+      // tenants (not their own offer) keep their per-tenant override.
+      ...(!isOwnOffer && toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+      ...(!isOwnOffer && toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
       uploaderTenant: uploaderMap.get(o.createdByTenantId) ?? undefined,
     });
 
     return {
       ...base,
-      ...(toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
-      ...(toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
+      ...(!isOwnOffer && toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
+      ...(!isOwnOffer && toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
     };
   });
 
@@ -512,14 +579,16 @@ export async function getTenantOfferDetail(
     isOwnOffer,
     isPlatformAdmin,
     canSeeNexusCost,
-    ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
-    ...(toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
+    // See getTenantCatalogView: the uploading tenant's OWN offer never shows a
+    // per-tenant override - only adopters do.
+    ...(!isOwnOffer && toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+    ...(!isOwnOffer && toc?.variantMarkupPct && { effectiveVariantMarkup: toc.variantMarkupPct }),
     uploaderTenant: uploaderTenant ?? undefined,
   });
   return {
     ...base,
-    ...(toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
-    ...(toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
+    ...(!isOwnOffer && toc?.memberPrice !== undefined ? { tenantMemberPrice: toc.memberPrice } : {}),
+    ...(!isOwnOffer && toc?.displayPrice !== undefined ? { tenantDisplayPrice: toc.displayPrice } : {}),
   };
 }
 
@@ -539,7 +608,7 @@ export async function getMemberCatalogView(
   query: CatalogQuery,
 ): Promise<CatalogPage> {
   const db = await getMongoDb();
-  const { nexusOffers, tenantOfferConfigs } = getSupplyDomainCollections(db);
+  const { tenantOfferConfigs } = getSupplyDomainCollections(db);
 
   // Pre-fetch the adopted set; bail early when the tenant has adopted nothing.
   const adoptedConfigs = await tenantOfferConfigs
@@ -547,64 +616,51 @@ export async function getMemberCatalogView(
     .toArray();
   if (adoptedConfigs.length === 0) return { items: [], total: 0 };
 
-  const nowDate = new Date();
-  const andClauses: Array<Record<string, unknown>> = [
-    { offerId: { $in: adoptedConfigs.map((c) => c.offerId) } },
-    { status: 'active' },
-    NOT_DELETED,
-    { $or: [{ validFrom: null }, { validFrom: { $exists: false } }, { validFrom: { $lte: nowDate } }] },
-    { $or: [{ validUntil: null }, { validUntil: { $exists: false } }, { validUntil: { $gte: nowDate } }] },
-  ];
-
-  if (query.category) andClauses.push({ category: query.category });
-  const searchFilter = buildSearchFilter(query.search);
-  if (searchFilter) andClauses.push(searchFilter);
-  andClauses.push(...buildFilterClauses(query));
-
-  const offerFilter = { $and: andClauses };
-  const skip = (query.page - 1) * query.limit;
-
-  // Build the configMap up-front so the price-sort branch can resolve the
-  // effective per-tenant displayPrice without an additional fetch.
+  // configMap feeds the pricing projection below; the overrides map is the
+  // same data narrowed to what the catalog-search module needs for its
+  // effective-value sorts (price + cashback rank by the TENANT's numbers).
   const configMap = new Map<string, TenantOfferConfig>(
     adoptedConfigs.map((c) => [c.offerId, c]),
   );
+  const overrides = new Map<string, TenantPriceOverride>(
+    adoptedConfigs.map((c) => [c.offerId, {
+      ...(c.displayPrice !== undefined && { displayPrice: c.displayPrice }),
+      ...(c.memberPrice !== undefined && { memberPrice: c.memberPrice }),
+      ...(c.variantPrices !== undefined && { variantPrices: c.variantPrices }),
+    }]),
+  );
 
-  // When the member sort is by price, we must rank by the EFFECTIVE price -
-  // TenantOfferConfig.displayPrice when present, else NexusOffer.displayPrice.
-  // Mongo cannot sort by that without a $lookup, and the project rule is to
-  // preserve the two-query + JS-map join pattern. So for price sorts only,
-  // fetch the full filtered set (bounded by this tenant's adopted offers,
-  // already in memory), JS-sort by effective price, then paginate in memory.
-  // Non-price sorts keep the cheap Mongo-side sort + skip/limit path so the
-  // catalog stays fast for the common "newest" / expiry sorts.
-  const isPriceSort = query.sort === 'price_asc' || query.sort === 'price_desc';
+  // Matching, filtering (search/category/stackable/price/tags/stock), sorting,
+  // and pagination live in the catalog-search module - engine (Atlas Search /
+  // regex fallback) and cache are invisible here. Context gates (adopted set,
+  // active status, open validity window) are enforced inside the module and
+  // are never search-scored. This view keeps the member gate, the pricing
+  // projection, and the item mapping.
+  const { offers, total } = await searchCatalog({
+    context: {
+      kind: 'tenant',
+      tenantId,
+      adoptedOfferIds: adoptedConfigs.map((c) => c.offerId),
+      overrides,
+    },
+    query,
+  });
 
-  let total: number;
-  let offers: NexusOffer[];
-
-  if (isPriceSort) {
-    const all = await nexusOffers.find(offerFilter).toArray();
-    total = all.length;
-    const direction = query.sort === 'price_asc' ? 1 : -1;
-    all.sort((a, b) => {
-      const aEff = configMap.get(a.offerId)?.displayPrice ?? a.displayPrice ?? 0;
-      const bEff = configMap.get(b.offerId)?.displayPrice ?? b.displayPrice ?? 0;
-      if (aEff !== bEff) return (aEff - bEff) * direction;
-      // Stable tie-breaker matches the Mongo-side sort: newest first.
-      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      return bTime - aTime;
-    });
-    offers = all.slice(skip, skip + query.limit);
-  } else {
-    const [count, page] = await Promise.all([
-      nexusOffers.countDocuments(offerFilter),
-      nexusOffers.find(offerFilter).sort(buildSortMap(query.sort)).skip(skip).limit(query.limit).toArray(),
-    ]);
-    total = count;
-    offers = page;
-  }
+  // Uploader identity: batch-fetch the creating tenants for this page in ONE
+  // query (no N+1), mirroring getTenantCatalogView, so wallet/member cards can
+  // show the real "created by <org>" name + logo instead of the NEXUS fallback.
+  // coverImages rides along so cards get the creator's first cover background
+  // without a per-tenant public lookup (only the first entry is exposed).
+  const uploaderTenantIds = [...new Set(offers.map((o) => o.createdByTenantId).filter(Boolean))];
+  const uploaderTenants = uploaderTenantIds.length === 0
+    ? []
+    : await getTenantDomainCollections(db).domainTenants
+        .find(
+          { tenantId: { $in: uploaderTenantIds } },
+          { projection: { tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1, coverImages: 1 } },
+        )
+        .toArray();
+  const uploaderMap = new Map(uploaderTenants.map((tn) => [tn.tenantId, tn]));
 
   const items = offers.map((o) => {
     const toc = configMap.get(o.offerId);
@@ -615,9 +671,13 @@ export async function getMemberCatalogView(
       canSeeNexusCost: false,
       effectiveMemberPrice,
       ...(toc?.variantPrices && { effectiveVariantPrices: toc.variantPrices }),
+      uploaderTenant: uploaderMap.get(o.createdByTenantId) ?? undefined,
     });
   });
 
+  // Real voucher stock overrides the offer-level isSoldOut so store tiles can
+  // show a sold-out badge (a voucher is sold out at 0 available units).
+  await markVoucherSoldOut(db, items);
   return { items, total };
 }
 

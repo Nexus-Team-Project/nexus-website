@@ -16,7 +16,9 @@ export const EMAIL_OTP_COLLECTION = 'emailOtpChallenges';
  *   the email creates/links a NexusIdentity carrying the verified phone.
  * - login_recovery: future use, for email-only recovery flows.
  */
-export type EmailOtpPurpose = 'attach_to_phone_signup' | 'login_recovery';
+// - wallet_email_attach: adds/changes the verified email on an
+//   authenticated caller's identity (pre-stories identifier gate).
+export type EmailOtpPurpose = 'attach_to_phone_signup' | 'login_recovery' | 'wallet_email_attach';
 
 /**
  * A single email-OTP challenge row. codeHash holds bcrypt(code, 10);

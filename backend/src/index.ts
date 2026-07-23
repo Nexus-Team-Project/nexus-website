@@ -19,7 +19,10 @@ import { env } from './config/env';
 import { prisma } from './config/database';
 import { closeMongoConnection, getMongoDb, verifyMongoConnection } from './config/mongo';
 import { ensureDomainIndexes } from './models/domain';
+import { ensureSearchIndexes, catalogSearchEngineName } from './services/catalog-search';
 import { ensureOnboardingIndexes } from './models/onboarding.models';
+import { ensureWalletMagicLinkIndexes } from './models/auth/wallet-magic-link.models';
+import { ensureWalletPaymentIndexes } from './models/payments/wallet-payments.models';
 import { ensureDefaultRolePermissions } from './services/domain-permissions.service';
 import { getSupplyDomainCollections } from './models/domain/supply.models';
 import { scheduleDailyDigest } from './jobs/dailyDigest';
@@ -190,7 +193,16 @@ async function bootstrap() {
     const mongoDb = await getMongoDb();
     await ensureOnboardingIndexes(mongoDb);
     await ensureDomainIndexes(mongoDb);
+    await ensureWalletMagicLinkIndexes(mongoDb);
+    await ensureWalletPaymentIndexes(mongoDb);
     await ensureDefaultRolePermissions();
+    // Catalog search: Atlas Search indexes exist only when the Atlas engine is
+    // enabled (the commands are Atlas-only); either way, log the active engine
+    // so each environment's search mode is visible at boot.
+    if (env.ATLAS_SEARCH_ENABLED) {
+      await ensureSearchIndexes(mongoDb);
+    }
+    console.log(`🔎 Catalog search engine: ${catalogSearchEngineName()}`);
     // One-shot idempotent backfill: legacy offers carry only `imageUrl`. Copy
     // that into `imageUrls` so the new gallery field is consistent with the
     // cover for every existing doc. The filter intentionally excludes docs

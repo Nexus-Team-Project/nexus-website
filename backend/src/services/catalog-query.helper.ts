@@ -2,8 +2,11 @@
  * Catalog query helpers used by catalog.service.
  *
  * Extracted so the main service file stays inside the 350-line guideline.
- * Pure functions; no Mongo I/O here.
+ * Pure functions, except buildInStockClause (voucher stock lives in
+ * voucherCodes units, so it needs one distinct() pre-fetch).
  */
+import type { Db } from 'mongodb';
+import { getVoucherCodeCollection } from '../models/domain/voucher-codes.models';
 
 /**
  * Builds a Mongo `$or` clause that matches the supplied search string against
@@ -79,16 +82,87 @@ export function buildFilterClauses(query: CatalogQuery): Array<Record<string, un
     clauses.push({ tags: { $in: query.tags } });
   }
 
-  if (query.inStockOnly) {
+  // Stackable tri-state: match on the per-variant flags (multikey), falling
+  // back to the offer-level flag for docs with no variants array. An offer
+  // with NO stackable signal anywhere (non-vouchers) matches neither value -
+  // it only appears when the filter is absent.
+  if (query.stackable === 'with' || query.stackable === 'without') {
+    const wanted = query.stackable === 'with';
     clauses.push({
       $or: [
-        { stockLimit: null },
-        { $expr: { $lt: ['$stockUsed', '$stockLimit'] } },
+        { 'variants.voucherStackable': wanted },
+        {
+          $and: [
+            { $or: [{ variants: { $exists: false } }, { variants: { $size: 0 } }] },
+            { voucherStackable: wanted },
+          ],
+        },
       ],
     });
   }
 
+  // inStockOnly is NOT handled here: voucher stock lives in voucherCodes units
+  // and needs an async pre-fetch - see buildInStockClause below, which the view
+  // functions await and push themselves.
+
   return clauses;
+}
+
+/**
+ * Builds the inStockOnly clause. Vouchers derive stock from their inventory
+ * units (an offer is in stock when it has at least one AVAILABLE voucherCodes
+ * unit - offer.stockLimit may be null/stale for variant vouchers, and null must
+ * NOT read as "unlimited" for them). Non-voucher offers keep the legacy
+ * semantics: null stockLimit = unlimited, else stockUsed < stockLimit.
+ *
+ * Async (unlike buildFilterClauses) because the voucher offerIds are resolved
+ * with a distinct() pre-fetch.
+ * ponytail: unindexed distinct on status - add a status index when the
+ * voucherCodes collection grows past what a scan tolerates.
+ *
+ * Input:  db - the Mongo database handle.
+ * Output: one Mongo $or clause ready to push into the view's $and array.
+ */
+export async function buildInStockClause(db: Db): Promise<Record<string, unknown>> {
+  const inStockVoucherIds = await getVoucherCodeCollection(db)
+    .distinct('offerId', { status: 'available' });
+  return {
+    $or: [
+      { executionType: { $ne: 'voucher' }, stockLimit: null },
+      { executionType: { $ne: 'voucher' }, $expr: { $lt: ['$stockUsed', '$stockLimit'] } },
+      { executionType: 'voucher', offerId: { $in: inStockVoucherIds } },
+    ],
+  };
+}
+
+/** The minimal item shape markVoucherSoldOut needs to read + mutate. */
+interface SoldOutMarkable {
+  offerId: string;
+  executionType?: string | null;
+  isSoldOut: boolean;
+}
+
+/**
+ * Sets `isSoldOut` on VOUCHER items from real voucherCodes availability (a
+ * voucher offer is sold out when it has zero AVAILABLE units) - the offer-level
+ * stockLimit toItem uses does not track voucher units. One distinct() over the
+ * page's offerIds; non-voucher items are left untouched. Mutates in place.
+ */
+export async function markVoucherSoldOut<T extends SoldOutMarkable>(db: Db, items: T[]): Promise<T[]> {
+  const voucherIds = items
+    .filter((i) => (i.executionType ?? 'voucher') === 'voucher')
+    .map((i) => i.offerId);
+  if (voucherIds.length === 0) return items;
+  const inStock = new Set(
+    await getVoucherCodeCollection(db).distinct('offerId', {
+      offerId: { $in: voucherIds },
+      status: 'available',
+    }),
+  );
+  for (const item of items) {
+    if ((item.executionType ?? 'voucher') === 'voucher') item.isSoldOut = !inStock.has(item.offerId);
+  }
+  return items;
 }
 
 /**
@@ -115,6 +189,14 @@ export function buildSortMap(
     case 'price_desc':  return { displayPrice: -1, createdAt: -1 };
     case 'expiry_soon': return { validUntil: 1, createdAt: -1 };
     case 'expiry_far':  return { validUntil: -1, createdAt: -1 };
+    // Stored BASE cashback range. Descending puts nulls (no cashback) last
+    // naturally; ascending would put them FIRST, so the catalog-search module
+    // uses its JS nulls-last path for cashback_asc - this Mongo mapping is the
+    // legacy/admin-path approximation only.
+    case 'cashback_desc': return { cashbackMaxPct: -1, createdAt: -1 };
+    case 'cashback_asc':  return { cashbackMinPct: 1, createdAt: -1 };
+    // Title order; the catalog-search module adds the Hebrew collation.
+    case 'title_asc':   return { title: 1, createdAt: -1 };
     case 'newest':
     default:            return { createdAt: -1 };
   }

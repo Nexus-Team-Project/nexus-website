@@ -29,16 +29,7 @@ export interface LoginOtpChallenge {
   expiresAt: Date;
   verifiedAt: Date | null;
   ip: string | null;
-  /** Wallet flow discriminator; absent = website new-device MFA. */
-  purpose?: 'wallet_login' | 'wallet_signup' | 'wallet_reset';
-  /** bcrypt(cost 12) of a wallet-signup password, held until email verify. */
-  pendingPasswordHash?: string | null;
-  /** Set when a wallet_reset challenge finished its password change (single-use). */
-  consumedAt?: Date | null;
 }
-
-/** The wallet flow discriminators a challenge can carry. */
-export type ChallengePurpose = NonNullable<LoginOtpChallenge['purpose']>;
 
 /**
  * Ensure indexes on loginOtpChallenges. Idempotent.

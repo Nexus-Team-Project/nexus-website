@@ -7,6 +7,7 @@
 import { getMongoDb } from '../config/mongo';
 import { env } from '../config/env';
 import { getTenantDomainCollections, type TenantUserRoleName } from '../models/domain';
+import type { InviteJobItem } from '../models/domain/invite-jobs.models';
 import {
   buildMemberInviteUrl,
   sendTenantMemberInviteEmail,
@@ -17,6 +18,7 @@ import {
   markInviteJobItemSent,
   reclaimStaleInviteJobItems,
 } from '../services/member-invite-job.service';
+import { deliverOutreachItem } from '../services/tenant-outreach-send.service';
 
 const POLL_INTERVAL_MS = 2_000;
 const STALE_SWEEP_INTERVAL_MS = 60_000;
@@ -57,46 +59,61 @@ class TokenBucket {
 }
 
 /**
- * Processes one item end-to-end: rate-limited send, mark sent on success,
- * record failure with backoff on error.
+ * Delivers one claimed item, dispatching by kind. Exported for tests.
+ * - service_outreach: SMS/email blast + contact stamp (deliverOutreachItem).
+ * - member_invite (kind absent): the original invite-email path, unchanged.
+ * Throws on failure so the caller records the retry/backoff.
+ */
+export async function processClaimedItem(item: InviteJobItem): Promise<void> {
+  if (item.kind === 'service_outreach') {
+    await deliverOutreachItem(item);
+    return;
+  }
+
+  if (!item.rawToken) throw new Error('missing_raw_token');
+  const inviteUrl = buildMemberInviteUrl({
+    token: item.rawToken,
+    tenantId: item.tenantId,
+    roles: item.roles as TenantUserRoleName[],
+    language: item.language,
+  });
+  const messageId = await sendTenantMemberInviteEmail({
+    to: item.email,
+    displayName: item.displayName,
+    tenantName: item.tenantName,
+    tenantId: item.tenantId,
+    roles: item.roles as never,
+    services: item.services,
+    inviteUrl,
+    expiresAt: item.expiresAt,
+    language: item.language,
+  });
+
+  const db = await getMongoDb();
+  const tenantCollections = getTenantDomainCollections(db);
+  await tenantCollections.tenantMemberInvitations.updateOne(
+    { tenantMemberInvitationId: item.invitationId },
+    {
+      $set: {
+        ...(messageId ? { emailMessageId: messageId } : {}),
+        lastEmailSentAt: new Date(),
+        updatedAt: new Date(),
+      },
+    },
+  );
+}
+
+/**
+ * Processes one item end-to-end: claim, rate-limited kind dispatch, mark
+ * sent on success, record failure with backoff on error.
  */
 async function processOneItem(bucket: TokenBucket): Promise<boolean> {
   const item = await claimNextInviteJobItem();
   if (!item) return false;
 
   try {
-    if (!item.rawToken) throw new Error('missing_raw_token');
     await bucket.take();
-
-    const inviteUrl = buildMemberInviteUrl({
-      token: item.rawToken,
-      tenantId: item.tenantId,
-      roles: item.roles as TenantUserRoleName[],
-      language: item.language,
-    });
-    const messageId = await sendTenantMemberInviteEmail({
-      to: item.email,
-      displayName: item.displayName,
-      tenantName: item.tenantName,
-      roles: item.roles as never,
-      services: item.services,
-      inviteUrl,
-      expiresAt: item.expiresAt,
-      language: item.language,
-    });
-
-    const db = await getMongoDb();
-    const tenantCollections = getTenantDomainCollections(db);
-    await tenantCollections.tenantMemberInvitations.updateOne(
-      { tenantMemberInvitationId: item.invitationId },
-      {
-        $set: {
-          ...(messageId ? { emailMessageId: messageId } : {}),
-          lastEmailSentAt: new Date(),
-          updatedAt: new Date(),
-        },
-      },
-    );
+    await processClaimedItem(item);
     await markInviteJobItemSent(item.jobItemId, item.jobId);
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'send_failed';

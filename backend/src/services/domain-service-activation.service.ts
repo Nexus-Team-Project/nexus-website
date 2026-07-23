@@ -10,11 +10,13 @@ import {
   getTenantDomainCollections,
   type CatalogAdoptionMode,
   type DefaultPricingRule,
+  type TenantServiceKey,
 } from '../models/domain';
 import { getSupplyDomainCollections, NOT_DELETED } from '../models/domain/supply.models';
 import { getOnboardingCollections } from '../models/onboarding.models';
 import type { BenefitsCatalogActivationInput } from '../schemas/domain-service-activation.schemas';
 import { getDomainAuthorizationContext, hasDomainPermission } from './domain-authorization.service';
+import { autoAdoptAdminOffersForTenant } from './admin-offer-auto-adopt.service';
 import { syncDomainIdentityForLoginUser } from './domain-identity.service';
 import { syncDomainTenantMembership } from './domain-tenant-sync.service';
 import { getUserContext } from './onboarding.service';
@@ -244,6 +246,16 @@ export async function activateBenefitsCatalogForUser(
     },
   );
 
+  // Admin-offer auto-adopt catch-up: a tenant activating (or re-activating)
+  // the catalog service adopts all current admin offers it has no adoption
+  // row for (explicit exclusions are respected). Best-effort: activation
+  // never fails because of it.
+  try {
+    await autoAdoptAdminOffersForTenant(access.tenantId);
+  } catch (err) {
+    console.error('[SERVICE-ACTIVATION] Admin-offer auto-adopt catch-up failed:', err);
+  }
+
   return {
     tenantId: access.tenantObjectId.toHexString(),
     serviceKey: 'benefits_catalog',
@@ -303,4 +315,20 @@ export async function deactivateBenefitsCatalogForUser(
     status: 'suspended',
     offersDeactivated: offerResult.modifiedCount,
   };
+}
+
+/**
+ * Lists the tenant's ACTIVE service activations for the outreach modal.
+ * Input: tenant id (permission already enforced by the calling route).
+ * Output: { services: [{ serviceKey, status: 'active' }] }.
+ */
+export async function listActiveTenantServices(tenantId: string): Promise<{
+  services: { serviceKey: TenantServiceKey; status: 'active' }[];
+}> {
+  const db = await getMongoDb();
+  const col = getTenantDomainCollections(db).tenantServiceActivations;
+  const docs = await col
+    .find({ tenantId, status: 'active' }, { projection: { serviceKey: 1 } })
+    .toArray();
+  return { services: docs.map((doc) => ({ serviceKey: doc.serviceKey, status: 'active' as const })) };
 }

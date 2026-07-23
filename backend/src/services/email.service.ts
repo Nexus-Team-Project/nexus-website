@@ -101,7 +101,43 @@ export function buildAuthEmailBannerHtml(): string {
 </div>`;
 }
 
+/**
+ * Banner for TENANT-sent emails (invites, outreach, removals): the Nexus logo
+ * with the tenant's logo beside it when one exists. Falls back to the plain
+ * Nexus banner when the tenant has no logo. Table layout for email-client
+ * compatibility; the tenant logo is height-capped so any aspect ratio fits.
+ * Input: the tenant's logo URL (Cloudinary), or null/undefined for none.
+ * Output: banner HTML fragment.
+ */
+export function buildTenantEmailBannerHtml(tenantLogoUrl?: string | null): string {
+  if (!tenantLogoUrl) return buildAuthEmailBannerHtml();
+  const bannerUrl = buildPublicAssetUrl(AUTH_EMAIL_BANNER_PATH);
+
+  return `<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:22px 20px;margin-bottom:30px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto;">
+<tr>
+<td style="vertical-align:middle;padding:0 14px;">
+<img src="${bannerUrl}" width="180" style="display:block;max-width:180px;width:100%;height:auto;border:0;outline:none;text-decoration:none;" alt="Nexus">
+</td>
+<td style="vertical-align:middle;border-left:1px solid #e5e7eb;padding:0 14px;">
+<img src="${tenantLogoUrl}" height="44" style="display:block;height:44px;max-height:44px;width:auto;max-width:140px;border:0;outline:none;text-decoration:none;border-radius:8px;" alt="">
+</td>
+</tr>
+</table>
+</div>`;
+}
+
 // ─── Unified send interface ──────────────────────────────────
+
+/** One file attached to an outgoing email. */
+export interface EmailAttachment {
+  /** File name shown to the recipient, e.g. 'receipt.pdf'. */
+  filename: string;
+  /** Raw file bytes. */
+  content: Buffer;
+  /** MIME type, e.g. 'application/pdf'. Defaults to octet-stream when omitted. */
+  contentType?: string;
+}
 
 export interface SendMailOptions {
   to: string;
@@ -112,6 +148,7 @@ export interface SendMailOptions {
   text?: string;
   replyTo?: string;
   headers?: Record<string, string>;
+  attachments?: EmailAttachment[];
   /** Label for logging (e.g. 'CUSTOMER', 'AI') */
   _label?: string;
 }
@@ -158,6 +195,13 @@ export async function sendMail(options: SendMailOptions): Promise<string | null>
         ...(references && { references }),
         ...(options.replyTo && { replyTo: options.replyTo }),
         ...(Object.keys(extraHeaders).length > 0 && { headers: extraHeaders }),
+        ...(options.attachments?.length && {
+          attachments: options.attachments.map((a) => ({
+            filename: a.filename,
+            content: a.content,
+            contentType: a.contentType,
+          })),
+        }),
       });
 
       console.log(`✅  [${label}] SMTP sent — messageId: ${info.messageId ?? 'none'}`);
@@ -188,6 +232,14 @@ export async function sendMail(options: SendMailOptions): Promise<string | null>
       to: [{ name: options.toName ?? options.to, email: options.to }],
     };
     if (options.replyTo) emailPayload.reply_to = options.replyTo;
+    // SendPulse's documented attachment shape: an object mapping filename ->
+    // base64 content (not yet exercised against a live SendPulse account -
+    // verify the first real send with an attachment lands correctly).
+    if (options.attachments?.length) {
+      emailPayload.attachments = Object.fromEntries(
+        options.attachments.map((a) => [a.filename, a.content.toString('base64')]),
+      );
+    }
 
     const body = JSON.stringify({ email: emailPayload });
     const res = await fetch('https://api.sendpulse.com/smtp/emails', {

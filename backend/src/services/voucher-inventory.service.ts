@@ -107,24 +107,41 @@ export async function getInventorySummary(
   };
 }
 
+/** Per-variant inventory breakdown: total units + units already bought. */
+export interface OfferVariantInventoryCounts {
+  /** variantId -> TOTAL unit count, every kind + status (absent = 0 units). */
+  counts: Record<string, number>;
+  /** variantId -> units already BOUGHT by members: status assigned + redeemed (absent = 0). */
+  bought: Record<string, number>;
+}
+
 /**
  * Per-variant unit COUNTS for one offer (every kind + status, matching the
- * owner summary's semantics). Returns ONLY numbers - never code values - so
- * the route may expose it to any caller who can SEE the offer in the catalog
- * (visibility is enforced by the route, not here).
- * Input: offerId. Output: map of variantId -> unit count (absent = 0 units).
+ * owner summary's semantics), split into the total and the bought portion
+ * (assigned + redeemed - units members purchased; available = total - bought).
+ * Returns ONLY numbers - never code values - so the route may expose it to any
+ * caller who can SEE the offer in the catalog (visibility is enforced by the
+ * route, not here). One aggregation grouped by variant+status (covered by the
+ * `offer_variant_status` index).
+ * Input: offerId. Output: { counts, bought } maps keyed by variantId.
  */
-export async function getOfferVariantInventoryCounts(offerId: string): Promise<Record<string, number>> {
+export async function getOfferVariantInventoryCounts(offerId: string): Promise<OfferVariantInventoryCounts> {
   const db = await getMongoDb();
   const rows = await getVoucherCodeCollection(db)
-    .aggregate<{ _id: string; n: number }>([
+    .aggregate<{ _id: { variantId: string; status: string }; n: number }>([
       { $match: { offerId } },
-      { $group: { _id: '$variantId', n: { $sum: 1 } } },
+      { $group: { _id: { variantId: '$variantId', status: '$status' }, n: { $sum: 1 } } },
     ])
     .toArray();
   const counts: Record<string, number> = {};
-  for (const r of rows) counts[r._id] = r.n;
-  return counts;
+  const bought: Record<string, number> = {};
+  for (const r of rows) {
+    counts[r._id.variantId] = (counts[r._id.variantId] ?? 0) + r.n;
+    if (r._id.status === 'assigned' || r._id.status === 'redeemed') {
+      bought[r._id.variantId] = (bought[r._id.variantId] ?? 0) + r.n;
+    }
+  }
+  return { counts, bought };
 }
 
 /** MongoDB duplicate-key error code. */

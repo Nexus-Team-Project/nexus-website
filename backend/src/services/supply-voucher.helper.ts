@@ -11,9 +11,28 @@
  * and to give the security-relevant validation a pure, testable surface.
  */
 import {
+  VOUCHER_PAYMENTS_DEFAULT,
+  VOUCHER_PAYMENTS_MAX,
+  VOUCHER_PAYMENTS_MIN,
   VOUCHER_VALIDITY_MAX,
   type OfferVoucherValidityUnit,
 } from '../models/domain/supply.models';
+
+/**
+ * Resolves the stored `maxPayments` value for a create/update write.
+ * Voucher: the provided value clamped into [VOUCHER_PAYMENTS_MIN, VOUCHER_PAYMENTS_MAX]
+ * (Zod already bounds route input; the clamp guards non-route callers such as
+ * the backfill), defaulting to VOUCHER_PAYMENTS_DEFAULT when absent.
+ * Non-voucher: always null - the field never carries a value on other types.
+ */
+export function resolveVoucherMaxPayments(
+  isVoucher: boolean,
+  value: number | undefined,
+): number | null {
+  if (!isVoucher) return null;
+  const v = value ?? VOUCHER_PAYMENTS_DEFAULT;
+  return Math.min(Math.max(Math.round(v), VOUCHER_PAYMENTS_MIN), VOUCHER_PAYMENTS_MAX);
+}
 
 /** Result of a voucher validity check. */
 export type VoucherValidityResult =
@@ -99,4 +118,40 @@ export function assertVoucherStackable(
     error: 'Voucher offers require a combine-with-promotions choice',
     errorHe: 'שובר מחייב בחירה אם ניתן לכפל מבצעים',
   };
+}
+
+/** The minimal variant shape the uniqueness rule needs. */
+export interface VariantValueStack {
+  face_value?: number;
+  voucherStackable?: boolean | null;
+}
+
+/**
+ * Validates variant uniqueness (owner decision 2026-07-16): at most ONE
+ * variant per (face_value, stackable) pair. A different selling price never
+ * makes a duplicate value legal, so a value appears at most twice - once
+ * stackable and once not. The wallet's card deck resolves a variant by
+ * (value, stackable choice), which must be unambiguous. A null/undefined
+ * stackable counts as not-stackable (the mandatory-choice rule fires
+ * separately per variant).
+ *
+ * Input:  variants - the offer's variant inputs.
+ * Output: { ok: true }, or { ok: false, error, errorHe } naming the conflict.
+ */
+export function assertUniqueVariantValueStack(
+  variants: VariantValueStack[],
+): VoucherValidityResult {
+  const seen = new Set<string>();
+  for (const v of variants) {
+    const key = `${v.face_value}|${v.voucherStackable === true}`;
+    if (seen.has(key)) {
+      return {
+        ok: false,
+        error: 'Two variants cannot share the same value and the same promo-stacking setting',
+        errorHe: 'לא ניתן ליצור שני וריאנטים עם אותו שווי ואותה הגדרת כפל מבצעים',
+      };
+    }
+    seen.add(key);
+  }
+  return { ok: true };
 }

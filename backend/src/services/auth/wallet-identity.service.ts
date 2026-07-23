@@ -18,7 +18,6 @@
  * Spec: docs/superpowers/specs/2026-05-25-nexus-wallet-auth-design.md sections 10.2 and 10.3
  */
 import { randomUUID } from 'crypto';
-import { ObjectId } from 'mongodb';
 import { prisma } from '../../config/database';
 import { getMongoDb } from '../../config/mongo';
 import { getIdentityDomainCollections } from '../../models/domain';
@@ -114,9 +113,7 @@ export async function resolveWalletIdentity(args: {
       { _id: identity._id },
       { $set: { phone: args.verifiedPhone, phoneVerifiedAt: now, updatedAt: now } },
     );
-    if (identity._id) {
-      await clearStalePhoneEntries(db, args.verifiedPhone, identity._id as ObjectId);
-    }
+    await clearStalePhoneEntries(db, args.verifiedPhone, identity.nexusIdentityId);
     phoneLinked = true;
   } else if (!identityCreated && !identity.emailVerifiedAt) {
     await nexusIdentities.updateOne(

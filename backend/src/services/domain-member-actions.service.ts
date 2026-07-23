@@ -11,8 +11,10 @@ import { createError } from '../middleware/errorHandler';
 import {
   getIdentityDomainCollections,
   getTenantDomainCollections,
+  SERVICE_KEYS,
   type TenantUserRoleName,
 } from '../models/domain';
+import { TENANT_JOIN_REQUEST_COLLECTION } from '../models/auth/tenant-join-request.models';
 import { syncDomainIdentityForMemberInvite } from './domain-identity.service';
 import { buildMemberInviteUrl, sendTenantMemberInviteEmail } from './domain-member-invite-email.service';
 import { sendTenantMemberRemovedEmail, sendTenantInviteRevokedEmail } from './domain-member-remove-email.service';
@@ -122,10 +124,21 @@ export async function updateTenantMemberRoles(
     );
   }
 
-  // Sync roles on any still-pending invitation so the email/acceptance record stays consistent.
+  // Decision 7 (2026-07-15): TenantMember.services is a privileged-staff
+  // concept. Any non-member role grants ALL service surfaces; a plain
+  // ['member'] set clears them (regular members gate on membership +
+  // tenant catalog activation instead).
+  const services = uniqueRoles.some((r) => r !== 'member') ? [...SERVICE_KEYS] : [];
+  await tenantCollections.tenantMembers.updateOne(
+    { tenantMemberId, tenantId: access.tenantId },
+    { $set: { services, updatedAt: now } },
+  );
+
+  // Sync roles + services on any still-pending invitation so the
+  // email/acceptance record stays consistent.
   await tenantCollections.tenantMemberInvitations.updateOne(
     { tenantMemberId, tenantId: access.tenantId, status: 'pending' },
-    { $set: { roles: uniqueRoles, updatedAt: now } },
+    { $set: { roles: uniqueRoles, services, updatedAt: now } },
   );
 
   return { roles: uniqueRoles };
@@ -201,6 +214,7 @@ export async function updateTenantMemberEmail(
     void sendTenantInviteRevokedEmail({
       to: oldNormalizedEmail,
       tenantName,
+      tenantId: access.tenantId,
       language: 'he',
     }).catch(() => undefined);
   }
@@ -330,6 +344,7 @@ export async function updateTenantMemberEmail(
   void sendTenantMemberInviteEmail({
     to: newNormalized,
     tenantName,
+    tenantId: access.tenantId,
     roles: oldRoles,
     inviteUrl: buildMemberInviteUrl({
       token: rawToken,
@@ -347,8 +362,12 @@ export async function updateTenantMemberEmail(
 /**
  * Removes a tenant member from the tenant.
  * Deletes all tenant-scoped Mongo records: TenantMember, TenantUserRole,
- * MemberGroupAssignment, TenantContact. Revokes pending invitations.
- * Never touches NexusIdentity, ContactProfile, or Prisma User.
+ * MemberGroupAssignment, TenantContact, TenantJoinRequest. Revokes pending
+ * invitations. Never touches NexusIdentity, ContactProfile, or Prisma User.
+ * Clearing the join-request history (not just membership) matters: the
+ * wallet's discovery sheet treats any pending/approved/auto_accepted request
+ * as "already handled" and hides that tenant from the joinable list - without
+ * this, a removed member could never be offered that tenant again.
  * Input: manager user id, target member id, optional email suppress flag.
  * Output: void on success.
  */
@@ -409,6 +428,12 @@ export async function removeTenantMemberFromTenant(
     tenantId: access.tenantId,
     tenantMemberId,
   });
+  // Clear join-request history so the tenant becomes discoverable/joinable
+  // again (see the function doc above for why this is necessary).
+  await db.collection(TENANT_JOIN_REQUEST_COLLECTION).deleteMany({
+    tenantId: access.tenantId,
+    nexusIdentityId: member.nexusIdentityId,
+  });
   // Remove the tenant contact record (tenant-scoped address book entry).
   if (identity?.normalizedEmail) {
     await tenantCollections.tenantContacts.deleteOne({
@@ -424,6 +449,7 @@ export async function removeTenantMemberFromTenant(
       to: identity.normalizedEmail,
       displayName: identity.displayName,
       tenantName,
+      tenantId: access.tenantId,
       language: (identity.locale as 'he' | 'en') ?? 'he',
     }).catch(() => undefined);
   }
@@ -452,11 +478,16 @@ export async function removeTenantContact(
   if (!contact) throw createError('Contact not found', 404);
 
   // Resolve NexusIdentity by normalizedEmail, then find the TenantMember.
+  // Phone-only contacts (email-or-phone rule, spec s.4) have no email and can
+  // never be linked members - skip the lookup entirely (an undefined filter
+  // value would serialize to null and could mismatch).
   const identityCollections2 = getIdentityDomainCollections(db);
-  const linkedIdentity = await identityCollections2.nexusIdentities.findOne(
-    { normalizedEmail: contact.normalizedEmail },
-    { projection: { nexusIdentityId: 1 } },
-  );
+  const linkedIdentity = contact.normalizedEmail
+    ? await identityCollections2.nexusIdentities.findOne(
+        { normalizedEmail: contact.normalizedEmail },
+        { projection: { nexusIdentityId: 1 } },
+      )
+    : null;
   const linkedMember = linkedIdentity
     ? await tenantCollections.tenantMembers.findOne({
         tenantId: access.tenantId,
@@ -520,12 +551,15 @@ export async function updateTenantContactEmail(
     return;
   }
 
-  // Pending or expired: resolve identity → member, then delegate.
+  // Pending or expired: resolve identity -> member, then delegate.
+  // Phone-only contacts carry no email; the null identity falls through to 404.
   const identityCollections3 = getIdentityDomainCollections(db);
-  const linkedIdentity3 = await identityCollections3.nexusIdentities.findOne(
-    { normalizedEmail: contact.normalizedEmail },
-    { projection: { nexusIdentityId: 1 } },
-  );
+  const linkedIdentity3 = contact.normalizedEmail
+    ? await identityCollections3.nexusIdentities.findOne(
+        { normalizedEmail: contact.normalizedEmail },
+        { projection: { nexusIdentityId: 1 } },
+      )
+    : null;
   const linkedMember = linkedIdentity3
     ? await tenantCollections.tenantMembers.findOne({
         tenantId: access.tenantId,

@@ -4,12 +4,15 @@
  * - Invite revoked (admin changed the invited email address).
  * Visual style matches the invite email: logo banner, white card, centered layout.
  */
-import { buildAuthEmailBannerHtml, sendMail } from './email.service';
+import { buildTenantEmailBannerHtml, sendMail } from './email.service';
+import { fetchTenantEmailLogoUrl } from './email/tenant-email-logo.helper';
 
 export interface TenantMemberRemovedEmailInput {
   to: string;
   displayName?: string;
   tenantName: string;
+  /** When provided, the tenant's logo (if set) is shown beside the Nexus logo. */
+  tenantId?: string;
   language: 'he' | 'en';
 }
 
@@ -38,7 +41,7 @@ export async function sendTenantMemberRemovedEmail(
   const isHebrew = input.language === 'he';
   const dir = isHebrew ? 'rtl' : 'ltr';
   const tenantName = escapeHtml(input.tenantName);
-  const bannerHtml = buildAuthEmailBannerHtml();
+  const bannerHtml = buildTenantEmailBannerHtml(await fetchTenantEmailLogoUrl(input.tenantId));
 
   const subject = isHebrew
     ? `הוסרת מ-${tenantName}`
@@ -91,6 +94,8 @@ export interface TenantInviteRevokedEmailInput {
   to: string;
   displayName?: string;
   tenantName: string;
+  /** When provided, the tenant's logo (if set) is shown beside the Nexus logo. */
+  tenantId?: string;
   language: 'he' | 'en';
 }
 
@@ -105,7 +110,7 @@ export async function sendTenantInviteRevokedEmail(
   const isHebrew = input.language === 'he';
   const dir = isHebrew ? 'rtl' : 'ltr';
   const tenantName = escapeHtml(input.tenantName);
-  const bannerHtml = buildAuthEmailBannerHtml();
+  const bannerHtml = buildTenantEmailBannerHtml(await fetchTenantEmailLogoUrl(input.tenantId));
 
   const subject = isHebrew
     ? `ההזמנה שלך ל-${tenantName} בוטלה`

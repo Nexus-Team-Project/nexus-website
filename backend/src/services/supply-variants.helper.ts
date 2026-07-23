@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto';
 import { createError } from '../middleware/errorHandler';
 import type { NexusOffer, OfferVariant } from '../models/domain/supply.models';
 import { VARIANT_ID_REGEX, MAX_VARIANTS_PER_OFFER } from '../models/domain/supply-variants.models';
+import { applyNexusFee } from './supply-price.helper';
 
 /**
  * A variant as received from a client (create/update). `variantId` is optional:
@@ -153,12 +154,18 @@ export function hasDuplicateVariants(variants: OfferVariant[]): boolean {
 
 /**
  * Finalizes a client variant input into a persisted OfferVariant: keeps a valid
- * incoming `variantId` (edit) or generates one (new); defaults member_price to
- * nexus_cost when omitted (matches the offer-level voucher rule); strips
- * undefined fields. Does NOT validate pricing bounds - the route does that.
+ * incoming `variantId` (edit) or generates one (new); DERIVES member_price as the
+ * fee-inflated base price applyNexusFee(nexus_cost, face_value, feePct) whenever
+ * both cost and face are defined (any client-sent member_price is ignored - the
+ * platform owns the base price); falls back to the legacy member ?? cost seeding
+ * when either is missing. Strips undefined fields. Does NOT validate pricing
+ * bounds - the route does that.
  */
-function finalizeVariant(v: OfferVariantInput): OfferVariant {
-  const member = v.member_price === undefined ? v.nexus_cost : v.member_price;
+function finalizeVariant(v: OfferVariantInput, feePct: number): OfferVariant {
+  const member =
+    v.nexus_cost !== undefined && v.face_value !== undefined
+      ? applyNexusFee(v.nexus_cost, v.face_value, feePct)
+      : (v.member_price === undefined ? v.nexus_cost : v.member_price);
   return {
     variantId: v.variantId && VARIANT_ID_REGEX.test(v.variantId) ? v.variantId : generateVariantId(),
     ...(v.face_value !== undefined && { face_value: v.face_value }),
@@ -180,19 +187,22 @@ function finalizeVariant(v: OfferVariantInput): OfferVariant {
  * synthesized from the flat fields (backward-compat with the pre-variant form).
  * Guarantees at least one variant.
  *
- * Input:  variants (optional client array) + flat fallback fields.
+ * Input:  variants (optional client array) + flat fallback fields + feePct (the
+ *         offer's nexus fee %, REQUIRED so every caller decides it explicitly -
+ *         money code; member_price is derived from it per variant).
  * Output: a non-empty OfferVariant[].
  * Throws: 400 when more than MAX_VARIANTS_PER_OFFER are supplied or duplicates exist.
  */
 export function buildVoucherVariants(
   variants: OfferVariantInput[] | undefined,
   flat: FlatVoucherFields,
+  feePct: number,
 ): OfferVariant[] {
   const raw: OfferVariantInput[] = variants && variants.length > 0 ? variants : [flat];
   if (raw.length > MAX_VARIANTS_PER_OFFER) {
     throw createError(`A voucher offer may have at most ${MAX_VARIANTS_PER_OFFER} variants.`, 400);
   }
-  const finalized = raw.map(finalizeVariant);
+  const finalized = raw.map((v) => finalizeVariant(v, feePct));
   if (hasDuplicateVariants(finalized)) {
     throw createError('Duplicate variant: two variants have identical values.', 400);
   }

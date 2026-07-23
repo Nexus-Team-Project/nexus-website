@@ -106,26 +106,38 @@ export interface CustomWritePlan {
   clearKeys: string[];
   /** Column display names that failed validation (for strict-mode errors). */
   invalid: string[];
+  /**
+   * Wallet-mirror column names the payload tried to write. These fields are
+   * filled ONLY by the member answering wallet onboarding / updating the
+   * wallet profile (the sync path writes them directly, not through here) -
+   * strict callers 400 on them, the lenient import drops them.
+   */
+  readOnly: string[];
 }
 
 /**
  * Turn a raw `customFields` payload object into a write plan, dropping any key
  * that is not a known fieldId for this tenant. Unknown keys are silently
- * ignored; bad values are reported in `invalid` (the caller errors in strict
- * mode, or ignores them for lenient import = "blank that cell, keep the row").
+ * ignored; bad values are reported in `invalid`, wallet-mirror keys in
+ * `readOnly` (the caller errors on both in strict mode, or ignores them for
+ * lenient import = "blank that cell, keep the row").
  */
 export function planCustomWrites(
   defs: TenantContactFieldDocument[],
   payload: Record<string, unknown>,
 ): CustomWritePlan {
   const byId = new Map(defs.map((d) => [d.fieldId, d]));
-  const plan: CustomWritePlan = { set: {}, clearKeys: [], invalid: [] };
+  const plan: CustomWritePlan = { set: {}, clearKeys: [], invalid: [], readOnly: [] };
 
   for (const [key, raw] of Object.entries(payload)) {
     if (!FIELD_ID_RE.test(key)) continue; // never trust an arbitrary key
     const def = byId.get(key);
     if (!def) continue;
-    if (def.origin === 'wallet_profile') continue; // mirror columns are read-only
+    if (def.origin === 'wallet_profile') {
+      // Mirror columns are member-owned; never written by tenant APIs.
+      plan.readOnly.push(def.name);
+      continue;
+    }
     const res = validateCustomValue(def, raw);
     if (res.state === 'set') plan.set[`customFields.${key}`] = res.value;
     else if (res.state === 'clear') plan.clearKeys.push(key);

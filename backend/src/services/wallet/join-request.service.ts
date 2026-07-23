@@ -25,6 +25,7 @@ import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import { markTenantMemberInvitationAccepted } from '../domain-member-invitation-read.service';
 import { activeCatalogTenantIds } from './tenant-discovery.service';
 import { applyMirrorTokensToTenantContact } from './wallet-mirror-fields.helper';
+import { upsertJoinedTenantContact } from './join-contact.helper';
 import { profileToMirrorTokens, profileFullName, marketingConsentToken, normalizeGenderToken, type WalletProfileLike } from '../../config/wallet-profile-fields';
 
 export interface CreateJoinResult {
@@ -100,36 +101,18 @@ export async function materializeTenantMembership(
     { upsert: true },
   );
   // Mirror the invite-accept flow: an approved member must also appear in the
-  // tenant's Contacts tab.
-  //
-  // displayName placement rules (Mongo rejects a field in both $set and $setOnInsert):
-  //   - fullName present  -> always overwrite with wallet name via $set
-  //   - fullName absent   -> fall back to caller-supplied name / email prefix, new rows only via $setOnInsert
-  const contactSetOnInsert: Record<string, unknown> = {
-    tenantContactId: `tenant_contact_${randomUUID()}`,
+  // tenant's Contacts tab. The helper merges duplicate rows (email + phone-only
+  // for the same human) so the partial unique (tenantId, phone) index cannot
+  // fail the approval.
+  await upsertJoinedTenantContact(db, {
     tenantId: args.tenantId,
+    nexusIdentityId: args.nexusIdentityId,
     email: args.email,
-    normalizedEmail: args.email,
-    createdAt: now,
-  };
-  // nexusIdentityId is in $set (not $setOnInsert) so a pre-existing
-  // admin-added contact (added by email, no identity link) gets backfilled
-  // when its owner joins - otherwise the mirror write below, which matches by
-  // nexusIdentityId, would silently miss that row.
-  const contactSet: Record<string, unknown> = {
-    status: 'active', lastActivityAt: now, updatedAt: now,
-    nexusIdentityId: args.nexusIdentityId, ...phoneFields,
-  };
-  if (fullName) {
-    contactSet.displayName = fullName;
-  } else {
-    contactSetOnInsert.displayName = args.displayName ?? args.email.split('@')[0];
-  }
-  await db.collection(DOMAIN_COLLECTIONS.tenantContacts).updateOne(
-    { tenantId: args.tenantId, normalizedEmail: args.email },
-    { $setOnInsert: contactSetOnInsert, $set: contactSet },
-    { upsert: true },
-  );
+    displayName: args.displayName,
+    fullName,
+    phoneFields,
+    now,
+  });
 
   // Mirror the member's onboarding answers + marketing consent into this tenant's
   // contact columns. Reuse identityDoc fetched above - no second round-trip needed.

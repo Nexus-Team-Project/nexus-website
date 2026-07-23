@@ -18,9 +18,17 @@ import { PHONE_OTP_COLLECTION } from '../../models/auth/phone-otp.models';
 import { EMAIL_OTP_COLLECTION } from '../../models/auth/email-otp.models';
 import { PHONE_SIGNUP_TICKET_COLLECTION } from '../../models/auth/phone-signup-ticket.models';
 import { LOGIN_OTP_COLLECTION } from '../../models/auth/login-otp.models';
+import { WALLET_MAGIC_LINK_COLLECTION } from '../../models/auth/wallet-magic-link.models';
 import { TRUSTED_DEVICE_COLLECTION } from '../../models/auth/trusted-device.models';
 import { ONBOARDING_PHONE_VERIFICATION_COLLECTION } from '../../models/auth/onboarding-phone-verification.models';
 import { TENANT_JOIN_REQUEST_COLLECTION } from '../../models/auth/tenant-join-request.models';
+import { TENANT_RATING_COLLECTION } from '../../models/domain/tenant-rating.models';
+import { SHORT_LINK_COLLECTION } from '../../models/domain/short-links.models';
+import {
+  WALLET_PAYMENT_CARDS_COLLECTION,
+  WALLET_PURCHASES_COLLECTION,
+  WALLET_BALANCES_COLLECTION,
+} from '../../models/payments/wallet-payments.models';
 import {
   resolveMongoDeletionTargets,
   resolveOrchestrationDeletionTargets,
@@ -105,15 +113,22 @@ export async function collectMongoCounts(
     tenantContactFields,
     memberInviteJobs,
     memberInviteJobItems,
+    shortLinks,
     phoneOtpChallenges,
     emailOtpChallenges,
     phoneSignupTickets,
     walletRateLimits,
     loginOtpChallenges,
+    walletMagicLinks,
     trustedDevices,
     onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
+    tenantRatingsByUser,
+    tenantRatingsForOwnedTenants,
+    walletPaymentCards,
+    walletPurchasesRetained,
+    walletBalances,
     ownerAssignmentsCleared,
   ] = await Promise.all([
     identity.nexusIdentities.countDocuments({
@@ -214,6 +229,10 @@ export async function collectMongoCounts(
     // Bulk member-invite jobs + their items for the owned tenants.
     inviteJobs.memberInviteJobs.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
     inviteJobs.memberInviteJobItems.countDocuments({ tenantId: { $in: targets.domainOwnedTenantIds } }),
+    // Outreach short links are tenant-linked (one per tenant+service).
+    db.collection(SHORT_LINK_COLLECTION).countDocuments({
+      tenantId: { $in: targets.domainOwnedTenantIds },
+    }),
     // Plan #1: phone-OTP challenges keyed by the user's phone.
     db.collection(PHONE_OTP_COLLECTION).countDocuments({
       phone: { $in: targets.walletPhones },
@@ -233,6 +252,8 @@ export async function collectMongoCounts(
     }),
     // Login new-device OTP challenges keyed by email.
     db.collection(LOGIN_OTP_COLLECTION).countDocuments({ email }),
+    // Wallet magic-link tokens keyed by email.
+    db.collection(WALLET_MAGIC_LINK_COLLECTION).countDocuments({ email }),
     // Trusted login devices keyed by the Prisma user id.
     db.collection(TRUSTED_DEVICE_COLLECTION).countDocuments(
       targets.prismaUserIds.length
@@ -257,6 +278,27 @@ export async function collectMongoCounts(
     // Plan #4: tenant join requests TO tenants the user owns.
     db.collection(TENANT_JOIN_REQUEST_COLLECTION).countDocuments({
       tenantId: { $in: targets.domainOwnedTenantIds },
+    }),
+    // Tenant ratings authored by this user.
+    db.collection(TENANT_RATING_COLLECTION).countDocuments({
+      nexusIdentityId: { $in: targets.nexusIdentityIds },
+    }),
+    // Tenant ratings ON tenants the user owns.
+    db.collection(TENANT_RATING_COLLECTION).countDocuments({
+      tenantId: { $in: targets.domainOwnedTenantIds },
+    }),
+    // Saved wallet payment cards (PayMe buyer_key tokens) for this user.
+    db.collection(WALLET_PAYMENT_CARDS_COLLECTION).countDocuments({
+      identityId: { $in: targets.nexusIdentityIds },
+    }),
+    // Wallet voucher purchases made by this user - NOT deleted: retained as
+    // audit records (buyer snapshot + buyerDeletedAt stamped instead).
+    db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({
+      identityId: { $in: targets.nexusIdentityIds },
+    }),
+    // Wallet balance doc for this user.
+    db.collection(WALLET_BALANCES_COLLECTION).countDocuments({
+      identityId: { $in: targets.nexusIdentityIds },
     }),
     // Admin-created orgs where this user is the ASSIGNED owner: the tenant is
     // kept but its ownerAssignment is cleared (reverts to "no owner").
@@ -298,15 +340,22 @@ export async function collectMongoCounts(
     tenantContactFields,
     memberInviteJobs,
     memberInviteJobItems,
+    shortLinks,
     phoneOtpChallenges,
     emailOtpChallenges,
     phoneSignupTickets,
     walletRateLimits,
     loginOtpChallenges,
+    walletMagicLinks,
     trustedDevices,
     onboardingPhoneVerifications,
     tenantJoinRequestsByUser,
     tenantJoinRequestsForOwnedTenants,
+    tenantRatingsByUser,
+    tenantRatingsForOwnedTenants,
+    walletPaymentCards,
+    walletPurchasesRetained,
+    walletBalances,
     ownerAssignmentsCleared,
   };
 }
@@ -348,6 +397,8 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   await db.collection(EMAIL_OTP_COLLECTION).deleteMany({ email });
   // Login new-device OTP challenges + trusted devices (login-device-otp).
   await db.collection(LOGIN_OTP_COLLECTION).deleteMany({ email });
+  // Wallet magic-link tokens keyed by email.
+  await db.collection(WALLET_MAGIC_LINK_COLLECTION).deleteMany({ email });
   if (targets.prismaUserIds.length > 0) {
     await db.collection(TRUSTED_DEVICE_COLLECTION).deleteMany({
       prismaUserId: { $in: targets.prismaUserIds },
@@ -374,6 +425,42 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
         : []),
     ],
   });
+  // Tenant ratings authored by this user + ratings on tenants the user owns.
+  await db.collection(TENANT_RATING_COLLECTION).deleteMany({
+    $or: [
+      ...(targets.nexusIdentityIds.length
+        ? [{ nexusIdentityId: { $in: targets.nexusIdentityIds } }]
+        : []),
+      ...(targets.domainOwnedTenantIds.length
+        ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }]
+        : []),
+    ],
+  });
+
+  // Saved payment cards (PayMe tokens) are hard-deleted; wallet purchases
+  // are RETAINED as tenant/tax audit records ("who bought what and when").
+  // The buyer name/email snapshot is backfilled onto docs that predate the
+  // purchase-time snapshot, and buyerDeletedAt marks the account as gone.
+  if (targets.nexusIdentityIds.length > 0) {
+    await db.collection(WALLET_PAYMENT_CARDS_COLLECTION).deleteMany({
+      identityId: { $in: targets.nexusIdentityIds },
+    });
+    await db.collection(WALLET_PURCHASES_COLLECTION).updateMany(
+      { identityId: { $in: targets.nexusIdentityIds } },
+      [
+        {
+          $set: {
+            buyerName: { $ifNull: ['$buyerName', prismaUser?.fullName ?? null] },
+            buyerEmail: { $ifNull: ['$buyerEmail', email] },
+            buyerDeletedAt: '$$NOW',
+          },
+        },
+      ],
+    );
+    await db.collection(WALLET_BALANCES_COLLECTION).deleteMany({
+      identityId: { $in: targets.nexusIdentityIds },
+    });
+  }
 
   await orchestration.consumedEvents.deleteMany({ platformEventId: { $in: orchestrationTargets.platformEventIds } });
   await orchestration.platformEvents.deleteMany({ platformEventId: { $in: orchestrationTargets.platformEventIds } });
@@ -422,6 +509,10 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
   // item ever outlives its parent job).
   await inviteJobs.memberInviteJobItems.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   await inviteJobs.memberInviteJobs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
+  // Outreach short links for the owned tenants (spec s.3 deletion completeness).
+  await db.collection(SHORT_LINK_COLLECTION).deleteMany({
+    tenantId: { $in: targets.domainOwnedTenantIds },
+  });
   // Delete adoption records (tenant chose to show these platform offers to members).
   await supply.tenantOfferConfigs.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
   // Collect image URLs before deleting offer documents so we can clean up Cloudinary.
@@ -462,17 +553,22 @@ export async function deleteMongoUser(email: string, prismaUser: PrismaUserSnaps
       ...(targets.domainOwnedTenantIds.length ? [{ tenantId: { $in: targets.domainOwnedTenantIds } }] : []),
     ],
   });
-  // Collect each owned tenant's logo URL before deleting the docs so the
-  // uploaded Cloudinary logo (folder nexus/tenant-logos) can be cleaned up too.
+  // Collect each owned tenant's logo URL + cover-image URLs before deleting the
+  // docs so the uploaded Cloudinary assets (folders nexus/tenant-logos +
+  // nexus/tenant-covers) can be cleaned up too.
   const tenantsToDelete = await tenants.domainTenants
-    .find({ tenantId: { $in: targets.domainOwnedTenantIds } }, { projection: { logoUrl: 1 } })
+    .find({ tenantId: { $in: targets.domainOwnedTenantIds } }, { projection: { logoUrl: 1, coverImages: 1 } })
     .toArray();
   await tenants.domainTenants.deleteMany({ tenantId: { $in: targets.domainOwnedTenantIds } });
-  // Delete tenant logos from Cloudinary after the DB rows are gone. deleteOfferImage
-  // works for any Cloudinary URL and swallows errors / skips non-Cloudinary URLs.
+  // Delete tenant logos + covers from Cloudinary after the DB rows are gone.
+  // deleteOfferImage works for any Cloudinary URL and swallows errors / skips
+  // non-Cloudinary URLs.
+  const brandingAssetUrls = tenantsToDelete.flatMap((t) => [
+    t.logoUrl,
+    ...((t.coverImages ?? []) as { url?: string }[]).map((entry) => entry.url),
+  ]);
   await Promise.all(
-    tenantsToDelete
-      .map((t) => t.logoUrl)
+    brandingAssetUrls
       .filter((url): url is string => typeof url === 'string' && url.length > 0)
       .map((url) => deleteOfferImage(url)),
   );

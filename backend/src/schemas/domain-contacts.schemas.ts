@@ -75,18 +75,24 @@ export type ListContactsQuery = z.infer<typeof listContactsQuerySchema>;
 
 /**
  * Validates POST /api/v1/tenant/contacts body.
- * Status is not accepted — all new contacts start as inactive.
- * Status advances automatically through the invite lifecycle.
+ * Status is not accepted - all new contacts start as inactive.
+ * At least one of a valid email / valid Israeli phone is required
+ * (members-service-invite s.4); displayName stays required.
  */
-export const createContactSchema = z.object({
-  email: z.string().email().max(255),
-  // Required: a contact must have a display name (the default('') previously
-  // collided with min(1), making name-less creates fail validation).
-  displayName: z.string().trim().min(1, 'Full name is required').max(255),
-  address: z.string().trim().max(500).optional(),
-  phone: israeliPhoneInput,
-  customFields: customFieldsInput,
-});
+export const createContactSchema = z
+  .object({
+    email: z.string().email().max(255).optional(),
+    // Required: a contact must have a display name (the default('') previously
+    // collided with min(1), making name-less creates fail validation).
+    displayName: z.string().trim().min(1, 'Full name is required').max(255),
+    address: z.string().trim().max(500).optional(),
+    phone: israeliPhoneInput,
+    customFields: customFieldsInput,
+  })
+  .refine((data) => data.email !== undefined || data.phone !== undefined, {
+    message: 'A contact needs a valid email or a valid Israeli phone',
+    path: ['email'],
+  });
 
 export type CreateContactInput = z.infer<typeof createContactSchema>;
 
@@ -110,15 +116,26 @@ export type UpdateContactInput = z.infer<typeof updateContactSchema>;
 
 /**
  * Validates a single row in the bulk CSV import payload.
- * Status is ignored — all imported contacts start as inactive.
+ * Status is ignored - all imported contacts start as inactive.
+ * Empty email cells are treated as absent; each row needs at least one of a
+ * valid email / valid Israeli phone. The service re-checks defensively and
+ * counts violating rows in errors/skipped for direct callers.
  */
-const importContactRowSchema = z.object({
-  email: z.string().email().max(255),
-  displayName: z.string().trim().max(255).optional(),
-  address: z.string().trim().max(500).optional(),
-  phone: israeliPhoneInput,
-  customFields: customFieldsInput,
-});
+const importContactRowSchema = z
+  .object({
+    email: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().email().max(255).optional(),
+    ),
+    displayName: z.string().trim().max(255).optional(),
+    address: z.string().trim().max(500).optional(),
+    phone: israeliPhoneInput,
+    customFields: customFieldsInput,
+  })
+  .refine((data) => data.email !== undefined || data.phone !== undefined, {
+    message: 'A row needs a valid email or a valid Israeli phone',
+    path: ['email'],
+  });
 
 /**
  * Validates POST /api/v1/tenant/contacts/import body.

@@ -6,7 +6,7 @@
  */
 import { getMongoDb } from '../config/mongo';
 import { getTenantDomainCollections, getIdentityDomainCollections } from '../models/domain';
-import type { LogoCrop } from '../models/domain/tenant.models';
+import type { LogoCrop, TenantCoverImage } from '../models/domain/tenant.models';
 import { getSupplyDomainCollections, NOT_DELETED, type NexusOffer } from '../models/domain/supply.models';
 import { createError } from '../middleware/errorHandler';
 import { approveOffer } from './supply-approval.service';
@@ -60,6 +60,12 @@ export interface AdminTenantLookupRow {
   logoUrl?: string;
   brandColor?: string;
   logoCrop?: LogoCrop | null;
+  /** Ordered cover gallery (max 5), for the admin Appearance cover card. */
+  coverImages?: TenantCoverImage[];
+  /** Social handles (bare, no URL) - seed the admin Appearance social editor. */
+  instagramHandle?: string;
+  facebookHandle?: string;
+  twitterHandle?: string;
 }
 
 /**
@@ -80,7 +86,7 @@ export async function lookupTenants(
   const [total, docs] = await Promise.all([
     domainTenants.countDocuments(filter),
     domainTenants
-      .find(filter, { projection: { _id: 0, tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1 } })
+      .find(filter, { projection: { _id: 0, tenantId: 1, organizationName: 1, logoUrl: 1, brandColor: 1, logoCrop: 1, coverImages: 1, instagramHandle: 1, facebookHandle: 1, twitterHandle: 1 } })
       .sort({ organizationName: 1 })
       .skip((opts.page - 1) * opts.limit)
       .limit(opts.limit)
@@ -94,6 +100,11 @@ export async function lookupTenants(
       ...(d.logoUrl ? { logoUrl: d.logoUrl } : {}),
       ...(d.brandColor ? { brandColor: d.brandColor } : {}),
       ...(d.logoCrop ? { logoCrop: d.logoCrop } : {}),
+      ...(Array.isArray(d.coverImages) && d.coverImages.length > 0 ? { coverImages: d.coverImages } : {}),
+      // Social handles: seed the admin Appearance social-links editor.
+      ...(d.instagramHandle ? { instagramHandle: d.instagramHandle } : {}),
+      ...(d.facebookHandle ? { facebookHandle: d.facebookHandle } : {}),
+      ...(d.twitterHandle ? { twitterHandle: d.twitterHandle } : {}),
     })),
   };
 }

@@ -9,6 +9,7 @@ import { getMongoDb } from '../config/mongo';
 import { createError } from '../middleware/errorHandler';
 import {
   getInviteJobCollections,
+  type InviteJobItem,
   type MemberInviteJob,
   type MemberInviteJobItem,
   type MemberInviteJobStatus,
@@ -102,7 +103,7 @@ export async function enqueueInviteJob(input: {
  * The findOneAndUpdate filter on status+nextAttemptAt prevents two workers
  * from claiming the same row.
  */
-export async function claimNextInviteJobItem(): Promise<MemberInviteJobItem | null> {
+export async function claimNextInviteJobItem(): Promise<InviteJobItem | null> {
   const db = await getMongoDb();
   const { memberInviteJobItems } = getInviteJobCollections(db);
   const now = new Date();
@@ -240,14 +241,14 @@ export async function getInviteJobStatus(
   failedCount: number;
   skippedCount: number;
   language: 'he' | 'en';
-  failedItems: { email: string; lastError?: string }[];
+  failedItems: { email?: string; phone?: string; lastError?: string }[];
 }> {
   const db = await getMongoDb();
   const { memberInviteJobs, memberInviteJobItems } = getInviteJobCollections(db);
   const job = await memberInviteJobs.findOne({ jobId, tenantId });
   if (!job) throw createError('Invite job not found', 404);
   const failedItems = await memberInviteJobItems
-    .find({ jobId, status: 'failed' }, { projection: { email: 1, lastError: 1 } })
+    .find({ jobId, status: 'failed' }, { projection: { email: 1, phone: 1, lastError: 1 } })
     .limit(100)
     .toArray();
   return {
@@ -258,7 +259,12 @@ export async function getInviteJobStatus(
     failedCount: job.failedCount,
     skippedCount: job.skippedCount,
     language: job.language,
-    failedItems: failedItems.map((item) => ({ email: item.email, lastError: item.lastError })),
+    // Outreach items can be phone-only, so email is optional in failure rows.
+    failedItems: failedItems.map((item) => ({
+      email: item.email,
+      phone: 'phone' in item ? item.phone : undefined,
+      lastError: item.lastError,
+    })),
   };
 }
 

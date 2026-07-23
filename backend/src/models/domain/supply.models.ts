@@ -148,6 +148,23 @@ export const SKU_REGEX = /^[A-Z0-9_-]+$/;
  */
 export const OFFER_IMAGES_MAX = 6;
 
+/**
+ * Bounds + default for a voucher's `maxPayments` (how many credit-card payments
+ * a member may split the voucher purchase into). Voucher-only. Single source of
+ * truth for the route Zod schemas, service defaulting, and the backfill script.
+ * Keep in sync with the mirrored constants in the dashboard `src/lib/api.ts`.
+ */
+export const VOUCHER_PAYMENTS_MIN = 1;
+export const VOUCHER_PAYMENTS_MAX = 6;
+export const VOUCHER_PAYMENTS_DEFAULT = 1;
+
+/**
+ * Default platform fee percentage on a voucher offer's margin
+ * (face_value - nexus_cost). Baked into each variant's member_price at write
+ * time; editable per offer by platform admins only, range [0, 100].
+ */
+export const NEXUS_FEE_DEFAULT_PCT = 10;
+
 export type OfferStatus = typeof OFFER_STATUSES[number];
 export type OfferCategory = typeof OFFER_CATEGORIES[number];
 export type OfferAdoptionStatus = typeof OFFER_ADOPTION_STATUSES[number];
@@ -297,12 +314,38 @@ export const nexusOfferSchema = z.object({
    * `scripts/backfill-display-price.ts`.
    */
   displayPrice: z.number().nonnegative().optional(),
+  /**
+   * Plain-text mirror of `description` (HTML stripped), stamped on every write
+   * that touches the description. Search engines match against this field only
+   * (never the raw HTML). Absent on docs that predate the backfill.
+   */
+  descriptionText: z.string().max(10000).optional(),
+  /**
+   * BASE cashback range across the offer's priced variants, derived from
+   * face_value vs the fee-baked base member_price (integer percent, same
+   * formula the wallet renders). Recomputed wherever displayPrice recomputes;
+   * indexed for catalog cashback sorting. null = no variant yields cashback
+   * (non-vouchers / unpriced / price >= face); absent = pre-backfill doc.
+   * Per-tenant price overrides do NOT affect these - the member feed adjusts
+   * effective cashback at query time (see services/catalog-search).
+   */
+  cashbackMinPct: z.number().min(0).max(100).nullable().optional(),
+  cashbackMaxPct: z.number().min(0).max(100).nullable().optional(),
   /** Voucher face value (e.g. ₪100). Only applicable when executionType === 'voucher'. */
   face_value: z.number().positive().optional(),
   /** What the supplier charges Nexus. Stored only - never returned to adopting tenants or members. */
   nexus_cost: z.number().positive().optional(),
   /** What end customers pay. Must satisfy: nexus_cost <= member_price <= face_value. */
   member_price: z.number().positive().optional(),
+  /**
+   * Platform fee percentage taken from each variant's margin
+   * (face_value - nexus_cost). Voucher offers only. Never exposed to
+   * non-platform-admin callers. The fee-inflated price is BAKED into
+   * variant.member_price; this stores the intent for recompute + receipts.
+   * May be fractional: the admin picks a whole-shekel customer price and the
+   * pct is derived from it, e.g. (97-51)/(500-51) -> 10.24%.
+   */
+  nexusFeePct: z.number().min(0).max(100).optional(),
   /** Reason provided by platform admin when denying a voucher offer. Cleared on resubmit. */
   denial_reason: z.string().max(1000).optional(),
   status: z.enum(OFFER_STATUSES).default('active'),
@@ -340,6 +383,24 @@ export const nexusOfferSchema = z.object({
   /** Human-readable redemption instructions. */
   implementationInstructions: z.string().max(1000).optional().default(''),
   /**
+   * Optional https:// URL to a page listing the tenant's participating
+   * branches/locations for this voucher. Voucher-only; null for other offer
+   * types. Scheme is re-checked (https only, no http) at the route schema -
+   * this model-level check only requires a well-formed URL.
+   */
+  branchListUrl: z.string().url().nullable().optional(),
+  /**
+   * Optional https:// URL to the voucher's regulations page (תקנון).
+   * Voucher-only; null for other offer types. Same validation contract as
+   * branchListUrl: https-only enforced at the route schema, well-formed URL here.
+   */
+  regulationsUrl: z.string().url().nullable().optional(),
+  /**
+   * Optional https:// URL to the voucher's return policy page (מדיניות החזרות).
+   * Voucher-only; null for other offer types. Same contract as branchListUrl.
+   */
+  returnPolicyUrl: z.string().url().nullable().optional(),
+  /**
    * Spec OfferVersion.valid_from - the offer is hidden from member catalogs
    * until this date. null means the offer is live as soon as it is approved.
    */
@@ -374,6 +435,15 @@ export const nexusOfferSchema = z.object({
    * types. Uppercase alphanumeric + hyphen + underscore, length 4-20.
    */
   sku: z.string().min(SKU_MIN_LENGTH).max(SKU_MAX_LENGTH).regex(SKU_REGEX).nullable().optional(),
+  /**
+   * Maximum number of credit-card payments (installments) a member may split
+   * this voucher purchase into. Offer-level (applies to ALL variants).
+   * Voucher-only; null for other types. Mandatory for vouchers by enforcement:
+   * create/update always write a value (default VOUCHER_PAYMENTS_DEFAULT) and
+   * reads fall back to it, so a missing field (pre-backfill doc) reads as 1.
+   * Payment enforcement itself is future nexusWallet work.
+   */
+  maxPayments: z.number().int().min(VOUCHER_PAYMENTS_MIN).max(VOUCHER_PAYMENTS_MAX).nullable().optional(),
   /** Terms and conditions text. */
   terms: z.string().max(2000).optional().default(''),
   /** Display tags set by the offer creator (max 10, each max 50 chars). */

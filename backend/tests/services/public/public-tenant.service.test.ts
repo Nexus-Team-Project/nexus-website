@@ -19,6 +19,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.collection(DOMAIN_COLLECTIONS.domainTenants).deleteMany({});
   await db.collection(DOMAIN_COLLECTIONS.tenantServiceActivations).deleteMany({});
+  await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).deleteMany({});
 });
 
 async function seedTenant(tenantId: string, opts: { catalogActive: boolean; name?: string }) {
@@ -50,22 +51,84 @@ describe('getPublicTenantInfo', () => {
     expect(r).toEqual({ tenantId: 't_active', organizationName: 'Acme Co', logoUrl: undefined });
   });
 
-  it('returns null when benefits_catalog is not activated', async () => {
-    await seedTenant('t_no_catalog', { catalogActive: false });
-    expect(await getPublicTenantInfo(db, 't_no_catalog')).toBeNull();
+  it('returns tenant info even when benefits_catalog is not activated (2026-07-19: an ecosystem-offer creator/supplier need not run its own member catalog to be viewable)', async () => {
+    await seedTenant('t_no_catalog', { catalogActive: false, name: 'Supplier Co' });
+    const r = await getPublicTenantInfo(db, 't_no_catalog');
+    expect(r).toEqual({ tenantId: 't_no_catalog', organizationName: 'Supplier Co', logoUrl: undefined });
   });
 
   it('returns null for an unknown tenant', async () => {
     expect(await getPublicTenantInfo(db, 't_missing')).toBeNull();
   });
 
-  it('returns null when activation exists but status is suspended', async () => {
+  it('returns null for a suspended tenant', async () => {
     await seedTenant('t_susp', { catalogActive: false });
-    await db.collection(DOMAIN_COLLECTIONS.tenantServiceActivations).insertOne({
-      tenantServiceActivationId: 'act_susp', tenantId: 't_susp',
-      serviceKey: 'benefits_catalog', status: 'suspended',
+    await db.collection(DOMAIN_COLLECTIONS.domainTenants).updateOne(
+      { tenantId: 't_susp' }, { $set: { status: 'suspended' } },
+    );
+    expect(await getPublicTenantInfo(db, 't_susp')).toBeNull();
+  });
+
+  it('returns null for an archived tenant', async () => {
+    await seedTenant('t_archived', { catalogActive: false });
+    await db.collection(DOMAIN_COLLECTIONS.domainTenants).updateOne(
+      { tenantId: 't_archived' }, { $set: { status: 'archived' } },
+    );
+    expect(await getPublicTenantInfo(db, 't_archived')).toBeNull();
+  });
+
+  it('includes businessDescription from tenantProfiles when authored', async () => {
+    await seedTenant('t_desc', { catalogActive: true });
+    await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).insertOne({
+      tenantProfileId: 'tp_desc', tenantId: 't_desc',
+      businessDescription: 'Leading Israeli fashion brand for the whole family.',
+      selectedUseCases: [], createdAt: new Date(), updatedAt: new Date(),
+    });
+    const r = await getPublicTenantInfo(db, 't_desc');
+    expect(r?.businessDescription).toBe('Leading Israeli fashion brand for the whole family.');
+  });
+
+  it('omits businessDescription when the profile is missing or blank', async () => {
+    await seedTenant('t_nodesc', { catalogActive: true });
+    expect((await getPublicTenantInfo(db, 't_nodesc'))?.businessDescription).toBeUndefined();
+
+    await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).insertOne({
+      tenantProfileId: 'tp_blank', tenantId: 't_nodesc',
+      businessDescription: '   ', selectedUseCases: [],
       createdAt: new Date(), updatedAt: new Date(),
     });
-    expect(await getPublicTenantInfo(db, 't_susp')).toBeNull();
+    expect((await getPublicTenantInfo(db, 't_nodesc'))?.businessDescription).toBeUndefined();
+  });
+
+  it('returns the description for a described tenant without an active catalog (2026-07-19: no longer gated on it)', async () => {
+    await seedTenant('t_desc_gated', { catalogActive: false });
+    await db.collection(DOMAIN_COLLECTIONS.tenantProfiles).insertOne({
+      tenantProfileId: 'tp_gated', tenantId: 't_desc_gated',
+      businessDescription: 'Visible even without an active catalog.', selectedUseCases: [],
+      createdAt: new Date(), updatedAt: new Date(),
+    });
+    expect((await getPublicTenantInfo(db, 't_desc_gated'))?.businessDescription).toBe(
+      'Visible even without an active catalog.',
+    );
+  });
+});
+
+describe('getPublicTenantInfo cover images', () => {
+  it('exposes the ordered cover set for a catalog-active tenant', async () => {
+    await seedTenant('t_covers', { catalogActive: true });
+    const covers = [
+      { url: 'https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/1.jpg', crop: null },
+      { url: 'https://res.cloudinary.com/demo/image/upload/nexus/tenant-covers/2.jpg', crop: { x: 0, y: 0.2, width: 1, height: 0.6 } },
+    ];
+    await db.collection(DOMAIN_COLLECTIONS.domainTenants).updateOne(
+      { tenantId: 't_covers' }, { $set: { coverImages: covers } },
+    );
+    const r = await getPublicTenantInfo(db, 't_covers');
+    expect(r?.coverImages).toEqual(covers);
+  });
+
+  it('omits coverImages when the tenant has none', async () => {
+    await seedTenant('t_nocover', { catalogActive: true });
+    expect((await getPublicTenantInfo(db, 't_nocover'))?.coverImages).toBeUndefined();
   });
 });

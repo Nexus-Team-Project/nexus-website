@@ -12,6 +12,7 @@ import { createError } from '../middleware/errorHandler';
 import {
   getIdentityDomainCollections,
   getTenantDomainCollections,
+  SERVICE_KEYS,
   type TenantUserRoleName,
 } from '../models/domain';
 import type { InviteTenantMemberInput } from '../schemas/domain-member.schemas';
@@ -81,14 +82,13 @@ export async function createMemberInviteRecord(
     if (existingContact?.phone) invitePhone = existingContact.phone;
   }
 
-  const inviteHasNonMemberRole = input.roles.some((r) => r !== 'member');
-  if (inviteHasNonMemberRole) {
-    const alreadySeated = await identityAlreadyHoldsNonMemberSeat(
-      access.tenantId,
-      invitedIdentity.nexusIdentityId,
-    );
-    if (!alreadySeated) await assertSeatAvailable(access.tenantId, 1);
-  }
+  // Every invite is privileged now (member invites were removed 2026-07-15),
+  // so the seat check always applies when the identity is not already seated.
+  const alreadySeated = await identityAlreadyHoldsNonMemberSeat(
+    access.tenantId,
+    invitedIdentity.nexusIdentityId,
+  );
+  if (!alreadySeated) await assertSeatAvailable(access.tenantId, 1);
 
   const tenantMemberId = `tenant_member_${randomUUID()}`;
   await tenantCollections.tenantMembers.insertOne({
@@ -99,7 +99,8 @@ export async function createMemberInviteRecord(
     employeeId: input.employeeId,
     requireAdminApproval: false,
     customFields: input.customFields,
-    services: input.services ?? ['benefits_catalog'],
+    // Privileged staff get every service surface (decision 7, 2026-07-15).
+    services: [...SERVICE_KEYS],
     ...(invitePhone !== undefined && { phone: invitePhone }),
     createdAt: now,
     updatedAt: now,
@@ -165,7 +166,7 @@ export async function createMemberInviteRecord(
     normalizedEmail: invitedIdentity.normalizedEmail,
     roles: uniqueRoles,
     groupIds,
-    services: input.services ?? ['benefits_catalog'],
+    services: [...SERVICE_KEYS],
     ...(invitePhone !== undefined && { phone: invitePhone }),
     tokenHash: hashToken(rawToken),
     status: 'pending',
@@ -205,7 +206,7 @@ export async function createMemberInviteRecord(
     email: invitedIdentity.normalizedEmail,
     displayName: input.displayName,
     roles: uniqueRoles,
-    services: input.services ?? ['benefits_catalog'],
+    services: [...SERVICE_KEYS],
     groupIds,
     tenantName,
     rawToken,

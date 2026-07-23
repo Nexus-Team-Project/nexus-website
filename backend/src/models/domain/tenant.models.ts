@@ -71,6 +71,26 @@ export const logoCropSchema = z.object({
 });
 export type LogoCrop = z.infer<typeof logoCropSchema>;
 
+/** Hard cap on tenant cover-gallery size (owner decision 2026-07-17). */
+export const TENANT_COVER_IMAGES_MAX = 5;
+
+/**
+ * One tenant cover-gallery entry: the pristine Cloudinary original + its
+ * display-time crop (null = full image). Same pristine+crop pattern as the
+ * logo, but as an ordered array (the offer-page hero slideshow order).
+ */
+export const tenantCoverImageSchema = z.object({
+  url: z.string().url().max(2048),
+  crop: logoCropSchema.nullable(),
+  // Dominant palette of the PRISTINE image (up to 3 lowercase '#rrggbb', most
+  // common first, near-white/near-black filtered - see utils/dominant-color).
+  // Extracted by Cloudinary at upload time; powers the wallet store-tile
+  // bottom color fade. Absent on entries stored before 2026-07-20 until
+  // scripts/backfill-cover-colors.ts runs.
+  colors: z.array(z.string().regex(/^#[0-9a-f]{6}$/)).max(3).optional(),
+});
+export type TenantCoverImage = z.infer<typeof tenantCoverImageSchema>;
+
 /** Audit stamp for tenants created from the admin "Create & Manage Organizations" page. */
 export const tenantAdminCreatedSchema = z.object({
   /** Email of the NEXUS platform admin who created this tenant. */
@@ -96,17 +116,37 @@ export type TenantOwnerAssignment = z.infer<typeof tenantOwnerAssignmentSchema>;
 export const domainTenantSchema = z.object({
   tenantId: z.string().min(1),
   organizationName: z.string().min(1).max(255),
+  // MIRROR of tenantProfiles.businessDescription, kept in sync by the single
+  // profile write funnel (syncDomainTenantCoreDocs) so the catalog-search
+  // tenants_search Atlas index can cover name + description on ONE collection
+  // (M0 allows only 3 search indexes). Read tenantProfiles for the source of
+  // truth; this copy exists for search only. Backfilled by
+  // scripts/backfill-search-fields.ts.
+  businessDescription: z.string().max(2000).optional(),
   // Cloudinary URL of the organization logo (the PRISTINE original). Absent -> the
   // UI shows the tenant-name initials (only the Nexus ecosystem catalog uses Nexus logo).
   logoUrl: z.string().url().optional(),
   // Crop of the logo (normalized fractions), applied at display time. Absent/null =
   // show the full logo. Lets the crop be adjusted or reverted without re-upload.
   logoCrop: logoCropSchema.nullable().optional(),
+  // ORDERED cover-image gallery (max TENANT_COVER_IMAGES_MAX): each entry holds
+  // the PRISTINE Cloudinary original + a display-time crop (same fraction shape
+  // as the logo crop). Powers the wallet offer-page hero (index 0 first; >1
+  // entries loop as a slideshow). Absent/empty -> the wallet renders its
+  // placeholder. Only OUR re-hosted Cloudinary URLs are ever stored here.
+  coverImages: z.array(tenantCoverImageSchema).max(TENANT_COVER_IMAGES_MAX).optional(),
   // Organization brand color as a 6-digit hex (e.g. "#635bff"). This is the
   // accent color wallet members see the first time they sign in to this
   // tenant's benefits. Absent -> the wallet derives a deterministic color from
   // the tenantId so every tenant still looks distinct.
   brandColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  // Social-media HANDLES only (never a full URL/domain) - set from tenant
+  // settings, editable any time. The public tenant lookup builds the actual
+  // profile URL from OUR hardcoded per-platform domain + this handle, so a
+  // tenant can never store an arbitrary/malicious link under these labels.
+  instagramHandle: z.string().optional(),
+  facebookHandle: z.string().optional(),
+  twitterHandle: z.string().optional(),
   status: z.enum(TENANT_STATUSES),
   // Billing plan that controls how many non-member seats this tenant has.
   // Defaults to 'basic'. Updated manually in MongoDB until PayMe billing lands.
@@ -126,6 +166,15 @@ export const domainTenantSchema = z.object({
    * Absent on tenants created before this field = treated as false (not trusted).
    */
   autoApproveOffers: z.boolean().default(false),
+  /**
+   * When true (the default), offers uploaded by a NEXUS platform admin
+   * (ecosystem + uploadedByIdentityId) are automatically adopted into this
+   * tenant's catalog - both on future admin uploads and as a catch-up when the
+   * benefits catalog is activated or this flag is re-enabled. When false, no
+   * NEW auto-adoptions happen (already-adopted offers stay; the tenant removes
+   * them per offer). Absent on tenants created before this field = true.
+   */
+  autoAdoptAdminOffers: z.boolean().default(true),
   /**
    * NEXUS-admin approval of this tenant's business setup (Phase 2 M8). Absent =
    * never submitted. Set to 'pending' when business setup is submitted (or via
@@ -254,8 +303,9 @@ export const tenantMemberInvitationSchema = z.object({
 export const tenantContactSchema = z.object({
   tenantContactId: z.string().min(1),
   tenantId: z.string().min(1),
-  email: z.string().email(),
-  normalizedEmail: z.string().email(),
+  // Optional since members-service-invite s.4: a contact needs email OR phone.
+  email: z.string().email().optional(),
+  normalizedEmail: z.string().email().optional(),
   displayName: z.string().min(1).max(255),
   status: z.enum(TENANT_CONTACT_STATUSES),
   address: z.string().max(500).optional(),
@@ -265,6 +315,13 @@ export const tenantContactSchema = z.object({
   // True only when the member verified this number themselves (SMS / wallet OTP).
   // Tenant-entered or test-attached numbers are false.
   phoneVerified: z.boolean().optional(),
+  // Per-service outreach stamp, written by the outreach worker after at least
+  // one channel was delivered. Keyed by TenantServiceKey. Used to exclude
+  // already-invited contacts from the next outreach run and to render an
+  // "invited" badge in the dashboard Contacts tab.
+  serviceInvites: z
+    .record(z.object({ lastSentAt: z.date(), channels: z.array(z.enum(['sms', 'email'])) }))
+    .optional(),
   lastActivityAt: z.date().optional(),
   nexusIdentityId: z.string().optional(),
   // User-defined custom column values, keyed by the server-generated fieldId

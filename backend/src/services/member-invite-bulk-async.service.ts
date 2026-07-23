@@ -64,11 +64,10 @@ export async function enqueueBulkInviteAsync(
     deduped.push(row);
   }
 
-  // Seat check on deduped non-member rows - fixes the loose batch check the
-  // legacy sync route had.
-  const newNonMemberRows = deduped.filter((row) => row.roles.some((r) => r !== 'member')).length;
-  if (newNonMemberRows > 0) {
-    await assertSeatAvailable(access.tenantId, newNonMemberRows);
+  // Seat check on deduped rows - every invite is privileged now (member
+  // invites were removed 2026-07-15), so each deduped row needs a seat.
+  if (deduped.length > 0) {
+    await assertSeatAvailable(access.tenantId, deduped.length);
   }
 
   const itemInputs: EnqueueInviteJobItemInput[] = [];

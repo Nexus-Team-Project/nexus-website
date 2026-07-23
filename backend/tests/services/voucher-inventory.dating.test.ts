@@ -45,12 +45,26 @@ describe('getOfferVariantInventoryCounts', () => {
     await addBarcodes(OFFER, VARIANT, ['C1', 'C2', 'C3'], { validityValue: 1, validityUnit: 'years' });
     await addBarcodes(OFFER, 'var_other', ['C4'], { validityValue: 1, validityUnit: 'years' });
     await addBarcodes('offer_2', VARIANT, ['C5'], { validityValue: 1, validityUnit: 'years' });
-    const counts = await getOfferVariantInventoryCounts(OFFER);
+    const { counts, bought } = await getOfferVariantInventoryCounts(OFFER);
     expect(counts).toEqual({ [VARIANT]: 3, var_other: 1 });
+    expect(bought).toEqual({});
   });
 
-  it('returns an empty map for an offer with no units', async () => {
-    expect(await getOfferVariantInventoryCounts('offer_none')).toEqual({});
+  it('counts bought units (assigned + redeemed) separately from the total', async () => {
+    await addBarcodes(OFFER, VARIANT, ['B1', 'B2', 'B3', 'B4'], { validityValue: 1, validityUnit: 'years' });
+    await getVoucherCodeCollection(db).updateOne(
+      { offerId: OFFER, variantId: VARIANT, value: 'B1' }, { $set: { status: 'assigned' } },
+    );
+    await getVoucherCodeCollection(db).updateOne(
+      { offerId: OFFER, variantId: VARIANT, value: 'B2' }, { $set: { status: 'redeemed' } },
+    );
+    const { counts, bought } = await getOfferVariantInventoryCounts(OFFER);
+    expect(counts).toEqual({ [VARIANT]: 4 }); // total is every status
+    expect(bought).toEqual({ [VARIANT]: 2 }); // assigned + redeemed
+  });
+
+  it('returns empty maps for an offer with no units', async () => {
+    expect(await getOfferVariantInventoryCounts('offer_none')).toEqual({ counts: {}, bought: {} });
   });
 });
 

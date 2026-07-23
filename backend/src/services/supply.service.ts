@@ -14,6 +14,7 @@ import {
   getSupplyDomainCollections,
   deriveValueTypeFromExecutionType,
   NOT_DELETED,
+  NEXUS_FEE_DEFAULT_PCT,
   type NexusOffer,
   type OfferVariant,
   type OfferCategory,
@@ -31,7 +32,7 @@ import {
   lowestMemberPrice,
   type OfferVariantInput,
 } from './supply-variants.helper';
-import { defaultOfferImageUrl } from '../utils/cloudinary';
+import { defaultOfferImageUrl, uploadOfferImageFromUrl } from '../utils/cloudinary';
 import {
   assertStatusReasonProvided,
   resolveStatusReasonValue,
@@ -45,9 +46,12 @@ import {
   type ImageUploadFile,
 } from './supply-images.helper';
 import { computeDisplayPrice } from './supply-price.helper';
+import { offerSearchWriteFields } from './offer-search-fields.helper';
+import { resolveVoucherMaxPayments } from './supply-voucher.helper';
 import { isTenantAutoApprove } from './admin-tenants.service';
 import { getVoucherCodeCollection } from '../models/domain/voucher-codes.models';
 import { clampTenantVariantPricesToBounds, resetTenantPricesForChangedVariants } from './tenant-pricing.service';
+import { autoAdoptOfferForAllTenants } from './admin-offer-auto-adopt.service';
 
 // ---------------------------------------------------------------------------
 // Public input/output interfaces
@@ -75,6 +79,12 @@ export interface CreateOfferInput {
   implementationLink?: string | null;
   /** Human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Optional https:// link to a page listing participating branches. Voucher-only. */
+  branchListUrl?: string | null;
+  /** Optional https:// link to the voucher's regulations page (תקנון). Voucher-only. */
+  regulationsUrl?: string | null;
+  /** Optional https:// link to the voucher's return policy page (מדיניות החזרות). Voucher-only. */
+  returnPolicyUrl?: string | null;
   /** Offer goes live on this date. null means immediately available after approval. */
   validFrom?: Date | null;
   /** Offer expiry date. null means no expiry. Ignored for vouchers (forced null). */
@@ -88,6 +98,9 @@ export interface CreateOfferInput {
   voucherBackgroundColor?: string | null;
   /** Optional voucher SKU / internal company code. Voucher-only. */
   sku?: string | null;
+  /** Max credit-card payments for this voucher (offer-level). Voucher-only;
+   *  defaults to VOUCHER_PAYMENTS_DEFAULT when omitted. */
+  maxPayments?: number;
   /** Terms and conditions text. */
   terms?: string;
   /** Display tags set by the offer creator (max 10, each max 50 chars). */
@@ -126,6 +139,13 @@ export interface CreateOfferInput {
    * as metadata and applied at display time via Cloudinary transform URLs.
    */
   newImageCrops?: (ImageCrop | null)[];
+  /**
+   * URL-sourced images (route-validated http(s) only): each is RE-HOSTED via
+   * Cloudinary fetch-by-URL (Cloudinary downloads it, never this server) and
+   * appended to the gallery AFTER the uploaded files. Only the re-hosted
+   * Cloudinary URL is ever stored - the user's URL is never persisted.
+   */
+  remoteImages?: { url: string; crop: ImageCrop | null }[];
   /** MongoDB tenantId of the creator (derived from server-side auth, not browser). */
   createdByTenantId: string;
   /** MongoDB identityId of the authenticated user creating the offer. */
@@ -182,6 +202,12 @@ export interface UpdateOfferInput {
   implementationLink?: string | null;
   /** Updated human-readable redemption instructions. */
   implementationInstructions?: string;
+  /** Updated branch-list link. null clears it. Voucher-only. */
+  branchListUrl?: string | null;
+  /** Updated regulations link (תקנון). null clears it. Voucher-only. */
+  regulationsUrl?: string | null;
+  /** Updated return-policy link (מדיניות החזרות). null clears it. Voucher-only. */
+  returnPolicyUrl?: string | null;
   /** Updated offer go-live date. null clears the gate (immediately live). */
   validFrom?: Date | null;
   /** Updated offer expiry date. null clears the expiry. Ignored for vouchers (forced null). */
@@ -195,6 +221,8 @@ export interface UpdateOfferInput {
   voucherBackgroundColor?: string | null;
   /** Updated voucher SKU / internal company code. Voucher-only. */
   sku?: string | null;
+  /** Updated max credit-card payments (offer-level). Voucher-only. */
+  maxPayments?: number;
   /** Updated terms and conditions text. */
   terms?: string;
   /** Updated display tags. */
@@ -238,6 +266,12 @@ export interface UpdateOfferInput {
    * full image). Combined with `keptImageCrops` to rebuild the gallery's crops.
    */
   newImageCrops?: (ImageCrop | null)[];
+  /**
+   * URL-sourced images to append (route-validated http(s) only): re-hosted via
+   * Cloudinary fetch-by-URL and appended after uploaded files. Only the
+   * re-hosted Cloudinary URL is stored - the user's URL is never persisted.
+   */
+  remoteImages?: { url: string; crop: ImageCrop | null }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +290,31 @@ export interface UpdateOfferInput {
  * Output: Promise resolving to the persisted NexusOffer document.
  * Throws: on Cloudinary failure or MongoDB write error.
  */
+/**
+ * Re-hosts URL-sourced images and appends them (URLs + aligned crops) after
+ * the freshly-uploaded file URLs. Pads the file-crop list to the uploaded
+ * count first so the remote crops align correctly even when the caller sent
+ * no file crops. Shared by createOffer + updateOffer.
+ */
+async function appendRemoteImages(
+  uploaded: string[],
+  newImageCrops: (ImageCrop | null)[] | undefined,
+  remoteImages: { url: string; crop: ImageCrop | null }[] | undefined,
+): Promise<{ urls: string[]; crops: (ImageCrop | null)[] | undefined }> {
+  if (!remoteImages || remoteImages.length === 0) {
+    return { urls: uploaded, crops: newImageCrops };
+  }
+  const rehosted: string[] = [];
+  for (const remote of remoteImages) {
+    rehosted.push(await uploadOfferImageFromUrl(remote.url));
+  }
+  const paddedFileCrops = uploaded.map((_, index) => newImageCrops?.[index] ?? null);
+  return {
+    urls: [...uploaded, ...rehosted],
+    crops: [...paddedFileCrops, ...remoteImages.map((remote) => remote.crop)],
+  };
+}
+
 export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> {
   const db = await getMongoDb();
   const { nexusOffers } = getSupplyDomainCollections(db);
@@ -272,8 +331,14 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     imageUrls = input.imageUrls;
   } else {
     const uploaded = await uploadOfferImages(input.imageFiles ?? []);
-    imageUrls = uploaded.length > 0 ? uploaded : [defaultOfferImageUrl()];
-    imageCrops = reconcileImageCrops(imageUrls, uploaded, undefined, input.newImageCrops);
+    // URL-sourced images: re-host each via Cloudinary fetch-by-URL (route
+    // pre-validated http(s)), appended AFTER the uploaded files. Crops align
+    // per source list, so pad the file crops before appending remote crops.
+    const { urls: allNew, crops: allNewCrops } = await appendRemoteImages(
+      uploaded, input.newImageCrops, input.remoteImages,
+    );
+    imageUrls = allNew.length > 0 ? allNew : [defaultOfferImageUrl()];
+    imageCrops = reconcileImageCrops(imageUrls, allNew, undefined, allNewCrops);
   }
   const imageUrl = imageUrls[0];
 
@@ -290,8 +355,8 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     ? buildVoucherVariants(input.variants, {
         face_value: input.face_value,
         nexus_cost: input.nexus_cost,
-        // Default member_price to nexus_cost when omitted (per-variant); each
-        // adopting tenant later sets their own price via TenantOfferConfig.
+        // member_price here is only the legacy fallback for variants missing
+        // cost/face; priced variants get member_price DERIVED from the nexus fee.
         member_price: input.member_price,
         // Validity VALUE is per inventory unit, not the variant. The flat
         // single-variant inherits the offer's defaultValidityType (override null).
@@ -300,7 +365,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
         tags: input.tags,
         terms: input.terms,
         implementationInstructions: input.implementationInstructions,
-      })
+      }, NEXUS_FEE_DEFAULT_PCT)
     : undefined;
   const mirror = mirrorRepresentativeOntoOffer(voucherVariants);
 
@@ -329,6 +394,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
   const resolvedStackable = isVoucher ? (mirror.voucherStackable ?? null) : null;
   const resolvedBgColor = isVoucher ? (input.voucherBackgroundColor ?? null) : null;
   const resolvedSku = isVoucher ? (mirror.sku ?? null) : null;
+  const resolvedMaxPayments = resolveVoucherMaxPayments(isVoucher, input.maxPayments);
   const resolvedRedemptionScope = isVoucher ? (input.redemptionScope ?? 'shared') : 'shared';
   const resolvedDefaultValidityType = isVoucher ? (input.defaultValidityType ?? null) : null;
 
@@ -353,11 +419,22 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     category: input.category,
     market_price: input.market_price,
     ...(displayPrice !== undefined && { displayPrice }),
+    // Derived search fields: plain-text description mirror + base cashback
+    // range (see offer-search-fields.helper).
+    ...offerSearchWriteFields({
+      description: input.description,
+      variants: voucherVariants,
+      flatFaceValue: resolvedFaceValue,
+      flatMemberPrice: resolvedMemberPrice,
+    }),
     // Voucher pricing fields - only populated when executionType === 'voucher'
     // (mirrored from the representative variant).
     ...(resolvedFaceValue !== undefined && { face_value: resolvedFaceValue }),
     ...(resolvedNexusCost !== undefined && { nexus_cost: resolvedNexusCost }),
     ...(resolvedMemberPrice !== undefined && { member_price: resolvedMemberPrice }),
+    // Platform fee intent; the fee-inflated price is already baked into each
+    // variant's member_price above. Voucher-only.
+    ...(isVoucher && { nexusFeePct: NEXUS_FEE_DEFAULT_PCT }),
     status,
     visibility: input.visibility,
     executionType,
@@ -375,6 +452,11 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     // offer-level link, so implementationLink is never stored for vouchers.
     implementationLink: isVoucher ? null : (input.implementationLink ?? null),
     implementationInstructions: input.implementationInstructions ?? '',
+    // Branch list is the opposite of implementationLink: voucher-only.
+    branchListUrl: isVoucher ? (input.branchListUrl ?? null) : null,
+    // Regulations + return-policy links follow the same voucher-only gate.
+    regulationsUrl: isVoucher ? (input.regulationsUrl ?? null) : null,
+    returnPolicyUrl: isVoucher ? (input.returnPolicyUrl ?? null) : null,
     validFrom: resolvedValidFrom,
     validUntil: resolvedValidUntil,
     // Legacy parent validity mirror is no longer populated (per-unit now).
@@ -383,6 +465,7 @@ export async function createOffer(input: CreateOfferInput): Promise<NexusOffer> 
     voucherStackable: resolvedStackable,
     voucherBackgroundColor: resolvedBgColor,
     sku: resolvedSku,
+    maxPayments: resolvedMaxPayments,
     terms: input.terms ?? '',
     tags: resolvedTags,
     redemptionScope: resolvedRedemptionScope,
@@ -494,15 +577,20 @@ export async function updateOffer(
   // image without adding/removing/reordering). undefined = leave crops intact.
   let nextImageCrops: ImageCropEntry[] | undefined;
   const galleryTouched = input.keptImageUrls !== undefined
-    || (input.imageFiles && input.imageFiles.length > 0);
+    || (input.imageFiles && input.imageFiles.length > 0)
+    || (input.remoteImages && input.remoteImages.length > 0);
   const cropsTouched = input.keptImageCrops !== undefined || input.newImageCrops !== undefined;
   if (galleryTouched) {
     const uploaded = await uploadOfferImages(input.imageFiles ?? []);
+    // URL-sourced images re-host + append after the files (crops aligned).
+    const { urls: allNew, crops: allNewCrops } = await appendRemoteImages(
+      uploaded, input.newImageCrops, input.remoteImages,
+    );
     const kept = input.keptImageUrls ?? currentOffer.imageUrls ?? [];
     const { finalUrls, orphanedUrls } = reconcileImageUrls(
       currentOffer.imageUrls,
       kept,
-      uploaded,
+      allNew,
     );
     // Fire-and-forget orphan deletion: failure must not block the save.
     deleteOrphanedImages(orphanedUrls).catch((err) =>
@@ -512,9 +600,9 @@ export async function updateOffer(
     nextImageUrl = finalUrls[0] ?? defaultOfferImageUrl();
     nextImageCrops = reconcileImageCrops(
       finalUrls,
-      uploaded,
+      allNew,
       input.keptImageCrops ?? currentOffer.imageCrops,
-      input.newImageCrops,
+      allNewCrops,
     );
   } else if (cropsTouched) {
     // Crop-only edit: no URL/file change. Recompute against the existing gallery.
@@ -561,6 +649,7 @@ export async function updateOffer(
         ...(input.voucherStackable !== undefined && { voucherStackable: input.voucherStackable }),
         ...(input.voucherBackgroundColor !== undefined && { voucherBackgroundColor: input.voucherBackgroundColor }),
         ...(input.sku !== undefined && { sku: input.sku }),
+        ...(input.maxPayments !== undefined && { maxPayments: resolveVoucherMaxPayments(true, input.maxPayments) }),
       }
     : {
         ...(input.validFrom !== undefined && { validFrom: input.validFrom }),
@@ -571,6 +660,7 @@ export async function updateOffer(
         voucherStackable: null,
         voucherBackgroundColor: null,
         sku: null,
+        maxPayments: null,
       };
   const mergedMemberPrice =
     input.member_price !== undefined ? input.member_price : currentOffer.member_price;
@@ -605,7 +695,7 @@ export async function updateOffer(
       tags: input.tags,
       terms: input.terms,
       implementationInstructions: input.implementationInstructions,
-    });
+    }, currentOffer.nexusFeePct ?? NEXUS_FEE_DEFAULT_PCT);
     // Detect which variants had their sale price (nexus_cost) changed. A brand-new
     // variant (no stored match) counts as changed.
     const storedForPricing = new Map((currentOffer.variants ?? []).map((v) => [v.variantId, v]));
@@ -642,6 +732,11 @@ export async function updateOffer(
     // redemption); force it null when the merged type is voucher.
     ...(isVoucherUpdate && { implementationLink: null }),
     ...(input.implementationInstructions !== undefined && { implementationInstructions: input.implementationInstructions }),
+    ...(input.branchListUrl !== undefined && { branchListUrl: input.branchListUrl }),
+    ...(input.regulationsUrl !== undefined && { regulationsUrl: input.regulationsUrl }),
+    ...(input.returnPolicyUrl !== undefined && { returnPolicyUrl: input.returnPolicyUrl }),
+    // These links are voucher-only - force null when the merged type is not a voucher.
+    ...(!isVoucherUpdate && { branchListUrl: null, regulationsUrl: null, returnPolicyUrl: null }),
     // Voucher/non-voucher expiry + validity normalization (computed above).
     ...validityUpdate,
     ...(input.terms !== undefined && { terms: input.terms }),
@@ -678,10 +773,23 @@ export async function updateOffer(
     // Resubmit: clear denial and move to the resubmit target status (queue, or
     // live for a trusted tenant).
     ...(wasResubmitted && { status: resubmitStatus, denial_reason: '' }),
+    // Stamp the fee intent on voucher offers that predate the field (the bake
+    // above already used the default), so reads + the admin slider see it.
+    ...(isVoucherUpdate && currentOffer.nexusFeePct === undefined && { nexusFeePct: NEXUS_FEE_DEFAULT_PCT }),
     // Variant mirror + array win over the flat spreads above (voucher edit only).
     ...variantMirror,
     ...variantSet,
     ...(variantDisplayPrice !== undefined && { displayPrice: variantDisplayPrice }),
+    // Derived search fields recompute from the MERGED state (existing + patch):
+    // descriptionText only when the description changed; the base cashback
+    // range ALWAYS (cheap, idempotent - variant/price edits must never leave
+    // the stored range stale).
+    ...offerSearchWriteFields({
+      description: input.description,
+      variants: variantSet.variants ?? currentOffer.variants,
+      flatFaceValue: input.face_value ?? currentOffer.face_value,
+      flatMemberPrice: mergedMemberPrice,
+    }),
   };
 
   const result = await nexusOffers.findOneAndUpdate(
@@ -703,6 +811,19 @@ export async function updateOffer(
       await tenantOfferConfigs.deleteMany({ offerId, tenantId: currentOffer.createdByTenantId });
     } catch (err) {
       console.error('[SUPPLY] Old-owner config cleanup on reassignment failed:', err);
+    }
+  }
+
+  // Admin-offer auto-adopt: an admin flipping an ON-BEHALF offer (marked by
+  // uploadedByIdentityId) to ecosystem publishes it live, so fan it out to all
+  // eligible tenants' catalogs - same behavior as an on-behalf ecosystem
+  // create. Regular tenant offers (no uploadedByIdentityId) never auto-adopt.
+  // Best-effort: never fails the save.
+  if (visibilityChange && input.visibility === 'ecosystem' && result.uploadedByIdentityId) {
+    try {
+      await autoAdoptOfferForAllTenants(offerId);
+    } catch (err) {
+      console.error('[SUPPLY] Admin-offer auto-adopt fan-out failed:', err);
     }
   }
 
