@@ -28,6 +28,7 @@ import type { Db } from 'mongodb';
 import { DOMAIN_COLLECTIONS } from '../../models/domain/collections';
 import { NOT_DELETED } from '../../models/domain/supply.models';
 import { resolveMemberCatalogAccess } from '../catalog-member-gate.service';
+import { resolveEffectiveVariantTerms } from '../supply-variants.helper';
 
 export interface ResolvedPurchaseOffer {
   /** Tenant context used for pricing; null = ecosystem/default pricing. */
@@ -46,6 +47,10 @@ export interface ResolvedPurchaseOffer {
   /** Creator tenant display fields for purchase views ("NEXUS" when no tenant doc). */
   createdByTenantName: string;
   createdByTenantLogoUrl: string | null;
+  /** Effective redemption terms for the purchased variant (variant's own, else the offer's shared text). */
+  terms?: string;
+  /** Effective redemption method for the purchased variant. */
+  implementationInstructions?: string;
 }
 
 interface OfferDoc {
@@ -57,8 +62,16 @@ interface OfferDoc {
   createdByTenantId: string;
   validFrom?: Date | null;
   validUntil?: Date | null;
-  variants?: Array<{ variantId: string; face_value?: number; member_price?: number }>;
+  variants?: Array<{
+    variantId: string;
+    face_value?: number;
+    member_price?: number;
+    terms?: string;
+    implementationInstructions?: string;
+  }>;
   imageUrl?: string;
+  terms?: string;
+  implementationInstructions?: string;
 }
 
 /** Converts a shekel amount to integer agorot (90.5 -> 9050). */
@@ -130,6 +143,8 @@ export async function resolvePurchaseOffer(
     .collection<{ organizationName?: string; logoUrl?: string }>(DOMAIN_COLLECTIONS.domainTenants)
     .findOne({ tenantId: offer.createdByTenantId }, { projection: { organizationName: 1, logoUrl: 1 } });
 
+  const { terms, implementationInstructions } = resolveEffectiveVariantTerms(offer, variant);
+
   return {
     tenantId: args.tenantId,
     offerTitle: offer.title,
@@ -142,5 +157,7 @@ export async function resolvePurchaseOffer(
     createdByTenantId: offer.createdByTenantId,
     createdByTenantName: creator?.organizationName ?? 'NEXUS',
     createdByTenantLogoUrl: creator?.logoUrl ?? null,
+    terms,
+    implementationInstructions,
   };
 }

@@ -37,6 +37,7 @@ import { computeTenantDisplayPrice } from './supply-price.helper';
 import { getTenantDomainCollections } from '../models/domain';
 import type { LogoCrop, TenantCoverImage } from '../models/domain/tenant.models';
 import { uploaderFieldsFromTenant, type UploaderTenantDoc } from './catalog-uploader.helper';
+import { resolveEffectiveVariantTerms } from './supply-variants.helper';
 
 // ---------------------------------------------------------------------------
 // Public contract
@@ -353,13 +354,8 @@ export function toItem(
         // member_price (the selling price members see for this tenant).
         const effPrice = context.effectiveVariantPrices?.[v.variantId] ?? v.member_price;
         // Redemption text is surfaced PER VARIANT so each variant is
-        // self-contained: a variant's own (custom) text wins; otherwise it
-        // inherits the offer's shared terms/method. Storage stays normalized
-        // (inherited variants persist no terms) - this is a read-time fill only.
-        const effTerms = (v.terms && v.terms.trim()) ? v.terms : (offer.terms || undefined);
-        const effMethod = (v.implementationInstructions && v.implementationInstructions.trim())
-          ? v.implementationInstructions
-          : (offer.implementationInstructions || undefined);
+        // self-contained - see resolveEffectiveVariantTerms for the fallback rule.
+        const { terms: effTerms, implementationInstructions: effMethod } = resolveEffectiveVariantTerms(offer, v);
         return ({
         variantId: v.variantId,
         ...(v.face_value !== undefined && { face_value: v.face_value }),

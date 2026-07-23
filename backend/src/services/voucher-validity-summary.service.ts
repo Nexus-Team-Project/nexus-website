@@ -114,8 +114,16 @@ export async function getOfferVariantValiditySummaries(
         $group: {
           _id: {
             variantId: { $ifNull: ['$variantId', null] },
-            validFrom: { $ifNull: ['$validFrom', null] },
-            validUntil: { $ifNull: ['$validUntil', null] },
+            // A PURCHASE-stamped window (validityFilledAt set - purchase date
+            // + the limit recipe) is per-buyer noise here: ignore it so the
+            // unit keeps classifying by its recipe batch, exactly as before
+            // it was sold. Admin-authored windows pass through unchanged.
+            validFrom: {
+              $cond: [{ $ifNull: ['$validityFilledAt', false] }, null, { $ifNull: ['$validFrom', null] }],
+            },
+            validUntil: {
+              $cond: [{ $ifNull: ['$validityFilledAt', false] }, null, { $ifNull: ['$validUntil', null] }],
+            },
             validityValue: { $ifNull: ['$validityValue', null] },
             validityUnit: { $ifNull: ['$validityUnit', null] },
           },

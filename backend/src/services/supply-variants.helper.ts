@@ -214,3 +214,22 @@ export function lowestMemberPrice(variants: OfferVariant[] | undefined): number 
   const rep = representativeVariant(variants);
   return rep?.member_price;
 }
+
+/**
+ * Resolves the EFFECTIVE redemption terms/method for one variant: the
+ * variant's own (custom) text wins when non-blank, otherwise it inherits the
+ * offer's shared text. Storage stays normalized (inherited variants persist
+ * no terms) - this is a read-time fill only. Shared by every read site that
+ * needs a variant's effective redemption text (catalog reads, wallet purchase
+ * views) so the fallback rule lives in exactly one place.
+ */
+export function resolveEffectiveVariantTerms(
+  offer: { terms?: string; implementationInstructions?: string },
+  variant: { terms?: string; implementationInstructions?: string } | undefined,
+): { terms?: string; implementationInstructions?: string } {
+  const terms = (variant?.terms && variant.terms.trim()) ? variant.terms : (offer.terms || undefined);
+  const implementationInstructions = (variant?.implementationInstructions && variant.implementationInstructions.trim())
+    ? variant.implementationInstructions
+    : (offer.implementationInstructions || undefined);
+  return { terms, implementationInstructions };
+}

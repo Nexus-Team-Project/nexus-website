@@ -219,7 +219,9 @@ export async function createPurchase(args: {
         createdByTenantLogoUrl: offer.createdByTenantLogoUrl,
         faceValueAgorot: offer.faceValueAgorot,
         cardMask: card.cardMask,
-        vouchers: units.map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null })),
+        vouchers: units.map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null, validUntil: u.validUntil ? u.validUntil.toISOString() : null })),
+        terms: offer.terms,
+        implementationInstructions: offer.implementationInstructions,
       },
     );
   } catch (e) {

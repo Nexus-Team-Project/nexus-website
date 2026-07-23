@@ -61,8 +61,9 @@ export type VoucherCodeStatus = typeof VOUCHER_CODE_STATUSES[number];
  *     inventory time; `validityValue`/`validityUnit` are unused.
  *   - effective type `limit`: the admin authors `validityValue`/`validityUnit`
  *     (the "N units from purchase" recipe); `validFrom`/`validUntil` stay empty
- *     while `available` and are filled at purchase (purchase date + the limit) by
- *     the future redemption flow. Switching a variant's type never deletes the
+ *     while `available` and are FILLED AT PURCHASE (purchase date + the limit)
+ *     by the wallet purchase flow (purchase-inventory.helper claimUnits; marked
+ *     `validityFilledAt`). Switching a variant's type never deletes the
  *     other set - both may coexist on a unit, dormant until that type is active.
  * The unit's effective type is resolved from the parent/variant, not stored here.
  */
@@ -86,6 +87,15 @@ export const voucherCodeSchema = z.object({
   // The actual redeemable window (authored for from_until; purchase-filled for limit):
   validFrom: z.date().nullable().optional(),
   validUntil: z.date().nullable().optional(),
+  /**
+   * Set when the PURCHASE flow computed validFrom/validUntil from the unit's
+   * limit recipe (purchase date + duration). Distinguishes a purchase-stamped
+   * window from an admin-AUTHORED from_until window (a unit may carry dormant
+   * fields of both types), so releasing a failed purchase clears only stamped
+   * windows and the admin validity summary keeps classifying the unit by its
+   * recipe. Absent on authored windows and unsold units.
+   */
+  validityFilledAt: z.date().nullable().optional(),
   createdAt: z.date(),
   /** Last time the unit's validity was changed (set on create = createdAt, and on
    *  every validity edit). Optional so legacy units validate until first touched. */
@@ -116,6 +126,27 @@ export function mockBarcodeValue(index: number): string {
  */
 export function getVoucherCodeCollection(db: Db) {
   return db.collection<VoucherCode>(DOMAIN_COLLECTIONS.voucherCodes);
+}
+
+/**
+ * Adds a limit-recipe duration to a date with real calendar arithmetic
+ * (months/years roll via setMonth/setFullYear, not a fixed day count).
+ * Used by the purchase flow to turn "N months from purchase" into the
+ * unit's actual validUntil.
+ *
+ * Input:  from - the anchor date (purchase date); value/unit - the recipe.
+ * Output: a new Date, `value` units after `from` (input is not mutated).
+ */
+export function addValidityDuration(
+  from: Date,
+  value: number,
+  unit: typeof VOUCHER_VALIDITY_UNITS[number],
+): Date {
+  const result = new Date(from);
+  if (unit === 'days') result.setDate(result.getDate() + value);
+  else if (unit === 'months') result.setMonth(result.getMonth() + value);
+  else result.setFullYear(result.getFullYear() + value);
+  return result;
 }
 
 /**

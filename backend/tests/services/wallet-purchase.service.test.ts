@@ -112,7 +112,7 @@ describe('createPurchase - single unit', () => {
 
     expect(view.status).toBe('completed');
     expect(view.quantity).toBe(1);
-    expect(view.vouchers).toEqual([{ kind: 'barcode', value: 'BAR-v1-0', code: null }]);
+    expect(view.vouchers).toEqual([{ kind: 'barcode', value: 'BAR-v1-0', code: null, validUntil: null }]);
     expect(view.priceAgorot).toBe(10000); // face value 100 charged, not the 90 sale price
     expect(view.cashbackAgorot).toBe(1000); // 100 - 90 credited back
     expect(chargeMock.mock.calls[0][0].priceAgorot).toBe(10000);
@@ -222,5 +222,78 @@ describe('createPurchase - failure paths', () => {
     await expect(createPurchase({ ...PURCHASE_ARGS, cardId: 'not-mine' })).rejects.toThrow('card_not_found');
     expect(await db.collection(WALLET_PURCHASES_COLLECTION).countDocuments({})).toBe(0);
     expect(await db.collection(DOMAIN_COLLECTIONS.voucherCodes).countDocuments({ status: 'available' })).toBe(1);
+  });
+});
+
+describe('createPurchase - limit-recipe validity window fill', () => {
+  /** Insert one available limit-recipe unit (N months from purchase, no window). */
+  async function seedLimitUnit(codeId = 'unit_lim', months = 3): Promise<void> {
+    await db.collection(DOMAIN_COLLECTIONS.voucherCodes).insertOne({
+      codeId, offerId: OFFER, variantId: 'v1', kind: 'barcode', value: `BAR-${codeId}`,
+      status: 'available', validityValue: months, validityUnit: 'months', validFrom: null, validUntil: null,
+    });
+  }
+
+  it('stamps validFrom/validUntil (purchase date + recipe) on the claimed unit and exposes validUntil in the view', async () => {
+    await seedLimitUnit();
+    chargeOk();
+    const before = Date.now();
+    const view = await createPurchase(PURCHASE_ARGS);
+
+    const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit_lim' });
+    expect(unit!.validFrom).toBeInstanceOf(Date);
+    expect(unit!.validUntil).toBeInstanceOf(Date);
+    expect(unit!.validityFilledAt).toBeInstanceOf(Date);
+    const expectedUntil = new Date(before);
+    expectedUntil.setMonth(expectedUntil.getMonth() + 3);
+    // within a minute of "purchase moment + 3 months"
+    expect(Math.abs((unit!.validUntil as Date).getTime() - expectedUntil.getTime())).toBeLessThan(60_000);
+    expect(view.vouchers[0].validUntil).toBe((unit!.validUntil as Date).toISOString());
+  });
+
+  it('an admin-authored window is never overwritten by the fill', async () => {
+    const authoredUntil = new Date('2030-06-30T00:00:00Z');
+    await db.collection(DOMAIN_COLLECTIONS.voucherCodes).insertOne({
+      codeId: 'unit_win', offerId: OFFER, variantId: 'v1', kind: 'barcode', value: 'BAR-unit_win',
+      status: 'available', validityValue: 3, validityUnit: 'months',
+      validFrom: new Date('2026-01-01T00:00:00Z'), validUntil: authoredUntil,
+    });
+    chargeOk();
+    const view = await createPurchase(PURCHASE_ARGS);
+    const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit_win' });
+    expect((unit!.validUntil as Date).toISOString()).toBe(authoredUntil.toISOString());
+    expect(unit!.validityFilledAt ?? null).toBeNull();
+    expect(view.vouchers[0].validUntil).toBe(authoredUntil.toISOString());
+  });
+
+  it('a declined charge clears the stamped window so a later buyer gets fresh dates', async () => {
+    await seedLimitUnit();
+    chargeMock.mockRejectedValueOnce(new PaymeError('charge_failed', 'declined'));
+    await expect(createPurchase(PURCHASE_ARGS)).rejects.toThrow('card_declined');
+    const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit_lim' });
+    expect(unit!.status).toBe('available');
+    expect(unit!.validUntil ?? null).toBeNull();
+    expect(unit!.validityFilledAt ?? null).toBeNull();
+  });
+
+  it('listMyPurchases heals a limit unit sold before the fill existed (window from paidAt, persisted)', async () => {
+    await seedLimitUnit();
+    chargeOk();
+    await createPurchase(PURCHASE_ARGS);
+    // Simulate a pre-fill purchase: strip the stamped window from the sold unit.
+    await db.collection(DOMAIN_COLLECTIONS.voucherCodes).updateOne(
+      { codeId: 'unit_lim' },
+      { $unset: { validFrom: '', validUntil: '', validityFilledAt: '' } },
+    );
+
+    const mine = await listMyPurchases(IDENTITY);
+    const paidAt = new Date(mine[0].paidAt!);
+    const expectedUntil = new Date(paidAt);
+    expectedUntil.setMonth(expectedUntil.getMonth() + 3);
+    expect(mine[0].vouchers[0].validUntil).toBe(expectedUntil.toISOString());
+    // and the heal persisted the window for the admin inventory view
+    const unit = await db.collection(DOMAIN_COLLECTIONS.voucherCodes).findOne({ codeId: 'unit_lim' });
+    expect((unit!.validUntil as Date).toISOString()).toBe(expectedUntil.toISOString());
+    expect(unit!.validityFilledAt).toBeInstanceOf(Date);
   });
 });

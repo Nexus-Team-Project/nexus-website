@@ -12,7 +12,52 @@ import {
   type WalletPurchase,
 } from '../../models/payments/wallet-payments.models';
 import { NOT_DELETED } from '../../models/domain/supply.models';
+import { addValidityDuration } from '../../models/domain/voucher-codes.models';
+import { resolveEffectiveVariantTerms } from '../supply-variants.helper';
 import { toPurchaseView, type PurchaseView, type VoucherUnitDoc } from './purchase-view.helper';
+
+/**
+ * Heals limit-type units sold BEFORE the purchase-time window fill existed:
+ * a sold unit that still carries only its duration recipe gets its window
+ * computed from the owning purchase's payment date and persisted (marked
+ * validityFilledAt, same as the claim-time fill). Mutates the passed unit
+ * docs so the current response already shows the dates; persistence is
+ * best-effort - a write failure never fails the read.
+ */
+async function healMissingLimitWindows(
+  db: Awaited<ReturnType<typeof getMongoDb>>,
+  docs: WalletPurchase[],
+  unitMap: Map<string, VoucherUnitDoc>,
+): Promise<void> {
+  const fills: { codeId: string; validFrom: Date; validUntil: Date }[] = [];
+  for (const purchase of docs) {
+    const anchor = purchase.paidAt ?? purchase.createdAt;
+    for (const codeId of purchase.voucherCodeIds ?? []) {
+      const unit = unitMap.get(codeId);
+      if (!unit || unit.validUntil || !unit.validityValue || !unit.validityUnit) continue;
+      const validFrom = new Date(anchor);
+      const validUntil = addValidityDuration(validFrom, unit.validityValue, unit.validityUnit);
+      unit.validFrom = validFrom;
+      unit.validUntil = validUntil;
+      fills.push({ codeId, validFrom, validUntil });
+    }
+  }
+  if (fills.length === 0) return;
+  try {
+    const now = new Date();
+    await db.collection<VoucherUnitDoc>(DOMAIN_COLLECTIONS.voucherCodes).bulkWrite(
+      fills.map((f) => ({
+        updateOne: {
+          filter: { codeId: f.codeId },
+          update: { $set: { validFrom: f.validFrom, validUntil: f.validUntil, validityFilledAt: now, updatedAt: now } },
+        },
+      })),
+      { ordered: false },
+    );
+  } catch (e) {
+    console.error('[wallet-purchases] limit-window heal failed (response still shows computed dates):', e);
+  }
+}
 
 /**
  * Available (unclaimed) voucher-unit counts per variant for one offer, for the
@@ -58,7 +103,26 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   const [offers, units, cards] = await Promise.all([
     db.collection(DOMAIN_COLLECTIONS.nexusOffers)
       .find({ offerId: { $in: offerIds } })
-      .project<{ offerId: string; title: string; imageUrl?: string; createdByTenantId?: string; variants?: Array<{ variantId: string; face_value?: number }> }>({ offerId: 1, title: 1, imageUrl: 1, createdByTenantId: 1, 'variants.variantId': 1, 'variants.face_value': 1 })
+      .project<{
+        offerId: string;
+        title: string;
+        imageUrl?: string;
+        createdByTenantId?: string;
+        terms?: string;
+        implementationInstructions?: string;
+        variants?: Array<{ variantId: string; face_value?: number; terms?: string; implementationInstructions?: string }>;
+      }>({
+        offerId: 1,
+        title: 1,
+        imageUrl: 1,
+        createdByTenantId: 1,
+        terms: 1,
+        implementationInstructions: 1,
+        'variants.variantId': 1,
+        'variants.face_value': 1,
+        'variants.terms': 1,
+        'variants.implementationInstructions': 1,
+      })
       .toArray(),
     codeIds.length
       ? db.collection<VoucherUnitDoc>(DOMAIN_COLLECTIONS.voucherCodes).find({ codeId: { $in: codeIds } }).toArray()
@@ -71,6 +135,9 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
   const offerMap = new Map(offers.map((o) => [o.offerId, o]));
   const unitMap = new Map(units.map((u) => [u.codeId, u]));
   const cardMaskMap = new Map(cards.map((c) => [c.cardId, c.cardMask]));
+
+  // Backfill windows for limit units sold before the claim-time fill shipped.
+  await healMissingLimitWindows(db, docs, unitMap);
 
   // Batch-join the CREATOR tenants (logo + name for the receipt/flip-card
   // tile) in one query; a missing doc (NEXUS platform sentinel) reads NEXUS.
@@ -91,7 +158,10 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
     const vouchers = (d.voucherCodeIds ?? [])
       .map((id) => unitMap.get(id))
       .filter((u): u is VoucherUnitDoc => Boolean(u))
-      .map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null }));
+      .map((u) => ({ kind: u.kind, value: u.value, code: u.code ?? null, validUntil: u.validUntil ? u.validUntil.toISOString() : null }));
+    const { terms, implementationInstructions } = offer
+      ? resolveEffectiveVariantTerms(offer, variant)
+      : {};
     return toPurchaseView(d, {
       offerTitle: offer?.title ?? d.offerId,
       variantTitle: variant?.face_value !== undefined ? `₪${variant.face_value}` : d.variantId,
@@ -101,6 +171,8 @@ export async function listMyPurchases(identityId: string): Promise<PurchaseView[
       faceValueAgorot: variant?.face_value !== undefined ? Math.round(variant.face_value * 100) : null,
       cardMask: cardMaskMap.get(d.cardId) ?? null,
       vouchers,
+      terms,
+      implementationInstructions,
     });
   });
 }
