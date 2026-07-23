@@ -10,12 +10,13 @@ import {
 } from '../../src/services/monday-lead.service';
 
 describe('buildOneTapLeadMessage', () => {
-  it('includes the page when provided', () => {
-    expect(buildOneTapLeadMessage('/partners')).toBe('Google One Tap signup (page: /partners)');
+  it('leads with the email and includes the page when provided', () => {
+    expect(buildOneTapLeadMessage('new@user.com', '/partners'))
+      .toBe('new@user.com - Google One Tap signup (page: /partners)');
   });
 
   it('omits the page suffix when absent', () => {
-    expect(buildOneTapLeadMessage()).toBe('Google One Tap signup');
+    expect(buildOneTapLeadMessage('new@user.com')).toBe('new@user.com - Google One Tap signup');
   });
 });
 
@@ -24,9 +25,9 @@ describe('one tap lead column values', () => {
     const values = buildContactSalesColumnValues({
       email: 'new@user.com',
       name: 'New User',
-      message: buildOneTapLeadMessage('/he/partners'),
+      message: buildOneTapLeadMessage('new@user.com', '/he/partners'),
     });
-    expect(values['text_mkm03xx']).toBe('Google One Tap signup (page: /he/partners)');
+    expect(values['text_mkm03xx']).toBe('new@user.com - Google One Tap signup (page: /he/partners)');
     expect(values['email_mkm011dr']).toEqual({ email: 'new@user.com', text: 'new@user.com' });
     expect(values['status']).toEqual({ label: 'Unqualified' });
   });
