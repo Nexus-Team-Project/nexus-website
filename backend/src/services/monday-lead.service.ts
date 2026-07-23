@@ -279,12 +279,15 @@ export interface OneTapLeadInput {
 }
 
 /**
- * Builds the lead message shown in the Company column + item update.
+ * Builds the lead message shown in the Company column + item update. The
+ * email leads the text because some board views hide the Email column -
+ * sales must see who signed up directly in the table.
  * Pure - exported for unit testing.
- * Input: optional page path. Output: the message string.
+ * Input: lead email + optional page path. Output: the message string.
  */
-export function buildOneTapLeadMessage(page?: string): string {
-  return page ? `Google One Tap signup (page: ${page})` : 'Google One Tap signup';
+export function buildOneTapLeadMessage(email: string, page?: string): string {
+  const suffix = page ? ` (page: ${page})` : '';
+  return `${email} - Google One Tap signup${suffix}`;
 }
 
 /**
@@ -303,7 +306,7 @@ export async function createOneTapLead(input: OneTapLeadInput): Promise<void> {
     console.warn(`[monday-lead] MONDAY_API_TOKEN not set - skipping one-tap lead for ${input.email}`);
     return;
   }
-  const message = buildOneTapLeadMessage(input.page);
+  const message = buildOneTapLeadMessage(input.email, input.page);
   try {
     const itemId = await createWebsiteLeadsItem(
       input.fullName?.trim() || input.email,
