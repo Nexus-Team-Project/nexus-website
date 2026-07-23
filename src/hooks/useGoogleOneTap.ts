@@ -47,6 +47,10 @@ let initializedGisApi: GoogleIdApi | null = null;
  * Input: onSuppressed - called when the prompt cannot show (GIS not
  * initialized, Google cooldown after a dismissal, no browser session) so the
  * caller can fall back to the login page.
+ * FedCM reports both "never shown" and "user closed it" as skipped, so a
+ * timing heuristic separates them: suppression fires near-instantly, while a
+ * human seeing and closing the prompt takes seconds - and a deliberate close
+ * must NOT be treated as a fallback trigger.
  */
 export function promptGoogleOneTap(onSuppressed?: () => void): void {
   const idApi = initializedGisApi;
@@ -54,8 +58,10 @@ export function promptGoogleOneTap(onSuppressed?: () => void): void {
     onSuppressed?.();
     return;
   }
+  const startedAt = Date.now();
   idApi.prompt((notification) => {
-    if (notification.isNotDisplayed?.() || notification.isSkippedMoment?.()) {
+    const notShown = notification.isNotDisplayed?.() || notification.isSkippedMoment?.();
+    if (notShown && Date.now() - startedAt < 1500) {
       onSuppressed?.();
     }
   });
