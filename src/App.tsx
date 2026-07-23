@@ -7,7 +7,7 @@ import AccessibilityWidget from './components/AccessibilityWidget';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAuth } from './contexts/AuthContext';
 import { api } from './lib/api';
-import { clearOneTapSilentSession } from './lib/oneTapSilent';
+import { isOneTapSilentSession, clearOneTapSilentSession } from './lib/oneTapSilent';
 
 const ContactSalesButton = lazy(() => import('./components/ContactSalesButton'));
 const LiveChat            = lazy(() => import('./components/LiveChat'));
@@ -154,7 +154,8 @@ function GeoDetectHome() {
      * Output: dashboard handoff starts once when a user session exists.
      */
     const redirectAuthenticatedRoot = async () => {
-      if (isAuthLoading || !user || hasRedirectedDashboard.current) return;
+      // One Tap silent sessions stay on the website - no dashboard handoff.
+      if (isAuthLoading || !user || hasRedirectedDashboard.current || isOneTapSilentSession()) return;
       hasRedirectedDashboard.current = true;
 
       try {
@@ -202,7 +203,7 @@ function GeoDetectHome() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if ((isAuthLoading || (user && !redirectFailed)) || knownHe) return <PageLoader />;
+  if ((isAuthLoading || (user && !redirectFailed && !isOneTapSilentSession())) || knownHe) return <PageLoader />;
   return <Home />;
 }
 
@@ -223,7 +224,8 @@ function WebsiteHomeSessionGate({ children }: { children: ReactNode }) {
      * Output: dashboard navigation starts once when possible.
      */
     const redirectAuthenticatedHome = async () => {
-      if (isLoading || !user || hasRedirectedDashboard.current) return;
+      // One Tap silent sessions stay on the website - no dashboard handoff.
+      if (isLoading || !user || hasRedirectedDashboard.current || isOneTapSilentSession()) return;
       hasRedirectedDashboard.current = true;
 
       try {
@@ -237,7 +239,7 @@ function WebsiteHomeSessionGate({ children }: { children: ReactNode }) {
     void redirectAuthenticatedHome();
   }, [isLoading, user]);
 
-  if (isLoading || (user && !redirectFailed)) return <PageLoader />;
+  if (isLoading || (user && !redirectFailed && !isOneTapSilentSession())) return <PageLoader />;
   return <>{children}</>;
 }
 
