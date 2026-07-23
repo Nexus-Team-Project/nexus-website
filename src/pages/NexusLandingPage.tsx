@@ -1061,7 +1061,7 @@ function UseCasesSection() {
 
         <div
           ref={scrollRef}
-          className="flex gap-6 overflow-x-auto px-1 pt-3 pb-10 snap-x snap-mandatory"
+          className="flex gap-6 overflow-x-auto px-2 pt-6 pb-16 snap-x snap-mandatory"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
         >
           {useCases.map((useCase, i) => (
