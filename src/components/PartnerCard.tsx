@@ -1,5 +1,4 @@
 import { Lock } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { useLanguage } from '../i18n/LanguageContext';
 import BorderHighlightCard from './BorderHighlightCard';
 
@@ -24,7 +23,6 @@ interface PartnerCardProps {
 
 export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
   const { language } = useLanguage();
-  const loginTo = language === 'he' ? '/he/login' : '/login';
   const lockLabel = language === 'he' ? 'התחבר לצפייה בקאשבק' : 'Sign in to view cashback';
 
   return (
@@ -95,15 +93,11 @@ export default function PartnerCard({ partner, isLoggedIn }: PartnerCardProps) {
               <div className="flex items-center justify-center bg-slate-50 border border-slate-100 rounded-xl px-3 py-2 select-none">
                 <span className="text-slate-400 font-bold text-sm blur-[3px]">00% הנחה</span>
               </div>
-              <div className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-xl backdrop-blur-[0.5px] bg-white/60">
+              <div className="absolute inset-0 flex items-center justify-center gap-1.5 rounded-xl backdrop-blur-[0.5px] bg-white/60 select-none">
                 <Lock size={11} className="text-nx-primary shrink-0" />
-                <Link
-                  to={loginTo}
-                  className="text-[11px] font-semibold text-nx-primary hover:underline whitespace-nowrap"
-                  onClick={(e) => e.stopPropagation()}
-                >
+                <span className="text-[11px] font-semibold text-nx-primary whitespace-nowrap">
                   {lockLabel}
-                </Link>
+                </span>
               </div>
             </div>
           )}

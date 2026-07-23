@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
 import { useSEO } from '../hooks/useSEO';
 import { useGoogleOneTap } from '../hooks/useGoogleOneTap';
+import { useOneTapSilentFlag } from '../hooks/useOneTapSilentFlag';
 
 const Footer = lazy(() => import('../components/Footer'));
 
@@ -30,6 +31,9 @@ export default function PartnersPage() {
   // Google One Tap for logged-out visitors (silent session on tap).
   useGoogleOneTap();
   const isLoggedIn = !!user;
+  // Between the One Tap account pick and the authenticated refetch landing,
+  // keep the grid in its loading skeleton so cashback appears in one step.
+  const pendingOneTapLogin = useOneTapSilentFlag() && !isLoggedIn && !authLoading;
   const he = language === 'he';
 
   useSEO({
@@ -109,6 +113,10 @@ export default function PartnersPage() {
   }, [sorted, currentPage]);
 
   const signupLink = language === 'he' ? '/he/signup' : '/signup';
+  // One loading signal for the grid: initial/refetch load OR the One Tap
+  // login round-trip (so tapping an account shows a skeleton, not stale
+  // guest cards, until cashback values arrive).
+  const isBusy = loading || pendingOneTapLogin;
 
   return (
     <div dir={direction} className="min-h-screen bg-slate-100">
@@ -229,7 +237,7 @@ export default function PartnersPage() {
         )}
 
         {/* Loading skeleton */}
-        {loading && (
+        {isBusy && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="bg-white rounded-xl border border-slate-100 overflow-hidden animate-pulse">
@@ -245,7 +253,7 @@ export default function PartnersPage() {
         )}
 
         {/* No results */}
-        {!loading && sorted.length === 0 && (
+        {!isBusy && sorted.length === 0 && (
           <div className="text-center py-24">
             <p className="text-slate-500 text-lg font-medium mb-2">
               {pT?.noResults ?? (language === 'he' ? 'לא נמצאו תוצאות' : 'No results found')}
@@ -263,7 +271,7 @@ export default function PartnersPage() {
         )}
 
         {/* Grid */}
-        {!loading && sorted.length > 0 && (
+        {!isBusy && sorted.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {paginated.map((partner) => (
               <PartnerCard key={partner.id} partner={partner} isLoggedIn={isLoggedIn} />
@@ -272,7 +280,7 @@ export default function PartnersPage() {
         )}
 
         {/* Pagination */}
-        {!loading && totalPages > 1 && (
+        {!isBusy && totalPages > 1 && (
           <div className={`flex gap-2 justify-center mt-8 flex-wrap ${direction === 'rtl' ? 'flex-row-reverse' : ''}`}>
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <button
@@ -291,7 +299,7 @@ export default function PartnersPage() {
         )}
 
         {/* Guest CTA banner */}
-        {!isLoggedIn && !loading && sorted.length > 0 && (
+        {!isLoggedIn && !isBusy && sorted.length > 0 && (
           <div className="mt-12 bg-gradient-to-r from-nx-blue to-violet-900 rounded-2xl p-8 text-white text-center">
             <h2 className="text-xl font-bold mb-2">
               {language === 'he' ? 'הצטרפו לקהילת Nexus וגלו את כל ההטבות' : 'Join Nexus Community and unlock all benefits'}
