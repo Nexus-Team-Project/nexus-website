@@ -74,6 +74,13 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 
 const googleCodeRequests = new Map<string, Promise<GoogleAuthResponse>>();
 
+// The OAuth code whose post-exchange handling (redirect decision) already ran.
+// StrictMode mounts the effect twice: exchangeGoogleCodeOnce dedups the POST,
+// but BOTH .then chains fire - the second one must not run the redirect logic
+// again (it raced the first: consumed nothing and replaced the location with
+// the dashboard, overriding a website returnTo navigation).
+let handledGoogleCode: string | null = null;
+
 /**
  * Infers the active website language without depending on React context.
  * Input: current route, saved preference, and document language.
@@ -210,6 +217,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logAuthHandoff('Google callback detected; exchanging code');
       exchangeGoogleCodeOnce(code)
         .then(async (data) => {
+          // Redirect decision must run ONCE per code (see handledGoogleCode).
+          if (handledGoogleCode === code) return;
+          handledGoogleCode = code;
           const dashboardRedirect = getSavedGoogleDashboardRedirect();
           sessionStorage.removeItem('google_oauth_redirect');
           logAuthHandoff('Google exchange succeeded', {
